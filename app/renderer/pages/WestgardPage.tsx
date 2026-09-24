@@ -354,11 +354,11 @@ export function WestgardPage() {
         {view === 'current' && (
           <>
             <div className={`wg-test-picker${chartMode === 'lj' ? ' wg-test-picker-3' : ''}`}>
-              <div>
+              <div className="field">
                 <label>Tìm nhanh</label>
                 <input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value={query} onChange={(e) => setQuery(e.target.value)} />
               </div>
-              <div>
+              <div className="field">
                 <label>Chọn xét nghiệm <span id="wgTestCount" className="hint">({matchedTests.length}/{summaries.length})</span></label>
                 <select id="wgTestSelect" aria-label="Chọn xét nghiệm" disabled={!matchedTests.length} value={testId} onChange={(e) => setTestId(e.target.value)}>
                   {matchedTests.length

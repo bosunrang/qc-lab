@@ -423,7 +423,7 @@ export function ReagentPage() {
       <div className="panel rc-toolbar-panel">
         <h2 className="panel-title">Thiết lập so sánh</h2>
         <div className="rc-toolbar">
-          <div className="rc-toolbar-selcol">
+          <div className="field rc-toolbar-selcol">
             <label>Chọn hóa chất</label>
             <select id="rcSel" aria-label="Chọn hóa chất" value={current.id} onChange={(e) => setCurrentId(e.target.value)}>
               {store.comparisons.map((c) => <option key={c.id} value={c.id}>{comparisonLabel(c)}</option>)}
@@ -447,15 +447,15 @@ export function ReagentPage() {
         <div className="panel rc-info-panel">
           <h2 className="panel-title">Thông tin đánh giá</h2>
           <div className="rc-info-grid">
-            <div className="rc-field"><label>Tên hóa chất</label><input {...wp} defaultValue={current.reagent} placeholder="Tên hóa chất / xét nghiệm" onBlur={(e) => meta({ reagent: e.target.value })} /></div>
-            <div className="rc-field"><label>Đơn vị</label><input {...wp} defaultValue={current.unit} placeholder="mmol/L..." onBlur={(e) => meta({ unit: e.target.value })} /></div>
-            <div className="rc-field"><label>Số lô cũ</label><input {...wp} aria-label="Số lô cũ" defaultValue={current.lot_old} onBlur={(e) => meta({ lotOld: e.target.value })} /></div>
-            <div className="rc-field"><label>Số lô mới</label><input {...wp} aria-label="Số lô mới" defaultValue={current.lot_new} onBlur={(e) => meta({ lotNew: e.target.value })} /></div>
-            <div className="rc-field rc-date-field">
+            <div className="field rc-field"><label>Tên hóa chất</label><input {...wp} defaultValue={current.reagent} placeholder="Tên hóa chất / xét nghiệm" onBlur={(e) => meta({ reagent: e.target.value })} /></div>
+            <div className="field rc-field"><label>Đơn vị</label><input {...wp} defaultValue={current.unit} placeholder="mmol/L..." onBlur={(e) => meta({ unit: e.target.value })} /></div>
+            <div className="field rc-field"><label>Số lô cũ</label><input {...wp} aria-label="Số lô cũ" defaultValue={current.lot_old} onBlur={(e) => meta({ lotOld: e.target.value })} /></div>
+            <div className="field rc-field"><label>Số lô mới</label><input {...wp} aria-label="Số lô mới" defaultValue={current.lot_new} onBlur={(e) => meta({ lotNew: e.target.value })} /></div>
+            <div className="field rc-field rc-date-field">
               <label>Ngày thực hiện</label>
               <DateField value={current.date} disabled={!writable} onChange={(v) => meta({ date: v })} />
             </div>
-            <div className="rc-field">
+            <div className="field rc-field">
               <label>Người thực hiện</label>
               <div className="rc-quick-field">
                 {/* `key` bắt ô nhập remount khi giá trị đổi từ modal "Chọn nhanh"
@@ -465,16 +465,16 @@ export function ReagentPage() {
                 <button type="button" className="rc-icon-btn" disabled={!writable} onClick={() => setQuickType('operator')} title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện"><ReagentToolIcon type="user" /></button>
               </div>
             </div>
-            <div className="rc-field">
+            <div className="field rc-field">
               <label>Loại mẫu</label>
               <div className="rc-quick-field">
                 <input {...wp} key={current.sample_type} defaultValue={current.sample_type} placeholder="Loại mẫu" onBlur={(e) => meta({ sampleType: e.target.value })} />
                 <button type="button" className="rc-icon-btn" disabled={!writable} onClick={() => setQuickType('sampleType')} title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu"><ReagentToolIcon type="sample" /></button>
               </div>
             </div>
-            <div className="rc-field"><label>Bias mong muốn (%)</label><input {...wp} aria-label="Bias mong muốn (%)" type="number" step="any" defaultValue={current.bias_target ?? 6} onBlur={(e) => meta({ biasTarget: Number(e.target.value) })} /></div>
-            <div className="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input {...wp} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" defaultValue={current.alpha ?? 0.05} onBlur={(e) => meta({ alpha: Number(e.target.value) })} /></div>
-            <div className="rc-field rc-coverage-cell">
+            <div className="field rc-field"><label>Bias mong muốn (%)</label><input {...wp} aria-label="Bias mong muốn (%)" type="number" step="any" defaultValue={current.bias_target ?? 6} onBlur={(e) => meta({ biasTarget: Number(e.target.value) })} /></div>
+            <div className="field rc-field"><label>Mức ý nghĩa (α, alpha)</label><input {...wp} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" defaultValue={current.alpha ?? 0.05} onBlur={(e) => meta({ alpha: Number(e.target.value) })} /></div>
+            <div className="field rc-field rc-coverage-cell">
               <label className="rc-coverage-check">
                 <input {...wp} type="checkbox" defaultChecked={!!current.coverage_confirmed} onChange={(e) => meta({ coverageConfirmed: e.target.checked })} />
                 <span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span>

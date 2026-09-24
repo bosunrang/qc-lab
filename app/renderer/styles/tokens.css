@@ -122,8 +122,8 @@
 
   /* Cỡ chữ: 8 bậc, SỐ NGUYÊN, gốc 14px cho app dữ liệu dày. */
   --text-2xs:11px;   /* overline, mã, badge rất nhỏ */
-  --text-xs:12px;    /* caption, nhãn form, header cột bảng */
-  --text-sm:13px;    /* chữ phụ, thân bảng */
+  --text-xs:12px;    /* caption, badge, chú thích nhỏ */
+  --text-sm:13px;    /* chữ phụ, thân bảng, header cột bảng, nhãn form */
   --text-base:14px;  /* thân chữ, control, nút */
   --text-md:16px;    /* tiêu đề panel */
   --text-lg:20px;    /* tiêu đề modal/dialog */
@@ -334,7 +334,11 @@
   --table-head-tracking-sm:var(--table-head-tracking);
 
   --modal-padding:var(--space-5);
-  --field-label-gap:var(--space-1);
+  /* Khoảng cách nhãn → ô nhập. Là NGUỒN DUY NHẤT: chỉ `margin-bottom` của
+     nhãn mang giá trị này; khối `.field` bao quanh không dùng `gap` chen
+     giữa. Trước 2026-09-24 có nơi 4px (margin nhãn), nơi 6px (gap khối),
+     nơi 10px (gap + margin cộng dồn), nơi 20px (gap lưới + margin). */
+  --field-label-gap:var(--space-1-5);
   --form-row-gap:var(--space-3);
   --toolbar-gap:var(--space-2);
   --page-header-gap:var(--space-6);

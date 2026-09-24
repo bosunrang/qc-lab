@@ -97,7 +97,7 @@ export function AuditPage() {
         <div className="audit-filterbar">
           <DateField label="Từ ngày" className="audit-date" value={from} onChange={(v) => setRange(v, to)} />
           <DateField label="Đến ngày" className="audit-date" value={to} onChange={(v) => setRange(from, v)} />
-          <div><label>Số dòng mỗi trang</label>
+          <div className="field"><label>Số dòng mỗi trang</label>
             <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
               <option value={25}>25 dòng</option><option value={50}>50 dòng</option><option value={100}>100 dòng</option>
             </select>

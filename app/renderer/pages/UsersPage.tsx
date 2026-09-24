@@ -86,11 +86,11 @@ function CreatePanel() {
         <div className="user-create-card">
           <div className="user-create-card-title">Thông tin tài khoản</div>
           <div className="user-create-fields">
-            <div><label htmlFor="uUser">Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-            <div><label htmlFor="uName">Họ tên</label><input id="uName" aria-label="Họ tên" value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <div><label htmlFor="uInitials">Mã viết tắt</label><input id="uInitials" readOnly placeholder="NTL" value={initialsFromName(name)} title="Tự động lấy chữ cái đầu của họ tên" /></div>
-            <div><label htmlFor="uRole">Vai trò</label><RoleSelect id="uRole" value={role} onChange={changeRole} /></div>
-            <div><label htmlFor="uPass">Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            <div className="field"><label htmlFor="uUser">Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+            <div className="field"><label htmlFor="uName">Họ tên</label><input id="uName" aria-label="Họ tên" value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div className="field"><label htmlFor="uInitials">Mã viết tắt</label><input id="uInitials" readOnly placeholder="NTL" value={initialsFromName(name)} title="Tự động lấy chữ cái đầu của họ tên" /></div>
+            <div className="field"><label htmlFor="uRole">Vai trò</label><RoleSelect id="uRole" value={role} onChange={changeRole} /></div>
+            <div className="field"><label htmlFor="uPass">Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
             <div className="user-create-actions"><button className="btn teal" onClick={submit}>Thêm</button></div>
           </div>
         </div>

@@ -294,9 +294,9 @@ export function SettingsPage() {
         <div className="panel">
           <h2 className="panel-title">Thông tin đơn vị</h2>
           <div className="settings-unit-fields">
-            <div><label htmlFor="labName">Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <div><label htmlFor="labDept">Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value={dept} onChange={(e) => setDept(e.target.value)} /></div>
-            <div><label htmlFor="labAddr">Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+            <div className="field"><label htmlFor="labName">Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div className="field"><label htmlFor="labDept">Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value={dept} onChange={(e) => setDept(e.target.value)} /></div>
+            <div className="field"><label htmlFor="labAddr">Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" value={address} onChange={(e) => setAddress(e.target.value)} /></div>
           </div>
           <div className="settings-panel-actions"><button className="btn teal" onClick={submit}>Lưu thông tin</button></div>
         </div>
@@ -305,23 +305,27 @@ export function SettingsPage() {
           <h2 className="panel-title">Logo &amp; tên phần mềm</h2>
           <div className="grid2">
             <div className="settings-brand-fields">
-              <div><label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} /></div>
-              <div><label htmlFor="brandSub">Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value={brandSub} onChange={(e) => setBrandSub(e.target.value)} /></div>
-              <div><label htmlFor="logoText">Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxLength={4} value={logoText} onChange={(e) => setLogoText(e.target.value)} /></div>
+              <div className="field"><label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} /></div>
+              <div className="field"><label htmlFor="brandSub">Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value={brandSub} onChange={(e) => setBrandSub(e.target.value)} /></div>
+              <div className="field"><label htmlFor="logoText">Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxLength={4} value={logoText} onChange={(e) => setLogoText(e.target.value)} /></div>
             </div>
-            <div>
-              <label>Logo hiện tại</label>
-              <div className="brand-preview">
-                <div className="brand-mark">{currentLogo ? <img src={currentLogo} alt="" /> : (logoText || 'QC')}</div>
-                <div><b>{brandTitle}</b><small>{brandSub}</small></div>
+            <div className="settings-logo-fields">
+              <div className="field">
+                <label>Logo hiện tại</label>
+                <div className="brand-preview">
+                  <div className="brand-mark">{currentLogo ? <img src={currentLogo} alt="" /> : (logoText || 'QC')}</div>
+                  <div><b>{brandTitle}</b><small>{brandSub}</small></div>
+                </div>
               </div>
-              <label>Chọn ảnh logo</label>
-              <div className="file-pick">
-                <button type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>Chọn tệp</button>
-                <span id="logoFileName" className="hint">{logoFileName || 'Chưa chọn tệp'}</span>
+              <div className="field">
+                <label>Chọn ảnh logo</label>
+                <div className="file-pick">
+                  <button type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>Chọn tệp</button>
+                  <span id="logoFileName" className="hint">{logoFileName || 'Chưa chọn tệp'}</span>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickLogo} />
+                <div className="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickLogo} />
-              <div className="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
             </div>
           </div>
           <div className="settings-panel-actions">
@@ -358,12 +362,14 @@ export function SettingsPage() {
           <h2 className="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
           <div className="firebase-body">
             <div className="firebase-auth-grid">
-              <div><label htmlFor="fbCode">Mã phòng</label><input id="fbCode" value={fbCode} onChange={(e) => setFbCode(e.target.value)} /></div>
-              <div><label htmlFor="fbEmail">Email Firebase Authentication</label><input id="fbEmail" type="email" autoComplete="username" value={fbEmail} onChange={(e) => setFbEmail(e.target.value)} /></div>
-              <div><label htmlFor="fbPassword">Mật khẩu Firebase</label><input id="fbPassword" type="password" autoComplete="current-password" value={fbPassword} onChange={(e) => setFbPassword(e.target.value)} placeholder="Chỉ dùng để đăng nhập, không lưu" /></div>
+              <div className="field"><label htmlFor="fbCode">Mã phòng</label><input id="fbCode" value={fbCode} onChange={(e) => setFbCode(e.target.value)} /></div>
+              <div className="field"><label htmlFor="fbEmail">Email Firebase Authentication</label><input id="fbEmail" type="email" autoComplete="username" value={fbEmail} onChange={(e) => setFbEmail(e.target.value)} /></div>
+              <div className="field"><label htmlFor="fbPassword">Mật khẩu Firebase</label><input id="fbPassword" type="password" autoComplete="current-password" value={fbPassword} onChange={(e) => setFbPassword(e.target.value)} placeholder="Chỉ dùng để đăng nhập, không lưu" /></div>
             </div>
-            <label htmlFor="fbConfig">Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
-            <textarea id="fbConfig" className="firebase-config-input" value={fbConfig} onChange={(e) => setFbConfig(e.target.value)} placeholder={FIREBASE_CONFIG_PLACEHOLDER} />
+            <div className="field">
+              <label htmlFor="fbConfig">Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
+              <textarea id="fbConfig" className="firebase-config-input" value={fbConfig} onChange={(e) => setFbConfig(e.target.value)} placeholder={FIREBASE_CONFIG_PLACEHOLDER} />
+            </div>
             <div className={`alert${firebase?.connected ? ' ok' : ''}`}>{firebase?.status || 'Chưa kết nối'} · {firebase?.dataPath || 'qclab-shared/{mã-phòng}'}</div>
           </div>
           <div className="firebase-actions settings-panel-actions">
@@ -376,8 +382,8 @@ export function SettingsPage() {
           <h2 className="panel-title">LIS Gateway (thử nghiệm)</h2>
           <div className="lis-gateway-body">
             <div className="lis-gateway-grid">
-              <div><label htmlFor="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value={lisUrl} onChange={(e) => setLisUrl(e.target.value)} placeholder="http://127.0.0.1:8787" /></div>
-              <div><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Dán token in ra khi chạy npm run lis:gateway" /></div>
+              <div className="field"><label htmlFor="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value={lisUrl} onChange={(e) => setLisUrl(e.target.value)} placeholder="http://127.0.0.1:8787" /></div>
+              <div className="field"><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Dán token in ra khi chạy npm run lis:gateway" /></div>
               <label className="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" checked={lisEnabled} onChange={(e) => setLisEnabled(e.target.checked)} /><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label>
             </div>
             <div id="lisGatewayStatus" className={`alert lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>

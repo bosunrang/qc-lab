@@ -236,10 +236,10 @@ test('nhãn đứng trên control dùng thang form chung', () => {
   const reagent = readFileSync(join(STYLE_DIR, 'pages', 'reagent.css'), 'utf8');
   const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
 
-  assert.match(appCss, /label\{[^}]*font-size:var\(--text-xs\)[^}]*color:var\(--text-secondary\)[^}]*font-weight:var\(--weight-semibold\);\}/,
-    'nhãn field toàn app dùng token 12px/600/màu phụ');
-  assert.match(settings, /\.settings-unit-fields label,[\s\S]*?\{\s*margin:0;\s*\}/,
-    'Cài đặt chỉ chỉnh nhịp label, không tự đổi thang chữ');
+  assert.match(appCss, /label\{[^}]*font-size:var\(--text-sm\)[^}]*color:var\(--text-secondary\)[^}]*font-weight:var\(--weight-semibold\);\}/,
+    'nhãn field toàn app dùng token 13px/600/màu phụ — 12px làm dấu tiếng Việt chồng lên nhau khó đọc');
+  assert.match(settings, /\.settings-unit-fields label,[\s\S]*?\{\s*margin-top:0;\s*\}/,
+    'Cài đặt chỉ chỉnh nhịp giữa các field, không đổi thang chữ hay khoảng nhãn → ô');
   assert.match(reagent, /\.rc-field label\s*\{\s*display:\s*block;\s*margin:\s*0 0 var\(--field-label-gap\);\s*\}/,
     'nhãn field So sánh hóa chất dùng khoảng cách chuẩn');
   assert.doesNotMatch(reagent, /\.rc-field label,.rc-toolbar-selcol label\{[^}]*font-size/,
@@ -264,7 +264,7 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
     'tên xét nghiệm đã thể hiện ở selector, không lặp lại ở trường chỉ đọc');
   assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row\{display:grid;grid-template-columns:minmax\(0,1fr\) 118px minmax\(0,1fr\);/,
     'chọn xét nghiệm, đơn vị và thiết bị dùng chung một hàng');
-  assert.match(sigmaPage, /<div className="sg-unit-field"><label>Đơn vị<\/label>/,
+  assert.match(sigmaPage, /<div className="field sg-unit-field"><label>Đơn vị<\/label>/,
     'đơn vị nằm trong hàng nhận diện xét nghiệm');
   assert.match(sigmaPage, /const sigmaTestLabel = \(item: typeof tests\[number\]\) => \{[\s\S]*?item\.instrument_id[\s\S]*?`\$\{item\.name\} — \$\{machine\}`/,
     'lựa chọn Sigma nêu cả máy khi một xét nghiệm có nhiều cấu hình máy');
@@ -654,4 +654,96 @@ test('chiều cao control và hàng bảng nằm trên thang, không tự đặt
     }
   }
   assert.deepEqual(raw, [], 'dùng --control-h-sm/-compact/--control-h, --table-row-h-compact/--table-row-h/-input hoặc --panel-header-min-height');
+});
+
+// Khoảng cách nhãn → ô nhập từng đến từ ba nguồn cộng dồn tuỳ trang: margin
+// đáy của nhãn (4px), `gap` của khối bao (6px ở Cài đặt, 6 + 4 = 10px ở bộ
+// chọn So sánh hoá chất) và `gap` của lưới cha khi nhãn đứng thẳng trong lưới
+// (16 + 4 = 20px ở cấu hình Firebase). Luật: một nguồn duy nhất.
+test('nhãn → ô nhập: một khoảng cách, một nguồn, trong khối .field', () => {
+  assert.equal(flat('--field-label-gap'), '6px');
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(app, /(?:^|\})\s*label\{[^}]*margin:[^;]*\s0\svar\(--field-label-gap\);/, 'nhãn chuẩn mang khoảng cách qua margin đáy');
+  assert.match(app, /label\.field>span:first-child\{[^}]*margin-bottom:var\(--field-label-gap\)/, 'kiểu nhãn bọc control dùng cùng khoảng cách');
+
+  // 1) Mọi nhãn đứng ngay trước control phải nằm trong khối có class `field`.
+  const RENDERER = join(ROOT, 'renderer');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const CONTROL = /^<(input|select|textarea|DateField)\b/;
+  const outside = [];
+  const wrapperClasses = new Set(['field']);
+  for (const file of tsxFiles(RENDERER)) {
+    const src = readFileSync(file, 'utf8');
+    const stack = [];
+    let label = null;
+    const tagRe = /<\/?([A-Za-z][\w.]*)((?:[^>"'{}]|"[^"]*"|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\})*?)(\/?)>/g;
+    for (let m; (m = tagRe.exec(src));) {
+      const [whole, name, attrs, selfClose] = m;
+      if (whole.startsWith('</')) {
+        const i = stack.map((s) => s.name).lastIndexOf(name);
+        if (i >= 0) stack.length = i;
+        if (name === 'label' && label && !label.wraps && CONTROL.test(src.slice(tagRe.lastIndex).trimStart())) {
+          const parent = stack[stack.length - 1];
+          const classes = (parent?.cls || '').split(/\s+/).filter(Boolean);
+          if (classes.includes('field')) classes.forEach((c) => wrapperClasses.add(c));
+          else outside.push(`${relative(ROOT, file)}:${src.slice(0, m.index).split('\n').length} <${parent?.name || '?'} class="${parent?.cls || ''}">`);
+        }
+        continue;
+      }
+      const cls = (attrs.match(/className="([^"]*)"/) || attrs.match(/className=\{`([^`]*)`\}/) || [])[1] || '';
+      if (name === 'label') {
+        const end = src.indexOf('</label>', tagRe.lastIndex);
+        label = { wraps: /<(input|select|textarea)\b/.test(end >= 0 ? src.slice(tagRe.lastIndex, end) : '') };
+      }
+      if (!selfClose && !['input', 'img', 'br', 'hr'].includes(name)) stack.push({ name, cls });
+    }
+  }
+  assert.deepEqual(outside, [], 'bọc nhãn + control trong <div className="field"> (thêm lớp riêng bên cạnh nếu cần)');
+
+  // 2) CSS trang không đổi margin đáy của nhãn trong khối field, và khối field
+  //    không dùng gap chen giữa nhãn và control.
+  const hasWrapper = (compound) => [...wrapperClasses].some((c) => new RegExp(`\\.${c}(?![\\w-])`).test(compound));
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      const body = m[2];
+      for (const part of m[1].split(',').map((p) => p.trim()).filter(Boolean)) {
+        const compounds = part.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+        const last = compounds.at(-1) || '';
+        if (/^label(?:[.:\[]|$)/.test(last) && compounds.slice(0, -1).some(hasWrapper)) {
+          const longhand = body.match(/(?:^|;)\s*margin-(?:bottom|block-end)\s*:\s*([^;]+)/);
+          const shorthand = body.match(/(?:^|;)\s*margin\s*:\s*([^;]+)/);
+          const values = shorthand ? shorthand[1].trim().split(/\s+/) : null;
+          const bottom = longhand ? longhand[1].trim() : values ? (values[2] ?? values[0]) : null;
+          if (bottom !== null && bottom !== 'var(--field-label-gap)') bad.push(`${relative(ROOT, file)}: ${part} đặt margin đáy nhãn = ${bottom}`);
+        }
+        if (hasWrapper(last) && !/label/.test(last)) {
+          const gap = body.match(/(?:^|;)\s*(?:gap|row-gap)\s*:\s*([^;]+)/);
+          if (gap && gap[1].trim() !== '0') bad.push(`${relative(ROOT, file)}: ${part} dùng gap ${gap[1].trim()} giữa nhãn và control`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(bad, [], 'khoảng nhãn → ô nhập chỉ đến từ margin đáy chuẩn của nhãn');
+});
+
+// Một comment mất dấu đóng sẽ nuốt mọi rule phía sau cho đến `*/` kế tiếp —
+// trình duyệt bỏ qua im lặng, và mọi test ở trên cũng bỏ qua vì chúng bỏ
+// comment trước khi đọc CSS. Đã xảy ra hai lần: quy tắc `label{}` gốc cùng
+// kiểu readonly/disabled của ô nhập (app.css), và toàn bộ CSS thẻ nguồn TEa
+// (manage.css). Dấu hiệu: bên trong comment có một dòng là rule CSS hoàn chỉnh.
+test('không comment nào nuốt mất rule CSS', () => {
+  const swallowed = [];
+  for (const file of ALL) {
+    const source = readFileSync(file, 'utf8');
+    for (const m of source.matchAll(/\/\*[\s\S]*?\*\//g)) {
+      const rule = m[0].slice(2, -2).split('\n').find((line) => /^\s*[.#:a-z*[][^{}]*\{[^{}]*:[^{}]*;[^{}]*\}\s*$/i.test(line) && !/`/.test(line));
+      if (rule) swallowed.push(`${relative(ROOT, file)}:${source.slice(0, m.index).split('\n').length}: ${rule.trim().slice(0, 80)}`);
+    }
+  }
+  assert.deepEqual(swallowed, [], 'đóng comment bằng */ trước rule tiếp theo');
 });

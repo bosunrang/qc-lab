@@ -139,10 +139,11 @@ textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:v
 :focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:var(--focus-ring-offset);}
 /* Click chuột chỉ đổi MỘT viền. Khi focus bằng bàn phím, `:focus-visible`
    để viền thường và chỉ hiện vòng tương phản ở trên — tránh hai đường teal
+   song song như control trước đây. */
 input:not([type="checkbox"]):not([type="radio"]):focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){border-color:var(--accent-border);box-shadow:none;}
 input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:var(--surface-subtle);color:var(--text-readonly);border-color:var(--border-subtle);}
 input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--bg);color:var(--text-disabled);border-color:var(--border-subtle);cursor:not-allowed;}
-label{display:block;font-size:var(--text-xs);color:var(--text-secondary);margin:var(--space-sm) 0 var(--field-label-gap);font-weight:var(--weight-semibold);}
+label{display:block;font-size:var(--text-sm);color:var(--text-secondary);margin:var(--space-sm) 0 var(--field-label-gap);font-weight:var(--weight-semibold);}
 
 /* hệ thống KHÔNG có class `.field` — mỗi ô là một `<div>` thường: nhãn là
    block có margin `8px 0 4px`, ô nhập `width:100%`. app dựng `.field`
@@ -153,6 +154,17 @@ label{display:block;font-size:var(--text-xs);color:var(--text-secondary);margin:
 /* Form QC Lab dùng `gap` để quyết định nhịp hàng, không cộng margin của nhãn
    vào từng field. `.field` vẫn là block để ô ngày không bị giãn ngang. */
 :is(form,.action-form-body) .field>label{margin:0 0 var(--field-label-gap);}
+/* QUY TẮC NHÃN → Ô NHẬP (khoá bằng design-system.test.mjs):
+   · Mỗi cặp nhãn + control nằm trong một khối có class `field`
+     (`<div className="field"><label/>…control</div>`); lớp riêng của trang
+     chỉ thêm bên cạnh, ví dụ `field rc-field`.
+   · Khoảng cách nhãn → control CHỈ đến từ `margin-bottom:var(--field-label-gap)`
+     của nhãn. Khối `.field` không dùng `gap`; CSS trang không đổi margin
+     đáy của nhãn (chỉnh margin-top để xếp nhịp giữa các field thì được).
+   · Kiểu nhãn bọc control `<label class="field"><span>Nhãn</span>…</label>`
+     dùng đúng khoảng cách đó cho `span` đầu tiên. */
+label.field{margin-bottom:0;}
+label.field>span:first-child{display:block;margin-bottom:var(--field-label-gap);}
 .req{color:var(--danger-ink);}
 
 .field-row{display:flex;gap:var(--form-row-gap);align-items:flex-end;flex-wrap:wrap;}
@@ -237,8 +249,7 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 .confirm-modal-text{min-width:0;padding-top:2px;}
 .confirm-modal-text b{display:block;color:var(--text-strong);font-size:var(--text-base);font-weight:var(--weight-bold);line-height:var(--leading-body);white-space:pre-line;}
 .confirm-modal-text p{margin:6px 0 0;color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);white-space:pre-line;}
-.reauth-modal-field{padding:0 24px 14px;}
-.reauth-modal-field label{display:block;margin-bottom:6px;}
+.reauth-modal-field{padding:var(--space-2) 24px 14px;}
 .confirm-modal-actions{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px 20px;border-top:1px solid var(--border-subtle);background:var(--surface);}
 .confirm-modal-actions .btn{min-height:var(--button-height);padding:0 16px;border-radius:var(--control-radius);}
 .info-modal{width:min(420px,calc(100vw - 32px));}

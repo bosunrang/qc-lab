@@ -167,7 +167,7 @@ export function HistoryTab() {
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD.</EmptyState> : <>
         <div className="target-selector history-selector">
-          <div><label>Xét nghiệm / Máy</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {
+          <div className="field"><label>Xét nghiệm / Máy</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {
             const q = query.trim().toLowerCase();
             const instrument = instruments.find((item) => item.id === test.instrument_id);
             return !q || testSearchValues(test, levelsByTestId[test.id] || [], lots, instrument?.name || '').some((v) => v.toLowerCase().includes(q));

@@ -164,11 +164,13 @@ function ReauthForm({ title, message, onResolve }: { title: string; message?: st
          * tạo cảm giác sai là dữ liệu đã bị xoá trước khi xác nhận. */}
         <input type="text" name="username" autoComplete="username" defaultValue={currentUser?.username || ''}
           tabIndex={-1} aria-hidden="true" className="sr-only" />
-        <label htmlFor="reauth-password">Mật khẩu hiện tại</label>
-        <input
-          ref={inputRef} id="reauth-password" name="current-password" type="password" autoComplete="current-password" autoFocus value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div className="field">
+          <label htmlFor="reauth-password">Mật khẩu hiện tại</label>
+          <input
+            ref={inputRef} id="reauth-password" name="current-password" type="password" autoComplete="current-password" autoFocus value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
         {error && <p className="field-error">{error}</p>}
       </form>
       <div className="confirm-modal-actions">

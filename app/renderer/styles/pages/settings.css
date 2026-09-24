@@ -32,32 +32,19 @@
   margin:16px 16px 0;
 }
 
-.settings-unit-fields > div,
-.settings-brand-fields > div,
-.settings-profile-grid > .panel > .grid2 > div:last-child{
-  display:grid;
-  align-content:start;
-}
-
-.settings-unit-fields > div,
-.settings-brand-fields > div{
-  gap:6px;
-}
-
-.settings-brand-fields{
+/* Khoảng hở giữa các field do lưới cha quyết định; khoảng nhãn → ô nhập là
+   margin đáy chuẩn của nhãn trong `.field` (xem app.css). */
+.settings-brand-fields,
+.settings-logo-fields{
   display:grid;
   align-content:start;
   gap:12px;
 }
 
-.settings-profile-grid > .panel > .grid2 > div:last-child{
-  gap:6px;
-}
-
 .settings-unit-fields label,
-.settings-brand-fields > div > label,
-.settings-profile-grid > .panel > .grid2 > div:last-child > label{
-  margin:0;
+.settings-brand-fields label,
+.settings-logo-fields label{
+  margin-top:0;
 }
 
 .settings-profile-grid .settings-unit-fields > div > input:not([type="file"]),
@@ -156,7 +143,7 @@
 .firebase-body{display:grid;gap:var(--gap-content);margin:var(--panel-content-gap) 16px 0}
 .firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-content)}
 .firebase-auth-grid > div:last-child{grid-column:1 / -1}
-.firebase-auth-grid label,.firebase-body > label{margin-top:0}
+.firebase-auth-grid label,.firebase-body > .field > label{margin-top:0}
 /* Ô dán cấu hình vẫn cao để đọc dễ, nhưng dùng đúng cỡ/chữ/line-height của
    textarea hệ thống; khối Firebase Rules bên dưới mới là vùng monospace. */
 .firebase-config-input{width:100%;min-height:168px;resize:vertical;font-family:var(--sans);font-size:var(--text-base);line-height:var(--leading-body)}
