@@ -4,6 +4,7 @@
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
+import { DEFAULT_SIGMA_REPORT_TEMPLATE, validateReportTemplate, type ReportTemplateInput } from '../domain/report-template-validation';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin } from './shared';
 // Kiểu hàng báo cáo lấy từ HỢP ĐỒNG dùng chung thay vì khai lại ở đây — bản
 // trước có hai khai báo song song cùng tên và bản ở đây thiếu cột `lot`.
@@ -12,10 +13,42 @@ import type { ReportPointRow } from '../../shared/qc-api';
 export type { ReportPointRow };
 
 export interface PeriodLockRow { id: string; ym: string; locked_at: string; locked_by: string; note: string }
+export interface ReportTemplateSettings { formCode: string; version: string }
+
+const REPORT_TEMPLATE_META_KEY = 'reportTemplateSettings';
 
 
 
 export function createReportHandlers(db: Db) {
+  function getReportTemplateSettings(): ReportTemplateSettings {
+    const row = db.prepare('SELECT value FROM app_meta WHERE key=?').get(REPORT_TEMPLATE_META_KEY) as { value?: unknown } | undefined;
+    try {
+      const parsed = JSON.parse(String(row?.value || '')) as Record<string, unknown>;
+      const result = validateReportTemplate(parsed);
+      return result.ok ? result.data : { ...DEFAULT_SIGMA_REPORT_TEMPLATE };
+    } catch {
+      return { ...DEFAULT_SIGMA_REPORT_TEMPLATE };
+    }
+  }
+
+  function saveReportTemplateSettings(input: { data: ReportTemplateInput }, actor: Actor): IpcResult<ReportTemplateSettings> {
+    const denied = requireAdmin(actor); if (denied) return denied;
+    const result = validateReportTemplate(input.data);
+    if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
+    try {
+      db.exec('BEGIN');
+      db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
+        .run(REPORT_TEMPLATE_META_KEY, JSON.stringify(result.data));
+      writeAudit(db, actor, 'Sửa biểu mẫu báo cáo Six Sigma', `Mã ${result.data.formCode} · phiên bản ${result.data.version}`, result.data.formCode);
+      db.exec('COMMIT');
+    } catch (error) {
+      try { db.exec('ROLLBACK'); } catch { /* transaction chưa mở hoặc đã rollback */ }
+      return { ok: false, error: { code: 'save-report-template-failed', message: error instanceof Error ? error.message : 'Không lưu được biểu mẫu báo cáo.' } };
+    }
+    notifyChanged(['report_templates']);
+    return { ok: true, data: result.data };
+  }
+
   function listPeriodLocks(): PeriodLockRow[] {
     return db.prepare('SELECT * FROM period_locks ORDER BY ym DESC').all() as unknown as PeriodLockRow[];
   }
@@ -74,7 +107,9 @@ export function createReportHandlers(db: Db) {
     return db.prepare(sql).all(...params) as unknown as ReportPointRow[];
   }
 
-  return { listPeriodLocks, isPeriodLocked, lockPeriod, unlockPeriod, queryReport };
+  return { getReportTemplateSettings, saveReportTemplateSettings, listPeriodLocks, isPeriodLocked, lockPeriod, unlockPeriod, queryReport };
 }
 
 export type ReportHandlers = ReturnType<typeof createReportHandlers>;
+
+

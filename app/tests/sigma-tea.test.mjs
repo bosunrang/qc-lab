@@ -56,10 +56,8 @@ assert.equal(lab.value, 2.5);
   assert.equal(lab.value, 2.5, 'hồ sơ TEa PXN theo analyte_id phải khớp được xét nghiệm mang tên hiển thị');
 }
 
-// BẤT BIẾN KHÔNG ĐƯỢC NỚI: vẫn là khớp TUYỆT ĐỐI, không đoán theo tiền tố.
-// Đây là lý do app cố ý khác app cũ (app cũ dùng exact-rồi-longest-prefix,
-// nên "Glucose (huyết tương)" tự thừa hưởng TEa của "Glucose"). TEa là tiêu
-// chí lâm sàng: thừa hưởng sai còn tệ hơn báo "chưa có".
+// Bất biến không được nới: chỉ khớp tuyệt đối, không đoán theo tiền tố. TEa
+// là tiêu chí lâm sàng; thừa hưởng sai còn tệ hơn báo "chưa có".
 {
   const two = [
     { id: 'qclab-ck', name: 'Creatine kinase', abbr: 'CK', unit: 'U/L', clia: 20, ricos: null },
@@ -75,3 +73,5 @@ assert.equal(lab.value, 2.5);
   assert.equal(at('Creatine kinase toàn phần'), null, 'không được khớp theo tiền tố');
 }
 console.log('app sigma-tea resolver oracle tests passed');
+
+

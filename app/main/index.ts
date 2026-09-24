@@ -15,7 +15,6 @@ import { createSettingsHandlers } from './ipc/settings-handlers';
 import { createReportHandlers } from './ipc/report-handlers';
 import { buildXlsxBase64, printHtmlToPdf, type ExportTableInput } from './ipc/export-handlers';
 import { createBackupHandlers } from './ipc/backup-handlers';
-import { createMigrationHandlers } from './ipc/migration-handlers';
 import { createLisHandlers } from './ipc/lis-handlers';
 import { createFirebaseHandlers } from './ipc/firebase-handlers';
 import { lanAddresses } from './lan/addresses';
@@ -24,6 +23,15 @@ import { LanHttpServer } from './lan/http-server';
 const LAN_PORT = 3200;
 let tray: Tray | null = null;
 let quitting = false;
+let mainWindow: BrowserWindow | null = null;
+
+function showMainWindow(): void {
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
 
 function showLanAddresses(port: number): void {
   const addresses = lanAddresses(port, networkInterfaces());
@@ -38,26 +46,24 @@ function showLanAddresses(port: number): void {
   });
 }
 
-function createTray(win: BrowserWindow, port: number): void {
+function createTray(port: number): void {
   tray?.destroy();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'build', 'icon.png'));
   tray = new Tray(icon);
   tray.setToolTip(`QC Lab — máy chủ LAN đang chạy tại cổng ${port}`);
-  const showWindow = () => { if (win.isMinimized()) win.restore(); win.show(); win.focus(); };
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mở QC Lab', click: showWindow },
+    { label: 'Mở QC Lab', click: showMainWindow },
     { label: `Máy chủ LAN · cổng ${port}`, enabled: false },
     { label: 'Địa chỉ cho máy nhân viên…', click: () => showLanAddresses(port) },
     { type: 'separator' },
     { label: 'Thoát QC Lab (máy nhân viên sẽ mất kết nối)', click: () => { quitting = true; app.quit(); } },
   ]));
-  tray.on('double-click', showWindow);
+  tray.on('double-click', showMainWindow);
 }
 
 async function createWindow(): Promise<void> {
   // Giữ bản đồ handler IPC để HTTP LAN gọi ĐÚNG cùng cổng nghiệp vụ. Đây là
   // cầu nối tạm thời khi renderer web thay IPC; không sao chép validation hay
-  // SQL sang server HTTP.
   type IpcHandler = (event: unknown, ...args: unknown[]) => unknown;
   const lanHandlers = new Map<string, IpcHandler>();
   const electronHandle = ipcMain.handle.bind(ipcMain);
@@ -79,7 +85,6 @@ async function createWindow(): Promise<void> {
   const settings = createSettingsHandlers(db, dbPath);
   const report = createReportHandlers(db);
   const backup = createBackupHandlers(db, userDataDir);
-  const migration = createMigrationHandlers(db, userDataDir);
   const lis = createLisHandlers(db);
   const firebase = createFirebaseHandlers(db, userDataDir);
   setCloudChangeNotifier(firebase.onDataChanged);
@@ -107,10 +112,10 @@ async function createWindow(): Promise<void> {
     const routes: Record<string, string> = {
       resetUserPassword: 'auth:resetPassword', verifyOwnPassword: 'auth:verifyPassword',
       listEntryHistoryPoints: 'entry:listHistoryPoints', listVoidedEntryPoints: 'entry:listVoidedPoints', listParallelEntryColumns: 'entry:listParallelColumns', listPreviousEntryLotSeries: 'entry:listPreviousLotSeries', getRangeCandidate: 'entry:rangeCandidate',
-      listSigmaPeriods: 'sigma:listPeriods', listSigmaCohorts: 'sigma:listCohorts', setSigmaTracking: 'sigma:setTracking', saveSigmaTeaConfig: 'sigma:saveTeaConfig', saveSigmaPeriod: 'sigma:savePeriod', renameSigmaPeriod: 'sigma:renamePeriod', removeSigmaPeriod: 'sigma:removePeriod',
+      listSigmaPeriods: 'sigma:listPeriods', listSigmaCohorts: 'sigma:listCohorts', saveSigmaTeaConfig: 'sigma:saveTeaConfig', saveSigmaPeriod: 'sigma:savePeriod', renameSigmaPeriod: 'sigma:renamePeriod', removeSigmaPeriod: 'sigma:removePeriod',
       listNceRecords: 'nce:listRecords', returnNce: 'nce:returnForRevision', setNceCompletedDate: 'nce:setActionCompletedDate', markNceEffectiveness: 'nce:markEffectiveness', setNceReleaseDecision: 'nce:setReleaseDecision', setNceRerunEvidence: 'nce:setRerunEvidence', reopenNce: 'nce:reopen',
       listReagentComparisons: 'reagent:listComparisons', createReagentComparison: 'reagent:createComparison', saveReagentMetadata: 'reagent:saveMetadata', saveReagentRows: 'reagent:saveRows', removeReagentComparison: 'reagent:removeComparison', listReagentQuickValues: 'reagent:listQuickValues', addReagentQuickValue: 'reagent:addQuickValue', removeReagentQuickValue: 'reagent:removeQuickValue',
-      getFirebaseSettings: 'firebase:getSettings', resetOperationalData: 'backup:resetAll', previewLegacyBackup: 'migration:previewLegacyBackup', importLegacyBackup: 'migration:importLegacyBackup',
+      getFirebaseSettings: 'firebase:getSettings', resetOperationalData: 'backup:resetAll',
       getLisSettings: 'lis:getSettings', saveLisSettings: 'lis:saveSettings', pullLisQueue: 'lis:pullQueue', importLisResult: 'lis:importResult', rejectLisResult: 'lis:rejectResult',
     };
     const target = routes[channel] || [...lanHandlers.keys()].find((name) => name.endsWith(`:${channel}`));
@@ -221,7 +226,6 @@ async function createWindow(): Promise<void> {
 
   ipcMain.handle('sigma:listPeriods', (_event, testId) => sigmaHandlers.listPeriods(testId));
   ipcMain.handle('sigma:listCohorts', (_event, testId, period, levels) => sigmaHandlers.listCohorts(testId, period, levels));
-  ipcMain.handle('sigma:setTracking', (_event, input) => sigmaHandlers.setTracking(input, requireActor()));
   ipcMain.handle('sigma:saveTeaConfig', (_event, input) => sigmaHandlers.saveTeaConfig(input, requireActor()));
   ipcMain.handle('sigma:savePeriod', (_event, input) => sigmaHandlers.savePeriod(input, requireActor()));
   ipcMain.handle('sigma:renamePeriod', (_event, input) => sigmaHandlers.renamePeriod(input, requireActor()));
@@ -258,6 +262,8 @@ async function createWindow(): Promise<void> {
   ipcMain.handle('firebase:disconnect', () => firebase.disconnect(requireActor()));
 
   ipcMain.handle('report:listPeriodLocks', () => report.listPeriodLocks());
+  ipcMain.handle('report:getTemplateSettings', () => report.getReportTemplateSettings());
+  ipcMain.handle('report:saveTemplateSettings', (_event, input) => report.saveReportTemplateSettings(input, requireActor()));
   ipcMain.handle('report:lockPeriod', (_event, input) => report.lockPeriod(input, requireActor()));
   ipcMain.handle('report:unlockPeriod', (_event, input) => report.unlockPeriod(input, requireActor()));
   ipcMain.handle('report:queryReport', (_event, input) => report.queryReport(input));
@@ -287,15 +293,13 @@ async function createWindow(): Promise<void> {
       return { ok: false, error: { code: 'xlsx-failed', message: e instanceof Error ? e.message : 'Không tạo được file Excel.' } };
     }
   });
-  ipcMain.handle('print:htmlToPdf', (_event, input: { html: string; defaultFileName: string }) =>
-    printHtmlToPdf(win, input.html, input.defaultFileName));
+  ipcMain.handle('print:htmlToPdf', (_event, input: { html: string; defaultFileName: string; pageNumbers?: boolean }) =>
+    printHtmlToPdf(win, input.html, input.defaultFileName, input.pageNumbers));
   ipcMain.handle('backup:export', () => backup.exportBackup(requireActor()));
   ipcMain.handle('backup:import', (_event, input) => backup.importBackup(input, requireActor()));
   ipcMain.handle('backup:status', () => backup.backupStatus());
   ipcMain.handle('backup:verify', (_event, input) => backup.verifyBackup(input, requireActor()));
   ipcMain.handle('backup:resetAll', () => backup.resetOperationalData(requireActor()));
-  ipcMain.handle('migration:previewLegacyBackup', (_event, input) => migration.preview(input));
-  ipcMain.handle('migration:importLegacyBackup', (_event, input) => migration.importLegacy(input, requireActor()));
   ipcMain.handle('lis:getSettings', () => lis.getSettings());
   ipcMain.handle('lis:saveSettings', (_event, input) => lis.saveSettings(input, requireActor()));
   ipcMain.handle('lis:pullQueue', () => lis.pullQueue());
@@ -310,6 +314,7 @@ async function createWindow(): Promise<void> {
     invoke: invokeLan,
     staticDir: path.join(__dirname, '..', 'renderer'),
   });
+  mainWindow = win;
   let lanPort: number;
   try {
     lanPort = await lan.start(LAN_PORT);
@@ -320,24 +325,34 @@ async function createWindow(): Promise<void> {
   setLanChangeNotifier((payload) => lan.publishChanged(payload));
   console.log(`QC Lab LAN server is listening on port ${lanPort}`);
 
-  createTray(win, lanPort);
+  createTray(lanPort);
   win.on('close', (event) => {
     if (quitting) return;
     event.preventDefault();
     win.hide();
   });
+  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
 
   const devServerUrl = process.env.APP_V2_DEV_SERVER_URL;
   if (devServerUrl) win.loadURL(devServerUrl);
   else win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 
-app.whenReady().then(createWindow).catch((error) => {
-  dialog.showErrorBox('Không khởi động được QC Lab', error instanceof Error ? error.message : 'Không thể khởi động máy chủ LAN.');
+// Một lần bấm icon thứ hai không được tạo thêm server LAN. Cổng 3200 là cố
+// định cho các máy trạm, vì vậy ta chuyển yêu cầu đó cho bản QC Lab đang chạy.
+if (!app.requestSingleInstanceLock()) {
   app.quit();
-});
+} else {
+  app.on('second-instance', showMainWindow);
+  app.whenReady().then(createWindow).catch((error) => {
+    dialog.showErrorBox('Không khởi động được QC Lab', error instanceof Error ? error.message : 'Không thể khởi động máy chủ LAN.');
+    app.quit();
+  });
 
-app.on('window-all-closed', () => {
-  // Máy chủ LAN phải tiếp tục chạy khi cửa sổ chỉ được ẩn xuống khay.
-});
-app.on('before-quit', () => { quitting = true; });
+  app.on('window-all-closed', () => {
+    // Máy chủ LAN phải tiếp tục chạy khi cửa sổ chỉ được ẩn xuống khay.
+  });
+  app.on('before-quit', () => { quitting = true; });
+}
+
+

@@ -1,16 +1,11 @@
-// Giai đoạn C3 (docs/APP-V2-PLAN.md) — xuất/phục hồi toàn bộ dữ liệu app.
-// Đọc/ghi bảng qua `main/db/table-io.ts` (tách ra khi Giai đoạn C4 cần dùng
-// lại đúng transaction phục hồi này cho dữ liệu đã ánh xạ từ app cũ).
+// Xuất, kiểm tra và phục hồi dữ liệu của QC Lab.
 import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
 import { listTableNames, dumpAllTables, restoreAllTables, writeSafetySnapshot } from '../db/table-io';
 import { buildBackupEnvelope, validateBackupEnvelope } from '../domain/backup';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin } from './shared';
 
-/** Ngưỡng chặn file backup quá lớn khi NHẬP — copy đúng
- * `BACKUP_IMPORT_MAX_BYTES` (128 MB) của app cũ, nơi nó chặn TRƯỚC khi
- * `JSON.parse` để một file khổng lồ không treo tiến trình. app trước
- * Giai đoạn D3.3 không có ngưỡng nào. */
+
 const MAX_IMPORT_BYTES = 128 * 1024 * 1024;
 
 export function createBackupHandlers(db: Db, userDataDir: string) {
@@ -32,8 +27,8 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     const envelope = buildBackupEnvelope(data, SCHEMA_VERSION, 'app', nowIso());
     const json = JSON.stringify(envelope);
     // Ghi mốc sao lưu gần nhất + kích thước để trang Cài đặt nhắc đúng như
-    // app cũ ("Chưa sao lưu trên máy này." / "Sao lưu gần nhất: N ngày
-    // trước." + cỡ file so với ngưỡng khuyến nghị). app cũ giữ mốc này
+    // hệ thống ("Chưa sao lưu trên máy này." / "Sao lưu gần nhất: N ngày
+    // trước." + cỡ file so với ngưỡng khuyến nghị). hệ thống giữ mốc này
     // trong `state`; app dùng `app_meta` — cùng cơ chế key/value đã dùng
     // cho `activityAnchor` (Giai đoạn B8), không thêm bảng mới.
     setMeta('lastBackupAt', nowIso());
@@ -65,10 +60,6 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     const result = validateBackupEnvelope(raw, SCHEMA_VERSION);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
 
-    // Tự động chốt 1 bản backup "trước khi thay đổi" ra đĩa thật TRƯỚC khi
-    // xoá bất cứ gì — nếu bước này lỗi thì HUỶ LUÔN việc phục hồi, không ghi
-    // đè khi chưa chắc có đường lùi (đúng nguyên tắc `BackupImportCommand`
-    // bản cũ).
     let snapshotPath: string;
     try {
       snapshotPath = writeSafetySnapshot(db, userDataDir, 'pre-restore-backup');
@@ -90,7 +81,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
   }
 
   /** "Kiểm tra backup" — CHỈ ĐỌC file người dùng chọn, KHÔNG chạm vào DB
-   * đang dùng (app cũ: `verifyBackupFile()`). Trả về số bảng/số dòng để
+   * đang dùng (hệ thống: `verifyBackupFile()`). Trả về số bảng/số dòng để
    * người dùng biết file có đúng thứ mình tưởng trước khi phục hồi. Không
    * ghi audit: đây là kiểm tra một file, không phải thao tác trên dữ liệu. */
   function verifyBackup(input: { data: { json: string } }, actor: Actor): IpcResult<{ tables: number; rows: number; points: number; schemaVersion: number; createdAt: string }> {
@@ -110,7 +101,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
   }
 
   /** "Xóa sạch dữ liệu test" — xoá dữ liệu VẬN HÀNH, giữ lại tài khoản và
-   * nhật ký hoạt động. Ánh xạ đúng `ResetOperationalDataCommand` app cũ: mặc
+   * nhật ký hoạt động. Ánh xạ đúng `ResetOperationalDataCommand` hệ thống: mặc
    * định `keepUsers`/`keepAudit` đều bật, và `blankAppState()` của nó đưa
    * `lab` về giá trị mặc định — nên ở đây cũng reset bảng `lab` về default
    * của schema chứ không giữ tên đơn vị.
@@ -151,3 +142,5 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
 }
 
 export type BackupHandlers = ReturnType<typeof createBackupHandlers>;
+
+

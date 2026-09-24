@@ -93,8 +93,8 @@ test('viền bề mặt mảnh được tách khỏi đường chia và trạng 
   assert.match(appCss, /\.modal\{[^}]*border:1px solid var\(--surface-divider\)/,
     'modal dùng cùng viền nhẹ với panel');
   const entryCss = readFileSync(join(STYLE_DIR, 'pages', 'entry.css'), 'utf8');
-  assert.match(entryCss, /\.lj-mini\.on\{[^}]*border-color:var\(--teal\)/,
-    'teal vẫn chỉ biểu đạt trạng thái active, không phải viền mặc định');
+  assert.doesNotMatch(entryCss, /\.lj-mini\.on\{/,
+    'thẻ biểu đồ không giữ trạng thái chọn chỉ để đổi màu mà không đổi dữ liệu');
 });
 
 test('thang chữ, độ đậm, dãn dòng, khoảng cách, bo góc đúng hình dạng', () => {
@@ -244,10 +244,36 @@ test('nhãn đứng trên control dùng thang form chung', () => {
     'nhãn field So sánh hóa chất dùng khoảng cách chuẩn');
   assert.doesNotMatch(reagent, /\.rc-field label,.rc-toolbar-selcol label\{[^}]*font-size/,
     'Reagent không tự nâng nhãn control lên 13px/700');
-  assert.match(sigma, /\.sg-tracking-toolbar>label\{margin:0;\}/,
-    'nhãn field Sigma chỉ chỉnh margin, còn thang chữ lấy từ label chung');
+  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row label\{margin-top:0;\}/,
+    'nhãn đầu tiên của thẻ Sigma không cộng thêm khoảng hở so với gutter panel');
   assert.doesNotMatch(appCss, /\.auth-card label\{font-size:var\(--text-base\)/,
     'nhãn đăng nhập không được tự tăng lên bằng cỡ control');
+});
+
+test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo dõi riêng', () => {
+  const sigmaPage = readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8');
+  const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
+
+  assert.match(sigmaPage, /const sigmaTests = tests;/,
+    'tất cả xét nghiệm từ Cấu hình chung đều hiện trong Six Sigma');
+  assert.doesNotMatch(sigmaPage, /SigmaTrackingModal|trackingPickerOpen|setTracking\(/,
+    'không còn luồng thêm hoặc gỡ xét nghiệm riêng trong Six Sigma');
+  assert.doesNotMatch(sigma, /\.sg-tracking-/,
+    'không giữ CSS chết của hộp chọn theo dõi đã bỏ');
+  assert.doesNotMatch(sigmaPage, /<label>Tên xét nghiệm<\/label>/,
+    'tên xét nghiệm đã thể hiện ở selector, không lặp lại ở trường chỉ đọc');
+  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row\{display:grid;grid-template-columns:minmax\(0,1fr\) 118px minmax\(0,1fr\);/,
+    'chọn xét nghiệm, đơn vị và thiết bị dùng chung một hàng');
+  assert.match(sigmaPage, /<div className="sg-unit-field"><label>Đơn vị<\/label>/,
+    'đơn vị nằm trong hàng nhận diện xét nghiệm');
+  assert.match(sigmaPage, /const sigmaTestLabel = \(item: typeof tests\[number\]\) => \{[\s\S]*?item\.instrument_id[\s\S]*?`\$\{item\.name\} — \$\{machine\}`/,
+    'lựa chọn Sigma nêu cả máy khi một xét nghiệm có nhiều cấu hình máy');
+  assert.match(sigmaPage, /placeholder="Tìm nhanh xét nghiệm…" aria-label="Tìm nhanh xét nghiệm"/,
+    'header thiết lập có ô lọc nhanh xét nghiệm');
+  assert.match(sigmaPage, /const visibleSigmaTests = useMemo\(\(\) => sigmaTests\.filter\(/,
+    'ô tìm kiếm lọc danh sách xét nghiệm trước khi chọn');
+  assert.match(sigma, /\.sg-setup-search input\[type="search"\]\{[^}]*height:var\(--control-h-compact\)/,
+    'ô tìm nhanh dùng chiều cao control gọn của header');
 });
 
 test('thao tác xóa kỳ dùng RowActionButton chung', () => {
@@ -521,3 +547,5 @@ test('CSS trang không còn giá trị thô nào', () => {
     .map(([k, v]) => `${k}: ${v.length} chỗ — ${[...new Set(v)].slice(0, 6).join(', ')}`);
   assert.deepEqual(bad, [], 'dùng token trong tokens.css, đừng viết thẳng giá trị');
 });
+
+

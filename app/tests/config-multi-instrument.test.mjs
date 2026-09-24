@@ -77,3 +77,5 @@ assert.equal(db.prepare('SELECT COUNT(*) n FROM test_levels').get().n, 0);
 
 db.close();
 console.log('app multi-instrument test catalog tests passed');
+
+

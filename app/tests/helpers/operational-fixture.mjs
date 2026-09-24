@@ -39,3 +39,5 @@ export function makeOperationalQc(db, { testId, instrumentId, panelId, assignmen
   }
   return { panelId: actualPanelId, groupId, lotIds: assignedLotIds };
 }
+
+

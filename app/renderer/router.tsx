@@ -34,12 +34,10 @@ const PAGE_ELEMENTS: Record<string, ReactElement> = {
   settings: <SettingsPage />,
 };
 
-// HashRouter — app đóng gói thành file:// trong Electron, không có server để
-// phục vụ route dạng path thật. Đủ 11/11 trang (2026-08-31). Từ Giai đoạn A1
-// (docs/APP-V2-PLAN.md), mọi route con nằm trong <AppShell/> (sidebar +
-// topbar + <Outlet/>) thay vì <nav> phẳng viết tay trực tiếp trong file này.
+// HashRouter — ứng dụng đóng gói thành `file://` trong Electron nên không có
+// server để phục vụ route dạng path thật. Mọi route con nằm trong `AppShell`
+// (sidebar, topbar và `Outlet`) để dùng chung khung điều hướng.
 //
-// MỌI route đều qua `canAccessPage()` — trước đây chỉ `/users` tự kiểm
 // riêng, nên gõ thẳng `#/manage`/`#/audit`/`#/settings` vào URL là vào được
 // trang admin với vai trò KTV hoặc chỉ-xem (sidebar ẩn mục đó nhưng route
 // vẫn mở). Không có quyền thì điều hướng về trang đầu tiên vai trò đó vào
@@ -49,7 +47,10 @@ export function AppRouter() {
 
   useEffect(() => { init(); }, [init]);
 
-  if (status === 'checking') return <div style={{ padding: 24 }}>Đang tải…</div>;
+  // Trên Electron, IPC xác nhận phiên diễn ra ngay sau lần render đầu. Hiện
+  // form đăng nhập ngay trong lúc đó để không chớp dòng "Đang tải…" thô giữa
+  // màn hình trước khi form đăng nhập hoàn chỉnh xuất hiện.
+  if (status === 'checking') return <LoginPage />;
   if (status !== 'logged-in') return <LoginPage />;
 
   return (
@@ -69,3 +70,4 @@ export function AppRouter() {
     </HashRouter>
   );
 }
+

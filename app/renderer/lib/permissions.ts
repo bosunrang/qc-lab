@@ -6,10 +6,11 @@
 //
 // Nhắc lại cho rõ: đây là lớp HIỂN THỊ. Chặn thật nằm ở main
 // (`requireWrite`/`requireAdmin` trong `main/ipc/shared.ts`, thu hẹp
-// `pagePerms` trong `main/ipc/auth-handlers.ts`).
 export {
   PAGE_DEFS, ROLE_LIST, roleOf, pageById, rolePageIds, selectUserPermissions, userPageIds,
   canAccessPage, canUserAccessPage, firstAccessPath, roleLabel,
   canWriteRole as canWrite, isAdminRole as isAdmin,
   type Role, type PageDef,
 } from '../../main/domain/page-roles';
+
+

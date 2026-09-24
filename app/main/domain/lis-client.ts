@@ -1,24 +1,10 @@
-// Giai đoạn C5 (docs/APP-V2-PLAN.md) — client cho LIS Gateway prototype
-// (`lis-gateway/`, server Node độc lập, KHÔNG đổi gì ở đó — chỉ thêm phía
-// app gọi vào). Tham khảo `src/application/lis/lis-client-service.ts`
-// bản cũ nhưng viết lại thuần (không đụng DOM/localStorage — main process
-// Electron dùng `app_meta` thay vì `localStorage` trình duyệt).
-//
-// 2 nguyên tắc BẮT BUỘC giữ nguyên từ bản cũ (xem CLAUDE.md "LIS Gateway"):
-// (1) chỉ báo gateway 'imported' SAU KHI ghi điểm QC cục bộ thành công — nếu
-// ghi thất bại thì KHÔNG được báo gateway gì cả (bản ghi vẫn còn 'pending'
-// trong hàng chờ); (2) ngày của điểm QC phải suy từ GIỜ ĐỊA PHƯƠNG của
-// `measuredAt` (`getFullYear()/getMonth()/getDate()`), KHÔNG cắt chuỗi ISO
-// UTC — 1 lần QC lúc 06:05 giờ VN có `measuredAt` là 23:05Z NGÀY HÔM TRƯỚC,
-// cắt UTC sẽ lệch ngày âm thầm trên biểu đồ Levey-Jennings.
 export const LIS_GATEWAY_ALLOWED_ORIGINS = ['http://127.0.0.1:8787', 'http://localhost:8787'];
 
 export interface LisGatewaySettings { enabled: boolean; url: string; token: string }
 
 export const DEFAULT_LIS_GATEWAY_SETTINGS: LisGatewaySettings = { enabled: false, url: 'http://127.0.0.1:8787', token: '' };
 
-/** Chỉ chấp nhận đúng origin của gateway đã biết trước — cùng lý do CSP của
- * bản cũ hardcode allowlist thay vì tin bất kỳ URL nào người dùng gõ vào. */
+
 export function normalizeGatewayUrl(value: unknown): string {
   try {
     const url = new URL(String(value || ''));
@@ -56,3 +42,5 @@ export function resultToPointInput(record: LisQueueRecord): LisPointInput | null
     runId: message.runId || '', operatorName: message.operator || '',
   };
 }
+
+

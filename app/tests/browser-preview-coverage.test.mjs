@@ -10,7 +10,7 @@
 // handler, và làm vậy nhiều lần thì bản xem trước lặng lẽ quay về chỗ cũ.
 //
 // Đây là SOURCE SCANNER (đọc mã nguồn như văn bản), cùng kiểu với
-// tests/global-name-uniqueness.test.js của app cũ — không phải test hành vi.
+// tests/global-name-uniqueness.test.js của hệ thống — không phải test hành vi.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -23,13 +23,12 @@ const preload = readFileSync(join(ROOT, 'main/preload.ts'), 'utf8');
 
 /** Số hàm được phép trả `not-available-in-browser-preview`. Khớp đúng danh
  * sách mà `api.ts` cũ đã trả như vậy: 3 Firebase (connect/sync/disconnect),
- * exportTableXlsx, printHtmlToPdf, 4 backup (export/import/verify/resetAll),
- * 2 migration (preview/import), 3 LIS (pull/import/reject) — tổng 14.
+ * và 3 LIS (pull/import/reject) — tổng 12.
  *
  * SIẾT xuống khi một hàm được nối vào handler thật; chỉ NÂNG khi có lý do
  * kỹ thuật thật (cần file system / BrowserWindow / HTTP ra ngoài) và ghi lý
  * do ngay tại chỗ trong real-api.ts. */
-const NOT_AVAILABLE_BUDGET = 14;
+const NOT_AVAILABLE_BUDGET = 12;
 
 test('real-api nối handler thật, không tự cài đặt lại nghiệp vụ', () => {
   // Phải dựng handler thật từ main/ipc — đây là điều làm nên cả đợt này.
@@ -40,8 +39,6 @@ test('real-api nối handler thật, không tự cài đặt lại nghiệp vụ
   }
   // Và phải chạy trên SQLite thật, không phải mảng JS trong localStorage.
   assert.ok(realApi.includes('openPreviewDatabase'), 'phải mở SQLite qua sqlite-loader');
-  // Kiểm việc DÙNG THẬT (getItem/setItem), không kiểm chữ "localStorage"
-  // trong comment — comment đầu file có nhắc nó khi mô tả bản cũ.
   assert.doesNotMatch(realApi, /localStorage\s*\.\s*(get|set|remove)Item/,
     'không được quay lại lưu bằng localStorage');
 });
@@ -70,3 +67,5 @@ test('mọi kênh IPC trong preload đều có mặt ở bản xem trước', ()
   const missing = names.filter((name) => !new RegExp('(^|[^A-Za-z])' + name + ':').test(realApi));
   assert.deepEqual(missing, [], `real-api.ts thiếu: ${missing.join(', ')}`);
 });
+
+

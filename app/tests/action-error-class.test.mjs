@@ -1,10 +1,8 @@
 // Cột `actions.error_type` chỉ được chứa MÃ `SE` / `RE` / `''`.
 //
-// Trước đây ba nguồn ghi dùng ba bộ từ vựng: form NCE ghi `SE`, huỷ điểm ghi
 // "SE — Sai số hệ thống", luồng quản lý dải ghi "Quản lý dải kiểm soát"; mà
 // trang Hành động so `=== 'SE'` nên hai nguồn sau hiện NGƯỢC thành "Sai số
-// ngẫu nhiên". File này khoá cả bốn mặt: hằng nhãn, cổng ghi, bước di trú dữ
-// liệu cũ, và các chỗ hiển thị.
+// ngẫu nhiên". File này khóa hằng nhãn, cổng ghi, chuẩn hóa dữ liệu và hiển thị.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
@@ -38,7 +36,7 @@ test('nhãn hiển thị và mã lưu trữ chung một nguồn', () => {
 test('applySchema dọn dữ liệu cũ về mã chuẩn và chạy lại được nhiều lần', t => {
   const db = openDatabase(':memory:'); t.after(() => db.close());
   const insert = db.prepare("INSERT INTO actions(id,date,nce_id,error_type) VALUES (?,?,?,?)");
-  const legacy = [
+  const rawErrorTypes = [
     ['a1', 'SE — Sai số hệ thống', 'SE'],
     ['a2', 'RE — Sai số ngẫu nhiên', 'RE'],
     ['a3', 'Quản lý dải kiểm soát', ''],
@@ -47,13 +45,13 @@ test('applySchema dọn dữ liệu cũ về mã chuẩn và chạy lại đư�
     ['a6', 'SE', 'SE'],
     ['a7', '', ''],
   ];
-  for (const [id, raw] of legacy) insert.run(id, '2026-09-01', `NCE-${id}`, raw);
+  for (const [id, raw] of rawErrorTypes) insert.run(id, '2026-09-01', `NCE-${id}`, raw);
   applySchema(db);
   const read = () => Object.fromEntries((db.prepare('SELECT id,error_type FROM actions').all()).map(r => [r.id, r.error_type]));
   const after = read();
-  for (const [id, raw, want] of legacy) assert.equal(after[id], want, `${id}: "${raw}" → "${want}"`);
+  for (const [id, raw, want] of rawErrorTypes) assert.equal(after[id], want, `${id}: "${raw}" → "${want}"`);
   // Phép ánh xạ SQL phải cho cùng kết quả với `normalizeErrorClass()`.
-  for (const [id, raw] of legacy) assert.equal(after[id], normalizeErrorClass(raw), `${id}: SQL lệch normalizeErrorClass()`);
+  for (const [id, raw] of rawErrorTypes) assert.equal(after[id], normalizeErrorClass(raw), `${id}: SQL lệch normalizeErrorClass()`);
   applySchema(db);
   assert.deepEqual(read(), after, 'chạy lại không đổi gì thêm');
 });
@@ -108,3 +106,5 @@ test('các chỗ hiển thị đọc mã ra nhãn, không in giá trị thô', (
   // không phải mã trần 'SE' bên cạnh "SE — Sai số hệ thống".
   assert.match(westgard, /cusumSignal \? ERROR_CLASS_LABEL\.SE : detail\.type/);
 });
+
+

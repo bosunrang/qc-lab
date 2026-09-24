@@ -2,16 +2,8 @@
 //
 // Vì sao cần test riêng: Sigma = (TEa − |Bias|) / CV, và với tiêu chí CLIA
 // dạng TUYỆT ĐỐI (Sodium ±4,0000 mmol/L) thì TEa% = |giới hạn / Mean| × 100 —
-// tức MỖI MỨC phải ra một TEa khác nhau. Trước 2026-09-10, khi kỳ không có
-// snapshot TEa theo mức, `computeLevel()` rơi thẳng về `sigma_data.tea` (một
-// con số dùng chung cho cả kỳ) nên hai mức nhận cùng một TEa — chỉ có thể
-// đúng tại đúng một Mean.
-//
-// Các con số kỳ vọng dưới đây được ĐO TỪ APP CŨ trên cùng bộ dữ liệu (bộ seed
-// của gate `app:ui-parity`): app cũ `sgReconcileAllTeaSnapshots()` ĐIỀN
-// snapshot còn thiếu từ nguồn đang khai tại Mean của từng mức
-// (`sgSetLevelTeaSnapshot(..., force = false)` — có rồi thì không ghi đè), cho
-// TEa 2,857%/4,000% và Sigma 0,29/0,56.
+// tức mỗi mức phải ra một TEa khác nhau. Khi một snapshot theo mức chưa có,
+// hệ thống giải lại từ nguồn đã chốt tại Mean của chính mức đó.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -24,9 +16,8 @@ const actor = { userId: 'u1', username: 'admin', name: 'Quan tri', role: 'admin'
 const round = (value, digits = 4) => (value == null ? null : Math.round(value * 10 ** digits) / 10 ** digits);
 
 /** Sodium (Na), mmol/L: danh mục CLIA CHỈ có giới hạn tuyệt đối ±4 mmol/L
- * (không có giới hạn %), Ricos 0,73%. Hai mức Mean 140 và 100 như bộ seed của
- * gate parity. Kỳ được ghi KHÔNG kèm TEa theo mức — đúng hình dạng bản ghi cũ
- * (v1) hoặc bản ghi do một caller IPC không truyền `levels[].tea`. */
+ * (không có giới hạn %), Ricos 0,73%. Hai mức Mean là 140 và 100. Trường hợp
+ * kiểm thử cố ý bỏ TEa theo mức để xác nhận cơ chế giải theo nguồn. */
 function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   const db = openDatabase(':memory:');
   const config = createConfigHandlers(db);
@@ -44,12 +35,11 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
     ],
   }, actor);
   assert.equal(saved.ok, true, 'luu ky Sigma phai thanh cong');
-  // New writes now persist resolved per-level snapshots. Explicitly model
-  // the legacy rows under review here instead of relying on the old writer.
+  // Bỏ snapshot theo mức để kiểm thử cơ chế giải lại từ nguồn đã chốt.
   if (levelTea == null) {
     const row = db.prepare('SELECT lv_json FROM sigma_data WHERE id=?').get(saved.data.id);
-    const legacy = JSON.parse(row.lv_json).map(({ tea, teaBasis, ...level }) => level);
-    db.prepare('UPDATE sigma_data SET lv_json=? WHERE id=?').run(JSON.stringify(legacy), saved.data.id);
+    const levelsWithoutTea = JSON.parse(row.lv_json).map(({ tea, teaBasis, ...level }) => level);
+    db.prepare('UPDATE sigma_data SET lv_json=? WHERE id=?').run(JSON.stringify(levelsWithoutTea), saved.data.id);
   }
   return { db, sigma, test, saved };
 }
@@ -61,15 +51,14 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
     const [m1, m2] = levels;
     assert.equal(round(m1.tea), round(4 / 140 * 100), 'muc 1 (Mean 140) phai ra TEa 2.857%');
     assert.equal(round(m2.tea), round(4 / 100 * 100), 'muc 2 (Mean 100) phai ra TEa 4.000%');
-    assert.equal(round(m1.sigma.sigma, 2), 0.29, 'Sigma muc 1 phai khop app cu');
-    assert.equal(round(m2.sigma.sigma, 2), 0.56, 'Sigma muc 2 phai khop app cu');
+    assert.equal(round(m1.sigma.sigma, 2), 0.29, 'Sigma mức 1 phải đúng theo công thức');
+    assert.equal(round(m2.sigma.sigma, 2), 0.56, 'Sigma mức 2 phải đúng theo công thức');
   }
 }
 
 // 2) CÓ snapshot theo mức → KHÔNG được giải lại. Đây là nửa còn lại của hợp
-//    đồng: kỳ đã chốt không bị kéo theo Bảng TEa tham chiếu/Mean hôm nay
-//    (cùng nguyên tắc `force = false` của app cũ). Thiếu nhánh này thì một
-//    hàm "luôn giải lại" cũng qua được mục 1.
+//    đồng: kỳ đã chốt không bị kéo theo Bảng TEa tham chiếu/Mean hôm nay.
+//    Thiếu nhánh này thì một hàm "luôn giải lại" cũng qua được mục 1.
 {
   const { sigma, test } = scenario({ levelTea: 6 });
   const [m1, m2] = sigma.listPeriods(test.id)[0].levels;
@@ -162,3 +151,5 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   assert.equal(sigma.listPeriods(test.id)[0].levels[0].tea, 10, 'snapshot cap ky phai thang bac fallback');
 }
 console.log('app sigma level-TEa end-to-end tests passed');
+
+

@@ -1,5 +1,5 @@
-// Giai đoạn C1 (docs/APP-V2-PLAN.md) — tiện ích xuất Excel/in PDF dùng chung
-// cho mọi trang. Excel: main trả base64 (`exportTableXlsx`), ở đây chỉ giải
+// Tiện ích xuất Excel/in PDF dùng chung cho mọi trang. Excel: main trả base64
+// (`exportTableXlsx`), ở đây chỉ giải
 // mã thành Blob rồi tải về — cùng cơ chế `downloadCsv` đã dùng ở Audit/Report
 // (không cần hộp thoại lưu file native, nhẹ hơn cho việc tải nhanh 1 bảng).
 // PDF: gọi thẳng IPC, main tự lo cửa sổ ẩn + hộp thoại lưu file native (khác
@@ -22,8 +22,9 @@ export async function exportTableXlsx(sheetName: string, headers: string[], rows
   return null;
 }
 
-export async function printHtmlToPdf(html: string, defaultFileName: string): Promise<string | null> {
-  const result = await window.qcApi.printHtmlToPdf({ html, defaultFileName });
+export async function printHtmlToPdf(html: string, defaultFileName: string, options: { pageNumbers?: boolean } = {}): Promise<string | null> {
+  const result = await window.qcApi.printHtmlToPdf({ html, defaultFileName, pageNumbers: options.pageNumbers });
   if (!result.ok) return result.error.code === 'cancelled' ? null : result.error.message;
   return null;
 }
+

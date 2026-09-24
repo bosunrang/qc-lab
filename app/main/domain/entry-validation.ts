@@ -1,7 +1,4 @@
-// Validate cho viec them/huy diem QC - tham khao preparePointInput() cua ban
-// cu (src/application/entry/entry-service.ts), rut gon cho module Entry giai
-// doan dau (chua co period lock/run-id tu dong danh so - de danh cho dot
-// sau khi module nay on dinh).
+// Xác thực dữ liệu thêm và hủy điểm QC tại cổng ghi của module Nhập QC.
 import { cleanId, cleanText, finiteNumber } from './text-utils';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,8 +52,8 @@ export function parseQcValue(value: unknown): number {
   return QC_VALUE_RE.test(text) ? Number(text) : NaN;
 }
 
-/** Cảnh báo dữ liệu bất thường trước khi lưu — port đúng ngưỡng app cũ:
- * chỉ cảnh báo khi |Z| > 5, còn đúng ±5SD vẫn được lưu bình thường. Đây là
+/** Cảnh báo dữ liệu bất thường trước khi lưu: chỉ cảnh báo khi |Z| > 5, còn
+ * đúng ±5SD vẫn được lưu bình thường. Đây là
  * cảnh báo có thể xác nhận "Vẫn lưu", không phải luật Westgard hay lỗi
  * validation chặn cứng. */
 export function extremeQcPointDeviation(value: unknown, mean: unknown, sd: unknown): number | null {
@@ -75,8 +72,7 @@ export function validateQcPointInput(input: QcPointInput, knownLevels: readonly 
   const date = cleanText(input.date, 20).trim();
   // Kiểm cả tính hợp lệ trên LỊCH, không chỉ định dạng: `2026-02-31` khớp
   // regex nhưng không tồn tại, và một điểm QC như vậy làm mốc thời gian của
-  // cohort Sigma/báo cáo thành vô nghĩa. App cũ chỉ kiểm định dạng ở đây rồi
-  // lọc lại ở tầng cohort — app chặn ngay ở cổng ghi duy nhất.
+  // cohort Sigma/báo cáo thành vô nghĩa, nên chặn ngay tại cổng ghi.
   if (!DATE_RE.test(date) || !isRealDate(date)) return { ok: false, code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' };
   const val = parseQcValue(input.val);
   if (!Number.isFinite(val)) return { ok: false, code: 'invalid-value', message: 'Giá trị QC không hợp lệ.' };
@@ -95,9 +91,9 @@ function cleanVoidKind(value: unknown): VoidKind {
   return value === 'analytical' || value === 'data-entry' ? value : 'other';
 }
 
-/** `entryVoidNceChoice()` bản cũ — 2 kind đầu KHOÁ cứng việc mở/không mở NCE
- * (người dùng chỉ chọn NGUYÊN NHÂN, không tự quyết định có mở hồ sơ hay
- * không), và không bắt buộc lý do (chỉ khuyến nghị) vì bản thân "kind" đã là
+/** Hai kind đầu khoá cứng việc mở/không mở NCE: người dùng chỉ chọn nguyên
+ * nhân, không tự quyết định có mở hồ sơ hay không. Chúng không bắt buộc lý do
+ * vì bản thân "kind" đã là
  * một mô tả. Chỉ `other` mới để người dùng tự bật/tắt `openNce` VÀ bắt buộc
  * gõ lý do ≥5 ký tự — đây là nhánh "cần điều tra" nên không thể để trống. */
 export function voidNceChoice(kind: VoidKind): { openNce: boolean; forced: boolean; reasonRequired: boolean } {
@@ -116,3 +112,5 @@ export function validateVoidInput(input: VoidPointInput): ValidationResult<Prepa
   const openNce = choice.forced ? choice.openNce : !!input.openNce;
   return { ok: true, data: { pointId, reason, kind, openNce } };
 }
+
+

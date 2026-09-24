@@ -7,8 +7,8 @@
 // (`verdict: 'rej'` kèm `accepted: true`), và điểm đó vẫn vào biểu đồ
 // Levey-Jennings lẫn thống kê Mean/SD/CV thực của trang Nhập QC.
 //
-// App cũ có cùng lỗ hổng (`acceptedLotPoints()` cũng chỉ nhận tập luật
-// `within`), nên đây là lệch golden master CÓ CHỦ ĐÍCH.
+// Chuỗi được chấp nhận phải nhận kết quả luật liên mức từ bộ máy đánh giá
+// ghép, thay vì chỉ nhìn các luật trong một mức.
 //
 // Từ 22/09/2026: thống kê dùng cùng kết luận với bảng, loại toàn bộ run.
 // Chỉ bắt đầu chuỗi luật mới sau mốc khắc phục đã duyệt và xác nhận hiệu quả.
@@ -57,7 +57,7 @@ function scenario(runs) {
 const byId = (analysis) => Object.fromEntries(analysis.points.map((p) => [p.id, p]));
 
 // 1) R4s — luật LIÊN MỨC THUẦN (scope 'across', không bao giờ nằm trong
-//    `within`), nên trước đây `acceptedPoints()` không có cách nào thấy nó.
+//    `within`), nên `acceptedPoints()` không tự đánh giá được luật này.
 {
   const { westgard, test } = scenario([[2.5, -2.5]]);
   const p = byId(westgard.analyzeLevel(test.id, 1))['L1r0'];
@@ -119,3 +119,5 @@ const byId = (analysis) => Object.fromEntries(analysis.points.map((p) => [p.id, 
 }
 
 console.log('app: chuỗi chấp nhận tính cả luật liên mức — tests passed');
+
+

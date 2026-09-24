@@ -1,9 +1,3 @@
-// Validate/prepare cho module thí điểm "Cấu hình chung": máy xét nghiệm,
-// xét nghiệm, mức QC. Tham khảo logic từ bản cũ
-// (src/application/manage/manage-config-service.ts) nhưng viết lại thuần,
-// không phụ thuộc `state` object lớn — nhận đúng dữ liệu cần qua tham số,
-// vì trong app mới việc kiểm tra trùng tên chạy trên kết quả SELECT từ
-// SQLite, không phải trên mảng `state.instruments` như trước.
 import { cleanId, cleanText, finiteNumber, sameText } from './text-utils';
 
 export interface InstrumentInput {
@@ -88,10 +82,10 @@ export interface PreparedTest {
 }
 
 /** k/h không hợp lệ (không phải số, hoặc ≤0) rơi về ĐÚNG mặc định lúc tạo
- * xét nghiệm mới (0.5/4 — xem `test-configuration-normalization.ts` app cũ:
+ * xét nghiệm mới (0.5/4 — xem `test-configuration-normalization.ts` hệ thống:
  * `test.cusum={on:false,k:0.5,h:4}`), KHÔNG phải clamp về 0 — clamp về 0 sẽ
  * biến CUSUM thành vô nghĩa (k=0/h=0) mà không báo gì, khác hẳn "âm thầm
- * quay về mặc định hợp lý" của app cũ. */
+ * quay về mặc định hợp lý" của hệ thống. */
 function cusumParam(value: unknown, fallback: number): number {
   const n = finiteNumber(value, NaN);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -104,7 +98,7 @@ export function prepareTest(input: TestInput = {}): PreparedTest {
     unit: cleanText(input.unit).trim(),
     decimalPlaces: Math.min(6, Math.max(0, Math.round(finiteNumber(input.decimalPlaces, 2)))),
     // TEa KHÔNG bị clamp về 0 ở đây — giá trị âm phải rơi qua validateTest()
-    // để báo lỗi rõ ràng ('invalid-tea'), đúng app cũ (`validateAssay()`:
+    // để báo lỗi rõ ràng ('invalid-tea'), đúng hệ thống (`validateAssay()`:
     // "TEa không được âm."), thay vì âm thầm ép về 0 như trước.
     tea: finiteNumber(input.tea, 0),
     section: cleanText(input.section).trim(),
@@ -112,9 +106,6 @@ export function prepareTest(input: TestInput = {}): PreparedTest {
     teaRefKey: cleanText(input.teaRefKey, 80).trim(),
     method: cleanText(input.method, 200).trim(),
     reagent: cleanText(input.reagent, 200).trim(),
-    // CUSUM (Xu hướng CUSUM, tham khảo tests/cusum.test.js bản cũ) — mặc định
-    // k=0.5, h=4, chỉ là tham số biểu đồ trend, KHÔNG ảnh hưởng verdict
-    // Westgard (xem CLAUDE.md "Confirmed business-logic decisions").
     cusumOn: input.cusumOn === true,
     cusumK: cusumParam(input.cusumK, 0.5),
     cusumH: cusumParam(input.cusumH, 4),
@@ -134,7 +125,7 @@ export function validateTest(
     return { ok: false, code: 'missing-instrument', message: 'Chọn máy xét nghiệm.' };
   }
   if (cleaned.tea < 0) return { ok: false, code: 'invalid-tea', message: 'TEa không được âm.' };
-  // App cũ chặn trùng trên CÙNG máy theo `analyteId` HOẶC tên. V2 dùng
+  // hệ thống chặn trùng trên CÙNG máy theo `analyteId` HOẶC tên. V2 dùng
   // `teaRefKey` làm khoá analyte của danh mục TEa; nhờ đó "Glucose" và
   // "GLU" không thể thành hai cấu hình của cùng analyte trên một máy, còn
   // cùng analyte trên hai máy khác nhau vẫn là hai cấu hình QC độc lập.
@@ -226,10 +217,7 @@ export interface MeanSdHistoryEntry {
   effectiveFrom?: string; effectiveTo?: string; source?: 'mfg' | 'lab';
 }
 
-/** Trang "Lịch sử dữ liệu" đọc lại đây — mỗi lần Mean/SD của 1 mức THẬT SỰ
- * đổi (không phải lưu lại y hệt giá trị cũ) thì chốt giá trị TRƯỚC khi ghi
- * đè vào lịch sử, có mốc thời gian. Tham khảo nguyên tắc "giữ lịch sử thay
- * đổi target" của bản cũ, không phải chỉ ghi đè im lặng. */
+
 export function appendMeanSdHistory(
   historyJson: string | null | undefined,
   previous: Omit<MeanSdHistoryEntry, 'at'> | null,
@@ -286,13 +274,6 @@ export interface PreparedLotGroup {
   active: boolean; status: '' | 'stopped' | 'planned'; lotIds: string[];
 }
 
-// KHÔNG có 'active' — port đúng app cũ (`lot-group-status.ts`/
-// `qcLotGroupOperational()`): "Đang hoạt động" không phải một trạng thái
-// lưu cứng, nó được SUY từ việc lô của nhóm có đang gán vào xét nghiệm nào
-// không (`inUse`, xem config-handlers.ts's `listLotGroups()`). Chỉ
-// 'stopped' (tự tay Dừng)/'planned' (dự kiến, chưa dùng đến ở app) là
-// trạng thái tự đặt thật; mọi giá trị khác (kể cả rỗng) đều là "không có gì
-// tự đặt", để `inUse` quyết định nhãn hiển thị.
 const GROUP_STATUSES = ['stopped', 'planned'] as const;
 
 export function prepareLotGroup(input: LotGroupInput = {}): PreparedLotGroup {
@@ -310,13 +291,11 @@ export function prepareLotGroup(input: LotGroupInput = {}): PreparedLotGroup {
   };
 }
 
-/** Nhóm lô QC phải gồm ÍT NHẤT 2 lô — tham khảo nguyên tắc bản cũ (một nhóm
- * chỉ có ý nghĩa khi so sánh/chuyển tiếp giữa các lô với nhau; 1 lô đơn lẻ
- * không cần nhóm). */
+
 export function validateLotGroup(input: LotGroupInput, fallbackName = ''): ValidationResult<PreparedLotGroup> {
   const cleaned = prepareLotGroup(input);
   if (!cleaned.name) cleaned.name = cleanText(fallbackName, 200).trim();
-  // App cũ kiểm đủ 2 lô trước; tên để trống được tự sinh từ số lô đã chọn.
+  // hệ thống kiểm đủ 2 lô trước; tên để trống được tự sinh từ số lô đã chọn.
   if (cleaned.lotIds.length < 2) return { ok: false, code: 'not-enough-lots', message: 'Nhóm lô QC cần ít nhất 2 lô.' };
   if (!cleaned.name) return { ok: false, code: 'missing-name', message: 'Nhập tên nhóm lô.' };
   return { ok: true, data: cleaned };
@@ -375,3 +354,5 @@ export function validateLotTransition(input: LotTransitionInput): ValidationResu
   if (cleaned.fromLotId === cleaned.toLotId) return { ok: false, code: 'same-lot', message: 'Lô cũ và lô mới phải khác nhau.' };
   return { ok: true, data: cleaned };
 }
+
+

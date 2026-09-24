@@ -85,3 +85,5 @@ assert.equal(previous[0].points[0].id, mainPoint.data.id);
 assert.equal(previous[0].points[0].verdict, 'ok');
 
 console.log('app entry parallel-lot end-to-end tests passed');
+
+

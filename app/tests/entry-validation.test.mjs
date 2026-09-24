@@ -14,10 +14,9 @@ assert.equal(extremeQcPointDeviation(6, null, 1), null, 'thiếu Mean không tí
 assert.equal(extremeQcPointDeviation('x', 10, 1), null, 'giá trị không phải số không tính độ lệch');
 
 
-// Ngày điểm QC phải tồn tại TRÊN LỊCH, không chỉ khớp `YYYY-MM-DD`. Cả app cũ
-// (`preparePointInput`) và app trước 2026-09-10 đều chỉ kiểm định dạng, nên
-// `2026-02-31` lưu được — rồi làm mốc thời gian của cohort Sigma và báo cáo
-// thành vô nghĩa. Đây là cổng ghi DUY NHẤT của `qc_points` nên siết ở đây.
+// Ngày điểm QC phải tồn tại trên lịch, không chỉ khớp `YYYY-MM-DD`; nếu không
+// mốc thời gian của cohort Sigma và báo cáo trở nên vô nghĩa. Đây là cổng ghi
+// duy nhất của `qc_points` nên cần siết tại đây.
 {
   const { validateQcPointInput } = require('../../app-dist/main/domain/entry-validation.js');
   const base = { testId: 'T1', level: 1, val: 10, date: '2026-08-01' };
@@ -51,3 +50,5 @@ assert.equal(extremeQcPointDeviation('x', 10, 1), null, 'giá trị không phả
 }
 
 console.log('app entry-validation ±5SD oracle tests passed');
+
+

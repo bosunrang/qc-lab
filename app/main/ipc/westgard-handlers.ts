@@ -1,6 +1,3 @@
-// IPC handler cho trang Phan tich Westgard: tong quan tat ca xet nghiem/muc
-// theo verdict te nhat hien tai, xem chi tiet 1 muc kem CUSUM, bat/tat tung
-// luat rieng cho 1 xet nghiem.
 import type { Db } from '../db/sqlite-like';
 import { listOperationalLevels, isTestInActivePanel } from '../db/operational-levels';
 import { readGlobalRules, writeGlobalRules } from '../db/rule-settings';
@@ -8,7 +5,7 @@ import { createHistoricalWestgard } from '../db/historical-westgard';
 import { evaluateQcSets, effectiveQcFixDates } from '../db/westgard-evaluation';
 import { cusumScan, acceptedRunPoints, rejectedLevelsByRun, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
-import { WG_RULE_REGISTRY, defaultRuleAction, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
+import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite } from './shared';
@@ -78,9 +75,8 @@ export function createWestgardHandlers(db: Db) {
     });
   }
 
-  /** Bật/tắt 1 luật ở tầng CHUNG — app cũ's `wgSet()`: đổi mặc định cho MỌI
-   * xét nghiệm, không riêng xét nghiệm đang xem. Giữ `requireWrite` như app cũ
-   * (`createWestgardRuleSettings` có `if(!deps.requireWrite())return`). */
+  /** Bật/tắt một luật ở tầng chung: đổi mặc định cho mọi xét nghiệm, không
+   * chỉ xét nghiệm đang xem. */
   function saveRuleSetting(ruleId: string, on: boolean, actor: Actor): IpcResult<{ ruleId: string; on: boolean }> {
     const denied = requireWrite(actor); if (denied) return denied;
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
@@ -94,8 +90,8 @@ export function createWestgardHandlers(db: Db) {
     return { ok: true, data: { ruleId, on } };
   }
 
-  /** "Khôi phục mặc định" — app cũ's `wgReset()`: ghi lại NGUYÊN bộ mặc định
-   * của `WG_RULE_REGISTRY`, không phải bật hết. */
+  /** Khôi phục toàn bộ cấu hình mặc định của `WG_RULE_REGISTRY`, không phải
+   * bật tất cả luật. */
   function resetRuleSettings(actor: Actor): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> {
     const denied = requireWrite(actor); if (denied) return denied;
     const defaults: RuleActionsMap = {};
@@ -112,8 +108,6 @@ export function createWestgardHandlers(db: Db) {
     return { ok: true, data };
   }
 
-  /** Danh sach tat ca xet nghiem + tung muc, kem verdict TE NHAT trong so
-   * cac diem CHUA huy hien co - dung cho man hinh tong quan. */
   function listTestSummaries(): TestSummary[] {
     // ORDER BY t.rowid (không phải t.name) — cùng quy ước "xét nghiệm thêm
     // trước nằm đầu" đã chốt cho `listTests()` (config-handlers.ts). Trước
@@ -137,8 +131,7 @@ export function createWestgardHandlers(db: Db) {
         let worstVerdict: RuleVerdict = 'ok';
         // `latestVerdict`/`latestRules` là kết luận của ĐIỂM CUỐI CÙNG, KHÁC
         // `worstVerdict` (xấu nhất trong MỌI điểm) — không phải trùng lặp:
-        // trang Tổng quan của app cũ chỉ báo động theo điểm cuối
-        // (`summarizeTestStatus()` chỉ đọc `points[points.length-1]`), nên
+        // Trang Tổng quan chỉ báo động theo điểm cuối, nên
         // một mức từng vi phạm hôm trước mà điểm mới nhất đã đạt thì KHÔNG
         // còn nằm trong "Cần xử lý". Cây điều hướng trang Nhập QC và trang
         // Phân tích Westgard vẫn dùng `worstVerdict` như trước.
@@ -214,16 +207,13 @@ export function createWestgardHandlers(db: Db) {
     return maWindow ? { cPos, cNeg, flags, k: scan.k, h: scan.h, ma } : { cPos, cNeg, flags, k: scan.k, h: scan.h };
   }
 
-  /** Chi tiet 1 muc: tung diem kem z-score/verdict/luat, chuoi CUSUM, va
-   * trang thai bat/tat cua tung luat cho xet nghiem nay. */
   function analyzeLevel(testId: string, level: number): LevelAnalysis {
     const test = db.prepare('SELECT cusum_on, cusum_k, cusum_h FROM tests WHERE id=?').get(testId) as { cusum_on: number; cusum_k: number; cusum_h: number } | undefined;
     const active = { levels: activeLevels(testId) }, levelRow = active.levels.find((item) => item.level === level), rows = levelRow?.pts || [];
     const byPoint = evaluateQcSets(db, testId, active.levels);
     const hasTarget = !!(levelRow && levelRow.mean != null && levelRow.sd != null);
-    // CUSUM chỉ tính khi xét nghiệm ĐÃ BẬT (`tests.cusum_on`) và mức có Mean/SD
-    // hợp lệ — trước đây luôn tính với k=0.5/h=4 mặc định bất kể cấu hình thật
-    // của xét nghiệm, và trang luôn cho vẽ dù người dùng chưa bật CUSUM.
+    // CUSUM chỉ tính khi xét nghiệm đã bật và mức có Mean/SD hợp lệ; dùng đúng
+    // ngưỡng cấu hình của xét nghiệm.
     const cusumOn = !!test?.cusum_on;
     const configuredH = Number(test?.cusum_h);
     const fallbackH = Number.isFinite(configuredH) && configuredH > 0 ? configuredH : 4;
@@ -243,8 +233,8 @@ export function createWestgardHandlers(db: Db) {
     // dạng khác nhau.
     const rejectedBy = rejectedLevelsByRun(active.levels, byPoint);
     const points = rows.map((r, i) => {
-      // Mức CHƯA có Mean/SD hợp lệ — port `levelTargetOk()` app cũ: điểm
-      // CHƯA ĐƯỢC ĐÁNH GIÁ ('none'), không phải 'ok'; Z không có nghĩa (giữ
+      // Mức chưa có Mean/SD hợp lệ: điểm chưa được đánh giá ('none'), không
+      // phải 'ok'; Z không có nghĩa (giữ
       // NaN, renderer tự hiện '—' thay vì "NaNs").
       if (!hasTarget) return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: NaN, verdict: 'none' as const, rules: [], cusumSignal: null, supportRules: [], accepted: false, runRejected: false, targetMean: null, targetSd: null, errorType: '—', errorDesc: '' };
       const flag = byPoint.get(r)!; const rules = flag.rules;
@@ -257,17 +247,16 @@ export function createWestgardHandlers(db: Db) {
 
   const { listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks } = createHistoricalWestgard(db);
 
-  /** Ghi đè RIÊNG cho 1 xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
-   * hình chung; boolean vẫn nhận cho client/dữ liệu V2 cũ và được đổi sang
-   * hành động mặc định của luật. */
-  function saveRuleAction(testId: string, ruleId: string, value: boolean | RuleAction | '', actor: Actor): IpcResult<{ ruleId: string; action: RuleAction | '' }> {
+  /** Ghi đè riêng cho một xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
+   * hình chung. */
+  function saveRuleAction(testId: string, ruleId: string, value: RuleAction | '', actor: Actor): IpcResult<{ ruleId: string; action: RuleAction | '' }> {
     const denied = requireWrite(actor); if (denied) return denied;
     const test = db.prepare('SELECT id, name, rule_actions_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
-    if (typeof value !== 'boolean' && value !== '' && !isRuleAction(value)) return { ok: false, error: { code: 'invalid-action', message: 'Hành động luật không hợp lệ.' } };
+    if (value !== '' && !isRuleAction(value)) return { ok: false, error: { code: 'invalid-action', message: 'Hành động luật không hợp lệ.' } };
     const overrides = parseRuleActions(test.rule_actions_json);
-    const action: RuleAction | '' = value === '' ? '' : typeof value === 'boolean' ? defaultRuleAction(ruleId, value) : value;
+    const action: RuleAction | '' = value;
     if (action) overrides[ruleId] = action; else delete overrides[ruleId];
     const label = action === '' ? 'theo cấu hình chung' : action === 'inactive' ? 'không dùng' : action === 'alert' ? 'cảnh báo' : 'loại bỏ';
     inTransaction(() => {
@@ -282,3 +271,5 @@ export function createWestgardHandlers(db: Db) {
 }
 
 export type WestgardHandlers = ReturnType<typeof createWestgardHandlers>;
+
+

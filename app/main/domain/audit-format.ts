@@ -13,3 +13,5 @@ export function formatAuditDateTimeVN(value: unknown): string {
 export function formatAuditDetailVN(value: unknown): string {
   return String(value || '').replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_match, year, month, day) => `${day}/${month}/${year}`);
 }
+
+

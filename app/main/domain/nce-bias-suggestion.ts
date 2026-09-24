@@ -16,3 +16,5 @@ export function latestNceSigmaBias(periods: readonly NceBiasPeriod[], level: num
   const value = latest?.levels.find((item) => item.level === level)?.biasEqa;
   return latest && value != null && Number.isFinite(value) ? { value, period: latest.period } : null;
 }
+
+

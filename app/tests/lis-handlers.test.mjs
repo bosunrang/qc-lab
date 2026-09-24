@@ -31,28 +31,22 @@ function fakeRecord(messageId, dateIso) {
   };
 }
 
-// 1) getSettings mac dinh khi chua luu gi
 const defaults = lis.getSettings();
 assert.equal(defaults.enabled, false);
 assert.equal(defaults.url, 'http://127.0.0.1:8787');
 
-// 2) chi admin duoc luu cau hinh
 const forbiddenSave = lis.saveSettings({ data: { enabled: true, url: 'http://127.0.0.1:8787', token: 'tok1' } }, viewer);
 assert.equal(forbiddenSave.ok, false);
 assert.equal(forbiddenSave.error.code, 'forbidden');
 
-// 3) url sai (khong trong allowlist) khi enabled=true phai bi tu choi
 const badUrl = lis.saveSettings({ data: { enabled: true, url: 'https://evil.example.com', token: 'tok1' } }, actor);
 assert.equal(badUrl.ok, false);
 assert.equal(badUrl.error.code, 'invalid-url');
 
-// 4) luu dung, doc lai dung
 const saved = lis.saveSettings({ data: { enabled: true, url: 'http://127.0.0.1:8787', token: 'tok1' } }, actor);
 assert.equal(saved.ok, true);
 assert.deepEqual(lis.getSettings(), { enabled: true, url: 'http://127.0.0.1:8787', token: 'tok1' });
 
-// 5) pullQueue: mock fetch, kiem tra Bearer header dung + tach dung
-// pending/unresolved
 const fetchCalls = [];
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, opts) => {
@@ -76,7 +70,6 @@ assert.equal(pulled.data.pending[0].message.messageId, 'm1');
 const healthCall = fetchCalls.find(c => c.url.endsWith('/health'));
 assert.equal(healthCall.opts.headers.authorization, 'Bearer tok1', 'phai gui dung Bearer token');
 
-// 6) importResult - duong THANH CONG: ghi diem QC that + goi decide dung body
 fetchCalls.length = 0;
 globalThis.fetch = async (url, opts) => {
   fetchCalls.push({ url: String(url), opts });
@@ -94,8 +87,6 @@ const decideBody = JSON.parse(decideCall.opts.body);
 assert.equal(decideBody.messageId, 'm3');
 assert.equal(decideBody.status, 'imported');
 
-// 7) importResult - GHI THAT BAI (ky da khoa) => TUYET DOI khong duoc goi
-// gateway - day la bat bien quan trong nhat cua tinh nang nay
 report.lockPeriod({ data: { ym: '2026-09', note: 'Chot ky' } }, actor);
 fetchCalls.length = 0;
 const blockedImport = await lis.importResult({ data: { record: fakeRecord('m4', '2026-09-10T02:00:00Z') } }, actor);
@@ -103,8 +94,6 @@ assert.equal(blockedImport.ok, false);
 assert.equal(blockedImport.error.code, 'period-locked');
 assert.equal(fetchCalls.length, 0, 'ghi that bai thi TUYET DOI khong duoc goi gateway - ban ghi phai con nguyen pending');
 
-// 8) importResult - ghi THANH CONG nhung goi decide THAT BAI => van tra
-// ok:true (diem QC KHONG duoc hoan tac) kem canh bao ro rang
 fetchCalls.length = 0;
 globalThis.fetch = async (url) => {
   if (String(url).includes('/decide')) throw new Error('ECONNREFUSED gia lap');
@@ -117,14 +106,11 @@ assert.ok(/chưa báo được về Gateway/.test(importedButDecideFailed.data.g
 const point5 = db.prepare('SELECT * FROM qc_points WHERE id=?').get(importedButDecideFailed.data.pointId);
 assert.ok(point5, 'diem QC van duoc ghi that, khong bi xoa/rollback');
 
-// 9) importResult - ban ghi chua khop cau hinh (resolved.ok=false) phai
-// tu choi RO RANG, khong tao diem QC rac
 const unresolvedRecord = { id: 'qcr_m6', message: { messageId: 'm6', measuredAt: '2026-08-08T00:00:00Z' }, resolved: { ok: false, code: 'UNMAPPED_TEST', reason: 'x' } };
 const rejectedInvalid = await lis.importResult({ data: { record: unresolvedRecord } }, actor);
 assert.equal(rejectedInvalid.ok, false);
 assert.equal(rejectedInvalid.error.code, 'invalid-record');
 
-// 10) rejectResult - goi dung gateway, ghi audit
 fetchCalls.length = 0;
 globalThis.fetch = async (url, opts) => { fetchCalls.push({ url: String(url), opts }); return { ok: true, status: 200, json: async () => ({}) }; };
 const rejected = await lis.rejectResult({ data: { messageId: 'm2', note: 'Sai don vi' } }, actor);
@@ -136,3 +122,5 @@ assert.equal(activityRows.length, 1);
 
 globalThis.fetch = originalFetch;
 console.log('app lis-handlers end-to-end tests passed');
+
+

@@ -14,3 +14,5 @@ assert.deepEqual(lanAddresses(3200, {
 }), ['http://192.168.1.20:3200']);
 
 console.log('app LAN address discovery tests passed');
+
+

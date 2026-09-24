@@ -1,17 +1,3 @@
-// Băm/kiểm mật khẩu cho BẢN XEM TRƯỚC QUA TRÌNH DUYỆT — PBKDF2-HMAC-SHA256
-// THẬT (đúng RFC 8018), viết bằng JS thuần vì `node:crypto`'s `pbkdf2Sync`
-// không có trong trình duyệt và WebCrypto's `deriveBits` là async (trong khi
-// `auth-handlers.ts`'s `login()` là đồng bộ, gọi từ trong transaction SQLite).
-//
-// KHÁC bản main process ĐÚNG MỘT THỨ: số vòng lặp. 600.000 vòng bằng JS thuần
-// mất ~5,3 giây mỗi lần đăng nhập/xác thực lại (đo được: 112.889 hash/giây),
-// không dùng nổi cho một bản để bấm xem giao diện. Dùng 20.000 vòng (~0,2s).
-//
-// Vì THUẬT TOÁN giống hệt và số vòng được ghi ngay trong chuỗi lưu trữ
-// (`pbkdf2$<iterations>$<salt>$<hash>`), một mật khẩu tạo ở bản xem trước vẫn
-// verify ĐÚNG ở bản Electron thật và ngược lại — `verifyPassword()` luôn đọc
-// số vòng từ chuỗi chứ không giả định hằng số. `app/tests/password-hash-parity.test.mjs`
-// chốt điều đó bằng cách đối chiếu với `pbkdf2Sync` của Node làm oracle.
 import { sha256Bytes } from './sha256-browser';
 
 /** Thấp hơn bản main process (600.000) một cách CÓ CHỦ ĐÍCH — xem đầu file.
@@ -46,7 +32,6 @@ function pbkdf2Sha256(password: Uint8Array, salt: Uint8Array, iterations: number
   for (let block = 1; written < keyLength; block++) {
     const seed = new Uint8Array(salt.length + 4);
     seed.set(salt);
-    // INT(block), big-endian 4 byte.
     seed[salt.length] = (block >>> 24) & 0xff;
     seed[salt.length + 1] = (block >>> 16) & 0xff;
     seed[salt.length + 2] = (block >>> 8) & 0xff;
@@ -114,3 +99,5 @@ export function verifyPassword(password: string, stored: string): boolean {
 export function isPbkdf2Hash(value: string): boolean {
   return /^pbkdf2\$\d+\$[0-9a-f]+\$[0-9a-f]+$/.test(String(value || ''));
 }
+
+

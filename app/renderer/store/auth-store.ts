@@ -24,7 +24,9 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  status: 'checking',
+  // App desktop luôn bắt đầu ở form đăng nhập; `init()` sẽ thay trạng thái
+  // này bằng khởi tạo admin hoặc phiên đã xác thực ngay khi IPC phản hồi.
+  status: 'logged-out',
   user: null,
   error: null,
 
@@ -72,3 +74,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (user) set({ user });
   },
 }));
+
+

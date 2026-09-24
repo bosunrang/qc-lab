@@ -1,5 +1,13 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+
+// Số phiên bản hiển thị (chân thanh điều hướng, trang đăng nhập) lấy THẲNG từ
+// `package.json` — cùng con số mà electron-builder đặt tên tệp cài. Trước đây
+// ba chỗ đó viết cứng "1.0.1", nên bump phiên bản rồi build ra
+// `QC-Lab-Setup-1.0.2.exe` mà giao diện vẫn khoe 1.0.1: người dùng không có
+// cách nào biết mình đang chạy bản nào, và đó là thông tin bắt buộc khi báo lỗi.
+const APP_VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
 
 // Thay module chỉ-chạy-được-ở-Node bằng bản trình duyệt khi build renderer.
 //
@@ -70,6 +78,10 @@ export default defineConfig({
   root: 'app/renderer',
   base: './',
   plugins: [swapNodeOnlyModulesForBrowser, relaxCspForDevServer],
+  // Dùng namespace `import.meta.env` của Vite để cùng được thay trong dev và
+  // production. Biến global tự đặt tên chỉ được Rollup thay khi build, khiến
+  // preview đang chạy có thể giữ nhãn phiên bản cũ sau khi bump manifest.
+  define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_VERSION) },
   // Cổng không cố định — Claude Code's preview harness gán cổng qua biến môi
   // trường PORT (autoPort trong .claude/launch.json); mặc định 5174 khi chạy
   // ngoài harness (vd `npm run app:dev` tay).

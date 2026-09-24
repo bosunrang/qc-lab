@@ -1,6 +1,5 @@
 import type { ArchivedBlock, LevelAnalysis } from '../../shared/qc-api';
 
-/** Shared selection for the visible table and its exports. */
 export function displayedWestgardBlocks(
   levels: readonly { level: number; mean: number | null; sd: number | null; lot: string }[],
   analysis: Record<number, LevelAnalysis>, previous: readonly ArchivedBlock[],
@@ -21,7 +20,6 @@ export function observedStats(points: readonly { val: number; accepted: boolean;
   return { n, days, mean, sd, cv: sd != null && mean ? sd / Math.abs(mean) * 100 : null, provisional: n < 20 || days < 10 };
 }
 
-/** Do not render a small but nonzero SD as zero. */
 export function statText(value: number | null | undefined, decimals = 2): string {
   if (value == null || !Number.isFinite(value)) return '—';
   const digits = Math.max(2, Math.min(6, decimals));
@@ -46,3 +44,5 @@ export function westgardExportRows(blocks: ReturnType<typeof displayedWestgardBl
 export function escapeHtml(value: unknown): string {
   return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 }
+
+

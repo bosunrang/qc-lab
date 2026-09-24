@@ -12,3 +12,5 @@ export function lanAddresses(port: number, interfaces: LanNetworkInterfaces): st
     .map((item) => `http://${item.address}:${port}`);
   return [...new Set(addresses)];
 }
+
+

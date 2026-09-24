@@ -89,8 +89,7 @@ export function nceRiskScore(values: Pick<PreparedNceProtocol, 'riskSeverity' | 
 export interface NceApprovalData { date: string; dueDate: string; actionCompletedDate: string; effectivenessStatus: string; followUpNceId: string; protocol: PreparedNceProtocol; hasAcceptedRerun: boolean; }
 export interface NceReadiness { ok: boolean; missing: string[]; }
 
-/** Cổng duyệt/khép vòng port từ `action-protocol-service.ts` app cũ.  Hàm
- * thuần để Electron handler và browser preview gọi cùng một quy tắc. */
+
 export function nceApprovalReadiness(data: NceApprovalData, today: string): NceReadiness {
   const p = data.protocol, missing: string[] = [];
   const need = (condition: boolean, label: string) => { if (condition) missing.push(label); };
@@ -135,7 +134,7 @@ export function validateNceCreate(input: NceCreateInput): ValidationResult<Prepa
   const date = cleanText(input.date, 20).trim();
   if (!DATE_RE.test(date)) return { ok: false, code: 'invalid-date', message: 'Ngày ghi nhận sự cố không hợp lệ.' };
   const correction = cleanText(input.correction, 2000).trim();
-  // Khớp `action-draft-status.ts` app cũ: đủ để lưu NCE đang điều tra là
+  // Khớp `action-draft-status.ts` hệ thống: đủ để lưu NCE đang điều tra là
   // một mô tả ngắn có nghĩa; phê duyệt sau đó còn có gate protocol đầy đủ.
   if (correction.length < 5) return { ok: false, code: 'missing-correction', message: 'Xử lý tức thời phải có ít nhất 5 ký tự.' };
   const dueDate = cleanText(input.dueDate, 20).trim();
@@ -217,3 +216,5 @@ export function validateResidualRisk(input: ResidualRiskInput): ValidationResult
   }
   return { ok: true, data: { id, status: input.status, residualRisk, note: cleanText(input.note, 2000).trim() } };
 }
+
+

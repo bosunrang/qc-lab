@@ -11,13 +11,13 @@ import {
   selectUserPermissions, userPageIds, canAccessPage, canUserAccessPage, firstAccessPath, roleLabel,
 } from '../main/domain/page-roles.ts';
 
-// ── 1) Đúng 11 trang, đúng thứ tự/id/nhãn như ROUTER_PAGE_DEFS app cũ ─────
+// ── 1) Đúng 11 trang, đúng thứ tự/id/nhãn như ROUTER_PAGE_DEFS hệ thống ─────
 assert.deepEqual(
   PAGE_DEFS.map((p) => p.id),
   ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'actions', 'report', 'manage', 'users', 'audit', 'settings'],
 );
 // Nhãn hiện ở 2 nơi nhìn thấy được (sidebar + lưới "Thẻ được phép dùng") nên
-// khoá luôn từng chuỗi — kể cả "Cài đặt & Đám mây", nhãn app cũ.
+// khoá luôn từng chuỗi — kể cả "Cài đặt & Đám mây", nhãn hệ thống.
 assert.deepEqual(PAGE_DEFS.map((p) => p.label), [
   'Tổng quan', 'Nhập QC & Biểu đồ', 'Phân tích Westgard', 'Six Sigma & Sai số', 'So sánh hóa chất',
   'Khắc phục sự cố', 'Báo cáo & Biểu mẫu', 'Cấu hình chung', 'Người dùng', 'Nhật ký hoạt động', 'Cài đặt & Đám mây',
@@ -42,7 +42,6 @@ assert.deepEqual(rolePageIds('technician'), ['dash', 'entry', 'westgard', 'sigma
 assert.deepEqual(rolePageIds('viewer'), ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'report']);
 assert.equal(rolePageIds('viewer').includes('actions'), false, 'chỉ-xem không thấy Khắc phục sự cố');
 
-// ── 4) Trang admin-only ──────────────────────────────────────────────────
 for (const id of ['manage', 'users', 'audit', 'settings']) {
   assert.equal(canAccessPage(id, 'admin'), true);
   assert.equal(canAccessPage(id, 'technician'), false);
@@ -67,8 +66,6 @@ assert.deepEqual(userPageIds({ role: 'technician', pagePerms: null }), rolePageI
 assert.deepEqual(userPageIds({ role: 'technician', pagePerms: ['dash', 'entry'] }), ['dash', 'entry']);
 // KHÔNG mở rộng vượt vai trò: KTV kèm pagePerms có 'manage' vẫn không được.
 assert.deepEqual(userPageIds({ role: 'technician', pagePerms: ['dash', 'manage'] }), ['dash']);
-// Thu hẹp xong ra RỖNG → phòng thân: trả trang đầu của vai trò, không để tài
-// khoản không vào được trang nào (port `userPageIds()` app cũ).
 assert.deepEqual(userPageIds({ role: 'viewer', pagePerms: ['manage', 'users'] }), ['dash']);
 // Không có user = hẹp nhất.
 assert.deepEqual(userPageIds(null), rolePageIds('viewer'));
@@ -88,10 +85,12 @@ assert.equal(firstAccessPath(null), '/dashboard');
 assert.equal(firstAccessPath({ role: 'technician', pagePerms: ['report'] }), '/report');
 assert.equal(firstAccessPath({ role: 'admin', pagePerms: ['settings', 'audit'] }), '/audit', 'theo thứ tự bảng, không theo thứ tự pagePerms');
 
-// ── 9) Nhãn vai trò giống app cũ (roleLabel trong router-permission.ts) ──
+// ── 9) Nhãn vai trò giống hệ thống (roleLabel trong router-permission.ts) ──
 assert.equal(roleLabel('admin'), 'Quản trị');
 assert.equal(roleLabel('technician'), 'KTV');
 assert.equal(roleLabel('viewer'), 'Chỉ xem');
 assert.equal(roleLabel(null), 'Chỉ xem');
 
 console.log('app page-roles oracle tests passed');
+
+

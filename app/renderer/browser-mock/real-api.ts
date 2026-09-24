@@ -8,16 +8,14 @@
 // dòng, mất cổng admin + allowlist origin của LIS, CSV không escape...).
 // Từ nay bản xem trước và bản Electron dùng CÙNG một đoạn mã nghiệp vụ; chỉ
 // khác 3 primitive, tất cả đều có bản song song đã test đối chiếu:
-//   - SQLite: `node:sqlite` <-> sql.js/WASM (`sqlite-shim.ts`)
 //   - SHA-256: `node:crypto` <-> JS thuần (`sha256-browser.ts`)
 //   - PBKDF2: 600.000 vòng <-> 20.000 vòng, cùng thuật toán, tương thích 2
 //     chiều vì số vòng nằm trong chuỗi lưu (`password-hash-browser.ts`)
 //
 // Những gì KHÔNG chạy được trong trình duyệt (file system, BrowserWindow,
-// HTTP tới LIS Gateway, exceljs) trả `not-available-in-browser-preview` —
-// GIỮ ĐÚNG danh sách hàm mà `api.ts` cũ đã trả như vậy, không mở rộng thêm ở
-// bước này, để mọi khác biệt quan sát được đều truy được về việc đổi backend
-// chứ không phải về việc bật thêm tính năng.
+// HTTP tới LIS Gateway) trả `not-available-in-browser-preview`. Riêng Excel
+// và PDF có đường thay thế thuần trình duyệt ở `browser-export.ts`, để xem và
+// xuất báo cáo ngay trên cổng 5174.
 import { openPreviewDatabase } from './sqlite-loader';
 import { setBrowserDbSizeSource } from '../../main/ipc/db-file-size-browser';
 import { type Actor, setBroadcastWindow, writeAudit } from '../../main/ipc/shared';
@@ -33,6 +31,7 @@ import { createSettingsHandlers } from '../../main/ipc/settings-handlers';
 import { createReportHandlers } from '../../main/ipc/report-handlers';
 import { createLisHandlers } from '../../main/ipc/lis-handlers';
 import type { QcApi, IpcResult } from '../../shared/qc-api';
+import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from './browser-export';
 
 
 /** Hiện ở thẻ "Dung lượng" trang Cài đặt. Không phải file thật — nói rõ điều
@@ -54,11 +53,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   const db = preview.db;
   setBrowserDbSizeSource(() => db.export().length);
 
-  // `store:changed` — bản xem trước tự làm đích phát. `api.ts` cũ trả
-  // `() => {}` và KHÔNG BAO GIỜ gọi callback, nên mọi `useStoreInvalidation()`
-  // đều vô hiệu ở bản xem trước (một lệch nữa mà mock-parity không thấy: nó
-  // chỉ chốt "trả về hàm huỷ đăng ký gọi được"). Nay dùng đúng điểm móc của
-  // kiến trúc thật.
   const listeners = new Set<(payload: { tables: string[]; testIds: string[] }) => void>();
   setBroadcastWindow({
     webContents: {
@@ -74,11 +68,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     },
   });
 
-  // Cửa duy nhất để buộc ghi ngay xuống IndexedDB. Chỉ tồn tại ở bản xem
-  // trước (Electron không đi qua file này) và chỉ dùng bởi gate parity: nó
-  // seed xong rồi tải lại trang, mà `persist()` gộp 250ms nên nếu không đợi
-  // ghi xong thì trang mới mở lên với database RỖNG — đã gặp thật, biểu hiện
-  // là mọi surface lệch vì app quay về màn hình "tạo tài khoản quản trị".
   (window as unknown as { __qcPreviewFlush?: () => Promise<void> }).__qcPreviewFlush = () => preview.flush();
 
   const config = createConfigHandlers(db);
@@ -140,7 +129,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   } catch { /* không có sessionStorage: coi như chưa đăng nhập */ }
 
   const api = {
-    // auth
     hasAnyUsers: async () => auth.hasAnyUsers(),
     currentUser: async () => (sessionActor ? auth.getUser(sessionActor.userId) : null),
     bootstrapAdmin: async (input) => {
@@ -171,7 +159,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     setAvatar: async (input) => auth.setAvatar(input, requireActor()),
     clearAvatar: async () => auth.clearAvatar(requireActor()),
 
-    // config
     listInstruments: async () => config.listInstruments(),
     saveInstrument: async (input) => config.saveInstrument(input, requireActor()),
     removeInstrument: async (input) => config.removeInstrument(input, requireActor()),
@@ -208,14 +195,12 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     removeTeaRef: async (input) => config.removeTeaRef(input, requireActor()),
     removeTeaLabProfile: async (input) => config.removeTeaLabProfile(input, requireActor()),
 
-    // audit
     queryActivity: async (input) => audit.query(input, requireActor()),
     previewArchiveActivity: async (input) => audit.previewArchive(input, requireActor()),
     exportActivityCsv: async (input) => audit.exportCsv(input, requireActor()),
     verifyActivityChainNow: async () => audit.verifyChainNow(requireActor()),
     archiveActivity: async (input) => audit.archive(input, requireActor()),
 
-    // entry
     queryPoints: async (testId: string, level: number) => entry.queryPoints(testId, level),
     listEntryHistoryPoints: async (testId: string) => entry.listHistoryPoints(testId),
     listVoidedEntryPoints: async (testId: string) => entry.listVoidedPoints(testId),
@@ -228,7 +213,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     voidPoint: async (input) => entry.voidPoint(input, requireActor()),
     setDayNote: async (input) => entry.setDayNote(input, requireActor()),
 
-    // westgard
     listTestSummaries: async () => westgard.listTestSummaries(),
     analyzeLevel: async (testId: string, level: number) => westgard.analyzeLevel(testId, level),
     saveRuleAction: async (testId: string, ruleId: string, action) => westgard.saveRuleAction(testId, ruleId, action, requireActor()),
@@ -239,16 +223,13 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     listArchivedGroupTests: async (groupId: string) => westgard.listArchivedGroupTests(groupId),
     listPreviousLotBlocks: async (testId: string) => westgard.listPreviousLotBlocks(testId),
 
-    // sigma
     listSigmaPeriods: async (testId: string) => sigma.listPeriods(testId),
     listSigmaCohorts: async (testId: string, period: string, levels: number[]) => sigma.listCohorts(testId, period, levels),
-    setSigmaTracking: async (input) => sigma.setTracking(input, requireActor()),
     saveSigmaTeaConfig: async (input) => sigma.saveTeaConfig(input, requireActor()),
     saveSigmaPeriod: async (input) => sigma.savePeriod(input, requireActor()),
     renameSigmaPeriod: async (input) => sigma.renamePeriod(input, requireActor()),
     removeSigmaPeriod: async (input) => sigma.removePeriod(input, requireActor()),
 
-    // nce
     listNceRecords: async () => nce.listRecords(),
     createNce: async (input) => nce.create(input, requireActor()),
     saveNceProtocol: async (input) => nce.saveProtocol(input, requireActor()),
@@ -261,7 +242,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     setNceRerunEvidence: async (input) => nce.setRerunEvidence(input, requireActor()),
     reopenNce: async (input) => nce.reopenNce(input, requireActor()),
 
-    // reagent
     listReagentComparisons: async () => reagent.listComparisons(),
     createReagentComparison: async (input) => reagent.createComparison(input, requireActor()),
     saveReagentMetadata: async (input) => reagent.saveMetadata(input, requireActor()),
@@ -271,27 +251,18 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     addReagentQuickValue: async (input) => reagent.addQuickListValue(input, requireActor()),
     removeReagentQuickValue: async (input) => reagent.removeQuickListValue(input, requireActor()),
 
-    // settings / report
     getLabProfile: async () => settings.getLabProfile(),
     getLoginBrand: async () => settings.getLoginBrand(),
     saveLabProfile: async (input) => settings.saveLabProfile(input, requireActor()),
     getStorageInfo: async () => settings.getStorageInfo(),
+    getReportTemplateSettings: async () => report.getReportTemplateSettings(),
+    saveReportTemplateSettings: async (input) => report.saveReportTemplateSettings(input, requireActor()),
     listPeriodLocks: async () => report.listPeriodLocks(),
     lockPeriod: async (input) => report.lockPeriod(input, requireActor()),
     unlockPeriod: async (input) => report.unlockPeriod(input, requireActor()),
     queryReport: async (input) => report.queryReport(input),
 
     backupStatus: async () => {
-      // KHÔNG import `backup-handlers.ts`: nó kéo `db/table-io.ts`
-      // (`node:fs`) và `domain/backup.ts` (`node:crypto`), mà Vite biến mọi
-      // builtin của Node thành proxy ném lỗi NGAY KHI MODULE LOAD — một
-      // import như vậy làm cả `real-api.ts` không nạp được trong tab. Thẻ
-      // "lời nhắc sao lưu" ở trang Cài đặt chỉ cần 2 mốc trong `app_meta`.
-      //
-      // Hình dạng trả về phải khớp CHÍNH XÁC `backup-handlers.ts`: object
-      // TRỰC TIẾP (không bọc `IpcResult`) và có đủ `maxImportBytes` —
-      // bọc nhầm `{ok,data}` làm trang Cài đặt không dựng được thẻ sao lưu,
-      // và gate parity bắt đúng chỗ đó.
       const rows = db.prepare("SELECT key, value FROM app_meta WHERE key IN ('lastBackupAt','lastBackupBytes')").all() as { key: string; value: string }[];
       const at = rows.find((r) => r.key === 'lastBackupAt')?.value || null;
       const bytes = Number(rows.find((r) => r.key === 'lastBackupBytes')?.value || 0);
@@ -310,14 +281,12 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     connectFirebase: async () => notAvailable(),
     syncFirebase: async () => notAvailable(),
     disconnectFirebase: async () => notAvailable(),
-    exportTableXlsx: async () => notAvailable(),
-    printHtmlToPdf: async () => notAvailable(),
+    exportTableXlsx: exportTableXlsxInBrowser,
+    printHtmlToPdf: ({ html }) => printHtmlToPdfInBrowser(html),
     exportBackup: async () => notAvailable(),
     importBackup: async () => notAvailable(),
     verifyBackup: async () => notAvailable(),
     resetOperationalData: async () => notAvailable(),
-    previewLegacyBackup: async () => notAvailable(),
-    importLegacyBackup: async () => notAvailable(),
     getLisSettings: async () => lis.getSettings(),
     saveLisSettings: async (input) => lis.saveSettings(input, requireActor()),
     pullLisQueue: async () => ({
@@ -343,3 +312,5 @@ export async function createRealBrowserApi(): Promise<QcApi> {
 
   return api;
 }
+
+

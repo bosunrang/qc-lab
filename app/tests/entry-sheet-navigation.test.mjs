@@ -102,3 +102,5 @@ const cell = (date, column, opts = {}) => ({
 }
 
 console.log('app entry sheet navigation tests passed');
+
+

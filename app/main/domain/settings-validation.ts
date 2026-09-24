@@ -1,7 +1,3 @@
-// Validate cho trang Cai dat: ho so phong xet nghiem (bang `lab`, luon dung
-// 1 dong id=1 - xem schema.ts). Khong co truong bat buoc that su (day la
-// thong tin mo ta, khong phai du lieu QC) - chi lam sach/gioi han do dai va
-// giu mac dinh cho brandTitle/brandSub neu bo trong, khop DEFAULT trong schema.
 import { cleanText } from './text-utils';
 
 export interface LabProfileInput {
@@ -33,3 +29,5 @@ export function prepareLabProfile(input: LabProfileInput = {}, existing?: Partia
     logoData: input.clearLogo === true ? '' : (logoData.startsWith('data:image/') ? logoData : (existing?.logoData || '')),
   };
 }
+
+

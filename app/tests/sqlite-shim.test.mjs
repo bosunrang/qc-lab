@@ -30,7 +30,7 @@ test('applySchema thật chạy được trên shim, và chạy lần hai vẫn 
   const cols = db.prepare("PRAGMA table_info('tests')").all();
   assert.ok(Array.isArray(cols) && cols.length > 0, 'PRAGMA table_info phải trả mảng dòng');
   assert.ok(cols.every((c) => typeof c.name === 'string'), 'mỗi dòng phải có trường name dạng chuỗi');
-  for (const name of ['active', 'analyte_id', 'sigma_tracked']) {
+  for (const name of ['active', 'analyte_id']) {
     assert.ok(cols.some((c) => c.name === name), `thiếu cột ${name} do ALTER TABLE không chạy`);
   }
   db.close();
@@ -134,3 +134,5 @@ test('statement được free sau mỗi lời gọi (không rò handle WASM)', (
 test('schemaVersion của shim khớp bản thật', () => {
   assert.equal(typeof SCHEMA_VERSION, 'number');
 });
+
+

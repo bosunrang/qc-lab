@@ -1,7 +1,4 @@
-/* Nhập QC — hợp nhất (không copy nguyên cascade nhiều lớp đè nhau của bản cũ,
-   chỉ giữ giá trị CUỐI CÙNG sau khi resolve — xem CLAUDE.md mục "CSS cascade
-   pitfalls") từ assets/professional-entry.css, đọc trực tiếp file gốc. Chỉ
-   giữ rule khớp class THẬT SỰ dùng trong EntryPage.tsx. */
+
 
 .entrygrid{
   display:grid; position:relative; grid-template-columns:auto minmax(0,1fr); gap:var(--space-panel); align-items:start;
@@ -32,7 +29,6 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .tnode:hover{background:var(--section-head-bg);}
 /* Nút cây nhận focus được từ 2026-09-12 (điều hướng bàn phím) — phải THẤY
    được đang đứng ở đâu, nếu không phím mũi tên chỉ di chuyển trong bóng tối. */
-/* Vong focus phai thut VAO: node nam sat mep vung cuon cua cay danh muc. */
 .tree .tnode:focus-visible{outline-offset:-2px;background:var(--section-head-bg);}
 .tree .tn-machine{margin-left:0;color:var(--card-head-ink);overflow-wrap:normal;font-weight:700;}
 .tree .tn-test{margin-left:16px;padding-left:8px;color:var(--text-body);overflow-wrap:normal;font-weight:700;}
@@ -128,22 +124,11 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    `.qc-table-grid` — theo yêu cầu người dùng, đồng bộ khoảng cách này xuyên
    suốt mọi khối bảng/biểu đồ trong trang Nhập QC. */
 .lj-stack{display:grid;gap:12px;margin:0 14px 8px;}
-/* 14px đều 4 cạnh (trước 16/8/20/0 lệch nhau, port app cũ) — theo yêu cầu
-   người dùng: khoảng cách từ biểu đồ tới viền thẻ luôn cố định 14px mọi
-   phía, không đổi theo tỉ lệ màn hình (giá trị `px` vốn đã không co giãn
-   theo % kích thước, chỉ cần đều nhau 4 cạnh). */
+
 .chart-scroll{padding:14px;}
 .chart-scroll canvas.entryLJStack{width:100%;max-width:none;}
-.lj-mini,.lj-mini canvas{cursor:pointer;}
-.lj-mini:hover{border-color:var(--accent-border);}
-/* Bỏ `background:#f7fcfc` app cũ có (dù rất nhạt, gần trắng) — theo yêu cầu
-   người dùng: chỉ cần đổi VIỀN sang teal khi chọn, không phủ nền cả thẻ. */
-.lj-mini.on{box-shadow:none;border-color:var(--teal);}
-.lj-mini.on .lj-mini-h{background:var(--card-head-active);border-bottom-color:var(--accent-border);}
-/* Mặt thẻ dùng chung — port `components.css` app cũ (cùng rule cho
-   `.qc-table-card`/`.tree`/`.lj-mini`). app chỉ áp riêng
-   cho `.qc-table-card`, nên thẻ biểu đồ `.lj-mini` KHÔNG có viền/bo/nền:
-   mất luôn viền teal của mức đang chọn và lệch 1px mỗi cạnh so với app cũ. */
+.lj-mini canvas{cursor:crosshair;}
+
 .qc-table-card,.tree,.lj-mini{
   border:1px solid var(--surface-border);border-radius:var(--radius-md);
   box-shadow:var(--surface-shadow);overflow:hidden;background:var(--panel);
@@ -156,15 +141,10 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
   background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);box-shadow:none;
   color:var(--card-head-ink);font-size:var(--title-panel);font-weight:var(--section-heading-weight);letter-spacing:0;text-transform:none;
 }
-/* `.entry-tree-head h4` phải khai SAU rule dùng chung ở trên — cùng độ đặc
-   hiệu (1 class + 1 thẻ) với nhánh `.tree h4` của rule đó (h4 này vừa là con
-   của `.entry-tree-head` vừa là hậu duệ của `.tree`), nên thứ tự nguồn quyết
-   định ai thắng. Khai TRƯỚC (như bản port đầu tiên) khiến `.tree h4` đè mất
-   toàn bộ màu/nền/viền/cỡ chữ dành riêng cho tiêu đề cây — đúng lỗi đã gặp,
-   xem CLAUDE.md mục rà soát Nhập QC 2026-09-04. */
+
 .entry-tree-head h4{min-width:0;flex:1;margin:0;padding:4px 8px;background:none;border-bottom:none;min-height:auto;font-size:var(--text-base);font-weight:var(--weight-bold);color:var(--text-accent);}
 .lj-mini-h{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-.lj-mini-h b{color:var(--text-strong);font-size:var(--text-base);}
+.lj-mini-h h3{margin:0;color:var(--text-strong);font-size:var(--text-base);font-weight:var(--section-heading-weight);line-height:var(--leading-heading);}
 .lj-mini-h .hint{font-size:var(--text-xs);}
 .lj-point-count{margin-left:8px;color:var(--muted);font-size:var(--text-xs);font-weight:700;white-space:nowrap;}
 .lj-qc-strip{display:grid;grid-template-columns:repeat(5,minmax(112px,1fr));border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto;background:var(--surface-subtle);}
@@ -198,12 +178,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    phải bấm thẻ biểu đồ Levey–Jennings chỉ nhằm đổi nội dung bảng bên dưới. */
 .range-summary-header .dayseg{flex:0 0 auto;}
 .range-summary-header .dayseg button{min-width:60px;}
-/* CHỈ `padding-bottom:14px` — port đúng nguyên văn app cũ
-   (`professional-entry.css:760-762`). KHÔNG có padding trái/phải/trên nào
-   khác: mỗi phần tử con tự mang margin riêng của nó (`.qc-cumulative-note`
-   margin 16px 2 bên, `.qc-table-grid` margin 14px riêng — xem dưới) —
-   app từng tự thêm `padding:14px 16px` ở đây, CỘNG DỒN với margin riêng
-   của `.qc-table-grid` thành ~30px, sai hẳn với app cũ. */
+
 .entry-secondary-body{padding-bottom:14px;}
 /* Đổi sang flexbox (không dùng CSS Grid `auto-fit`) — lý do kỹ thuật: với
    `grid-template-columns:repeat(auto-fit,minmax(340px,640px))`, vì TRẦN
@@ -217,9 +192,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    thanh điều hướng/danh mục xét nghiệm chẳng hạn) đều được chia hết. */
 /* `margin:14px` TỰ MANG (không nhờ cha) — `.qc-table-grid` và
    `.qc-sheet-wrap` phải LUÔN cùng margin, dù `.entry-secondary-body` (cha)
-   không có padding ngang nào. Các breakpoint mobile từng chỉnh lại margin này
-   (≤760px 12px, ≤640px 10px) đã bị gỡ ngày 2026-09-11 — app là ứng dụng
-   desktop, xem docs/APP-V2-PLAN.md mục 1.1b. */
+   không có padding ngang nào. Bố cục được tối ưu cho desktop nên duy trì cùng
+   một khoảng đệm ở toàn bộ vùng bảng. */
 .qc-table-grid{display:flex;flex-wrap:wrap;gap:var(--space-section);margin:var(--space-section);}
 /* Bỏ `max-width:640px` (từng thêm để trị nhầm vụ "khoảng cách viền chưa
    đúng" — hoá ra lỗi thật nằm ở `.entry-secondary-body` cộng dồn padding
@@ -230,7 +204,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-card{display:block;flex:1 1 340px;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;}
 /* Thu gọn bảng chi tiết để hai mức QC vừa cạnh nhau ở bố cục desktop. */
 .qc-table-card h4,.qc-table-card table,.qc-cumulative{min-width:540px;}
-/* CHỈ thêm phần app cũ khai RIÊNG cho `.qc-table-card h4` ngoài rule dùng
+/* CHỈ thêm phần hệ thống khai RIÊNG cho `.qc-table-card h4` ngoài rule dùng
    chung (`.qc-table-card h4,.lj-mini-h,.tree h4` ở trên) —
    không lặp lại background/border-bottom/margin/padding/font-size, nếu
    không bản khai lại (cùng độ đặc hiệu, đến SAU) sẽ đè mất giá trị đúng của
@@ -254,7 +228,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-card tbody tr.qc-point-rej:hover td{background:var(--danger-bg);}
 .qc-table-card tbody tr.qc-point-warn td{background:var(--warning-bg);border-bottom-color:var(--warning-border);}
 .qc-table-card tbody tr.qc-point-warn:hover td{background:var(--warning-bg);}
-.qc-table-empty{min-height:92px;margin:14px;padding:20px 16px;display:grid;place-items:center;box-sizing:border-box;border-radius:0;border:none;}
+.qc-table-empty{min-height:92px;margin:14px;padding:20px 16px;display:grid;place-items:center;box-sizing:border-box;border-radius:0;border:none;background:transparent;}
 .qc-row-actions{text-align:center;white-space:nowrap;}
 .qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:30px;height:var(--control-h-row);min-height:var(--control-h-row);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:.15s ease;}
 .qc-row-void svg{width:15px;height:15px;}
@@ -269,8 +243,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 .qc-voided-box{margin:16px 16px 0;overflow-x:auto;}
 .qc-voided-box h4{margin:0 0 10px;font-size:var(--title-sub);font-weight:var(--title-sub-weight);color:var(--text-strong);}
-/* Modal "Hủy điểm QC" — khối chọn kind/mở NCE (2026-09-04, port nguyên
-   `professional-entry.css:474-487`). */
+
 .void-nce-choice{margin-top:10px;padding:10px 12px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
 .void-nce-choice label{display:flex;align-items:center;gap:8px;margin:0;color:var(--ink);}
 .void-nce-choice input{flex:none;}
@@ -284,9 +257,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-voided-table th:nth-child(6),.qc-voided-table td:nth-child(6){width:13%;}
 .qc-voided-table td.num{font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;}
 
-/* ── D3.5: các class port thêm từ `assets/professional-entry.css` ─────────
-   Giữ nguyên giá trị của app cũ; chỉ những class mà gate ui-parity đo được
-   là thiếu, không copy cả file. */
+
 .lj-date-field { display: grid; grid-template-columns: 54px 164px; gap: 8px; align-items: center; margin: 0; }
 .lj-date-field .hint { display: flex; align-items: center; justify-content: flex-end; height: var(--control-h); white-space: nowrap; line-height:var(--leading-none); }
 .lj-date-field .datebox { width: 164px; height: var(--control-h-date); }
@@ -295,7 +266,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-month-picker select, .qc-current-month, .qc-today-jump { height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0 10px; font-size: var(--text-sm); }
 .qc-today-jump { white-space: nowrap; min-width: 104px; }
 
-/* Nút "＋ Thêm" chỉ hiện khi trỏ vào ô — app cũ dùng opacity + nở ngang. */
+/* Nút "＋ Thêm" chỉ hiện khi trỏ vào ô — hệ thống dùng opacity + nở ngang. */
 .qc-run-grid.has-add-btn { padding-right: 14px; }
 .qc-add-run-btn {
   position: absolute; top: 0; right: 0; bottom: 0; width: 22px; margin: 0; padding: 0;
@@ -318,7 +289,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .range-band-label { color: var(--text-body); font-weight: 700; margin-right: 10px; }
 .range-band-source { color: var(--ink); font-weight:var(--weight-bold); white-space: nowrap; margin-right: 4px; }
 
-/* Huy hiệu nhân sự trong ô "NV thực hiện" — port từ professional-entry.css. */
+
 .qc-staff {
   display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 25px;
   padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -327,10 +298,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 }
 .qc-staff-sep { margin: 0 2px; color: var(--text-faint); font-weight:var(--weight-bold); }
 
-/* Bù class app cũ CÓ CSS mà app để trống (2026-09-03, quét bằng đối
-   chiếu selector 2 bên; gate UI parity không thấy vì nó so TẬP class
-   trong DOM — class vẫn có ở cả 2 bản, chỉ bên app là không có rule
-   nào phía sau). Giá trị copy nguyên từ `assets/*.css`. */
+
 .qc-note-input{width:100%;min-width:128px;min-height:var(--control-h-table);resize:vertical;padding:6px 8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font-size:var(--text-sm);line-height:var(--leading-snug);box-shadow:none;}
 .qc-note-input::placeholder{color:var(--text-placeholder);}
 .qc-note-input:focus:not(:focus-visible){border-color:var(--accent-border);}
@@ -341,16 +309,16 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-sheet th.qc-level-head:focus-visible{outline-offset:-2px;}
 .qc-sheet th.qc-level-head:hover::after, .qc-sheet th.qc-level-head:focus-visible::after{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);}
 .tree .tn-config .config-name{min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;overflow-wrap:normal;line-height:var(--leading-heading);}
-.range-band-note{margin:12px 14px 0;padding:14px 16px 14px 16px;border:0;border-left:3px solid var(--info-accent);border-radius:var(--radius-lg);background:var(--info-bg);color:var(--ink);line-height:var(--leading-body);}
+.range-band-note{display:flex;align-items:center;gap:var(--space-md);margin:12px 14px 0;padding:14px 16px;border:0;border-left:3px solid var(--info-accent);border-radius:var(--radius-lg);background:var(--info-bg);color:var(--ink);line-height:var(--leading-body);}.range-band-copy{min-width:0;flex:1;}.range-band-action{flex:none;}
 .range-workflow-actions{display:flex;justify-content:flex-end;gap:8px;margin:12px 14px 0;flex-wrap:wrap;}
 .range-workflow-modal{width:min(760px,calc(100vw - 32px));}
-.range-workflow-checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
-.range-workflow-checks>div,.range-workflow-compare>div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-soft);}
-.range-workflow-checks .pass{border-left:3px solid var(--success-accent);}.range-workflow-checks .fail{border-left:3px solid var(--danger-accent);}
-/* Dòng THÔNG TIN trong bảng kiểm: không phải điều kiện đạt/không đạt nên
-   không mượn màu xanh/đỏ của hai lớp trên. */
-.range-workflow-checks .info{border-left:3px solid var(--surface-border);}
-.range-workflow-checks span,.range-workflow-compare span{color:var(--muted);}
-.range-workflow-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
-.range-workflow-compare>div{align-items:flex-start;flex-direction:column;gap:2px;}
+.range-workflow-meta{margin:0 0 12px;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
+.range-workflow-table-section{margin-bottom:16px;}.range-workflow-table-section h3{margin:0 0 8px;font-size:var(--text-base);font-weight:var(--weight-bold);line-height:var(--leading-heading);}
+.range-workflow-table-wrap{overflow:hidden;border:1px solid var(--table-head-border);border-radius:var(--radius-md);}.range-workflow-table{width:100%;border:0;border-radius:0;border-collapse:collapse;table-layout:fixed;}.range-workflow-table th,.range-workflow-table td{padding:10px 12px;border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:middle;}.range-workflow-table thead th{position:static;height:var(--table-header-height);background:var(--table-head-bg);color:var(--table-head-ink);border-bottom-color:var(--table-head-border);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-letter-spacing);}.range-workflow-table tbody tr:last-child td{border-bottom:0;}.range-workflow-table th:first-child,.range-workflow-table td:first-child{width:29%;}.range-workflow-table th:last-child,.range-workflow-table td:last-child{width:15%;text-align:center;}.range-comparison-table th:first-child,.range-comparison-table td:first-child{width:28%;}.range-comparison-table th:last-child,.range-comparison-table td:last-child{width:25%;text-align:left;}.range-proposed-row{background:var(--surface-soft);}
+.range-workflow-note{margin:0 0 14px;padding:10px 12px;border-left:3px solid var(--info-accent);border-radius:var(--radius-sm);background:var(--info-bg);color:var(--info-text);font-size:var(--text-sm);line-height:var(--leading-body);}
+.range-apply-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-soft);}.range-apply-choice>span{font-weight:var(--weight-semibold);}.range-apply-choice .dayseg{flex:none;}.range-apply-choice .dayseg button{min-height:var(--control-h-sm);font-weight:var(--weight-semibold);}
+.range-workflow-modal .field>span>b{color:var(--danger-ink);}
+.range-manual-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;margin-bottom:12px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-soft);}
 .range-safety-gate{display:grid;gap:8px;margin:12px 0;}.range-safety-gate>label:not(.field){display:flex;align-items:center;gap:8px;}
+@media (max-width:640px){.range-workflow-table{min-width:680px;}.range-workflow-table-wrap{overflow-x:auto;}.range-apply-choice{align-items:flex-start;flex-direction:column;}.range-manual-fields{grid-template-columns:1fr;}.range-band-note{align-items:flex-start;flex-direction:column;}.range-band-action{align-self:flex-end;}}
+

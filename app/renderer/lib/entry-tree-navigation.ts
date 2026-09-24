@@ -4,8 +4,7 @@ import type { KeyboardEvent } from 'react';
 // lại của `entry-sheet-navigation.ts` (bảng nhập). Trước bản này mọi `.tnode`
 // đều KHÔNG focus được: cả cây chỉ dùng được bằng chuột.
 //
-// Luồng thao tác tham khảo `entryTreeKey()` app cũ, nhưng viết mới theo cây
-// của app:
+// Luồng thao tác của cây:
 //   • Enter / Space  → kích hoạt nút đang focus (mở-đóng nhóm, hoặc chọn xét
 //                      nghiệm) — chính là cú click.
 //   • ArrowRight     → MỞ nhóm đang đóng;  ArrowLeft → ĐÓNG nhóm đang mở.
@@ -69,3 +68,5 @@ export function handleTreeKeyDown(event: KeyboardEvent<HTMLElement>): void {
   const target = treeNavigationTarget(visibleTreeNodes(), current, event.key);
   target?.focus();
 }
+
+

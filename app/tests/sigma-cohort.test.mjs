@@ -1,5 +1,5 @@
-// Oracle cho luồng "Nạp CV lô": chỉ gom IQC theo cùng mức/cùng lô, loại
-// điểm huỷ, chặn nhóm đổi Mean/SD và áp ngưỡng 20/30 điểm như app cũ.
+// Kiểm thử luồng "Nạp CV lô": chỉ gom IQC theo cùng mức/cùng lô, loại
+// điểm huỷ, chặn nhóm đổi Mean/SD và áp ngưỡng 20/30 điểm.
 import assert from 'node:assert/strict';
 import { buildSigmaCohorts, periodCutoff } from '../main/domain/sigma-cohort.ts';
 
@@ -24,9 +24,7 @@ assert.equal(unstable.status, 'unstable');
 assert.ok(unstable.issues.includes('Mean mục tiêu thay đổi'));
 
 
-// --- Ba tính chất chỉ lộ ra khi đối chiếu trực tiếp với app cũ
-// (`cross-app-westgard-sigma.test.mjs`). Giữ ở đây để chúng vẫn bị canh sau
-// khi app cũ bị cắt bỏ cùng file đối chiếu đó.
+// Các tính chất biên của cohort cần được duy trì bằng regression test.
 
 // (1) SNAPSHOT CHƯA GHI KHÔNG PHẢI LÀ 0. `qc_points.qc_mean` là cột nullable;
 //     `Number(null)` là 0 và 0 hữu hạn, nên một điểm thiếu snapshot từng tự
@@ -67,10 +65,8 @@ assert.ok(unstable.issues.includes('Mean mục tiêu thay đổi'));
   assert.equal(cohort.excluded.invalidValue, 2);
 }
 
-// (3) NGÀY PHẢI TỒN TẠI TRÊN LỊCH. Cổng nhập chỉ kiểm định dạng cho tới
-//     2026-09-10, nên `qc_points` có thể còn hàng `2026-02-31` (dữ liệu di
-//     trú hoặc nhập trước khi siết cổng); một ngày như vậy làm `start`/`end`
-//     của nhóm vô nghĩa và kéo điểm vào kỳ nó không thuộc về.
+// (3) Ngày phải tồn tại trên lịch; một ngày không hợp lệ làm `start`/`end`
+//     của nhóm vô nghĩa và có thể kéo điểm vào sai kỳ.
 {
   const rows = [
     { level: 1, lot: 'L', date: '2026-08-01', val: 10, qc_mean: 10, qc_sd: 1 },
@@ -95,8 +91,6 @@ assert.ok(unstable.issues.includes('Mean mục tiêu thay đổi'));
 // (5) TRONG TẦM KIỂM SOÁT — ISO/TS 20914 lấy u(Rw) từ dữ liệu IQC "đại diện
 //     cho hoạt động thường quy ĐÃ được thẩm định sau khi quản lý QC". Một
 //     nhóm 30 điểm có 1 điểm +40 SD chưa ai đụng tới không thoả điều kiện đó.
-//     Trước 11/09/2026 nhóm như vậy vẫn được gắn `eligible` và vẫn chi phối
-//     khuyến nghị thiết kế QC — app cũ cũng vậy, nên `cross-app` không thấy.
 {
   const base = [];
   for (let i = 0; i < 30; i++) base.push({ id: `p${i}`, level: 1, lot: 'L', date: `2026-08-${String(i % 28 + 1).padStart(2, '0')}`, val: 100 + (i % 2), qc_mean: 100, qc_sd: 2 });
@@ -151,3 +145,5 @@ assert.ok(unstable.issues.includes('Mean mục tiêu thay đổi'));
   }
 }
 console.log('app sigma-cohort oracle tests passed');
+
+

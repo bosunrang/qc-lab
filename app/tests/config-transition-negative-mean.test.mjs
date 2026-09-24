@@ -33,3 +33,5 @@ assert.equal(level.mean, -1.5);
 assert.equal(level.sd, 0.5);
 
 console.log('app negative-mean lot-transition test passed');
+
+

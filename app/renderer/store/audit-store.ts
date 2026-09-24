@@ -3,10 +3,9 @@ import type { ActivityArchivePreview, ActivityPage, IpcResult } from '../../shar
 
 const EMPTY_PAGE: ActivityPage = { page: 1, pageCount: 1, offset: 0, rows: [], resultFrom: 0, resultTo: 0, filteredCount: 0, total: 0 };
 
-/** Kết luận chuỗi hash — KHÔNG phải kết quả cổng quyền: các hàm đọc nhật ký
- * đều admin-only ở main, nên chúng trả `IpcResult<T>` bọc ngoài (xem
- * `shared/qc-api.d.ts`). */
-export type ChainVerifyView = { ok: boolean; checked: number; legacy: number; brokenIndex: number; reason: string };
+/** Kết luận chuỗi hash, không phải kết quả cổng quyền. Các hàm đọc nhật ký
+ * đều chỉ dành cho quản trị ở main nên trả `IpcResult<T>` bọc ngoài. */
+export type ChainVerifyView = { ok: boolean; checked: number; unhashed: number; brokenIndex: number; reason: string };
 
 interface AuditState {
   result: ActivityPage;
@@ -61,3 +60,4 @@ export const useAuditStore = create<AuditState>((set, get) => ({
     return result;
   },
 }));
+

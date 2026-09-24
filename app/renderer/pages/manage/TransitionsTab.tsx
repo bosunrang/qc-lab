@@ -1,11 +1,11 @@
 // Tab "TransitionsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 //
-// Viết lại 2026-09-03 (lần 2) để khớp ĐÚNG mô hình app cũ
+// Viết lại 2026-09-03 (lần 2) để khớp ĐÚNG mô hình hệ thống
 // (`LotTransitionModal.tsx`/`saveLotTransitionV2`): modal có 1 ô "Trạng
 // thái" chọn được cả 4 giá trị + 1 nút Lưu DUY NHẤT — không phải các nút
 // hành động tách rời (Kích hoạt/Chấp nhận/Không chấp nhận) như bản trước
-// trong phiên này, một thiết kế app tự nghĩ ra khác hẳn app cũ mà người
+// trong phiên này, một thiết kế app tự nghĩ ra khác hẳn hệ thống mà người
 // dùng đã yêu cầu sửa lại cho giống. Xem CLAUDE.md mục "chuyển tiếp lô".
 import { useEffect, useState } from 'react';
 import { useManageStore } from '../../store/manage-store';
@@ -19,13 +19,13 @@ import { todayIso } from '../../state/date-picker-store';
 import { EmptyState } from './shared';
 import type { LotTransition } from '../../../shared/qc-api';
 
-/** `formatDateTimeVN()` app cũ. */
+/** `formatDateTimeVN()` hệ thống. */
 function formatDateTimeVN(value: string): string {
   const date = new Date(value);
   return isNaN(+date) ? '' : date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString('vi-VN');
 }
 
-/** `manageTransitionStatus()` app cũ — copy nguyên nhãn/màu, không tự đặt lại. */
+
 const STATUS_TEXT: Record<string, { text: string; cls: string }> = {
   active: { text: 'Đang chạy song song', cls: 'warn' },
   accepted: { text: 'Chấp nhận lô mới', cls: 'ok' },
@@ -38,16 +38,12 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   const instrumentName = (id: string) => instruments.find((i) => i.id === id)?.name || '';
   const [targetQuery, setTargetQuery] = useState('');
 
-  /** Lô đã "hết dùng" (`depleted`) sang lô nào — port `transitionToNo()`
-   * app cũ, dùng để ghi rõ trong nhãn dropdown thay vì chỉ ẩn đi. */
+
   function transitionToNo(lotId: string): string {
     const accepted = lotTransitions.find((tr) => tr.from_lot_id === lotId && tr.status === 'accepted');
     return accepted ? lots.find((lot) => lot.id === accepted.to_lot_id)?.lot_no || '' : '';
   }
-  /** Port `availableLots()` app cũ: bỏ mọi lô đã hết dùng khỏi dropdown chọn
-   * Lô cũ/Lô mới, TRỪ khi đó chính là giá trị đang được chọn/sửa — không
-   * thì mở lại một hồ sơ cũ trỏ vào lô đã hết dùng sẽ mất luôn lựa chọn
-   * đang có. */
+
   function availableLots(selectedId: string) { return lots.filter((lot) => !lot.depleted || lot.id === selectedId); }
   function lotOptionLabel(lot: (typeof lots)[number]): string {
     const suffix = lot.depleted ? ` · ${transitionToNo(lot.id) ? `đã chuyển tiếp qua lô ${transitionToNo(lot.id)}` : 'đã hết QC'}` : '';
@@ -59,8 +55,8 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
     const result = await removeLotTransition(tr.id);
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
-  // `'new'` = thêm mới, một hồ sơ = đang SỬA hồ sơ đó (app cũ có cả 2 chiều
-  // trên cùng modal). Hồ sơ đã 'accepted' vẫn mở "Sửa" được (đúng app cũ:
+  // `'new'` = thêm mới, một hồ sơ = đang SỬA hồ sơ đó (hệ thống có cả 2 chiều
+  // trên cùng modal). Hồ sơ đã 'accepted' vẫn mở "Sửa" được (đúng hệ thống:
   // TransitionRow luôn hiện nút Sửa) nhưng đổi status khác 'accepted' sẽ bị
   // main chặn (`accepted-immutable`).
   const [creating, setCreating] = useState<'new' | LotTransition | null>(null);
@@ -70,7 +66,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   const [draftToLotId, setDraftToLotId] = useState('');
   const draftPanel = panels.find((panel) => panel.id === draftPanelId);
   // Chỉ xét nghiệm thuộc Panel và ĐANG dùng lô cũ mới là đối tượng của một
-  // hồ sơ chuyển lô. Đây là điều kiện của app cũ: khi không có dòng nào thì
+  // hồ sơ chuyển lô. Đây là điều kiện của hệ thống: khi không có dòng nào thì
   // không thể chuyển tiếp (hay thay lô) cho Panel đó.
   const draftTests = tests
     .filter((test) => draftPanel?.testIds.includes(test.id))
@@ -102,9 +98,9 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
    * cũ: gửi kèm status + Mean/SD ứng viên (`criteria`) trong CÙNG 1 lần
    * gọi. Đổi status sang 'accepted'/'rejected' lần đầu (`finalChanged`) thì
    * xác thực lại mật khẩu TRƯỚC khi gọi API — cùng 1 câu hỏi cho cả 2
-   * trường hợp, đúng `reauthenticateCurrentUser()` app cũ (không tách
+   * trường hợp, đúng `reauthenticateCurrentUser()` hệ thống (không tách
    * riêng "Xác thực chấp nhận"/"Xác thực từ chối"). KHÔNG có confirmDialog
-   * trước reauth — app cũ đi thẳng từ nút Lưu sang ô nhập mật khẩu. */
+   * trước reauth — hệ thống đi thẳng từ nút Lưu sang ô nhập mật khẩu. */
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
     const status = String(fd.get('status') || 'planned') as LotTransition['status'];
@@ -196,7 +192,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                 </div>
               </div>
               <section className="lot-transition-targets" aria-label="Mean SD cho lô mới">
-                {/* Đúng cấu trúc app cũ: `.lot-trans-target-head-row` +
+                {/* Đúng cấu trúc hệ thống: `.lot-trans-target-head-row` +
                     `.target-table.lot-trans-target-table` dùng lại `.target-head`/
                     `.target-row` của bảng Mean/SD (cùng CSS, cùng `syncTargetRange`). */}
                 <div className="lot-trans-target-head-row">
@@ -229,7 +225,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                         {/* checkbox chỉ trang trí, luôn đã chọn — mọi xét nghiệm
                             đang dùng lô cũ đều là ứng viên, không có nút bỏ
                             chọn từng dòng (khớp `checked disabled readOnly`
-                            của app cũ). */}
+                            của hệ thống). */}
                         <label className="lot-assay-check"><input type="checkbox" checked disabled readOnly /><span></span></label>
                         <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
                         <input className="tm-mean" type="number" step="any" defaultValue={mean ?? ''} placeholder="Trung bình" onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
@@ -252,3 +248,5 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
     </>
   );
 }
+
+

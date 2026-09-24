@@ -27,3 +27,5 @@ export class LanSessionStore {
   revoke(token: string | undefined): void { if (token) this.sessions.delete(token); }
   purge(): void { for (const [token, session] of this.sessions) if (session.expiresAt <= this.now()) this.sessions.delete(token); }
 }
+
+

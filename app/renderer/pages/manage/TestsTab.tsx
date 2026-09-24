@@ -19,11 +19,7 @@ function testCatalogKey(test: Test): string {
   return normalizeName(`${test.name}|${test.unit}`);
 }
 
-/** `openTestId` — điều hướng chéo trang mở SẴN modal sửa xét nghiệm (port
- * `openConfigAssay(testId)` app cũ, gọi từ nút "Mở cấu hình xét nghiệm" của
- * trang Phân tích Westgard khi CUSUM chưa bật). Chỉ mở 1 LẦN cho mỗi giá trị
- * — không phụ thuộc `tests` (mảng đổi tham chiếu mỗi lần store nạp lại) để
- * tránh việc form đang sửa dở bị reset mở lại liên tục. */
+
 // Nhãn của hai ô "để trống" trong bảng luật nâng cao. Phải khớp từng chữ với
 // các <option> tường minh ngay bên dưới, để "Theo chuẩn — Cả hai phạm vi" và
 // lựa chọn "Cả hai phạm vi" đọc ra cùng một thứ.
@@ -39,10 +35,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   // Gợi ý TEa: danh mục tích hợp đã phủ ghi đè của phòng xét nghiệm.
   const suggestions = useMemo(() => teaSuggestions(teaRefs), [teaRefs]);
 
-  /** Xoá xét nghiệm — port luồng `delTest()` app cũ: xác nhận (nêu rõ không
-   * thể hoàn tác) → xác thực lại mật khẩu → gọi IPC. Cổng "còn điểm QC thuộc
-   * kỳ đã khoá thì TỪ CHỐI" nằm ở main (`config:removeTest`), renderer chỉ
-   * hiện lại thông báo — kiểm ở main mới là kiểm thật. */
+
   async function removeTestRow(test: Test, assignments: Test[], selected: Test) {
     const removeWholeCatalog = assignments.length === 1;
     const instrument = instruments.find(item => item.id === selected.instrument_id);
@@ -118,16 +111,12 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   }, [editingId, ruleScopesByTestId]);
 
   function openNew() {
-    // App cũ mở thẳng form tạo máy nếu chưa có máy; tránh đưa người dùng vào
+    // hệ thống mở thẳng form tạo máy nếu chưa có máy; tránh đưa người dùng vào
     // form xét nghiệm không thể lưu vì select Máy hoàn toàn rỗng.
     if (!instruments.length) { onNeedInstrument?.(); return; }
     setErr(null); setEditingSingleAssignment(false); setEditing('new');
   }
-  /** Gõ tên khớp danh mục TEa tham chiếu → tự điền tên chuẩn hoá, đơn vị,
-   * TEa% và 2 trường nguồn (port `configAssaySuggestionInput` app cũ; ghi
-   * THẲNG vào DOM của form vì form này để uncontrolled, giống bản cũ).
-   * KHÔNG tự điền Khoa/Khu vực — app cũ cố ý bỏ trường đó ra, vì khoa lấy
-   * theo máy xét nghiệm đang chọn. */
+
   function fillTeaSuggestion(form: HTMLFormElement, match: TeaSuggestion | null) {
     if (!form) return;
     const field = <T extends HTMLElement>(name: string) => form.elements.namedItem(name) as T | null;
@@ -202,9 +191,6 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
       }),
       unit: String(fd.get('unit') || ''), decimalPlaces: Number(fd.get('decimalPlaces') || 2),
       tea: Number(fd.get('tea') || 0),
-      // Nguồn TEa do ô tên tự điền khi khớp danh mục TEa tham chiếu (app cũ:
-      // `configAssaySuggestionInput`); người dùng sửa tay TEa% thì 2 trường
-      // này vẫn giữ vết analyte đã khớp, đúng như bản cũ.
       teaSource: String(fd.get('teaSource') || ''),
       teaRefKey: String(fd.get('teaRefKey') || ''),
       method: String(fd.get('method') || ''), reagent: String(fd.get('reagent') || ''),
@@ -425,4 +411,5 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   );
 }
 
-// ---------------- Panel QC ----------------
+
+

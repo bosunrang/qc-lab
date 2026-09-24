@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/auth-store';
 import type { LoginBrand } from '../../shared/qc-api';
 
-// Bố cục giống hệt màn hình đăng nhập của app cũ (nền gradient xanh đậm +
+// Bố cục giống hệt màn hình đăng nhập của hệ thống (nền gradient xanh đậm +
 // card trắng nổi giữa, brand-mark "QC" teal, tiêu đề/phụ đề) — xem
-// CLAUDE.md mục "Đăng nhập/LoginPage" và app.css's `.auth-*`. Trước đây
 // trang này chưa từng được style (chỉ `sans-serif`/input trần) vì nằm
 // ngoài luồng AppRouter/AppShell bình thường (render TRƯỚC khi đăng nhập).
 function AuthBrand({ brand }: { brand: LoginBrand | null }) {
@@ -62,8 +61,10 @@ export function LoginPage() {
         </div>
         {error && <div className="auth-err">{error}</div>}
         <div className="auth-actions"><button className="btn teal" onClick={() => login(username, password)}>Đăng nhập</button></div>
-        <div className="auth-hint">Phiên bản 1.0.1</div>
+        <div className="auth-hint">Phiên bản {import.meta.env.VITE_APP_VERSION}</div>
       </div>
     </div>
   );
 }
+
+

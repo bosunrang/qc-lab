@@ -29,3 +29,5 @@ await assert.rejects(fallback.start(occupiedPort, '127.0.0.1'));
 const fallbackPort = await fallback.start(0, '127.0.0.1');
 assert.notEqual(fallbackPort, occupiedPort);
 await fallback.stop(); await occupied.stop(); console.log('app LAN port fallback tests passed');
+
+

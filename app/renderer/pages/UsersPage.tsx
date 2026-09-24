@@ -1,11 +1,9 @@
-// Người dùng — Giai đoạn D3.1 (docs/APP-V2-PLAN.md): viết lại theo golden
-// master `src/react/pages/UsersPage.tsx` của app cũ. Khác bản B7 trước đó ở
-// 3 điểm cấu trúc, không chỉ CSS:
+// Người dùng: trang quản lý tài khoản có ba điểm cấu trúc chính:
 //   1. Form "Thêm người dùng" nằm NGAY TRONG TRANG (2 thẻ cạnh nhau: thông
 //      tin tài khoản + lưới "Thẻ được phép dùng"), không phải modal.
 //   2. Bảng danh sách có 4 cột (Người dùng / Vai trò / Trạng thái / Hành
 //      động) với cụm nút trên từng dòng, không phải select+checkbox inline.
-//   3. `pagePerms` — quyền theo TỪNG TRANG (Giai đoạn A2 đã dời sang đây).
+//   3. `pagePerms` — quyền theo từng trang.
 //      Vai trò là trần trên, lưới checkbox chỉ thu hẹp thêm. Chặn thật ở
 //      main (`auth-handlers.ts` gọi `selectUserPermissions`), lưới này chỉ
 //      là giao diện.
@@ -178,8 +176,8 @@ export function UsersPage() {
   );
 }
 
-/** "Sửa quyền" — modal của app cũ (`UserPermissionsModal.tsx`): 1 select vai
- * trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở đây, đúng phạm vi app cũ. */
+/** "Sửa quyền" — modal của hệ thống (`UserPermissionsModal.tsx`): 1 select vai
+ * trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở đây, đúng phạm vi hệ thống. */
 function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
   const { update } = useUsersStore();
   const [role, setRole] = useState<string>(user.role);
@@ -235,3 +233,4 @@ function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () =
     </Modal>
   );
 }
+

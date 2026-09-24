@@ -1,9 +1,3 @@
-// Store thuần (zustand/vanilla, không phải React hook) cho 2 lớp dialog dùng
-// chung toàn app: confirm/info (thay window.confirm()/alert()) và reauth
-// (mật khẩu lại trước thao tác nhạy cảm — app cũ port sang từ danh sách ~9
-// thao tác: duyệt/trả NCE, khoá/mở kỳ báo cáo, sửa Mean/SD, chuyển lô, reset
-// dữ liệu, phục hồi backup). Chỉ 1 dialog mở tại 1 thời điểm (không xếp
-// chồng) — đúng hành vi bản cũ. DialogHost.tsx render theo store này.
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 
@@ -61,3 +55,5 @@ export function choiceDialog(opts: ChoiceOptions): Promise<string | null> {
 export function closeDialog(): void {
   dialogStore.setState({ dialog: { kind: 'none' } });
 }
+
+

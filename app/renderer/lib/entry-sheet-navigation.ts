@@ -1,16 +1,13 @@
 import type { KeyboardEvent } from 'react';
 
-// Điều hướng bàn phím trong bảng nhập QC ("Bảng nhập QC" trang Nhập QC) —
-// port `entry-sheet-navigation.ts`/`entry-sheet-input-order.ts`/
-// `entry-sheet-focus.ts` app cũ: ArrowLeft/ArrowRight/Tab di chuyển NGANG
+// Điều hướng bàn phím trong bảng nhập QC: ArrowLeft/ArrowRight/Tab di chuyển ngang
 // (giữa các cột mức QC cùng ngày), ArrowUp/ArrowDown/Enter di chuyển DỌC
 // (giữa các ngày trong cùng 1 cột mức) — Enter LUÔN xuống hàng dưới, quay
 // vòng về đầu cột khi đang ở hàng cuối, đúng luồng "gõ rồi Enter, xuống
 // dòng liên tục" của bảng tính. Đọc trực tiếp `dataset.focusDate`/
-// `.focusLevel` của phần tử input đang gõ, giống hệt cách app cũ đọc DOM
-// (không qua React state) — bảng này vốn đã uncontrolled (xem `RunSlot`).
-// `focusColumn` phân biệt cột lô chính và cột lô song song cùng một mức;
-// fallback `focusLevel` giữ tương thích với các ô/test cũ.
+// `data-*` của phần tử input đang gõ, không qua React state — bảng này là
+// uncontrolled (xem `RunSlot`). `focusColumn` phân biệt cột lô chính và cột
+// lô song song cùng một mức.
 export type EntrySheetKey = 'ArrowLeft' | 'ArrowRight' | 'Tab' | 'ArrowUp' | 'ArrowDown' | 'Enter';
 
 const SUPPORTED_KEYS: readonly string[] = ['Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -24,11 +21,11 @@ export function isSheetNavigationKey(key: string): key is EntrySheetKey {
 export function sheetInputOrder(inputs: readonly HTMLInputElement[]): HTMLInputElement[] {
   return [...inputs].sort((a, b) =>
     (a.dataset.focusDate || '').localeCompare(b.dataset.focusDate || '', 'vi', { numeric: true })
-    || Number(a.dataset.focusColumnOrder ?? a.dataset.focusLevel ?? 0) - Number(b.dataset.focusColumnOrder ?? b.dataset.focusLevel ?? 0));
+    || Number(a.dataset.focusColumnOrder ?? 0) - Number(b.dataset.focusColumnOrder ?? 0));
 }
 
 function focusColumn(el: HTMLInputElement): string {
-  return el.dataset.focusColumn || el.dataset.focusLevel || '';
+  return el.dataset.focusColumn || '';
 }
 
 export function sheetNavigationTarget(
@@ -53,7 +50,7 @@ export function sheetNavigationTarget(
 }
 
 /** Trong nhóm ô cùng ngày+mức (có thể còn ô cũ chưa kịp gỡ giữa 2 lượt vẽ),
- * ưu tiên ô còn TRỐNG (`.empty`) — port `entry-sheet-focus.ts`. */
+ * ưu tiên ô còn trống (`.empty`). */
 export function pickSheetFocusCandidate(candidates: readonly HTMLInputElement[]): HTMLInputElement | null {
   return candidates.find((el) => el.classList.contains('empty')) || candidates[0] || null;
 }
@@ -61,8 +58,7 @@ export function pickSheetFocusCandidate(candidates: readonly HTMLInputElement[])
 /** Ô đang gõ hiện tại → tính Ô KẾ TIẾP theo phím, rồi CHỜ 1 tick (để React
  * vẽ lại xong sau khi `blur()` kích hoạt lưu) và focus lại đúng ô đó bằng
  * `date+level` (không giữ tham chiếu DOM cũ — commit có thể làm ô đổi
- * `run-id`/unmount-remount, phải tra lại DOM sau khi vẽ xong, giống hệt
- * `entryFocusPendingSheet()` app cũ). */
+ * `run-id`/unmount-remount, phải tra lại DOM sau khi vẽ xong). */
 export function handleSheetKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
   if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
   if (!isSheetNavigationKey(event.key)) return;
@@ -86,3 +82,5 @@ export function handleSheetKeyDown(event: KeyboardEvent<HTMLInputElement>): void
     if (el) { el.focus(); el.select(); }
   }, 0);
 }
+
+

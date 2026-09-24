@@ -1,7 +1,7 @@
 // Six Sigma — thiết lập nguồn TEa, trạng thái cấu hình, không gian làm việc
 // theo kỳ (CV/Bias có nguồn gốc theo từng mức QC), modal Bias% RMS có cảnh
-// báo lệch dấu và modal MU ba thành phần. Bộ chọn xét nghiệm CHỈ lấy từ Cấu
-// hình chung — không tạo xét nghiệm trong Sigma (nguyên tắc đã chốt).
+// báo lệch dấu và modal MU ba thành phần. Bộ chọn luôn lấy toàn bộ danh mục
+// Cấu hình chung — không tạo hay bật/tắt xét nghiệm riêng trong Sigma.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
@@ -10,17 +10,19 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { Modal } from '../components/Modal';
-import { CalcIcon, DownloadIcon, PrintIcon, TrashIcon } from '../components/BtnIcons';
+import { CalcIcon, DownloadIcon, PrintIcon } from '../components/BtnIcons';
 import { RowActionButton } from '../components/RowActionButton';
 import { PageHeader } from '../components/PageHeader';
 import { DateField } from '../components/DateField';
 import { SigmaTrendChart, SigmaMdcChart } from '../components/SigmaCharts';
-import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
+import { printHtmlToPdf } from '../lib/export';
+import { exportSigmaReportXlsx } from '../lib/sigma-summary-export';
+import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib/sigma-print-report';
 import { vnDate as formatVnDate } from '../lib/format';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
-import type { SigmaCohortView, SigmaEqaRound, SigmaLevelResult, SigmaPeriodView, Test } from '../../shared/qc-api';
+import type { SigmaCohortView, SigmaEqaRound, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 import { resolveSigmaTea, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
-import { governingSigmaLevel, sigmaDesignEligible, parseEqaDraft, sigmaMuExport } from '../lib/sigma-workflow';
+import { governingSigmaLevel, sigmaDesignEligible, parseEqaDraft } from '../lib/sigma-workflow';
 import { uncertaintyBudget } from '../../main/domain/sigma-metrics';
 
 function rmsOf(values: number[]): number {
@@ -31,8 +33,8 @@ function rmsOf(values: number[]): number {
 /** Dải năm cho bộ lọc và hộp thêm kỳ: năm nay ± 5. */
 const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
 
-/** 4 nguồn TEa của app cũ (`TEA_SOURCE_REGISTRY`). Giá trị cấu hình của xét
- * nghiệm được chụp vào kỳ Sigma khi tạo, để lịch sử không bị đổi ngầm. */
+/** Nguồn TEa được hỗ trợ. Cấu hình được chụp vào kỳ Sigma khi tạo để lịch sử
+ * không bị thay đổi ngầm. */
 const TEA_SOURCES: ReadonlyArray<{ value: SigmaTeaSource; label: string }> = [
   { value: 'lab', label: 'TEa chuẩn hóa của phòng xét nghiệm' },
   { value: 'eflm', label: 'EFLM - nhập từ database' },
@@ -44,31 +46,26 @@ function isKnownTeaSource(value: string): value is SigmaTeaSource {
   return TEA_SOURCES.some((source) => source.value === value);
 }
 
-/** `formatSigmaDpmo()` app cũ — dưới 10 giữ 2 chữ số, dưới 1000 làm tròn,
- * còn lại phân nhóm nghìn kiểu en-US. */
+/** DPMO dưới 10 giữ 2 chữ số; dưới 1000 làm tròn; các số lớn phân nhóm nghìn. */
 function formatDpmo(value: unknown): string {
   const dpmo = Number(value);
   if (!Number.isFinite(dpmo)) return '—';
   return dpmo < 10 ? dpmo.toFixed(2) : dpmo < 1000 ? dpmo.toFixed(0) : Math.round(dpmo).toLocaleString('en-US');
 }
 
-/** `vnPeriod()` app cũ: 2026-09 → "Kỳ 09/2026". */
+/** Định dạng kỳ ISO thành nhãn tiếng Việt, ví dụ `2026-09` → `Kỳ 09/2026`. */
 function vnPeriod(period: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(period || '');
   return m ? `Kỳ ${m[2]}/${m[1]}` : (period || '?');
 }
 
-/** Nội dung bản in là dữ liệu do người dùng nhập; không ghép thẳng vào HTML. */
-function escapeHtml(value: unknown): string {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] || character));
-}
 const vnDate = (date: string) => formatVnDate(date, '—');
 /** Chỉ rút gọn khi hiển thị trong control; giá trị lưu và tính Sigma vẫn giữ
  * nguyên độ chính xác. Dùng chung cả lúc khôi phục sau khi lưu lỗi để ô không
  * bất ngờ hiện lại một dãy thập phân dài. */
 function editablePercent(value: number | null | undefined): string { return value != null ? value.toFixed(2) : ''; }
-/** Tháng hiện hành theo múi giờ máy, tương đương `isoMonth()` ở app cũ.
- * Không dùng `toISOString()` trực tiếp vì rạng sáng ở Việt Nam có thể rơi về
+/** Tháng hiện hành theo múi giờ máy. Không dùng `toISOString()` trực tiếp vì
+ * rạng sáng ở Việt Nam có thể rơi về
  * tháng trước theo UTC. */
 function currentPeriod(): string {
   const now = new Date();
@@ -107,10 +104,9 @@ function designRunText(design: { n: number; r: number; alternatives: { n: number
   return [one(design.n, design.r), ...alts].join(' hoặc ');
 }
 
-/** Port `sgTips()` app cũ — thẻ khuyến nghị cải thiện, chỉ hiện khi Sigma
- * tính được và < 4. Chia nguyên nhân theo tỉ lệ `|bias| / (|bias| + 1.65·cv)`
- * (>0.6 do bias, <0.4 do CV, còn lại do cả hai) và liệt kê đúng danh sách
- * hành động của bản cũ. */
+/** Thẻ khuyến nghị cải thiện chỉ hiện khi Sigma tính được và < 4. Phân nhóm
+ * nguyên nhân theo tỉ lệ `|bias| / (|bias| + 1.65·cv)`: >0,6 do Bias,
+ * <0,4 do CV, còn lại do cả hai. */
 const BIAS_ACTS = [
   'Hiệu chuẩn lại; kiểm tra lô/hạn dùng của calibrator.',
   'Kiểm tra giá trị đích EQA (nhóm peer cùng phương pháp/máy).',
@@ -155,8 +151,7 @@ function ImprovementCard({ level, result, tea }: { level: number; result: SigmaL
   );
 }
 
-/** 5 bậc màu Sigma — sao chép nguyên giá trị/ngưỡng từ `sigmaZone()` bản cũ
- * (src/domain/sigma/sigma-presentation.ts), không tự đặt lại thang màu. */
+/** Năm bậc màu và ngưỡng diễn giải Sigma dùng thống nhất trong toàn thẻ. */
 function sigmaZone(value: number | null | undefined): { c: string; label: string } {
   const sigma = value == null ? NaN : Number(value);
   if (!Number.isFinite(sigma)) return { c: '#506674', label: '—' };
@@ -169,7 +164,7 @@ function sigmaZone(value: number | null | undefined): { c: string; label: string
 
 export function SigmaPage() {
   const { tests, teaRefs, levelsByTestId, loadTests, loadTeaRefs, loadLevels, instruments, loadInstruments} = useManageStore();
-  const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, setTracking: setSigmaTrackingStore, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
+  const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
   // Vai trò chỉ-xem: vẫn đọc được bảng kỳ/Sigma/MU, không sửa được (main
   // chặn bằng requireWrite ở sigma-handlers.savePeriod).
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
@@ -182,8 +177,8 @@ export function SigmaPage() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [historyMonthFilter, setHistoryMonthFilter] = useState('');
   const [historyYearFilter, setHistoryYearFilter] = useState('');
+  const [testSearch, setTestSearch] = useState('');
   useEffect(() => { setSelectedPeriodId(null); setHistoryMonthFilter(''); setHistoryYearFilter(''); }, [testId]);
-  const [trackingPickerOpen, setTrackingPickerOpen] = useState(false);
   const [biasModal, setBiasModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [muModal, setMuModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [cohortModal, setCohortModal] = useState<{ period: SigmaPeriodView; cohorts: SigmaCohortView[] } | null>(null);
@@ -193,16 +188,12 @@ export function SigmaPage() {
   const navigate = useNavigate();
 
   useEffect(() => { loadTests(); loadTeaRefs(); loadInstruments(); }, [loadTests, loadTeaRefs, loadInstruments]);
-  // App cũ (`sigma-page-controller.ts`: `if (!ui().sgTest || !tests.find(...))
-  // ui().sgTest = tests[0].id`) TỰ CHỌN xét nghiệm đầu tiên trong danh sách
-  // theo dõi — mở trang là thấy ngay bảng kỳ. Bản app để rỗng nên chỉ
-  // render vỏ, gate parity đo được 73 class thiếu chỉ vì lý do này (cùng lớp
-  // với trang Nhập QC ở D3.5).
+  // Mọi xét nghiệm đã khai trong Cấu hình chung đều có thể được đánh giá
+  // Sigma. Tự chọn dòng đầu tiên để mở trang là thấy ngay không gian làm việc.
   useEffect(() => {
-    const tracked = tests.filter((item) => item.sigma_tracked !== 0);
-    if (!tracked.length) { if (testId) setTestId(''); return; }
-    if (testId && tracked.some((t) => t.id === testId)) return;
-    setTestId(tracked[0].id);
+    if (!tests.length) { if (testId) setTestId(''); return; }
+    if (testId && tests.some((item) => item.id === testId)) return;
+    setTestId(tests[0].id);
   }, [tests, testId]);
   useEffect(() => { loadPeriods(testId); if (testId) loadLevels(testId); }, [testId, loadPeriods, loadLevels]);
   useStoreInvalidation(['sigma_data', 'qc_points', 'actions', 'app_meta'], testId || undefined, () => { if (testId) loadPeriods(testId); });
@@ -212,7 +203,7 @@ export function SigmaPage() {
     if (testId) loadPeriods(testId);
   });
 
-  const sigmaTests = tests.filter((item) => item.sigma_tracked !== 0);
+  const sigmaTests = tests;
   const test = tests.find((t) => t.id === testId);
   const sourceTargetMean = (levelsByTestId[testId] || []).find((level) => Number.isFinite(level.mean) && level.mean !== 0)?.mean;
   const teaResolution = useMemo(
@@ -221,6 +212,23 @@ export function SigmaPage() {
   );
   const admin = isAdmin(useAuthStore((s) => s.user)?.role);
   const instrumentName = instruments.find((i) => i.id === test?.instrument_id)?.name || '';
+  // Cùng một analyte có thể được khai trên nhiều máy. `tests` giữ từng tổ
+  // hợp xét nghiệm–máy riêng, nên nhãn selector phải nêu máy để không chọn
+  // nhầm cấu hình/chuỗi kỳ Sigma của máy khác.
+  const sigmaTestLabel = (item: typeof tests[number]) => {
+    const machine = instruments.find((instrument) => instrument.id === item.instrument_id)?.name;
+    return machine ? `${item.name} — ${machine}` : item.name;
+  };
+  const normalizedTestSearch = testSearch.trim().toLocaleLowerCase('vi');
+  const visibleSigmaTests = useMemo(() => sigmaTests.filter((item) => {
+    if (!normalizedTestSearch) return true;
+    const machine = instruments.find((instrument) => instrument.id === item.instrument_id)?.name || '';
+    return [item.name, machine, item.unit, item.section].some((value) => value.toLocaleLowerCase('vi').includes(normalizedTestSearch));
+  }), [sigmaTests, instruments, normalizedTestSearch]);
+  const selectedVisible = visibleSigmaTests.some((item) => item.id === testId);
+  useEffect(() => {
+    if (normalizedTestSearch && visibleSigmaTests.length && !selectedVisible) setTestId(visibleSigmaTests[0].id);
+  }, [normalizedTestSearch, visibleSigmaTests, selectedVisible]);
   useEffect(() => {
     if (test?.tea_source && TEA_SOURCES.some((source) => source.value === test.tea_source)) setTeaSource(test.tea_source);
     else setTeaSource('lab');
@@ -255,7 +263,7 @@ export function SigmaPage() {
     const result = await saveTeaConfigStore({
       testId: test.id, source: nextSource,
       // EFLM do người dùng nhập; catalog/hồ sơ Lab không được tái dùng số
-      // TEa cũ của nguồn khác khi đổi nguồn.
+      // TEa của nguồn khác khi đổi nguồn.
       tea: patch.tea === undefined ? (nextSource === 'eflm' ? undefined : (resolved.value ?? 0)) : (patch.tea === '' ? 0 : Number(patch.tea)),
       eflmAnalyte: patch.eflmAnalyte ?? test.eflm_analyte,
       eflmAps: patch.eflmAps ?? test.eflm_aps,
@@ -309,9 +317,8 @@ export function SigmaPage() {
 
   function saveOwnedPeriod(period: SigmaPeriodView, levels: SigmaLevelSaveInput[]) {
     if (period.testId !== currentTest.current || useSigmaStore.getState().loading) return Promise.resolve({ ok: false as const, error: { code: 'stale-sigma-view', message: 'Xét nghiệm hoặc dữ liệu đang xem đã thay đổi. Vui lòng tải lại kỳ trước khi lưu.' } });
-    // Bản ghi kỳ cũ có thể mang tên nguồn TEa của phiên bản trước. Không gửi
-    // mã đó qua IPC (handler cố ý từ chối); dùng nguồn cấu hình hiện hành để
-    // tiếp tục sửa kỳ. Snapshot TEa hợp lệ của kỳ vẫn được giữ nguyên.
+    // Nếu mã nguồn TEa đã lưu không còn hợp lệ, dùng nguồn cấu hình hiện hành
+    // để tiếp tục sửa kỳ. Snapshot TEa hợp lệ của kỳ vẫn được giữ nguyên.
     const teaSource = isKnownTeaSource(period.teaSource) ? period.teaSource : configuredTeaSource;
     return savePeriod(period.testId, period.period, period.tea ?? undefined, teaSource, levels);
   }
@@ -329,40 +336,55 @@ export function SigmaPage() {
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
 
-  /** Bảng xuất/in: 1 hàng cho mỗi (kỳ × mức) — cùng bộ cột với bảng trên
-   * màn hình để người đọc file đối chiếu được. */
-  const exportRows = (rows: SigmaPeriodView[]) => rows.flatMap((p) => p.levels.map((lv) => [
-    vnPeriod(p.period), `Mức ${lv.level}`, lv.tea ?? p.tea ?? '', lv.targetMean ?? '', lv.cv ?? '', lv.biasEqa ?? '', lv.biasMean ?? '', lv.sigma ? Number(lv.sigma.sigma.toFixed(2)) : '',
-    lv.sigma ? formatDpmo(lv.sigma.dpmo) : '', ...sigmaMuExport(lv),
-  ]));
-  const EXPORT_HEADERS = ['Kỳ', 'Mức', 'TEa% snapshot', 'Mean mục tiêu', 'CV IQC%', 'Bias RMS EQA%', 'Bias TB có dấu%', 'Sigma', 'DPMO tham khảo (dịch 1,5σ)', 'U (k=2)%', `U tại Mean (${test?.unit || 'đơn vị xét nghiệm'})`, 'U / TEa%', 'Trạng thái MU', 'Mô hình MU', 'u(Cref)%', 'u(cal)%', 'Tiêu chí TEa', 'Nguồn CV', 'Rà soát IQC'];
-
   async function exportPeriod(period: SigmaPeriodView) {
-    const error = await exportTableXlsx(`Sigma ${period.period}`, EXPORT_HEADERS, exportRows([period]), `sigma-${test?.name || 'xet-nghiem'}-${period.period}.xlsx`);
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (!test) return;
+    const error = await exportSigmaReportXlsx({ test, instrumentName, periods: [period], mode: 'period' });
+    if (error) await infoDialog(error, { title: 'Không xuất được báo cáo kỳ', type: 'warn' });
   }
   async function exportAllPeriods() {
-    const error = await exportTableXlsx('Sigma tong hop', EXPORT_HEADERS, exportRows(periods), `sigma-${test?.name || 'xet-nghiem'}-tong-hop.xlsx`);
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (!test) return;
+    const error = await exportSigmaReportXlsx({ test, instrumentName, periods, mode: 'comparison' });
+    if (error) await infoDialog(error, { title: 'Không xuất được báo cáo các kỳ', type: 'warn' });
   }
-  function printHtml(title: string, rows: SigmaPeriodView[]): string {
-    const exported = exportRows(rows);
-    const headers = EXPORT_HEADERS.slice(0, 12);
-    const body = exported.map((r) => `<tr>${r.slice(0, 12).map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
-    const provenance = exported.map(row => `<p><b>${escapeHtml(row[0])} · ${escapeHtml(row[1])}</b><br>${row.slice(12).map((cell, index) => `${escapeHtml(EXPORT_HEADERS[index + 12])}: ${escapeHtml(cell)}`).join(' · ')}</p>`).join('');
-    return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${title}</title>
-      <style>@page{size:A4 landscape;margin:12mm}body{font:11px system-ui,sans-serif;color:#163541;padding:0}h1{font-size:17px}
-      table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #c9d9e0;padding:5px;text-align:left;overflow-wrap:anywhere}tr,p{break-inside:avoid}
-      th{background:#eef4f7;print-color-adjust:exact;-webkit-print-color-adjust:exact}</style></head>
-      <body><h1>${escapeHtml(title)}</h1><div>${escapeHtml(test?.name)}</div>
-      <table><thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table><h2>Nguồn và điều kiện đánh giá</h2>${provenance}</body></html>`;
-  }
+
   async function printPeriod(period: SigmaPeriodView) {
-    const error = await printHtmlToPdf(printHtml(`Six Sigma — ${vnPeriod(period.period)}`, [period]), `sigma-${period.period}.pdf`);
+    if (!test) return;
+    // Đọc ngay trước lúc mở hộp in để tên bệnh viện/khoa luôn là hồ sơ đã
+    // đồng bộ hiện hành, kể cả khi Cài đặt vừa được chỉnh ở cửa sổ khác.
+    const [lab, template] = await Promise.all([window.qcApi.getLabProfile(), window.qcApi.getReportTemplateSettings()]);
+    const error = await printHtmlToPdf(buildSigmaPeriodPrintHtml({
+      title: `Báo cáo Six Sigma — ${vnPeriod(period.period)}`,
+      labName: lab.name,
+      labDept: lab.dept,
+      labAddress: lab.address,
+      logoData: lab.logo_data,
+      formCode: template.formCode,
+      formVersion: template.version,
+      testName: test.name,
+      unit: test.unit,
+      instrumentName,
+      teaSource: TEA_SOURCES.find((source) => source.value === teaSource)?.label || teaSource,
+      teaCriterion: teaSourceValueText(teaSource),
+      period,
+    }), `Báo cáo Six Sigma - ${period.period}.pdf`, { pageNumbers: true });
     if (error) await infoDialog(error, { type: 'warn' });
   }
   async function printAllPeriods() {
-    const error = await printHtmlToPdf(printHtml('Six Sigma — tổng hợp các kỳ', periods), 'sigma-tong-hop.pdf');
+    if (!test) return;
+    const [lab, template] = await Promise.all([window.qcApi.getLabProfile(), window.qcApi.getReportTemplateSettings()]);
+    const error = await printHtmlToPdf(buildSigmaComparisonPrintHtml({
+      title: 'Báo cáo tổng hợp theo dõi Six Sigma — so sánh các kỳ',
+      labName: lab.name,
+      labDept: lab.dept,
+      labAddress: lab.address,
+      logoData: lab.logo_data,
+      formCode: template.formCode,
+      formVersion: template.version,
+      testName: test.name,
+      unit: test.unit,
+      instrumentName,
+      periods,
+    }), `Báo cáo tổng hợp Six Sigma - ${test.name}.pdf`, { pageNumbers: true });
     if (error) await infoDialog(error, { type: 'warn' });
   }
 
@@ -406,22 +428,13 @@ export function SigmaPage() {
     return true;
   }
 
-  async function setTracking(nextTestId: string, tracked: boolean) {
-    const result = await setSigmaTrackingStore(nextTestId, tracked);
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
-    await loadTests();
-    if (tracked) { setTestId(nextTestId); setTrackingPickerOpen(false); }
-  }
-
   if (!sigmaTests.length) {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       <div className="panel"><div className="empty-state analysis-empty-state">
-        <b>Chưa có xét nghiệm nào trong Sigma</b>
-        <span>{admin ? 'Bấm “+ Thêm xét nghiệm” để chọn từ danh mục đã khai báo trong Cấu hình chung.' : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.'}</span>
-        {admin && <button className="btn teal" onClick={() => setTrackingPickerOpen(true)}>+ Thêm xét nghiệm</button>}
+        <b>Chưa có xét nghiệm trong danh mục QC</b>
+        <span>Hãy khai báo xét nghiệm trong Cấu hình chung trước khi đánh giá Six Sigma.</span>
       </div></div>
-      {trackingPickerOpen && <SigmaTrackingModal tests={tests} onClose={() => setTrackingPickerOpen(false)} onTrack={(id) => setTracking(id, true)} />}
     </>;
   }
 
@@ -429,14 +442,12 @@ export function SigmaPage() {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       <div className="panel sg-no-level-panel">
-        <div className="row-flex sg-control-row"><div className="sg-test-picker"><label>Chọn xét nghiệm</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{sigmaTests.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-          {admin && <div className="sg-inline-btns"><label>&nbsp;</label><div className="sg-inline-btns-row"><button className="btn teal" onClick={() => setTrackingPickerOpen(true)}>+ Thêm</button><button className="btn danger" onClick={() => setTracking(testId, false)}>Xóa</button></div></div>}
+        <div className="row-flex sg-control-row"><div className="sg-test-picker"><label>Chọn xét nghiệm</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{sigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}</select></div>
         </div>
         <div className="alert warn sg-no-level-alert">Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.
           {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'mean-sd' } })}>Cấu hình Mean/SD</button>}
         </div>
       </div>
-      {trackingPickerOpen && <SigmaTrackingModal tests={tests} onClose={() => setTrackingPickerOpen(false)} onTrack={(id) => setTracking(id, true)} />}
     </>;
   }
 
@@ -454,28 +465,24 @@ export function SigmaPage() {
       {loadError && <div className="alert warn" role="alert">{loadError} <button className="btn ghost sm" onClick={() => loadPeriods(testId)}>Thử lại</button></div>}
       <div className="sg-top-grid">
         <div className="panel">
-          <h2 className="sg-setup-heading panel-title">Thiết lập phân tích</h2>
+          <div className="sg-setup-heading">
+            <h2 className="panel-title">Thiết lập phân tích</h2>
+            <div className="sg-setup-search">
+              <input type="search" value={testSearch} onChange={(event) => setTestSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setTestSearch(''); }} placeholder="Tìm nhanh xét nghiệm…" aria-label="Tìm nhanh xét nghiệm" />
+            </div>
+          </div>
           <div className="row-flex sg-control-row">
             <div className="sg-test-picker">
               <label>Chọn xét nghiệm</label>
-              <select id="sgTestSelect" aria-label="Chọn xét nghiệm" value={testId} onChange={(e) => setTestId(e.target.value)}>
-                {sigmaTests.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              <select id="sgTestSelect" aria-label="Chọn xét nghiệm" value={selectedVisible ? testId : ''} onChange={(event) => { setTestId(event.target.value); setTestSearch(''); }}>
+                {!visibleSigmaTests.length && <option value="" disabled>Không tìm thấy xét nghiệm phù hợp</option>}
+                {visibleSigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}
               </select>
             </div>
-            {admin && (
-              <div className="sg-inline-btns">
-                <label>&nbsp;</label>
-                <div className="sg-inline-btns-row">
-                  <button className="btn teal" onClick={() => setTrackingPickerOpen(true)}>+ Thêm</button>
-                  <button className="btn danger" onClick={() => setTracking(testId, false)}><TrashIcon />Xóa</button>
-                </div>
-              </div>
-            )}
+            <div className="sg-unit-field"><label>Đơn vị</label><input value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
+            <div className="sg-instrument-field"><label>Thiết bị</label><input value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
           </div>
           <div className="sg-setup-fields sg-analysis-fields">
-            <div><label>Tên xét nghiệm</label><input value={test?.name || ''} aria-label="Tên xét nghiệm" readOnly /></div>
-            <div><label>Đơn vị</label><input value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
-            <div><label>Thiết bị</label><input value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
             <div className="sg-tea-source">
               <label>Nguồn TEa</label>
               <select aria-label="Nguồn TEa" disabled={!writable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
@@ -608,7 +615,18 @@ export function SigmaPage() {
                 {admin && <RowActionButton kind="delete" label={`Xóa kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => removePeriodRow(displayPeriod)} />}
               </div>
             </section>
-          </div> : <div className="empty sg-period-empty">Chưa có kỳ nào. Hãy thêm kỳ đánh giá để bắt đầu.</div>}
+          </div> : <div className="empty sg-period-empty">
+            <div className="empty-title">{operationalLevels.length > 0 ? 'Chưa có kỳ đánh giá' : 'Chưa có mức QC đang vận hành'}</div>
+            <div>{operationalLevels.length === 0
+              ? 'Cần cấu hình ít nhất một mức QC đang vận hành trước khi thêm kỳ đánh giá.'
+              : writable
+                ? 'Thêm kỳ đánh giá để ghi nhận CV IQC, Bias EQA/EQC và theo dõi Sigma.'
+                : 'Liên hệ người có quyền ghi để thêm kỳ đánh giá.'}
+            </div>
+            {writable && operationalLevels.length > 0 && <div className="empty-actions">
+              <button className="btn teal" onClick={() => setAddPeriodOpen(true)}>+ Thêm kỳ</button>
+            </div>}
+          </div>}
           {periods.length > 0 && (
             <div className="sg-data-foot">
               <button className="btn teal" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" onClick={exportAllPeriods}><DownloadIcon />Xuất Excel</button>
@@ -748,54 +766,8 @@ export function SigmaPage() {
           return result;
         }} />
       )}
-      {trackingPickerOpen && <SigmaTrackingModal tests={tests} onClose={() => setTrackingPickerOpen(false)} onTrack={(id) => setTracking(id, true)} />}
     </div>
   );
-}
-
-function SigmaTrackingModal({ tests, onClose, onTrack }: { tests: Test[]; onClose: () => void; onTrack: (id: string) => void }) {
-  const navigate = useNavigate();
-  const [query, setQuery] = useState('');
-  const q = query.trim().toLocaleLowerCase('vi');
-  const rows = tests.filter((test) => !q || [test.name, test.unit, test.section].some((value) => value.toLocaleLowerCase('vi').includes(q)));
-  const availableCount = tests.filter((test) => test.sigma_tracked === 0).length;
-  function openTestCatalog() {
-    onClose();
-    navigate('/manage', { state: { tab: 'tests' } });
-  }
-  return <Modal title="Thêm xét nghiệm vào Six Sigma" onClose={onClose} className="sg-tracking-modal" footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-    <div className="sg-tracking-toolbar">
-      <div className="sg-tracking-heading">
-        <div><b>Chọn từ danh mục xét nghiệm</b><span className="sg-tracking-subtitle">Thêm xét nghiệm cần theo dõi hiệu năng bằng Six Sigma.</span></div>
-        <span className="sg-tracking-count">{availableCount} có thể thêm</span>
-      </div>
-      <label htmlFor="sgTrackingSearch">Tìm xét nghiệm</label>
-      <div className="sg-tracking-search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></svg>
-        <input id="sgTrackingSearch" className="sg-tracking-search-input" type="search" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tên xét nghiệm, khoa hoặc đơn vị..." />
-        {query && <button type="button" aria-label="Xóa từ khóa tìm kiếm" onClick={() => setQuery('')}>✕</button>}
-      </div>
-    </div>
-    <div className="sg-tracking-list" aria-live="polite">
-      {rows.map((test) => <div className="sg-tracking-row" key={test.id}>
-        <div className="sg-tracking-test">
-          <span className="sg-tracking-mark" aria-hidden="true">Σ</span>
-          <div><b>{test.name}</b><span>{[test.section, test.unit].filter(Boolean).join(' · ') || 'Chưa có thông tin bổ sung'}</span></div>
-        </div>
-        {test.sigma_tracked !== 0 ? <span className="badge ok">Đang theo dõi</span> : <button className="btn teal sm" onClick={() => onTrack(test.id)}>+ Thêm</button>}
-      </div>)}
-      {!rows.length && <div className="sg-tracking-empty" role="status">
-        <div className="sg-tracking-empty-icon" aria-hidden="true">
-          <svg viewBox="0 0 32 32"><path d="M8 6h16M10 6v7l-5 10.2A2 2 0 0 0 6.8 26h18.4a2 2 0 0 0 1.8-2.8L22 13V6" /><path d="M8.2 20h15.6" /><path d="M13 15.5h6" /></svg>
-        </div>
-        <b>{tests.length ? 'Không tìm thấy xét nghiệm phù hợp' : 'Danh mục xét nghiệm đang trống'}</b>
-        <p>{tests.length ? 'Thử tên xét nghiệm, khoa hoặc đơn vị khác.' : 'Hãy khai báo xét nghiệm trong Cấu hình chung trước khi thêm vào Six Sigma.'}</p>
-        {tests.length
-          ? <button type="button" className="btn ghost sm" onClick={() => setQuery('')}>Xóa từ khóa</button>
-          : <button type="button" className="btn teal sm" onClick={openTestCatalog}>Mở Cấu hình chung</button>}
-      </div>}
-    </div>
-  </Modal>;
 }
 
 function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
@@ -977,3 +949,5 @@ function MuModal({ level, onClose, onSubmit }: {
     </Modal>
   );
 }
+
+

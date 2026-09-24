@@ -5,9 +5,8 @@
 // LIÊN MỨC (cùng `run_id`) và số lượng mức quyết định một luật chạy ở phạm vi
 // within hay across (`makeScopeOf`). Trước 2026-09-10 `activeLevels()` trả MỌI
 // dòng `test_levels`, nên một mức thuộc nhóm lô ĐÃ DỪNG vẫn kéo vào và làm
-// điểm của mức đang chạy nổ `2-2s` → "Loại bỏ", trong khi app cũ
-// (`operationalLevels()` + `qcOperationalAccess.lotPoints()`) chỉ cảnh báo
-// `1-2s`. Đây là lệch KẾT LUẬN, không phải lệch hiển thị.
+// điểm của mức đang chạy nổ `2-2s` → "Loại bỏ". Chỉ các mức đang vận hành
+// mới được đưa vào đánh giá; đây là vấn đề kết luận, không phải hiển thị.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -21,7 +20,7 @@ const actor = { userId: 'u1', username: 'admin', name: 'Quan tri', role: 'admin'
 /** Dựng 1 xét nghiệm 2 mức, mỗi mức 1 nhóm lô riêng, cùng 1 lần chạy có cả
  * hai mức lệch +2,5SD cùng chiều (điều kiện của 2-2s liên mức). Ghi điểm
  * THẲNG vào bảng: cổng `addPoint()` sẽ chặn mức không vận hành, mà ở đây cần
- * dữ liệu đã tồn tại (di trú, hoặc nhóm lô bị dừng SAU khi đã nhập). */
+ * dữ liệu đã tồn tại (hoặc nhóm lô bị dừng sau khi đã nhập). */
 function scenario({ groupBStatus, groupBActive = 1, panelActive = 1 }) {
   const db = openDatabase(':memory:');
   const config = createConfigHandlers(db);
@@ -70,8 +69,8 @@ for (const state of [{ groupBStatus: 'stopped' }, { groupBStatus: 'planned' }, {
   assert.deepEqual(westgard.analyzeLevel(test.id, 2).points, []);
 }
 
-// 3) Xét nghiệm KHÔNG nằm trong Panel QC đang hoạt động: app cũ vẫn giữ mức
-//    trong danh sách nhưng `lotPoints()` trả rỗng, nên tổng quan hiện mức với
+// 3) Xét nghiệm không nằm trong Panel QC đang hoạt động vẫn giữ mức trong
+//    danh sách nhưng không nạp điểm, nên tổng quan hiện mức với
 //    0 điểm thay vì biến mất — giữ đúng sự phân biệt đó.
 {
   const { westgard, test } = scenario({ groupBStatus: '', panelActive: 0 });
@@ -91,3 +90,5 @@ for (const state of [{ groupBStatus: 'stopped' }, { groupBStatus: 'planned' }, {
 }
 
 console.log('app westgard active-levels end-to-end tests passed');
+
+

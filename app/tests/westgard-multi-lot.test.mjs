@@ -77,4 +77,6 @@ assert.equal(currentSummary.worstVerdict, 'ok');
 const oldStillStored = db.prepare('SELECT id,lot FROM qc_points WHERE id=?').get(high.data.id);
 assert.equal(oldStillStored.lot, 'LOT-L1-CU', 'đổi lô không được xóa hoặc sửa mất điểm lịch sử');
 
-console.log('app current-lot + multi-level Westgard tests passed');
+console.log('current-lot + multi-level Westgard tests passed');
+
+

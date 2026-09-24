@@ -112,7 +112,7 @@ function drawLjCircles(points, mean, sd) {
   const source = readFileSync(new URL('../renderer/components/QcChart.tsx', import.meta.url), 'utf8');
   const section = [
     source.slice(source.indexOf('function isRunCollateral('), source.indexOf('export interface QcChartCusum')),
-    source.slice(source.indexOf('function geometry('), source.indexOf('/** Màu theo MỨC cho biểu đồ tổng hợp')),
+    source.slice(source.indexOf('function geometry('), source.indexOf('const MULTI_COLORS')),
   ].join('\n');
   const LJ = { okBand: 'band', okMid: 'band', warnBand: 'band', rejectBand: 'band', grid: 'grid', mean: 'mean', line: 'line', okPoint: 'OK', warnPoint: 'WARN', rejectPoint: 'REJ' };
   const context = vm.createContext({ vnDayMonth: (date) => date, LJ, BANDS: [] });
@@ -301,11 +301,22 @@ test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại
   assert.match(page, /Tổng ghi nhận \{recorded\.length\}/);
 });
 
+test('EN13: thẻ biểu đồ là vùng thông tin, không lồng tương tác giả; số điểm nói rõ phần dùng thống kê', () => {
+  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const chart = readFileSync(new URL('../renderer/components/QcChart.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /role="button" tabIndex=\{0\}/,
+    'không đặt role button cho cả thẻ khi bên trong còn có nút Xem lô cũ');
+  assert.match(page, /const chartPointSummary = acceptedCount === chartPoints\.length/,
+    'tiêu đề biểu đồ phân biệt tổng hiển thị với n dùng thống kê');
+  assert.match(chart, /role="img" aria-label=\{chartAriaLabel\}/,
+    'canvas có mô tả thay thế cho công cụ hỗ trợ');
+});
+
 test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận Westgard', () => {
   const { db, test: subject, entry } = twoOperationalLevels();
   const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
-  // Điểm vượt +3,5SD: bản cũ dán `verdict:'rej'` bằng ngưỡng z thuần, trùng
-  // tên và trùng kiểu với verdict Westgard thật nhưng mang nghĩa khác hẳn.
+  // Điểm vượt +3,5SD phải nhận verdict từ engine Westgard, không từ một ngưỡng
+  // z-score hiển thị độc lập.
   ins.run('a0', subject.id, 1, '2026-09-01', '2026-09-01-1', 107, 'A1', 100, 2);
   const [point] = entry.listHistoryPoints(subject.id);
   assert.equal('verdict' in point, false, 'không còn trường verdict');
@@ -317,3 +328,5 @@ test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận 
   assert.equal(point.qc_mean, 100);
   assert.equal(point.qc_sd, 2);
 });
+
+

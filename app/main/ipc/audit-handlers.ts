@@ -1,16 +1,3 @@
-// IPC handler cho trang Nhật ký hoạt động (Audit log). Đọc bảng `activity`
-// (đã ghi sẵn từ module đầu tiên qua shared.ts's writeAudit) qua bộ lọc/phân
-// trang THUẦN đã được port sẵn từ bản cũ trong domain/audit-filter.ts nhưng
-// chưa từng được nối vào IPC/renderer nào — đây là lần đầu.
-//
-// CẢ 5 hàm đều là admin-only, kể cả 4 hàm ĐỌC (`query`/`previewArchive`/
-// `exportCsv`/`verifyChainNow`): trang Nhật ký là ADMIN_ONLY trong
-// `page-roles.ts`, và
-// nhật ký chứa tên tài khoản + mọi thao tác của từng người — chặn ở renderer
-// thôi thì gọi thẳng `window.qcApi.queryActivity()` từ DevTools vẫn đọc
-// được toàn bộ. Đây là lý do 4 hàm đó trả `IpcResult` chứ không trả thẳng
-// dữ liệu như các hàm đọc khác của app (điểm QC, báo cáo, Westgard — những
-// trang mở cho mọi vai trò).
 import type { Db } from '../db/sqlite-like';
 // Hình dạng trang nhật ký lấy từ hợp đồng dùng chung (đã có `total`).
 import type { ActivityArchivePreview, ActivityPage } from '../../shared/qc-api';
@@ -64,16 +51,13 @@ export function createAuditHandlers(db: Db) {
     return all.filter((activity) => activity.ts < cutoffIso);
   }
 
-  /** Đọc TOÀN BỘ activity theo thứ tự tăng dần seq rồi mới lọc/đảo chiều —
-   * `filterActivity()` tự đảo về mới-nhất-trước ở bước cuối, truyền nhầm
-   * mảng đã DESC sẵn (như `config.listActivity()`) sẽ đảo ngược 2 lần thành
-   * cũ-nhất-trước, sai với quy ước hiển thị của bản cũ. */
+
   function query(input: AuditQueryInput, actor: Actor): IpcResult<ActivityPage> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const all = allChronological();
     const filtered = filterActivity(all, String(input.query || ''), String(input.from || ''), String(input.to || ''));
     // `total` = TOÀN BỘ nhật ký (không phụ thuộc bộ lọc) — trang Nhật ký của
-    // app cũ hiện cả "N dòng hoạt động đã ghi nhận" và "khớp/tổng".
+    // hệ thống hiện cả "N dòng hoạt động đã ghi nhận" và "khớp/tổng".
     const page = paginateActivity(filtered, Number(input.page) || 1, Number(input.pageSize) || 25);
     // `paginateActivity` là hàm thuần generic trên `ActivityLike`; hợp đồng
     // khai `rows: ActivityEntry[]`. Hai hình dạng khớp nhau ở runtime (cùng
@@ -81,7 +65,7 @@ export function createAuditHandlers(db: Db) {
     return { ok: true, data: { ...page, rows: page.rows as ActivityPage['rows'], total: all.length } };
   }
 
-  /** App cũ luôn xuất TOÀN BỘ nhật ký theo thứ tự ghi (cũ đến mới), không
+  /** hệ thống luôn xuất TOÀN BỘ nhật ký theo thứ tự ghi (cũ đến mới), không
    * phụ thuộc bộ lọc đang xem. Đây là bản lưu vết để đối chiếu, không phải
    * chức năng xuất kết quả tìm kiếm. Giữ `input` để không phá tương thích IPC
    * với preview/bản đã cài; cố ý không dùng các giá trị trong đó. */
@@ -91,8 +75,7 @@ export function createAuditHandlers(db: Db) {
   }
 
   /** Xem trước đúng đoạn sắp được gỡ. Renderer dùng CSV này trước bước xác
-   * nhận cuối; main vẫn tính lại đoạn cắt khi thực thi, không tin số đếm từ
-   * renderer. */
+   * nhận cuối; main vẫn tính lại đoạn cắt khi thực thi, không tin số đếm từ giao diện. */
   function previewArchive(input: AuditArchiveInput, actor: Actor): IpcResult<ActivityArchivePreview> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const window = archiveWindow(input.data?.months);
@@ -149,3 +132,4 @@ export function createAuditHandlers(db: Db) {
 }
 
 export type AuditHandlers = ReturnType<typeof createAuditHandlers>;
+

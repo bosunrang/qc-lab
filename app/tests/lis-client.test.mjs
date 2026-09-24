@@ -1,7 +1,3 @@
-// Giai đoạn C5: kiểm chứng hàm THUẦN của client LIS Gateway — không cần DB
-// hay gateway thật. Pin đúng 2 nguyên tắc bắt buộc port từ bản cũ: allowlist
-// origin, và ngày điểm QC suy từ GIỜ ĐỊA PHƯƠNG của measuredAt (không cắt
-// chuỗi ISO UTC).
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -16,10 +12,6 @@ assert.equal(normalizeGatewayUrl('http://127.0.0.1:9999'), '', 'sai port cung ph
 assert.equal(normalizeGatewayUrl('khong-phai-url'), '');
 assert.equal(normalizeGatewayUrl(''), '');
 
-// 2) Ngay dung GIO DIA PHUONG - khong cat chuoi ISO UTC. 23:05Z la 1 ngay
-// khac o gio dia phuong dai duong (VN +7 -> 06:05 ngay hom sau); dung chinh
-// cach tinh cua ham (local getters) de lam gia tri ky vong, tranh hardcode
-// mui gio cu the (test phai chay dung tren moi may, moi mui gio).
 function localYmd(iso) {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -36,12 +28,10 @@ assert.equal(input.val, 101);
 assert.equal(input.runId, 'r1');
 assert.equal(input.operatorName, 'ktv1');
 
-// 3) measuredAt khong parse duoc -> null, KHONG fallback ve "hom nay"
 assert.equal(resultToPointInput({ message: { measuredAt: 'khong-phai-ngay' }, resolved: { ok: true, qclabTestId: 't1', level: 1 } }), null);
 
-// 4) Chi ban ghi da khop cau hinh (resolved.ok===true) moi tra ve input -
-// ban ghi UNMAPPED_TEST/UNMAPPED_LEVEL/UNIT_MISMATCH phai tra null (khong
-// tao diem QC voi testId/level rong)
 assert.equal(resultToPointInput({ message: { measuredAt: '2026-08-01T00:00:00Z' }, resolved: { ok: false, code: 'UNMAPPED_TEST', reason: 'chua mapping' } }), null);
 
 console.log('app lis-client oracle tests passed');
+
+

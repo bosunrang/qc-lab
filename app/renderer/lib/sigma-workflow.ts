@@ -42,3 +42,5 @@ export function sigmaMuExport(level: SigmaLevelResult): (string | number)[] {
     level.cohortStale ? 'Dữ liệu nền đã đổi; cần nạp và rà soát lại' : level.cohortReviewed ? `Đã rà soát: ${level.cohortReviewBy || ''}` : 'Chưa xác nhận rà soát IQC',
   ];
 }
+
+

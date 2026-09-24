@@ -1,27 +1,13 @@
-// ĐỐI CHIẾU BẢNG WESTGARD SIGMA RULES VỚI ĐỊNH NGHĨA CÔNG BỐ — không so với
-// app cũ.
-//
-// Vì sao cần file này: `cross-app-westgard-sigma.test.mjs` chỉ chứng minh hai
-// bản GIỐNG NHAU. Ở đúng hàm này thì app cũ (`QCCore.westgardSigmaRules()`)
-// dùng MỘT bảng duy nhất pha trộn hai bảng của Westgard, nên "giống app cũ"
-// nghĩa là cùng sai. File này chốt theo NGUỒN NGOÀI nên SỐNG TIẾP sau khi app
-// cũ bị cắt.
+// Đối chiếu bảng Westgard Sigma Rules với định nghĩa công bố.
 //
 // Nguồn: https://www.westgard.com/lessons/westgard-rules/westgard-rules/westgard-sigma-rules.html
 //
 //   2 mức QC:
-//     6σ   1-3s                          N=2 R=1
-//     5σ   1-3s/2-2s/R4s                 N=2 R=1
 //     4σ   1-3s/2-2s/R4s/4-1s            N=4 R=1  (hoặc N=2 R=2)
 //     <4σ  multirule kèm 8x              N=4 R=2  (hoặc N=2 R=4)
 //
 //   3 mức QC:
-//     6σ   1-3s                          N=3 R=1
-//     5σ   1-3s/2of3-2s/R4s              N=3 R=1
-//     4σ   1-3s/2of3-2s/R4s/3-1s         N=3 R=1
 //     <4σ  multirule kèm 6x              N=6 R=1  (hoặc N=3 R=2);
-//          "if a 9x rule were substituted for the 6x rule, then a day's work
-//           could be divided into 3 runs with 3 controls per run (N=3,R=3)"
 //
 // sigma-metrics.ts không import chéo module nào trong main/ nên import thẳng
 // .ts qua ESM được (giống eqa-rounds-stats.test.mjs).
@@ -88,8 +74,7 @@ const eq = (actual, expected, label) => { assert.deepEqual(actual, expected, lab
 
 // ---------------------------------------------------------------------------
 // 3) Hai bảng phải THẬT SỰ khác nhau — chốt riêng để một bản cài đặt bỏ qua
-//    `levelCount` (đúng lỗi của app cũ và của bản app trước 11/09) không
-//    thể lọt qua bộ test này.
+//    `levelCount` không thể lọt qua bộ test này.
 // ---------------------------------------------------------------------------
 for (const sigma of [6.5, 5.2, 4.3, 3.2, 2.0]) {
   const two = sigmaQualityDesign(sigma, 2);
@@ -117,8 +102,7 @@ eq(sigmaQualityDesign(5, 1), null, '1 mức → không có gợi ý Sigma Rules'
 eq([sigmaQualityDesign(5, 2).levels, sigmaQualityDesign(5, 2).levelCount], [2, 2], '2 mức → bảng 2 mức');
 eq([sigmaQualityDesign(5, 3).levels, sigmaQualityDesign(5, 3).levelCount], [3, 3], '3 mức → bảng 3 mức');
 eq([sigmaQualityDesign(5, 4).levels, sigmaQualityDesign(5, 4).levelCount], [3, 4], '4 mức → bảng 3 mức');
-// Thiếu `levelCount` giữ bảng 2 mức — cấu hình phổ biến nhất, và là hành vi
-// bảo toàn cho caller cũ.
+// Thiếu `levelCount` dùng bảng 2 mức mặc định.
 eq(sigmaQualityDesign(5).levels, 2, 'thiếu levelCount → bảng 2 mức');
 
 // ---------------------------------------------------------------------------
@@ -143,3 +127,5 @@ for (const bad of [null, undefined, '', 'abc', NaN, Infinity]) {
 }
 
 console.log(`Westgard Sigma Rules theo bảng công bố: ${checks} phép kiểm đều đúng`);
+
+

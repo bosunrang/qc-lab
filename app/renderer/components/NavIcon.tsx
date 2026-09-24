@@ -1,7 +1,3 @@
-// Icon sidebar — sao chép nguyên path SVG từ
-// src/presentation/router/router-icons.ts (bản cũ) để giữ đúng hình dạng
-// từng icon, không tự vẽ lại (dễ sai chi tiết, đặc biệt icon Westgard có
-// nhiều path+circle chồng nhau).
 import type { ReactNode } from 'react';
 
 const PATHS: Record<string, ReactNode> = {
@@ -33,3 +29,5 @@ export function NavIcon({ id }: { id: string }) {
     </svg>
   );
 }
+
+

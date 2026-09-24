@@ -1,6 +1,5 @@
-// Nhật ký hoạt động — Giai đoạn B8 (docs/APP-V2-PLAN.md): xuất CSV, lưu trữ
-// log cũ (12/24/36 tháng, qua reauth vì đây là thao tác không thể hoàn tác),
-// nút xác minh chuỗi hash thủ công.
+// Nhật ký hoạt động: xuất CSV, lưu trữ bản ghi cũ theo 12/24/36 tháng sau khi
+// xác thực lại và xác minh thủ công chuỗi hash.
 import { useEffect, useRef, useState } from 'react';
 import { useAuditStore, type ChainVerifyView } from '../store/audit-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -27,7 +26,7 @@ export function AuditPage() {
   const [archiving, setArchiving] = useState(false);
   const [chain, setChain] = useState<ChainVerifyView | null>(null);
   const chainEpoch = useRef(0);
-  /** Ngưỡng tự kiểm chuỗi hash — app cũ (`AUDIT_AUTO_VERIFY_MAX`) tự kiểm khi
+  /** Ngưỡng tự kiểm chuỗi hash — hệ thống (`AUDIT_AUTO_VERIFY_MAX`) tự kiểm khi
    * nhật ký còn nhỏ và chỉ đưa nút bấm khi log lớn, để không băm lại hàng
    * chục nghìn dòng mỗi lần mở trang. */
 
@@ -42,7 +41,7 @@ export function AuditPage() {
     return result;
   }
 
-  // Tự kiểm chuỗi hash khi nhật ký còn nhỏ, đúng app cũ.
+  // Tự kiểm chuỗi hash khi nhật ký còn nhỏ, đúng hệ thống.
   useEffect(() => {
     if (chain || !result.total || result.total > AUTO_VERIFY_MAX) return;
     // `r.ok` là cổng quyền, `r.data.ok` mới là kết luận chuỗi hash. Bị chặn
@@ -164,7 +163,7 @@ function AuditIntegrityStatus({
     return (
       <div className="audit-integrity-status">
         <span className="tag ok">Chuỗi hash hợp lệ</span>
-        <span>{chain.checked} dòng đã khóa hash{chain.legacy ? ` · ${chain.legacy} dòng cũ chưa có hash` : ''}</span>
+        <span>{chain.checked} dòng đã khóa hash{chain.unhashed ? ` · ${chain.unhashed} dòng chưa có hash` : ''}</span>
       </div>
     );
   }
@@ -229,3 +228,4 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
+

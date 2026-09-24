@@ -42,10 +42,7 @@ function groupSortPriority(g: LotGroup): number {
 }
 
 export function LotsTab() {
-  /** Tick/bỏ tick lô → ghi lại "Tên nhóm lô" bằng các số lô đang chọn, nối
-   * bằng "/" (port `suggestConfigGroupName()` app cũ: ghi ĐÈ, kể cả khi
-   * người dùng đã tự gõ tên — đúng hành vi bản cũ). Ghi thẳng vào DOM của
-   * form vì ô tên để uncontrolled, giống bản cũ. */
+
   function suggestGroupName(box: HTMLInputElement, checked: Set<string>) {
     const form = box.form;
     if (!form) return;
@@ -55,8 +52,7 @@ export function LotsTab() {
   }
 
   const { lots: allLots, lotGroups: allGroups, lotTransitions, saveLot, saveLotGroup, removeLot, removeLotGroup, stopLotGroup, activateLotGroup } = useManageStore();
-  /** Lô đã hết dùng chuyển tiếp SANG lô nào — port `transitionToNo()` app
-   * cũ: tra hồ sơ chuyển tiếp đã 'accepted' có `from_lot_id` đúng lô này. */
+
   const transitionToNo = (lotId: string): string | undefined => {
     const accepted = lotTransitions.find((tr) => tr.from_lot_id === lotId && tr.status === 'accepted');
     return accepted ? allLots.find((lot) => lot.id === accepted.to_lot_id)?.lot_no : undefined;
@@ -72,15 +68,14 @@ export function LotsTab() {
   const [groupErr, setGroupErr] = useState<string | null>(null);
   const [groupChecked, setGroupChecked] = useState<Set<string>>(new Set());
 
-  // Lọc theo cùng bộ field mà `manageMatch()` app cũ dùng cho tab này (số
+  // Lọc theo cùng bộ field mà `manageMatch()` hệ thống dùng cho tab này (số
   // lô, mô tả, nhà cung cấp, chương trình, tên nhóm lô, mức, hạn dùng).
   const q = query.trim().toLowerCase();
   const groupNameOfLot = (id: string) => allGroups.find((g) => g.lotIds.includes(id))?.name || '';
   const match = (values: unknown[]) => !q || values.some((v) => String(v ?? '').toLowerCase().includes(q));
   const lots = allLots.filter((l) => match([l.lot_no, l.description, l.supplier, l.program, groupNameOfLot(l.id), l.level, l.exp]));
-  // App cũ đặt class `levels-1|2|3plus` lên chính modal nhóm lô (bề rộng +
+  // hệ thống đặt class `levels-1|2|3plus` lên chính modal nhóm lô (bề rộng +
   // số cột lưới chọn lô thay đổi theo SỐ MỨC đang có lô), không dùng
-  // auto-fit — xem `.rcfg-group-modal.levels-*` trong professional-config.css.
   const groupLevelCount = new Set(allLots.map((l) => l.level)).size;
   const lotGroups = allGroups.filter((g) => match([g.name, g.note, ...g.lotIds.map((id) => allLots.find((l) => l.id === id)?.lot_no)]));
   const lotPageCount = Math.max(1, Math.ceil(lots.length / LOTS_PAGE_SIZE));
@@ -106,7 +101,7 @@ export function LotsTab() {
   /** Kích hoạt nhóm lô — áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
    * mức QC tương ứng và dừng nhóm bị thay thế. Đây là thao tác ghi vào cấu
    * hình QC đang vận hành nên đi qua `reauthDialog` như mọi thao tác Mean/SD
-   * khác (cùng danh sách thao tác nhạy cảm của app cũ). */
+   * khác (cùng danh sách thao tác nhạy cảm của hệ thống). */
   async function activateGroup(group: LotGroup) {
     if (!(await confirmDialog(
       `Áp dụng Mean/SD của nhóm lô ${group.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`
@@ -139,11 +134,6 @@ export function LotsTab() {
       note: editingLot !== 'new' && editingLot ? editingLot.note : '',
     };
     const id = editingLot !== 'new' && editingLot ? editingLot.id : undefined;
-    // Đổi số lô là VIẾT LẠI HÀNG LOẠT bản ghi lịch sử (nhãn lô nằm trên từng
-    // điểm QC), không phải sửa một ô cấu hình — người dùng phải thấy con số
-    // TRƯỚC khi làm, không chỉ đọc được trong nhật ký SAU khi làm. Hỏi trước
-    // khi gọi `saveLot` nên bấm Hủy là không còn dấu vết gì. Port đúng cách
-    // `saveConfigLot()` app cũ hỏi.
     if (id) {
       // Chỉ ĐẾM để hỏi người dùng trước khi ghi (không ghi gì, không hiển
       // thị lâu dài) — đọc tức thời là đúng, không cần store.
@@ -230,22 +220,6 @@ export function LotsTab() {
         <div className="rcfg-panel-h"><h3>Nhóm lô QC</h3><button className="btn teal sm" onClick={openNewGroup}>+ Thêm nhóm lô</button></div>
         {lotGroups.length ? <div className="lot-group-list">{pagedLotGroups.map((g) => {
           const groupLots = allLots.filter((lot) => g.lotIds.includes(lot.id));
-          // `archived` (nhóm "Đã lưu trữ" do CHẤP NHẬN chuyển tiếp lô tạo ra,
-          // `active=0`) KHÁC hẳn "Đã dừng" (`status='stopped'`, tự tay bấm
-          // Dừng, `active` vẫn 1) — port `lotGroupStatus()`/`lotGroupToggleAction()`
-          // app cũ: nhóm lưu trữ không có nút Kích hoạt/Dừng (lô bên trong đã
-          // hết dùng, kích hoạt lại vô nghĩa). Bản trước gộp cả hai vào chung
-          // "Đã dừng" + luôn hiện nút Kích hoạt — người dùng chỉ ảnh app cũ
-          // cho thấy khác hẳn.
-          //
-          // "Đang hoạt động" KHÔNG phải literal `status==='active'` — app cũ
-          // (`qcLotGroupOperational()`/`lotGroupInUse()`) không bao giờ lưu
-          // giá trị đó, nó là trạng thái SUY từ `g.inUse` (có lô nào của
-          // nhóm đang gán Mean/SD cho xét nghiệm nào không, tính ở main).
-          // Bản trước gán cứng `status:'active'` lúc tạo nhóm mới, nên một
-          // nhóm VỪA TẠO — CHƯA gán lô cho xét nghiệm nào cả — vẫn hiện
-          // "Đang hoạt động" và có nút "Dừng", sai mô hình "hoạt động suy từ
-          // đang-dùng-thật" của app cũ.
           const archived = g.active === 0;
           const operational = g.status !== 'stopped' && g.status !== 'planned';
           const statusClass = archived || g.status === 'stopped' ? 'rej' : g.status === 'planned' ? 'warn' : operational && g.inUse ? 'ok' : 'none';
@@ -305,10 +279,6 @@ export function LotsTab() {
                 return <div className="lot-level-col" key={level}>
                   <div className="lot-level-title">Mức {level}</div>
                   {levelLots.map((lot) => {
-                    // Lô đã hết dùng bị KHOÁ khỏi việc CHỌN THÊM vào nhóm khác
-                    // — port `locked = l.depleted && !selected` app cũ: vẫn
-                    // cho GIỮ LẠI nếu nó đã là thành viên hiện tại (sửa nhóm
-                    // cũ), chỉ chặn thêm mới một lô đã hết dùng.
                     const locked = !!lot.depleted && !groupChecked.has(lot.id);
                     return <label className={lot.depleted ? 'lot-opt-depleted' : ''} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
                       <input type="checkbox" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
@@ -332,4 +302,5 @@ export function LotsTab() {
   );
 }
 
-// ---------------- Mean/SD ----------------
+
+

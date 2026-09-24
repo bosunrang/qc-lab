@@ -16,3 +16,5 @@ export async function installBrowserMockIfNeeded(): Promise<boolean> {
   (window as unknown as { qcApi: unknown }).qcApi = await createRealBrowserApi();
   return true;
 }
+
+

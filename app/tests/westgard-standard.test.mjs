@@ -1,33 +1,11 @@
-// ĐỐI CHIẾU LUẬT WESTGARD VỚI ĐỊNH NGHĨA CHUẨN — không so với app cũ.
-//
-// Vì sao cần file này: `cross-app-westgard-sigma.test.mjs` chỉ chứng minh hai
-// bản GIỐNG NHAU; nếu app cũ định nghĩa sai thì cả hai vẫn xanh. Đó đúng là
-// chuyện đã xảy ra với `7T` (app cũ đợi 8 điểm) và `2of3-2s` (app cũ đòi điểm
-// mới nhất phải là một trong hai điểm vượt) — cả hai sai so với định nghĩa
-// công bố, và chính bộ test cũ đang KHOÁ hành vi sai đó.
-//
-// File này chốt hành vi theo NGUỒN NGOÀI, nên nó SỐNG TIẾP sau khi app cũ bị
-// cắt (khác `cross-app-westgard-sigma.test.mjs`, sẽ bị xoá cùng lúc).
+// Đối chiếu luật Westgard với định nghĩa chuẩn. Các ca kiểm thử chốt hai chi
+// tiết quan trọng: 7T gồm bảy điểm và 2of3-2s không bắt buộc điểm cuối cửa sổ
+// phải là một trong hai điểm vượt ngưỡng.
 //
 // Nguồn định nghĩa: https://westgard.com/westgard-rules/
-//   1-3s     "reject when a single control measurement exceeds the mean plus
-//             3s or the mean minus 3s control limit"
 //   1-2s     dùng làm luật CẢNH BÁO
-//   2-2s     "reject when 2 consecutive control measurements exceed the same
-//             mean plus 2s or the same mean minus 2s control limit"
-//   R4s      "reject when 1 control measurement in a group exceeds the mean
 //             plus 2s and another exceeds the mean minus 2s" — CHỈ within-run
-//   4-1s     "reject when 4 consecutive control measurements exceed the same
-//             mean plus 1s or the same mean minus 1s control limit"
-//   10x      "reject when 10 consecutive control measurements fall on one
-//             side of the mean"
-//   2of3-2s  "reject when 2 out of 3 control measurements exceed the same
-//             mean plus 2s or mean minus 2s control limit"
-//   3-1s     "reject when 3 consecutive control measurements exceed the same
-//             mean plus 1s or mean minus 1s control limit"
 //   6x/8x/9x/12x  N phép đo liên tiếp cùng một phía so với Mean
-//   7T       "reject when seven control measurements trend in the same
-//             direction, i.e. get progressively higher or progressively lower"
 //
 // Chạy qua bản ĐÃ BUILD (CommonJS) vì westgard-engine.ts import chéo
 // westgard-rules.ts — cùng lý do đã ghi ở westgard-engine.test.mjs.
@@ -87,7 +65,6 @@ for (const [id, n] of [['6x', 6], ['8x', 8], ['9x', 9], ['10x', 10], ['12x', 12]
   check(id, atMean, false, 'điểm đúng bằng Mean không thuộc phía nào');
 }
 
-// ------------------------------------------------------------- 2of3-2s
 // "2 out of 3" — KHÔNG đòi điểm mới nhất phải là một trong hai điểm vượt.
 check('2of3-2s', [2.1, 2.2, 0], true, 'hai điểm ĐẦU của cửa sổ cùng vượt +2SD');
 check('2of3-2s', [2.1, 0, 2.2], true, 'điểm đầu và điểm cuối cùng vượt');
@@ -115,7 +92,6 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
   assert.ok(F[1].supportRules.includes('2of3-2s'), 'điểm vượt trước đó là bằng chứng');
 }
 
-// ------------------------------------------------------------------ 7T
 // "seven control measurements trend in the same direction" — BẢY phép đo,
 // tức 6 bước tăng/giảm, KHÔNG phải 7 bước/8 điểm.
 {
@@ -154,11 +130,7 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
   // ---- Chuỗi GỘP qua nhiều lần chạy (Westgard, "Multirule Interpretation")
   //   41s: "can be applied 'across materials and across runs'" — 2 điểm lần
   //        chạy này + 2 điểm lần chạy trước.
-  //   10x: "applied to both control measurements in a run for the last five
-  //        runs, OR to the measurements on just one material for the last ten
   //        runs" — chính là lý do họ đếm chuỗi phải là `both`.
-  //   22s: "can also be applied to the last two measurements 'within a
-  //        material and across runs'".
   // Chuỗi gộp xếp theo LẦN CHẠY rồi tới MỨC, nên 2 mức × 2 lần chạy = 4 điểm
   // liên tiếp đúng như mô tả trên.
   const twoLevels = (runs) => [
@@ -195,7 +167,6 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
     '22s qua hai lần chạy của CÙNG một mức phải nổ ở kênh từng mức');
 
   // Với 3 mức QC, Westgard khuyến cáo dùng bộ 13s/2of3-2s/R4s/31s/6x/9x vì
-  // "The 22s, 41s, and 10x rules ... just don't fit with multiples of 3".
   // Đây là khuyến cáo THIẾT KẾ (chọn luật nào cho bao nhiêu mức), app đưa vào
   // bảng gợi ý ở `sigma-qc-design.test.mjs`, KHÔNG chặn ở engine — phòng xét
   // nghiệm vẫn được bật luật họ muốn. Chốt ở đây để không ai "sửa" engine
@@ -208,22 +179,21 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
 // ------------------------------------ Hàng rào: mô tả registry phải khớp luật
 {
   checks += 3;
-  assert.match(WG_RULE_BY_ID['7T'].desc, /7 điểm/, 'mô tả 7T phải nói 7 điểm — bản cũ ghi "(8 điểm QC)" đúng theo engine sai');
+  assert.match(WG_RULE_BY_ID['7T'].desc, /7 điểm/, 'mô tả 7T phải nói 7 điểm');
   assert.equal(WG_RULE_BY_ID['R4s'].scope, 'across', 'R4s phải là luật liên mức trong một lần chạy');
   assert.equal(WG_RULE_BY_ID['R4s'].run, null, 'R4s KHÔNG được nằm trong họ luật quét chuỗi (sẽ thành between-run)');
 }
 
 // ------------------------------ Nhãn loại sai số phải tự nhất quán
-// `type` và `desc` phải mô tả CÙNG một luật. App cũ chọn `desc` theo luật có
-// priority nhỏ nhất trên TOÀN BỘ danh sách, nên `['1-3s','2-2s']` in
+// `type` và `desc` phải mô tả cùng một luật. Với `['1-3s','2-2s']`,
 // "SE — Sai số hệ thống" kèm mô tả của 1-3s (một luật RE).
 {
   const seRules = Object.values(WG_RULE_BY_ID).filter((r) => r.err === 'SE').map((r) => r.id);
   const reRules = Object.values(WG_RULE_BY_ID).filter((r) => r.err === 'RE').map((r) => r.id);
   const descOf = (id) => WG_RULE_BY_ID[id].desc;
 
-  // Mọi tổ hợp 1 luật SE + 1 luật RE: type là SE (chính sách của app cũ, giữ
-  // nguyên) và desc PHẢI là mô tả của chính luật SE đó.
+  // Mọi tổ hợp một luật SE + một luật RE: type là SE và desc phải là mô tả
+  // của chính luật SE đó.
   for (const se of seRules) for (const re of reRules) {
     for (const combo of [[se, re], [re, se]]) {
       const d = errorTypeDetail(combo);
@@ -259,12 +229,6 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
 //
 // Định nghĩa chuẩn cho họ đếm chuỗi liên tiếp nói rõ CẢ HAI chiều đều hợp lệ,
 // và chiều cơ bản là qua nhiều lần chạy của cùng một mức:
-//   4-1s "These 4 may be from one control material or they may ALSO be the
-//         last 2 points from a high level control material and the last 2
-//         points from a normal level control material, thus the rule may
-//         also be applied across materials."
-//   10x  "The 10x rule usually has to be applied ACROSS RUNS and OFTEN
-//         across materials."
 // → cả họ phải là `both`. Để `across` thuần là bỏ sót đúng ca lâm sàng hay
 // gặp nhất: MỘT mức trôi dần một phía trong khi mức kia ổn định quanh Mean,
 // chuỗi gộp liên mức xen kẽ dấu nên không luật nào nổ.
@@ -295,3 +259,5 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
 
 assert.ok(checks >= 60, `số phép kiểm quá ít (${checks})`);
 console.log(`Westgard theo định nghĩa chuẩn: ${checks} phép kiểm đều đúng`);
+
+

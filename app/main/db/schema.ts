@@ -80,8 +80,7 @@ CREATE TABLE IF NOT EXISTS lot_groups (
   -- '' = KHÔNG có trạng thái tự đặt (mặc định) — "Đang hoạt động"/"Chưa
   -- dùng" được SUY từ việc lô của nhóm có đang gán vào xét nghiệm nào không
   -- (inUse, tính ở listLotGroups()), không phải giá trị lưu cứng. Chỉ
-  -- 'stopped'/'planned' là trạng thái tự đặt thật — port đúng logic
-  -- qcLotGroupOperational() app cũ (status field vắng mặt = "hoạt động
+  -- qcLotGroupOperational() hệ thống (status field vắng mặt = "hoạt động
   -- bình thường", không có literal 'active' nào từng được lưu).
   status TEXT NOT NULL DEFAULT '',
   stopped_at TEXT NOT NULL DEFAULT '',
@@ -89,11 +88,10 @@ CREATE TABLE IF NOT EXISTS lot_groups (
   -- '' = không có ảnh chụp — mọi nhóm ĐANG hoạt động dùng giá trị này,
   -- listLotGroups() suy lotIds SỐNG từ qc_lots.group_id như bình thường).
   -- Chỉ nhóm "Đã lưu trữ" (do CHẤP NHẬN chuyển tiếp lô tạo ra) mới có giá
-  -- trị khác rỗng — port đúng applyAcceptedLotTransition() app cũ: nhóm lưu
   -- trữ giữ NGUYÊN mọi lô cũ (kể cả lô KHÔNG chuyển tiếp, vd lô B khi A→C)
   -- làm thành viên, dù lô đó (B) đã thật sự chuyển sang thuộc nhóm ĐANG
   -- hoạt động qua group_id (1 lô chỉ có 1 group_id tại 1 thời điểm — khác
-  -- app cũ dùng mảng lotIds không loại trừ lẫn nhau nên 1 lô lưu được trong
+  -- hệ thống dùng mảng lotIds không loại trừ lẫn nhau nên 1 lô lưu được trong
   -- CẢ HAI nhóm cùng lúc). Không có cột này thì card "Đã lưu trữ" chỉ hiện
   -- đúng lô đã chuyển tiếp, thiếu hẳn lô B dù tên nhóm "A/B" vẫn ngụ ý đủ 2.
   archived_lot_ids_json TEXT NOT NULL DEFAULT ''
@@ -151,7 +149,6 @@ CREATE TABLE IF NOT EXISTS tests (
   eflm_aps TEXT NOT NULL DEFAULT 'desirable',
   eflm_lookup_date TEXT NOT NULL DEFAULT '',
   eflm_ref TEXT NOT NULL DEFAULT '',
-  sigma_tracked INTEGER NOT NULL DEFAULT 1,
   active INTEGER NOT NULL DEFAULT 1,
   rule_actions_json TEXT NOT NULL DEFAULT '{}',
   rule_scopes_json TEXT NOT NULL DEFAULT '{}',
@@ -170,7 +167,7 @@ CREATE TABLE IF NOT EXISTS test_levels (
   applied TEXT NOT NULL DEFAULT 'mfg',
   mean_sd_history_json TEXT NOT NULL DEFAULT '[]',
   -- Ngày cấu hình Mean/SD ĐANG HOẠT ĐỘNG bắt đầu có hiệu lực — port
-  -- effectiveFrom:isoToday() app cũ (commitTargetMatrix()/
+  -- effectiveFrom:isoToday() hệ thống (commitTargetMatrix()/
   -- applyLotGroupActivation()): mọi lần lưu qua Bảng Mean/SD đều đóng dấu
   -- NGÀY LƯU, không chỉ khi giá trị đổi. '' = chưa từng lưu qua các luồng
   -- này (vd Mức 1 tự tạo lúc thêm xét nghiệm, chưa ai gán Mean/SD).
@@ -180,7 +177,7 @@ CREATE TABLE IF NOT EXISTS test_levels (
 
 -- Mean/SD "Dự kiến": số đã nhập sẵn cho lô của một nhóm lô CHƯA dùng đến,
 -- chờ tới khi bấm "Kích hoạt nhóm lô" mới áp vào test_levels. Bảng RIÊNG,
--- KHÔNG nhét cờ planned vào mean_sd_history_json như app cũ: lịch sử là
+-- KHÔNG nhét cờ planned vào mean_sd_history_json như hệ thống: lịch sử là
 -- những giai đoạn ĐÃ có hiệu lực (trang Lịch sử dữ liệu, cảnh báo điểm QC và
 -- lotTargetSnapshot() đều đọc nó), trộn số chưa từng áp vào đó là mời gọi
 -- đúng lớp lỗi "áp nhầm số chưa duyệt". Xoá lô/xét nghiệm thì hàng dự kiến
@@ -249,7 +246,6 @@ CREATE TABLE IF NOT EXISTS actions (
   -- CỐ Ý KHÔNG khoá ngoại tới tests(id) — cùng nguyên tắc activity.user_id/
   -- username (chuỗi phẳng, không FK tới users): xoá xét nghiệm ở
   -- config-handlers.ts's removeTest() là xoá THẬT (không soft-delete),
-  -- nhưng hồ sơ NCE phải giữ NGUYÊN VẸN (port đúng removeAssay() app cũ —
   -- không đụng state.actions). Có FK ở đây sẽ khiến DELETE FROM tests
   -- ném lỗi FOREIGN KEY constraint (schema bật PRAGMA foreign_keys=ON)
   -- ngay khi xét nghiệm đó còn hồ sơ NCE — đúng trường hợp cần giữ lại,
@@ -376,9 +372,6 @@ export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: s
     if (!cols.some((c) => c.name === 'analyte_id')) {
       db.exec("ALTER TABLE tests ADD COLUMN analyte_id TEXT NOT NULL DEFAULT '';");
     }
-    if (!cols.some((c) => c.name === 'sigma_tracked')) {
-      db.exec('ALTER TABLE tests ADD COLUMN sigma_tracked INTEGER NOT NULL DEFAULT 1;');
-    }
     for (const [name, sql] of [['eflm_analyte', "TEXT NOT NULL DEFAULT ''"], ['eflm_aps', "TEXT NOT NULL DEFAULT 'desirable'"], ['eflm_lookup_date', "TEXT NOT NULL DEFAULT ''"], ['eflm_ref', "TEXT NOT NULL DEFAULT ''"]] as const) {
       if (!cols.some((c) => c.name === name)) db.exec(`ALTER TABLE tests ADD COLUMN ${name} ${sql};`);
     }
@@ -416,7 +409,6 @@ export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: s
     // hai nguồn sau. Mọi cổng ghi đã chuyển sang `normalizeErrorClass()`; bước
     // này dọn nốt dữ liệu đã lưu. Idempotent: dòng đã chuẩn bị `WHERE` loại ra.
     // Phép ánh xạ phải khớp `normalizeErrorClass()` trong
-    // `main/domain/westgard-rules.ts`.
     // KHÔNG dùng `UPPER()`: nó chỉ gấp chữ ASCII nên "số"/"hệ" giữ nguyên và
     // mẫu so sánh viết hoa sẽ trượt. `LIKE` mặc định của SQLite đã không phân
     // biệt hoa/thường cho phần ASCII, còn ký tự có dấu thì so khớp nguyên văn.
@@ -444,3 +436,5 @@ export function seedInitialRows(db: SqliteLike): void {
   db.prepare("INSERT INTO app_meta(key,value) VALUES('schemaVersion',?)").run(String(SCHEMA_VERSION));
   db.prepare('INSERT OR IGNORE INTO lab(id) VALUES (1)').run();
 }
+
+

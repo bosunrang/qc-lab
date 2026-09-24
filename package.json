@@ -1,6 +1,6 @@
 {
   "name": "qc-lab",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "QC Lab - Nội kiểm chất lượng xét nghiệm (IQC) cho phòng xét nghiệm lâm sàng",
   "author": "QC Lab",
   "license": "UNLICENSED",
@@ -11,6 +11,7 @@
     "dev": "npm run app:dev",
     "build": "npm run app:build",
     "test": "npm run app:test",
+    "test:performance": "npm run app:build:main && node --test app/tests/large-dataset-performance.perf.mjs",
     "typecheck": "npm run app:typecheck",
     "app:typecheck": "tsc -p tsconfig.app-main.json --noEmit && tsc -p tsconfig.app-renderer.json",
     "app:test": "node app/scripts/run-tests.cjs",

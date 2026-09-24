@@ -18,3 +18,5 @@ export function openDatabase(filePath: string): SqliteLike {
   seedInitialRows(conn);
   return conn;
 }
+
+

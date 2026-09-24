@@ -1,12 +1,4 @@
-// Cài đặt — Giai đoạn B10 (docs/APP-V2-PLAN.md): logo/brand ảnh (canvas
-// resize) + kiểm tra dung lượng lưu trữ. Giai đoạn C3: backup/restore thật
-// (`main/domain/backup.ts` + `main/ipc/backup-handlers.ts`). Giai đoạn C4:
-// di trú dữ liệu từ backup app CŨ (`main/domain/migrate-legacy.ts`) — khác
-// C3 (round-trip cùng định dạng), đây là ánh xạ giữa 2 hình dạng dữ liệu
-// khác nhau nên có bước "xem trước số lượng" riêng trước khi xác nhận.
-// Giai đoạn C5: client cho LIS Gateway prototype (`main/ipc/lis-handlers.ts`)
-// — gateway server độc lập (`lis-gateway/`), không đổi gì ở đó. Firebase C2
-// hoàn tất: xác thực và đồng bộ chạy ở main process, xem firebase-handlers.ts.
+// Cài đặt: hồ sơ đơn vị, sao lưu/phục hồi, LIS Gateway và đồng bộ Firebase.
 import { useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../store/settings-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -16,7 +8,7 @@ import { PageHeader } from '../components/PageHeader';
 import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
 
 const LOGO_SIZE = 96;
-/** Chu kỳ tự động kiểm tra hàng chờ LIS — copy `LIS_POLL_MS` app cũ. */
+
 const LIS_POLL_MS = 5 * 60 * 1000;
 const LIS_STATUS_LABEL: Record<string, string> = { off: 'Đang tắt', idle: 'Chưa kiểm tra', ok: 'Đã kết nối', error: 'Lỗi kết nối' };
 const FIREBASE_CONFIG_PLACEHOLDER = `const firebaseConfig = {
@@ -91,7 +83,7 @@ export function SettingsPage() {
     setFbCode(firebase.labCode || 'khoaXN'); setFbEmail(firebase.email); setFbConfig(firebase.config); setFbSeeded(true);
   }, [firebase, fbSeeded]);
 
-  // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn app cũ
+  // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn hệ thống
   // hứa (`LIS_POLL_MS`). Trước Giai đoạn D3.3 app chỉ lấy hàng chờ khi
   // bấm nút, nên nhãn đó là lời hứa suông — nay có bộ đếm thật.
   useEffect(() => {
@@ -267,8 +259,6 @@ export function SettingsPage() {
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
 
-  // Port `backupReminder.statusText()/capacityText()` app cũ — giữ nguyên
-  // từng chuỗi để lời nhắc sao lưu đọc giống nhau ở 2 bản.
   function backupStatusText(): string {
     if (!backupInfo || !backupInfo.lastBackupAt) return 'Chưa sao lưu trên máy này.';
     const days = Math.floor((Date.now() - new Date(backupInfo.lastBackupAt).getTime()) / 86400000);
@@ -282,7 +272,7 @@ export function SettingsPage() {
   }
 
   /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký
-   * (ánh xạ `ResetOperationalDataCommand` app cũ). Không thể hoàn tác nên đi
+   * (ánh xạ `ResetOperationalDataCommand` hệ thống). Không thể hoàn tác nên đi
    * qua đủ confirm + reauth, và main tự chốt 1 bản an toàn ra đĩa trước. */
   async function resetAll() {
     if (!(await confirmDialog(
@@ -298,7 +288,7 @@ export function SettingsPage() {
 
   return (
     <>
-      {/* Tiêu đề/phụ đề đã trở về đúng app cũ từ khi C2 Firebase hoàn tất. */}
+      {/* Tiêu đề/phụ đề đã trở về đúng hệ thống từ khi C2 Firebase hoàn tất. */}
       <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">
@@ -454,3 +444,5 @@ export function SettingsPage() {
     </>
   );
 }
+
+

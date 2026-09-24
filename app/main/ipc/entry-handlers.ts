@@ -74,9 +74,7 @@ export function createEntryHandlers(db: Db) {
   }
 
   /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
-   * đó — trên TẤT CẢ xét nghiệm, không phải theo từng xét nghiệm riêng, khớp
-   * chính sách PeriodService/entry-service.js của bản cũ (xem CLAUDE.md,
-   * report-handlers.ts's lockPeriod/unlockPeriod là nơi ghi/xoá bảng này).
+   * đó — trên tất cả xét nghiệm, không phải theo từng xét nghiệm riêng.
    * Đọc trực tiếp `period_locks` ở đây thay vì gọi qua report-handlers.ts để
    * 2 module không phụ thuộc lẫn nhau — mỗi handler tự SQL, khớp quy ước
    * chung của toàn bộ main/ipc/*. */
@@ -84,8 +82,8 @@ export function createEntryHandlers(db: Db) {
     return !!db.prepare('SELECT id FROM period_locks WHERE ym=?').get(ymOfDate(date));
   }
 
-  /** Cổng `canEnterQcForLevel()` của app cũ: xét nghiệm còn hoạt động, thuộc
-   * một Panel QC đang hoạt động, và CHÍNH mức đang nhập phải gắn với lô thuộc
+  /** Cổng nhập QC: xét nghiệm còn hoạt động, thuộc một Panel QC đang hoạt động,
+   * và chính mức đang nhập phải gắn với lô thuộc
    * nhóm còn vận hành (`active!==false`, không `stopped`/`planned`). Giữ cổng
    * này trong main để mọi nguồn ghi, kể cả LIS hay lời gọi IPC trực tiếp,
    * không thể lách điều kiện mà renderer dùng để dựng cây Nhập QC. */
@@ -108,14 +106,9 @@ export function createEntryHandlers(db: Db) {
 
   /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa hủy thuộc đúng lô
    * đang gán của từng mức, sắp lần chạy theo số tự nhiên, rồi ghép luật
-   * within/across.
    *
-   * Tập mức lấy từ `db/operational-levels.ts` — CÙNG tập mà trang Phân tích
-   * Westgard dùng. Trước đây hàm này đọc MỌI dòng `test_levels` (không cổng
-   * nào), nên hai trang cho hai kết luận khác nhau trên cùng một điểm QC và
-   * ngay trong trang này cây điều hướng cũng lệch với bảng worksheet — xem
-   * ghi chú đầu `db/operational-levels.ts` và
-   * `tests/entry-westgard-symmetry.test.mjs`. */
+   * Tập mức lấy từ `db/operational-levels.ts` — cùng tập mà trang Phân tích
+   * Westgard dùng, để hai màn hình luôn đánh giá trên cùng một tập dữ liệu. */
   function activeEvaluation(testId: string) {
     const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
     const inActivePanel = isTestInActivePanel(db, testId);
@@ -136,7 +129,6 @@ export function createEntryHandlers(db: Db) {
     const scope = makeScopeOf(parseRuleScopes(test?.rule_scopes_json), levels.length);
     // Chỉ kênh TỪNG MỨC cần lộ ra ngoài (nhánh dựng lại verdict của điểm lô đã
     // chuyển tiếp trong `voidPoint()`); kênh liên mức nằm trọn trong
-    // `evaluateQcSets()`.
     const within = (rule: string) => on(rule) && ['within', 'both'].includes(scope(rule));
     const byPoint = evaluateQcSets(db, testId, levels);
     return { levels, byPoint, within, actionOf };
@@ -148,9 +140,8 @@ export function createEntryHandlers(db: Db) {
     return rows.map((point) => ({ ...point, runId: point.run_id, qcMean: point.qc_mean, qcSd: point.qc_sd })).sort(compareQcPointOrder);
   }
 
-  /** Cột lô song song đúng `parallelLotForLevel()` app cũ: chỉ hồ sơ active,
-   * đúng Panel chứa xét nghiệm, lô cũ vẫn là lô đang gán và criteria có
-   * Mean/SD hợp lệ. Mỗi mức lấy hồ sơ khớp đầu tiên như bản cũ. */
+  /** Cột lô song song chỉ nhận hồ sơ active, đúng Panel chứa xét nghiệm, lô
+   * cũ vẫn đang gán và criteria có Mean/SD hợp lệ. Mỗi mức lấy hồ sơ khớp đầu tiên. */
   function listParallelColumns(testId: string): ParallelEntryColumn[] {
     const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
     if (!test) return [];
@@ -226,9 +217,7 @@ export function createEntryHandlers(db: Db) {
     });
   }
 
-  /** Danh sach diem QC cua 1 muc, kem verdict Westgard tinh theo Mean/SD hien
-   * hanh cua muc do (khong bao gom diem da huy trong phep tinh z-score).
-   * Tôn trọng CẢ 2 tầng cấu hình bật/tắt luật (chung toàn phòng xét nghiệm +
+  /** Tôn trọng cả hai tầng cấu hình bật/tắt luật: chung toàn phòng xét nghiệm và
    * ghi đè riêng xét nghiệm, xem `makeIsOnLayered()`) — CÙNG một hàm isOn mà
    * trang Westgard dùng, để verdict không lệch nhau giữa hai trang. */
   function queryPoints(testId: string, level: number): QcPointView[] {
@@ -317,23 +306,33 @@ export function createEntryHandlers(db: Db) {
     } };
   }
 
-  function createRangeAction(testId: string, level: number, lot: string, rule: string, reason: string, actor: Actor): void {
+  function createRangeAction(testId: string, level: number, lot: string, rule: string, reason: string, actor: Actor, detail: Record<string, unknown>): void {
     const id = uid(), now = nowIso();
     const nceId = nextDailyNceId(now.slice(0, 10));
     db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,rule,error_type,nce_id,protocol_version,approval_status,effectiveness_status,record_status,detail_json)
       VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,3,'pending','pending','active',?)`)
       // `error_type` chỉ chứa mã SE/RE — hồ sơ quản lý dải KHÔNG phân loại sai số
       // (loại việc đã nằm ở cột `rule` và cờ `rangeWorkflow` trong `detail_json`).
-      .run(id, now.slice(0, 10), now, now, actor.userId, actor.username, testId, level, lot, rule, '', nceId, JSON.stringify({ correction: reason, rangeWorkflow: true }));
+      .run(id, now.slice(0, 10), now, now, actor.userId, actor.username, testId, level, lot, rule, '', nceId, JSON.stringify({ correction: reason, rangeWorkflow: true, ...detail }));
   }
 
-  function applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number } }, actor: Actor): IpcResult<RangeCandidateView> {
+  function applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }, actor: Actor): IpcResult<RangeCandidateView> {
     const denied = requireWrite(actor); if (denied) return denied;
     const reason = validateRangeReason(input.data?.reason, 10);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do thiết lập dải tối thiểu 10 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
     if (!fresh.ok) return fresh;
     if (!fresh.data.eligible || !fresh.data.proposed) return { ok: false, error: { code: 'not-eligible', message: 'Dữ liệu chưa đủ điều kiện lập dải kiểm soát mới.' } };
+    // Hai giá trị phải đi cùng nhau: không cho client đổi lẻ Mean hoặc SD.
+    // Cổng này ở main để mọi caller IPC, không chỉ modal, chịu cùng ràng buộc.
+    const hasMean = input.data?.mean != null, hasSd = input.data?.sd != null;
+    if (hasMean !== hasSd) return { ok: false, error: { code: 'incomplete-manual-range', message: 'Khi chỉnh thủ công phải nhập đủ Mean và SD.' } };
+    const manual = hasMean && hasSd;
+    const chosenMean = manual ? Number(input.data.mean) : fresh.data.proposed.mean;
+    const chosenSd = manual ? Number(input.data.sd) : fresh.data.proposed.sd;
+    if (!Number.isFinite(chosenMean) || !Number.isFinite(chosenSd) || chosenSd <= 0) {
+      return { ok: false, error: { code: 'invalid-manual-range', message: 'Mean phải là số hợp lệ và SD phải lớn hơn 0.' } };
+    }
     if (fresh.data.safety.needed) {
       const bias = Number(input.data.bias), threshold = fresh.data.safety.biasThreshold;
       if (!input.data.causeConfirmed) return { ok: false, error: { code: 'cause-not-confirmed', message: 'Cần xác nhận đã xử lý nguyên nhân sai số hệ thống trước khi đổi dải.' } };
@@ -344,7 +343,7 @@ export function createEntryHandlers(db: Db) {
       { id: string; mean: number | null; sd: number | null; low: number | null; high: number | null; mfg_mean: number | null; mfg_sd: number | null; applied: 'mfg' | 'lab'; qc_lot_id: string | null; mean_sd_history_json: string; mean_sd_effective_from: string };
     const lotRow = row.qc_lot_id ? db.prepare('SELECT lot_no,opened FROM qc_lots WHERE id=?').get(row.qc_lot_id) as { lot_no: string; opened: string } | undefined : undefined;
     const changedAt = nowIso();
-    const p = fresh.data.proposed, history = appendMeanSdHistory(row.mean_sd_history_json, {
+    const p = { mean: chosenMean, sd: chosenSd }, history = appendMeanSdHistory(row.mean_sd_history_json, {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
       effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
     }, changedAt);
@@ -353,8 +352,11 @@ export function createEntryHandlers(db: Db) {
     try {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
-      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Thiết lập dải QC mới', reason, actor);
-      writeAudit(db, actor, 'Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Lý do: ${reason}`, fresh.data.testId);
+      const selection = manual ? 'chỉnh thủ công' : 'dải đề xuất';
+      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Thiết lập dải QC mới', reason, actor, {
+        selection, proposed: fresh.data.proposed, applied: p,
+      });
+      writeAudit(db, actor, 'Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
     notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
@@ -381,7 +383,7 @@ export function createEntryHandlers(db: Db) {
     try {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
-      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor);
+      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor, { selection: 'nhà sản xuất', applied: { mean: m, sd } });
       writeAudit(db, actor, 'Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
@@ -426,8 +428,8 @@ export function createEntryHandlers(db: Db) {
     if (duplicateRun) {
       return { ok: false, error: { code: 'duplicate-run', message: `Mức ${level}, lô ${targetLot || 'đang dùng'} đã có kết quả ở lần chạy ${runId}. Hãy tạo lần chạy bổ sung.` } };
     }
-    // Ghi chú theo ngày KẾ THỪA từ điểm khác cùng ngày/cùng xét nghiệm đã có
-    // ghi chú (port `addPoint()` bản cũ, dòng dựng `dayNote`) — ghi chú theo
+    // Ghi chú theo ngày kế thừa từ điểm khác cùng ngày/cùng xét nghiệm đã có
+    // ghi chú — ghi chú theo
     // ngày không có cột riêng, nằm ở `note` của MỌI điểm còn hiệu lực trong
     // ngày, nên điểm MỚI thêm phải mang đúng ghi chú đó thay vì để trống.
     const dayNoteRow = db.prepare('SELECT note FROM qc_points WHERE test_id=? AND date=? AND voided=0 AND note<>\'\' LIMIT 1').get(testId, date) as { note: string } | undefined;
@@ -457,11 +459,8 @@ export function createEntryHandlers(db: Db) {
     return { ok: true, data: view };
   }
 
-  /** Hủy điểm QC — port đúng `EntryService.voidPoint()` bản cũ, bao gồm cả
-   * phần trước đây CHƯA từng wiring ở app: "kind" (nguyên nhân hủy) quyết
-   * định có tự mở/dùng lại hồ sơ NCE hay không (`voidNceChoice()`). Cột
-   * `void_kind`/`void_requires_rerun` đã có sẵn trong schema từ đầu nhưng
-   * chưa handler nào ghi — đây là lần đầu được dùng thật. */
+  /** Hủy điểm QC. "kind" (nguyên nhân hủy) quyết định có tự mở/dùng lại hồ
+   * sơ NCE hay không (`voidNceChoice()`). */
   function voidPoint(input: { data: VoidPointInput }, actor: Actor): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }> {
     const denied = requireWrite(actor); if (denied) return denied;
     const result = validateVoidInput(input.data);
@@ -523,10 +522,9 @@ export function createEntryHandlers(db: Db) {
     return { ok: true, data: { id: pointId, nceId: mutation.nceId, reusedAction: mutation.reusedAction } };
   }
 
-  /** Ghi chú theo NGÀY (cột "Ghi chú" của bảng nhập QC). Port đúng
-   * `EntryService.saveDateNote()` bản cũ: không có bảng riêng, ghi chú nằm ở
-   * trường `note` của MỌI điểm QC còn hiệu lực trong ngày — nên ngày chưa có
-   * điểm nào thì không lưu được (`no-points`), đúng như bản cũ. */
+  /** Ghi chú theo ngày (cột "Ghi chú" của bảng nhập QC). Không có bảng riêng;
+   * ghi chú nằm ở trường `note` của mọi điểm QC còn hiệu lực trong ngày, nên
+   * ngày chưa có điểm nào thì không lưu được (`no-points`). */
   function setDayNote(input: { data: { testId: string; date: string; note: string } }, actor: Actor): IpcResult<{ note: string; updated: number }> {
     const denied = requireWrite(actor); if (denied) return denied;
     const testId = String(input.data?.testId || '').trim();
@@ -550,3 +548,4 @@ export function createEntryHandlers(db: Db) {
 }
 
 export type EntryHandlers = ReturnType<typeof createEntryHandlers>;
+

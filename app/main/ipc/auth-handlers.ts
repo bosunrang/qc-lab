@@ -116,8 +116,6 @@ export function createAuthHandlers(db: Db) {
     const id = uid();
     db.prepare('INSERT INTO users(id,username,name,initials,role,page_perms_json,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,?,1,1)')
       .run(id, username, name, initials, role, JSON.stringify(pagePerms), hashPassword(password));
-    // Chi tiết audit copy đúng khuôn app cũ: "<vai trò> · <n> thẻ · yêu cầu
-    // đổi mật khẩu" — số thẻ là thông tin kiểm soát truy cập, cần có trong log.
     writeAudit(db, actor, 'Thêm người dùng', `Tạo tài khoản "${username}": ${roleLabel(role)} · ${pagePerms.length} thẻ · yêu cầu đổi mật khẩu`, username);
     notifyChanged(['users']);
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
@@ -145,7 +143,7 @@ export function createAuthHandlers(db: Db) {
     if (wouldRemoveLastActiveAdmin(db, id, role, active)) {
       return { ok: false, error: { code: 'last-admin', message: 'Phải còn ít nhất 1 quản trị viên đang hoạt động.' } };
     }
-    // Tự sửa quyền của CHÍNH MÌNH bị chặn (app cũ: openUserPerms/applyUserPerms
+    // Tự sửa quyền của CHÍNH MÌNH bị chặn (hệ thống: openUserPerms/applyUserPerms
     // đều từ chối) — một admin hạ quyền chính mình rồi mất luôn trang Người
     // dùng là không tự cứu được. Đổi tên/khoá thì không rơi vào đây.
     if (id === actor.userId && (pagePerms !== undefined || role !== existing.role)) {
@@ -176,11 +174,7 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: { id } };
   }
 
-  /** Xác thực lại mật khẩu người dùng ĐANG đăng nhập, không đổi gì — cổng
-   * cho <ReauthDialog> trước các thao tác nhạy cảm (duyệt/trả NCE, khoá/mở
-   * kỳ báo cáo, sửa Mean/SD, chuyển lô, reset dữ liệu, phục hồi backup —
-   * port nguyên danh sách từ app cũ). Không ghi audit cho lần thử sai —
-   * nếu ghi, mỗi lần gõ nhầm 1 ký tự sẽ tạo 1 dòng audit vô nghĩa. */
+
   function verifyOwnPassword(input: { data: { password?: unknown } }, actor: Actor): IpcResult<{ ok: true }> {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
     if (!row || !verifyPassword(String(input.data?.password || ''), row.pass_hash)) {
@@ -203,10 +197,10 @@ export function createAuthHandlers(db: Db) {
   }
 
   /** Đổi/xoá ảnh đại diện — LUÔN tự phục vụ (chỉ trên `actor.userId`, không
-   * nhận id người khác) khớp `avatar-modal-controller.ts` app cũ: avatar chỉ
+   * nhận id người khác) khớp `avatar-modal-controller.ts` hệ thống: avatar chỉ
    * đổi được cho chính tài khoản đang đăng nhập, không phải thao tác quản
    * trị. Renderer đã resize về canvas 160×160 trước khi gửi lên (giữ đúng
-   * "Ảnh sẽ được cắt vuông và thu nhỏ tự động" của app cũ) — main không resize
+   * "Ảnh sẽ được cắt vuông và thu nhỏ tự động" của hệ thống) — main không resize
    * lại, chỉ validate hình dạng data URL. */
   function setAvatar(input: { data: { dataUrl?: unknown } }, actor: Actor): IpcResult<{ avatar: string }> {
     const result = validateSetAvatar(input.data?.dataUrl);
@@ -224,16 +218,7 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: { avatar: '' } };
   }
 
-  /** Xoá tài khoản — app cũ có nút "Xóa" trên từng dòng, app trước Giai
-   * đoạn D3.1 không có đường nào xoá. 3 cổng, đúng thứ tự app cũ: chỉ admin,
-   * KHÔNG tự xoá chính mình (mất luôn phiên đang đăng nhập), và không xoá
-   * admin ACTIVE cuối cùng (khoá cứng cả app, không có "quên mật khẩu").
-   *
-   * Xoá THẬT khỏi bảng `users`, không soft-delete: khác `qc_points` (dữ liệu
-   * QC phải giữ vĩnh viễn theo ISO 15189), một tài khoản không phải bản ghi
-   * xét nghiệm. Dấu vết của người đó VẪN CÒN trong `activity` — bảng đó lưu
-   * `user_id`/`username`/`user` dạng chuỗi phẳng, không khoá ngoại tới
-   * `users`, nên xoá tài khoản KHÔNG làm mất nhật ký họ đã làm gì. */
+
   function deleteUser(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
     if (actor.role !== 'admin') return forbidden();
     const id = String(input.id || '');
@@ -255,3 +240,5 @@ export function createAuthHandlers(db: Db) {
 }
 
 export type AuthHandlers = ReturnType<typeof createAuthHandlers>;
+
+

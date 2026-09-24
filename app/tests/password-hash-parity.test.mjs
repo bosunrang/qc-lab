@@ -63,3 +63,5 @@ test('isPbkdf2Hash khớp nhau giữa hai bản', () => {
   const cases = ['pbkdf2$20000$ab$cd', 'pbkdf2$600000$ab$cd', 'nope', '', 'pbkdf2$x$ab$cd'];
   for (const c of cases) assert.equal(browserImpl.isPbkdf2Hash(c), nodeImpl.isPbkdf2Hash(c), c);
 });
+
+

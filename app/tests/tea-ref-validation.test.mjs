@@ -1,5 +1,3 @@
-// Oracle test cho tab "Bảng TEa tham chiếu" — 6 điều kiện bắt buộc y hệt thứ
-// tự kiểm tra của teaLabProfileSave() bản cũ, xem CLAUDE.md.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -7,7 +5,6 @@ const { validateTeaRef } = require('../../app-dist/main/domain/tea-ref-validatio
 
 const BASE = {
   // 'regulation' — khoá hợp lệ trong danh sách ĐÓNG 6 nguồn (TEA_LAB_SOURCES);
-  // 'CLIA 2024' (chuỗi tự do trước đây) giờ bị chặn bởi cổng 'invalid-source'.
   name: 'Glucose', labValue: 10, labSource: 'regulation', reference: 'CLIA 2024 final rule',
   reason: 'Áp dụng theo quy định mới nhất của CLIA', effectiveDate: '2026-01-01',
   approvedDate: '2025-12-15', nextReviewDate: '2027-01-01', preparedBy: 'KTV A', approvedBy: 'Trưởng khoa B',
@@ -24,9 +21,6 @@ const BASE = {
   assert.equal(missingSource.code, 'missing-source');
 }
 {
-  // Danh sách ĐÓNG 6 nguồn (port `TEA_LAB_BASIS_SOURCES` app cũ) — một chuỗi
-  // tự do không nằm trong đó (kể cả không rỗng) phải bị chặn riêng, khác
-  // 'missing-source' (rỗng).
   const invalidSource = validateTeaRef({ ...BASE, labSource: 'CLIA 2024' });
   assert.equal(invalidSource.ok, false);
   assert.equal(invalidSource.code, 'invalid-source');
@@ -63,3 +57,5 @@ const BASE = {
 }
 
 console.log('app tea-ref-validation oracle tests passed');
+
+

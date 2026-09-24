@@ -29,13 +29,9 @@ export function periodCutoff(period: string, today: string): string {
   return end < today ? end : today;
 }
 
-/** Ngày phải là ngày THẬT trên lịch, không chỉ khớp `YYYY-MM-DD`: cổng nhập
- * điểm QC (cả app cũ lẫn app) chỉ kiểm định dạng, nên `2026-02-31` vẫn có
- * thể nằm trong `qc_points` (dữ liệu di trú, hoặc lần nhập trước khi cổng
- * được siết). Một ngày như vậy làm `start`/`end` của nhóm thành vô nghĩa và
- * kéo điểm vào một kỳ nó không thuộc về. Đúng `normalizeDate()` của
- * `src/domain/sigma/sigma-cohort-service.ts` app cũ — app cũ cũng chỉ phòng
- * thủ ở đây, không ở cổng nhập. */
+/** Ngày phải tồn tại thực trên lịch, không chỉ khớp `YYYY-MM-DD`. Một ngày
+ * như `2026-02-31` làm `start`/`end` của cohort vô nghĩa và có thể kéo điểm
+ * vào sai kỳ. */
 function isCalendarDate(text: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
   if (!m) return false;
@@ -67,8 +63,7 @@ function uniqueFinite(points: SigmaCohortPoint[], key: 'qc_mean' | 'qc_sd', posi
     // được đi qua `Number()`: `Number(null)` là 0 và 0 là số hữu hạn, nên
     // một điểm thiếu snapshot tự đẻ ra giá trị mục tiêu thứ hai và cả nhóm bị
     // dán nhãn "Mean mục tiêu thay đổi" → `unstable` → không dùng được cho
-    // Sigma. Nó cũng làm Mean mục tiêu 0 THẬT (base excess) lẫn với "chưa
-    // ghi". Đúng cách `uniqueFinite()` của `sigma-cohort-service.ts` app cũ.
+    // Sigma. Nó cũng làm Mean mục tiêu 0 THẬT (base excess) lẫn với "chưa ghi".
     const raw = point[key];
     if (raw == null || String(raw).trim() === '') continue;
     const value = Number(raw);
@@ -102,7 +97,7 @@ export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, le
     for (const point of rows) {
       if (point.voided) { excluded.voided++; continue; }
       // `Number('')` là 0 nên một giá trị rỗng sẽ lọt vào CV như một điểm 0
-      // thật; loại nó ra như app cũ thay vì tin `Number.isFinite` một mình.
+      // thật; phải loại trước khi kiểm tra số hữu hạn.
       if (point.val == null || String(point.val).trim() === '' || !Number.isFinite(Number(point.val))) { excluded.invalidValue++; continue; }
       valid.push(point);
     }
@@ -154,3 +149,5 @@ export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, le
   }
   return out.sort((a, b) => a.level - b.level || a.start.localeCompare(b.start) || a.lot.localeCompare(b.lot, 'vi'));
 }
+
+

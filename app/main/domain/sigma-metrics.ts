@@ -1,6 +1,3 @@
-// Toan hoc Six Sigma / do khong dam bao do (MU) - tham khao tu
-// src/domain/core/qc-core.ts ban cu (sigmaMetric/uncertaintyBudget/erf/
-// normalCdf/dpmoFromSigma), port nguyen ven thuat toan.
 export function erf(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const ax = Math.abs(x);
@@ -47,28 +44,16 @@ export interface SigmaQcDesign {
  *
  * | Sigma | 2 mức QC                          | 3 mức QC                                |
  * |-------|-----------------------------------|-----------------------------------------|
- * | ≥6    | 1-3s · N=2 R=1                    | 1-3s · N=3 R=1                          |
- * | 5–6   | 1-3s/2-2s/R4s · N=2 R=1           | 1-3s/2of3-2s/R4s · N=3 R=1              |
  * | 4–5   | +4-1s · N=4 R=1 (hoặc N=2 R=2)    | +3-1s · N=3 R=1                         |
  * | <4    | +8x · N=4 R=2 (hoặc N=2 R=4)      | +6x · N=6 R=1 (hoặc N=3 R=2); 9x thay 6x → N=3 R=3 |
- *
- * **Bản trước SAI, và sai giống hệt app cũ** (`QCCore.westgardSigmaRules()` —
- * cùng một bảng duy nhất, không phân biệt số mức), nên `cross-app` không thể
- * phát hiện: nó dùng MỘT bảng pha trộn hai bảng trên — thêm `4-1s` ở 5σ, thêm
- * `8x` ở 4σ, dùng `6x` (luật của bảng 3 mức) cho dưới 4σ, và N=8 ở 4σ/3σ
- * (con số không xuất hiện trong bảng nào của Westgard). Hệ quả: phòng xét
- * nghiệm chạy 3 mức nhận gợi ý của bảng 2 mức, và mọi tier từ 5σ xuống đều bị
- * đề nghị nhiều luật + nhiều điểm QC hơn Westgard thật sự khuyến nghị.
  *
  * `levelCount` là số mức QC thật của xét nghiệm trong kỳ đang xét. Westgard
  * chỉ công bố bảng cho 2 và 3 mức: ≥3 mức dùng bảng 3 mức, đúng 2 mức dùng
  * bảng 2 mức, còn 1 mức thì KHÔNG đưa gợi ý. Thiếu `levelCount` giữ bảng 2
- * mức để tương thích caller cũ. */
+ * mức khi caller không cung cấp số mức. */
 export function sigmaQualityDesign(value: unknown, levelCount?: unknown): SigmaQcDesign | null {
-  // `Number(null)`/`Number("")` ra 0 - huu han - nen ban cu (va app cu) tra ve
-  // thiet ke tier `<3` cho mot Sigma CHUA TINH DUOC, tuc noi "phuong phap khong
-  // du nang luc" khi that ra chi la thieu CV/Bias. Day la cau lam sang, khong
-  // duoc suy tu du lieu trong.
+  // `Number(null)` và `Number("")` đều bằng 0, vì vậy phải loại giá trị rỗng
+  // trước khi phân bậc; thiếu CV/Bias không đồng nghĩa phương pháp dưới 3σ.
   if (value == null || (typeof value === "string" && value.trim() === "")) return null;
   const sigma = Number(value);
   if (!Number.isFinite(sigma)) return null;
@@ -117,18 +102,15 @@ export interface EqaRoundsStats { rms: number; mean: number; n: number; biasSem:
  * u(Cref).** Nordtest TR 537 định nghĩa u(Cref) là độ không đảm bảo của
  * GIÁ TRỊ GÁN (chứng chỉ CRM: U(Cref)/2; kết quả EQA/PT theo ISO 13528:
  * U/2 của giá trị gán vòng đó) — một con số do nhà cung cấp công bố, không
- * suy được từ chuỗi bias của chính mình. App cũ gọi số này là
- * `referenceUncertainty` và nạp thẳng vào u(bias); app giữ nó lại như một
- * chỉ số THAM KHẢO (cho biết ước lượng bias ổn định tới đâu) và nhận u(Cref)
- * thật qua input riêng của `uncertaintyBudget()`. */
+ * suy được từ chuỗi bias của chính mình. `biasSem` chỉ là chỉ số tham khảo
+ * về độ ổn định của ước lượng Bias; `u(Cref)` được nhập riêng vào. */
 export function eqaRoundsStats(rounds: readonly unknown[]): EqaRoundsStats | null {
   const values = rounds.map(Number).filter((v) => Number.isFinite(v));
   if (!values.length) return null;
   const n = values.length;
   const mean = values.reduce((s, v) => s + v, 0) / n;
-  // MỘT vòng duy nhất giữ NGUYÊN DẤU của vòng đó (khớp `SigmaBiasService.stats()`
-  // app cũ: `valid.length === 1 ? valid[0].bias : sqrt(...)`). Sigma và MU đều
-  // lấy |bias| nên con số không đổi, nhưng bảng Bias EQA% phải cho thấy phương
+  // Một vòng duy nhất giữ nguyên dấu. Sigma và MU đều lấy |bias| nên giá trị
+  // độ lớn không đổi, nhưng bảng Bias EQA% phải cho thấy phương
   // pháp lệch về phía nào — `sqrt(v²)` sẽ biến −2% thành +2% và mất thông tin đó.
   // Từ 2 vòng trở lên mới dùng RMS, vì lúc đó dấu trái nhau có thể triệt tiêu.
   const rms = n === 1 ? values[0] : Math.sqrt(values.reduce((s, v) => s + v * v, 0) / n);
@@ -216,3 +198,4 @@ export function uncertaintyBudget(input: UncertaintyBudgetInput): UncertaintyBud
     tea, teaRatio: tea != null && !missing.length ? U / tea : null, withinTea: tea != null && !missing.length ? U <= tea : null,
   };
 }
+

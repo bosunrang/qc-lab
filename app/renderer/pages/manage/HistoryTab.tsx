@@ -1,22 +1,3 @@
-// Tab "Lịch sử dữ liệu" của trang Cấu hình chung — port đúng cấu trúc app cũ
-// (`src/react/pages/ManagePage.tsx`'s `HistoryTab`/`HistoryRow` +
-// `src/presentation/manage/history-rows.ts`/`history-period-label.ts`):
-//   • khung `panel target-matrix-panel` + `.target-selector.history-selector`
-//     (DÙNG LẠI khung của bảng Mean/SD, không phải khung riêng);
-//   • bảng 10 cột: Mức / Lô QC + nhóm lô / Mean / Giới hạn dưới / Giới hạn
-//     trên / SD / Hiệu lực / Nguồn (PXN|NSX) / Điểm QC (SỐ ĐẾM) / Chi tiết.
-//
-// Trước 2026-09-03 app tự thiết kế lại tab này: khung riêng
-// (`rcfg-list history-list`), bộ đếm thứ hai là "mức QC đang theo dõi" (không
-// phải số điểm QC), cột "Nguồn" hiện Hiện tại/Lịch sử thay vì PXN/NSX, và cột
-// "Điểm QC" chứa NÚT thay vì số đếm — nên không có chỗ nào cho số điểm.
-//
-// KHÁC app cũ ở dữ liệu, không phải ở bố cục: `mean_sd_history_json` của
-// app chỉ lưu `{at, mean, sd, qcLotId}` (giá trị BỊ THAY, kèm mốc thời
-// điểm thay) — không có `low`/`high`/`effectiveFrom`/`source` như bản cũ. Vì
-// vậy cột Hiệu lực của dòng lịch sử là "… → <ngày bị thay>", còn dòng đang
-// hiệu lực là "… → <hạn dùng lô>"; low/high suy từ Mean ± k·SD đúng như bảng
-// Mean/SD đang hiển thị, không bịa thêm cột dữ liệu không có.
 import { useEffect, useMemo, useState } from 'react';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
@@ -71,7 +52,7 @@ function parseHistory(json: string): HistoryEntry[] {
 
 
 
-/** `historyPeriodLabel()` app cũ — hai đầu để trống thì ghi "Không giới hạn". */
+/** `historyPeriodLabel()` hệ thống — hai đầu để trống thì ghi "Không giới hạn". */
 function periodLabel(from: string, to: string): string {
   return `${from ? vnDate(from) : 'Không giới hạn'} → ${to ? vnDate(to) : 'Không giới hạn'}`;
 }
@@ -80,17 +61,7 @@ function fmt(value: number | null, decimals: number): string {
   return value == null ? '—' : value.toFixed(decimals);
 }
 
-/** Tập giá trị để ô tìm kiếm so khớp cho 1 xét nghiệm — port
- * `historySearchValues()` app cũ: không chỉ tên xét nghiệm, mà cả số lô/mức
- * của MỌI mốc lịch sử Mean/SD. KHÁC app cũ ở 1 điểm bắt buộc do khác mô hình
- * dữ liệu: `mean_sd_history_json` của app chỉ chốt giá trị CŨ (ĐÃ BỊ
- * THAY) — không như `meanSdHistory` app cũ, nó KHÔNG có mục nào đại diện
- * cho lô ĐANG DÙNG hiện tại. app cũ dùng fallback `history.length ?
- * history : [{qcLotId:level.qcLotId}]` (fallback CHỈ khi rỗng) vì mảng lịch
- * sử của nó tự bao gồm cả mốc mới nhất; port y nguyên cách đó sẽ bỏ sót lô
- * hiện tại bất cứ khi nào mức đã từng đổi Mean/SD ít nhất 1 lần — bug thật
- * tìm được khi kiểm tra sống: gõ đúng số lô ĐANG DÙNG của 1 xét nghiệm đã có
- * lịch sử, không ra kết quả nào. Sửa: LUÔN cộng thêm mốc hiện tại. */
+
 function testSearchValues(test: Test, levels: TestLevel[], lots: QcLot[], instrumentLabel = ''): string[] {
   const values: unknown[] = [test.name, instrumentLabel, test.section];
   for (const level of levels) {
@@ -113,9 +84,6 @@ export function HistoryTab() {
 
   useEffect(() => { if (!testId && tests.length) setTestId(tests[0].id); }, [testId, tests]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
-  // Nạp mức QC của MỌI xét nghiệm (không chỉ xét nghiệm đang chọn) — cần
-  // thiết để ô tìm kiếm lọc được theo số lô/mức (xem `testSearchValues()`
-  // dưới đây), port đúng `historySearchValues()` app cũ.
   useEffect(() => { tests.forEach((test) => loadLevels(test.id)); }, [tests, loadLevels]);
 
   const levels = levelsByTestId[testId] || [];
@@ -154,7 +122,7 @@ export function HistoryTab() {
         group: groupLabel(entry.qcLotId),
         mean: entry.mean,
         sd: entry.sd,
-        // App cũ in giới hạn dưới/trên ĐÚNG như đã lưu ở mức (`level.low`/
+        // hệ thống in giới hạn dưới/trên ĐÚNG như đã lưu ở mức (`level.low`/
         // `level.high`), để trống thì "—" — KHÔNG suy từ Mean ± k·SD, vì đó là
         // dải hiển thị chứ không phải giới hạn đã được phê duyệt.
         low: entry.low ?? null,
@@ -183,9 +151,6 @@ export function HistoryTab() {
         const to = entry.effectiveTo || entry.at || lot?.exp || '';
         return build(entry, false, from, to, index);
       })
-      // Mốc lịch sử TRÙNG hoàn toàn với dòng đang hiệu lực (cùng Mean/SD/lô)
-      // thì bỏ — app cũ chỉ có MỘT bản ghi cho mỗi mốc, không hiện 2 dòng
-      // giống nhau cho cùng một giá trị.
       .filter((row) => !currentRow.some((now) => now.mean === row.mean && now.sd === row.sd && now.lotId === row.lotId));
     return [...currentRow, ...past];
   }), [levels, lots, lotGroups]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -235,11 +200,6 @@ export function HistoryTab() {
         </div>
       </>}
       {detail && (() => {
-        // "Mean/SD đã dùng" — MỌI mốc lịch sử của ĐÚNG lô đang xem (không chỉ
-        // dòng vừa bấm), kèm Mean/SD/CV TÍCH LŨY tính từ các điểm QC thật của
-        // lô đó tính TỚI thời điểm mốc đó hết hiệu lực (`row.to` rỗng = tính
-        // hết) — port `openQcHistoryDetail()` app cũ, KHÔNG phải chỉ 1 dòng
-        // hint tĩnh như bản trước (người dùng chỉ ảnh app cũ có cả bảng này).
         const historyEntries = rows.filter((row) => row.level === detail.level && row.lotId === detail.lotId);
         const detailPoints = pointsOf(detail);
         return (
@@ -307,3 +267,5 @@ export function HistoryTab() {
 function EmptyHistory({ title, message }: { title: string; message: string }) {
   return <EmptyState title={title}>{message}</EmptyState>;
 }
+
+

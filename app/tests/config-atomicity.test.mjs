@@ -29,3 +29,5 @@ assert.equal(db.prepare("SELECT COUNT(*) n FROM qc_panels WHERE name='Panel dở
 assert.equal(db.prepare('SELECT COUNT(*) n FROM qc_panel_tests').get().n, 0);
 
 console.log('app config atomicity regression tests passed');
+
+

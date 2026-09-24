@@ -1,6 +1,5 @@
-// Biểu đồ Six Sigma/MDC — port hình học và quy ước hiển thị của app cũ
-// (`sgTrendSVG`/`sgMDCSVG`) nhưng dựng bằng SVG React thuần. Không dùng
-// global DOM, không innerHTML: dữ liệu vẫn là SigmaPeriodView từ IPC/SQLite.
+// Biểu đồ Six Sigma/MDC dựng bằng SVG React thuần. Không thao tác DOM toàn
+// cục hoặc innerHTML; dữ liệu là SigmaPeriodView từ IPC/SQLite.
 import { useMemo, useState } from 'react';
 import { mdcRatios } from '../lib/sigma-workflow';
 import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
@@ -8,9 +7,8 @@ import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 const LEVEL_COLORS = ['#0e4d4a', '#7a4f9a', '#c47d12'];
 const SIGMA_BOUNDS: Array<[number, string]> = [[2, '#c0362c'], [3, '#dd8b1f'], [4, '#b59a00'], [5, '#3f9a55'], [6, '#0e8f8f']];
 
-/** Chỉ kỳ có ít nhất một mức đã tính Sigma mới là dữ liệu biểu đồ, đúng
- * `classifiable` của app cũ. Kỳ mới tạo nhưng chưa nhập CV/Bias không tạo ra
- * một canvas trống. */
+/** Chỉ kỳ có ít nhất một mức đã tính Sigma mới xuất hiện trên biểu đồ; kỳ mới
+ * chưa nhập CV/Bias không tạo một biểu đồ trống. */
 function validPeriods(periods: SigmaPeriodView[]): SigmaPeriodView[] {
   return [...periods]
     .sort((a, b) => a.period.localeCompare(b.period))
@@ -150,3 +148,5 @@ export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
   {tip && <div className="sg-chart-tooltip" style={{ left: `${tip.x / W * 100}%`, top: `${tip.y / H * 100}%` }}><b>{periodTitle(tip.period)} · Mức {tip.level}</b><div>Sigma: <strong style={{ color: tip.color }}>{Number(tip.levelData.sigma?.sigma).toFixed(2)}</strong></div><div>CV/TEa: {tip.cvRatio.toFixed(1)}% · |Bias|/TEa: {tip.biasRatio.toFixed(1)}%</div><div className="muted">CV {Number(tip.levelData.cv).toFixed(2)}% · Bias {Number(tip.levelData.biasEqa).toFixed(2)}%</div></div>}
   </div>;
 }
+
+

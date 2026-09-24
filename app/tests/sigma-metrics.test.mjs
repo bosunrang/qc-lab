@@ -6,3 +6,5 @@ const sigma = sigmaMetric(15, 2, 3); near(sigma.sigma, 13 / 3); assert.equal(sig
 const budget = uncertaintyBudget({ cv: 3, bias: 1.2, uCref: .3, uCal: .5 }); near(budget.uc, Math.sqrt(9 + 1.53 + .25)); assert.equal(budget.complete, true);
 assert.equal(uncertaintyBudget({ cv: 3, bias: 1.2, uCal: .5 }).complete, false);
 console.log('app sigma-metrics tests passed');
+
+

@@ -80,7 +80,6 @@ const api = {
   listPreviousLotBlocks: (testId: string) => ipcRenderer.invoke('westgard:listPreviousLotBlocks', testId),
   listSigmaPeriods: (testId: string) => ipcRenderer.invoke('sigma:listPeriods', testId),
   listSigmaCohorts: (testId: string, period: string, levels: number[]) => ipcRenderer.invoke('sigma:listCohorts', testId, period, levels),
-  setSigmaTracking: (input: { testId: string; tracked: boolean }) => ipcRenderer.invoke('sigma:setTracking', input),
   saveSigmaTeaConfig: (input: unknown) => ipcRenderer.invoke('sigma:saveTeaConfig', input),
   saveSigmaPeriod: (input: unknown) => ipcRenderer.invoke('sigma:savePeriod', input),
   renameSigmaPeriod: (input: { id: string; period: string }) => ipcRenderer.invoke('sigma:renamePeriod', input),
@@ -108,6 +107,8 @@ const api = {
   getLoginBrand: () => ipcRenderer.invoke('settings:getLoginBrand'),
   saveLabProfile: (input: unknown) => ipcRenderer.invoke('settings:saveLabProfile', input),
   getStorageInfo: () => ipcRenderer.invoke('settings:getStorageInfo'),
+  getReportTemplateSettings: () => ipcRenderer.invoke('report:getTemplateSettings'),
+  saveReportTemplateSettings: (input: unknown) => ipcRenderer.invoke('report:saveTemplateSettings', input),
   getFirebaseSettings: () => ipcRenderer.invoke('firebase:getSettings'),
   connectFirebase: (input: unknown) => ipcRenderer.invoke('firebase:connect', input),
   syncFirebase: (input: unknown) => ipcRenderer.invoke('firebase:sync', input),
@@ -123,8 +124,6 @@ const api = {
   backupStatus: () => ipcRenderer.invoke('backup:status'),
   verifyBackup: (input: unknown) => ipcRenderer.invoke('backup:verify', input),
   resetOperationalData: () => ipcRenderer.invoke('backup:resetAll'),
-  previewLegacyBackup: (input: unknown) => ipcRenderer.invoke('migration:previewLegacyBackup', input),
-  importLegacyBackup: (input: unknown) => ipcRenderer.invoke('migration:importLegacyBackup', input),
   getLisSettings: () => ipcRenderer.invoke('lis:getSettings'),
   saveLisSettings: (input: unknown) => ipcRenderer.invoke('lis:saveSettings', input),
   pullLisQueue: () => ipcRenderer.invoke('lis:pullQueue'),
@@ -138,3 +137,5 @@ const api = {
 } satisfies QcApi;
 
 contextBridge.exposeInMainWorld('qcApi', api);
+
+

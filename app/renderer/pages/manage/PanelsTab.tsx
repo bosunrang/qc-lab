@@ -11,9 +11,7 @@ import type { QcPanel } from '../../../shared/qc-api';
 export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => void; onGoInstruments?: () => void } = {}) {
   const { panels, instruments, tests, savePanel, removePanel } = useManageStore();
 
-  /** Xoá Panel QC — port `deleteConfigPanel()` app cũ, kèm ĐÚNG dòng chi tiết
-   * "Các xét nghiệm vẫn được giữ nguyên." Cổng "panel còn hồ sơ chuyển tiếp
-   * lô" nằm ở main. */
+
   async function removePanelRow(panel: QcPanel) {
     const ok = await confirmDialog(`Xóa Panel QC ${panel.name}? Các xét nghiệm vẫn được giữ nguyên.`, {
       title: 'Xóa Panel QC', confirmLabel: 'Xóa Panel QC', cancelLabel: 'Hủy', danger: true,
@@ -25,7 +23,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
 
   const [editing, setEditing] = useState<QcPanel | 'new' | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  // App cũ tự chọn MÁY ĐẦU TIÊN khi mở modal Panel QC (`openConfigPanel`),
+  // hệ thống tự chọn MÁY ĐẦU TIÊN khi mở modal Panel QC (`openConfigPanel`),
   // nên danh sách xét nghiệm hiện ngay; app để rỗng thì modal chỉ hiện
   // "Chọn máy để hiện danh sách xét nghiệm" — cùng lớp lỗi "không tự chọn
   // mục đầu tiên" đã gặp ở Entry/Sigma/Westgard/Reagent.
@@ -110,7 +108,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
                   <select value={instrumentId} onChange={(e) => {
                     const nextId = e.target.value;
                     setInstrumentId(nextId);
-                    // App cũ (`PanelModal.tsx`): checkbox không kiểm soát, list xét
+                    // hệ thống (`PanelModal.tsx`): checkbox không kiểm soát, list xét
                     // nghiệm remount theo máy — đổi máy rồi đổi LẠI đúng máy ban đầu
                     // thì `testIds` gốc của Panel tự phục hồi (vì initialInstrumentId
                     // khớp lại). Bản trước LUÔN xoá sạch `checked` ở mọi lần đổi máy,
@@ -146,3 +144,5 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
 }
 
 // ---------------- Lô & nhóm lô QC ----------------
+
+

@@ -1,8 +1,3 @@
-// Thong ke so sanh lo hoa chat (reagent lot comparison): paired t-test,
-// hoi quy OLS + Passing-Bablok, cong "dat sang loc phan mem" (rcCalc cu).
-// Day la quyet dinh lam sang thuc su (lo hoa chat moi co duoc dung tren mau
-// benh nhan khong) - port gan nguyen van tu src/domain/reagent/*.ts cu, xac
-// nhan bang oracle test doi chieu voi rcCalc/rcReportSummaryTable cua ban cu.
 
 export const RC_MIN_PAIRS = 5;
 
@@ -151,9 +146,6 @@ export function calculateReagentComparison(dataset: ReagentComparisonDataset | n
   const biasT = Number.parseFloat(String(test.biasTarget ?? '')) || 6;
   const coverage = !!test.coverageConfirmed, enoughN = N >= 20;
   const fit = reagentOls(o, n), pb = reagentPassingBablok(o, n);
-  // Bland-Altman: khoảng giới hạn tương đồng (Limits of Agreement) = md ± 1.96·SD
-  // của hiệu số — CÙNG công thức `reagent-bland-svg.ts`'s `up`/`low` bản cũ
-  // (dùng đúng md/sdd đã tính ở trên, không tính lại/không đổi công thức).
   const loaLower = md - 1.96 * sdd, loaUpper = md + 1.96 * sdd;
   const relPairs = o
     .map((value, index) => { const midpoint = (value + n[index]) / 2; return midpoint !== 0 ? Math.abs((value - n[index]) / midpoint) : null; })
@@ -169,3 +161,5 @@ export function calculateReagentComparison(dataset: ReagentComparisonDataset | n
   };
 }
 export type ReagentComparisonResult = ReturnType<typeof calculateReagentComparison>;
+
+

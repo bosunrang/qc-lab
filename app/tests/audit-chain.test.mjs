@@ -13,3 +13,5 @@ assert.deepEqual(verifyAuditChain(entries).ok, true);
 assert.equal(verifyAuditChain(entries.map((entry, i) => i === 1 ? { ...entry, detail: 'sửa' } : entry)).ok, false);
 assert.deepEqual(relinkAuditChain(entries), entries);
 console.log('app audit-chain tests passed');
+
+

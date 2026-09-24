@@ -2,8 +2,8 @@
 // hook, tự vẽ lại đúng phần liên quan khi state đổi. `tests`/`instruments`/
 // `loadTests`/`loadInstruments`/`levelsByTestId`/`loadLevels` giữ NGUYÊN tên
 // vì Entry/Sigma/Actions/Report cũng đọc qua store này (chỉ đọc `tests`,
-// không đụng phần CRUD mở rộng dưới đây — xem docs/APP-V2-PLAN.md Giai đoạn
-// B1). Mọi hàm `save*`/`create*` trả thẳng `IpcResult` để mỗi form tự hiển
+// không đụng phần CRUD mở rộng dưới đây). Mọi hàm `save*`/`create*` trả thẳng
+// `IpcResult` để mỗi form tự hiển
 // thị lỗi validate của MÌNH, không dùng 1 field `error` dùng chung dễ lẫn
 // giữa các tab/modal đang mở.
 import { create } from 'zustand';
@@ -228,3 +228,4 @@ export const useManageStore = create<ManageState>((set, get) => ({
     return result;
   },
 }));
+

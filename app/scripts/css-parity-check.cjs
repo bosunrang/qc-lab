@@ -1,29 +1,4 @@
 'use strict';
-// Gate "class chết" của app — viết lại 2026-09-11.
-//
-// BẢN CŨ so class của app với `assets/*.css` của app cũ: "app cũ có rule mà
-// app không có" = FAIL. Nghĩa là nó khẳng định app PHẢI giống app cũ về
-// giao diện — đúng cơ chế đã kéo ngược mọi cải tiến giao diện của người dùng.
-// Quyết định 2026-09-11: app cũ chỉ là tham khảo, app viết code mới. Gate
-// này vì vậy không còn đọc `assets/` nữa.
-//
-// Việc nó làm bây giờ, và CHỈ việc đó: tìm class được dùng trong
-// `app/renderer/**/*.tsx` mà KHÔNG có rule nào trong
-// `app/renderer/styles/**/*.css`. Đây là lỗi thật và tự đứng vững, không
-// cần so với bản nào khác: hoặc CSS bị quên, hoặc class đã chết sau một lần
-// đổi tên.
-//
-// Ratchet theo `app/tests/css-dead-class-baseline.json` (cùng quy ước với
-// `tests/a11y-ratchet.json`/`css-hex-ratchet` của repo gốc): danh sách hiện có
-// là class dùng làm ĐỊNH DANH cho JS/test chứ không phải để style (`tm-mean`,
-// `cfg-assay-rule`…) lẫn class thật sự đã chết chưa dọn. Class MỚI không có
-// rule thì FAIL. Siết baseline bằng
-// `node app/scripts/css-parity-check.cjs --update-baseline`, không sửa tay
-// để cho qua.
-//
-// GIỚI HẠN: chỉ đọc `className="..."`/`className={`...`}`; class dựng hoàn
-// toàn bằng biến bị bỏ qua. Chỉ kiểm "CÓ rule hay KHÔNG", không kiểm giá trị
-// rule hay ngữ cảnh `@media`.
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -86,3 +61,5 @@ if (added.length) {
   process.exit(1);
 }
 console.log('Class chết: đạt — không có class mới nào thiếu CSS.');
+
+

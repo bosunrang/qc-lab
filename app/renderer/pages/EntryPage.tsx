@@ -1,12 +1,3 @@
-// Nhập QC — cây xét nghiệm bên trái (máy > xét nghiệm > mức, trạng
-// thái theo màu), bảng "worksheet" theo lịch tháng (mỗi hàng 1 ngày, mỗi cột
-// 1 mức, nhập trực tiếp vào ô), biểu đồ Levey-Jennings dạng xếp chồng (mỗi
-// mức 1 thẻ mini), 2 panel gấp lại "Điểm trong khoảng xem"/"Thống kê toàn bộ".
-// Cột "song song 2 lô" chỉ xuất hiện khi hồ sơ chuyển lô đang hoạt động;
-// điểm lô mới được đánh giá độc lập và không quyết định kết luận lô chính.
-// "Thống kê toàn bộ & Dải kiểm soát" đã port nghiệp vụ dải PXN:
-// mức chọn ngay tại bảng này + lô đang vận hành, cổng 20 kết quả/20 ngày, không có
-// cảnh báo/loại bỏ, xác thực lại, lưu lịch sử và hoàn dải nhà sản xuất.
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
@@ -28,16 +19,12 @@ import { handleTreeKeyDown } from '../lib/entry-tree-navigation';
 import { nextSharedRunId } from '../lib/entry-run-id';
 import { vnDate as formatVnDate } from '../lib/format';
 
-/** `reportLabels.stateName()` app cũ — nhãn NGẮN dùng riêng cho cây điều
- * hướng ('Loại', không phải 'Loại bỏ'). */
+/** Nhãn ngắn dùng riêng cho cây điều hướng ('Loại', không phải 'Loại bỏ'). */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
-// `reportLabels.verdictLabel()` app cũ — 'Loại bỏ', không phải 'Vi phạm'.
-/** Lớp CSS của một hàng ngày trong bảng nhập — port `entry-page-controller.ts`
- * app cũ: `today` cho hôm nay; `missing` khi ngày ĐÃ QUA (hoặc chính hôm nay)
+/** Lớp CSS của một hàng ngày trong bảng nhập: `today` cho hôm nay; `missing`
+ * khi ngày đã qua (hoặc chính hôm nay)
  * mà CHƯA nhập đủ mọi mức đang vận hành (vệt cam bên trái ô Ngày, CSS loại
- * trừ `.today`); `has-data` khi ngày có ít nhất 1 điểm. Trước 2026-09-03
- * app gán `missing` cho ngày KHÔNG có điểm nào, nên ngày TƯƠNG LAI bị kẻ
- * vệt cam còn ngày quá khứ mới nhập 1/2 mức thì không — ngược hẳn app cũ. */
+ * trừ `.today`); `has-data` khi ngày có ít nhất một điểm. */
 function rowClass(date: string, today: string, doneLevels: number, liveLevels: number, hasPoint: boolean): string {
   return [date === today ? 'today' : '', date <= today && doneLevels < liveLevels ? 'missing' : '', hasPoint ? 'has-data' : '']
     .filter(Boolean).join(' ');
@@ -96,13 +83,13 @@ function TrashIcon() {
   );
 }
 
-const ENTRY_TREE_COLLAPSE_KEY = 'qclab-v2-entry-tree-collapsed';
+const ENTRY_TREE_COLLAPSE_KEY = 'qclab-entry-tree-collapsed';
 
 export function EntryPage() {
   const { instruments, lots, lotGroups, tests, panels, levelsByTestId, loadInstruments, loadLevels, loadLots, loadLotGroups, loadTests, loadPanels } = useManageStore();
   const { summaries, loadSummaries } = useWestgardStore();
   const { pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote } = useEntryStore();
-  // Vai trò "chỉ xem" vẫn MỞ được trang này (đúng như app cũ) nhưng không
+  // Vai trò "chỉ xem" vẫn mở được trang này nhưng không
   // thấy ô nhập/nút huỷ — main process cũng chặn (requireWrite), đây chỉ để
   // không hiện nút rồi mới báo lỗi.
   const role = useAuthStore((s) => s.user)?.role;
@@ -115,20 +102,15 @@ export function EntryPage() {
   // vẫn hiển thị đủ dữ liệu ngay lần đầu vào trang.
   const [closedMachines, setClosedMachines] = useState<Set<string>>(new Set());
   const [openTests, setOpenTests] = useState<Set<string>>(new Set());
-  /** Mức QC đang chọn — app cũ giữ trong `entrySel.level` và tô viền teal thẻ
-   * biểu đồ tương ứng (`.lj-mini.on`, `entryFocusLevel`). Mặc định là mức đầu
-   * tiên của xét nghiệm, đúng như `entrySelectionState.pick()`. */
-  const [focusLevel, setFocusLevel] = useState<number | null>(null);
-  /** Mức riêng của "Thống kê toàn bộ & Dải kiểm soát". Không dùng lựa chọn
-   * biểu đồ làm điều kiện ngầm: người dùng có thể giữ biểu đồ đang xem và đổi
-   * trực tiếp mức cần thống kê/dựng dải ở thanh chọn trên chính bảng này. */
+  /** Mức của "Thống kê toàn bộ & Dải kiểm soát". Thẻ biểu đồ là các khối
+   * thông tin đồng thời, không giả làm lựa chọn rồi âm thầm không đổi dữ liệu. */
   const [rangeLevel, setRangeLevel] = useState<number | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     try { return localStorage.getItem(ENTRY_TREE_COLLAPSE_KEY) === '1'; } catch { return false; }
   });
   const [testId, setTestId] = useState('');
   const today = new Date();
-  // App cũ: 11 năm, từ (năm nay − 5).
+  // Hiển thị 11 năm, từ năm hiện tại trừ 5 năm.
   const YEARS = Array.from({ length: 11 }, (_, i) => today.getFullYear() - 5 + i);
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
@@ -140,16 +122,14 @@ export function EntryPage() {
     setTreeCollapsed(collapsed);
     try { localStorage.setItem(ENTRY_TREE_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
   }
-  // `entryVoidNceChoice()` app cũ: 2 kind đầu khoá cứng openNce, chỉ 'other'
-  // để người dùng tự bật/tắt. Mặc định mở modal là 'analytical' (option đầu
-  // của `<select id="voidKindInput">` app cũ, không có `selected` tường
-  // minh nên trình duyệt tự chọn option đầu).
+  // Hai kind đầu khoá cứng openNce; chỉ 'other' cho phép người dùng bật/tắt.
+  // Modal mặc định dùng nguyên nhân 'analytical'.
   const [voidKind, setVoidKind] = useState<VoidKind>('analytical');
   const [voidOpenNce, setVoidOpenNce] = useState(true);
   const [voidMsg, setVoidMsg] = useState<string | null>(null);
   const voidChoice = voidNceChoice(voidKind);
-  // App cũ KHÔNG hiện sẵn ô trống ở ngày đã có điểm — phải bấm "＋ Thêm" mới
-  // mở lần chạy bổ sung (`entryUnlockExtraRun`). Trạng thái mở này thuần UI,
+  // Ngày đã có điểm chỉ mở lần chạy bổ sung khi người dùng bấm "＋ Thêm".
+  // Trạng thái mở này thuần UI,
   // khoá theo `mức|ngày`, không lưu xuống DB.
   const [extraRuns, setExtraRuns] = useState<Set<string>>(new Set());
   // Mỗi mức chỉ mở một chuỗi lô cũ trên biểu đồ/bảng chi tiết. Worksheet vẫn
@@ -166,6 +146,9 @@ export function EntryPage() {
   const [rangeSubmitError, setRangeSubmitError] = useState<string | null>(null);
   const [rangeCauseConfirmed, setRangeCauseConfirmed] = useState(false);
   const [rangeBias, setRangeBias] = useState('');
+  const [rangeSelection, setRangeSelection] = useState<'proposed' | 'manual'>('proposed');
+  const [rangeManualMean, setRangeManualMean] = useState('');
+  const [rangeManualSd, setRangeManualSd] = useState('');
 
   useEffect(() => { loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadTests(); loadPanels(); }, [loadInstruments, loadLots, loadLotGroups, loadSummaries, loadTests, loadPanels]);
   // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
@@ -183,11 +166,9 @@ export function EntryPage() {
   const levels = useMemo(() => allLevels.filter((l) => l.operational !== 0), [allLevels]);
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
-  // Đổi xét nghiệm thì mức đang chọn rơi về mức đầu tiên (app cũ:
-  // `entrySelectionState.pick()` luôn set lại `level` khi chọn xét nghiệm).
+  // Đổi xét nghiệm thì dải QC đang xem rơi về mức đầu tiên còn vận hành.
   useEffect(() => {
-    if (!levelNums.length) { setFocusLevel(null); setRangeLevel(null); return; }
-    setFocusLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
+    if (!levelNums.length) { setRangeLevel(null); return; }
     setRangeLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
   }, [testId, levelNums]);
   useEffect(() => { setPreviousLotOpen({}); }, [testId]);
@@ -204,34 +185,28 @@ export function EntryPage() {
   const currentSummary = summaries.find((s) => s.testId === testId);
   const testName = currentSummary?.testName || '';
 
-  // App cũ (`entry-page-controller.ts`, chỗ dựng `selT`) TỰ RƠI VỀ xét nghiệm
-  // ĐẦU TIÊN khi lựa chọn hiện tại không hợp lệ — mở trang là thấy ngay bảng
-  // nhập, không phải bấm thêm 1 lần. Bản app trước đây để `testId` rỗng nên
-  // toàn bộ khối `.entry-main` (bảng QC, biểu đồ LJ, toolbar) không render —
-  // gate parity đo được 40 class thiếu chỉ vì lý do này.
-  //
-  // `location.state.testId` là đường điều hướng chéo trang: Tổng quan bấm
-  // "Xem QC" thì mở đúng xét nghiệm đó, đúng `dashboardGoEntryFollowup()` của
-  // app cũ (mục còn treo từ Giai đoạn D2).
+  // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ để mở trang
+  // là có ngay bảng nhập. `location.state.testId` cho phép điều hướng chéo từ
+  // Tổng quan đến đúng xét nghiệm.
   const navState = useLocation().state as { testId?: string; level?: number } | null;
   useEffect(() => {
     if (!summaries.length) return;
     const wanted = navState?.testId;
     if (wanted && wanted !== testId && summaries.some((s) => s.testId === wanted)) { selectLeaf(wanted); return; }
     if (testId && summaries.some((s) => s.testId === testId)) return;
-    // Chỉ tự chọn xét nghiệm ĐÃ SẴN SÀNG NHẬP (đúng thứ tự operationalTests()
-    // app cũ) — không rơi vào 1 xét nghiệm chưa có nhóm lô hoạt động, thứ
+    // Chỉ tự chọn xét nghiệm đã sẵn sàng nhập — không rơi vào một xét nghiệm
+    // chưa có nhóm lô hoạt động, thứ
     // vốn còn không hiện trong cây để mà chọn.
     const first = summaries.find((s) => isOperationalTest(s));
     if (first) selectLeaf(first.testId);
   }, [summaries, navState?.testId, tests, panels, lots, lotGroups]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const wantedLevel = Number(navState?.level);
-    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) setFocusLevel(wantedLevel);
+    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) setRangeLevel(wantedLevel);
   }, [testId, levelNums, navState?.testId, navState?.level]);
 
-  /** Nhóm lô có đang "hoạt động" không — port `qcLotGroupOperational()` app
-   * cũ: `active!==false && status!=='stopped' && status!=='planned'`. Nhóm
+  /** Nhóm lô có đang hoạt động không: `active!==false && status!=='stopped' &&
+   * status!=='planned'`. Nhóm
    * đã dừng/dự kiến, và nhóm "Đã lưu trữ" (`active=0`, do CHẤP NHẬN chuyển
    * tiếp lô tạo ra) đều KHÔNG được tính — lô của các nhóm đó không còn xuất
    * hiện trong cây điều hướng Nhập QC, dù cột `qc_lots.group_id` cũ trong DB
@@ -239,8 +214,7 @@ export function EntryPage() {
   const isOperationalGroup = (group: (typeof lotGroups)[number] | undefined): boolean =>
     !!group && group.active !== 0 && group.status !== 'stopped' && group.status !== 'planned';
 
-  /** Nhóm lô ĐANG HOẠT ĐỘNG mà 1 lô thuộc về — port `operationalLotGroupForLevel()`
-   * app cũ (`derived().lotGroupByLotId`, chỉ xây từ nhóm operational): lô
+  /** Nhóm lô đang hoạt động mà một lô thuộc về: lô
    * thuộc nhóm đã dừng/dự kiến/lưu trữ trả về `null`, coi như KHÔNG có nhóm,
    * không phải "để tên số lô" như trước — số lô trần chỉ tự sinh khi CHÍNH
    * nhóm đó chưa được đặt tên, không phải khi nhóm không operational. */
@@ -252,12 +226,11 @@ export function EntryPage() {
     return isOperationalGroup(group) ? group! : null;
   };
 
-  /** Xét nghiệm có "sẵn sàng nhập" không — port `isOperationalTest()` app cũ:
-   * còn hoạt động, nằm trong 1 Panel QC đang hoạt động, và có ít nhất 1 mức
+  /** Xét nghiệm có sẵn sàng nhập không: còn hoạt động, nằm trong một Panel QC
+   * đang hoạt động và có ít nhất một mức
    * gán lô thuộc nhóm đang hoạt động. Chỉ những xét nghiệm này mới xuất hiện
-   * trong cây điều hướng — khớp `operationalTests()` app cũ (Entry page
-   * KHÔNG hiện xét nghiệm chưa đủ điều kiện, không có bucket "chưa sẵn sàng"
-   * trộn chung với xét nghiệm hợp lệ). */
+   * trong cây điều hướng. Xét nghiệm chưa đủ điều kiện không hiển thị trong
+   * cây để tránh trộn với xét nghiệm hợp lệ. */
   const isOperationalTest = (summary: TestSummary): boolean => {
     const test = tests.find((t) => t.id === summary.testId);
     if (!test || test.active === 0) return false;
@@ -265,9 +238,8 @@ export function EntryPage() {
     return summary.levels.some((l) => !!operationalGroupOfLot(l.qcLotId));
   };
 
-  /** Nhãn nhóm lô của 1 xét nghiệm — port `operationalLotGroupForTest()` app
-   * cũ: lấy nhóm lô ĐANG HOẠT ĐỘNG của mức QC đầu tiên có gán (không gộp theo
-   * Set — đúng thứ tự "mức đầu tiên khớp thắng" của bản gốc). Chỉ gọi cho
+  /** Nhãn nhóm lô của một xét nghiệm: lấy nhóm lô đang hoạt động của mức QC
+   * đầu tiên có gán. Chỉ gọi cho
    * xét nghiệm đã qua `isOperationalTest()` nên luôn tìm được 1 nhóm. */
   const lotGroupOf = (summary: TestSummary): { key: string; name: string } => {
     for (const level of summary.levels) {
@@ -280,9 +252,7 @@ export function EntryPage() {
     return { key: 'none', name: 'Chưa gán nhóm lô' };
   };
 
-  /** Verdict của điểm CUỐI trên mọi mức — app cũ đọc `points[points.length-1]`
-   * của từng mức (xem ghi chú Giai đoạn D2 trong dashboard-view-model.ts),
-   * không phải điểm xấu nhất từng có. */
+  /** Verdict của điểm cuối trên mọi mức, không phải điểm xấu nhất từng có. */
   const latestOf = (summary: TestSummary): 'ok' | 'warn' | 'rej' | 'none' => {
     let worst: 'ok' | 'warn' | 'rej' | 'none' = 'none';
     const rank = { none: -1, ok: 0, warn: 1, rej: 2 } as const;
@@ -309,20 +279,17 @@ export function EntryPage() {
     return Array.from(machines.entries()).map(([machine, byGroup]) => [machine, Array.from(byGroup.entries())] as const);
   }, [summaries, search, machineFilter, instruments, lots, lotGroups, tests, panels]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** "Tới hôm nay": về tháng hiện tại RỒI cuộn tới đúng hàng hôm nay — app cũ
-   * làm cả hai, chỉ đổi tháng thì người dùng vẫn phải tự tìm hàng. */
+  /** "Tới hôm nay": về tháng hiện tại rồi cuộn tới đúng hàng hôm nay. */
   function goToday() {
     setViewYear(today.getFullYear()); setViewMonth(today.getMonth() + 1);
     requestAnimationFrame(() => document.querySelector('.qc-sheet tr.today')?.scrollIntoView({ block: 'center' }));
   }
 
-  /** `fmtPointValue()` app cũ: giá trị QC in theo số thập phân của xét
-   * nghiệm, không phải theo cách JS in số mặc định. */
+  /** Giá trị QC in theo số thập phân của xét nghiệm, không dùng định dạng mặc định của JS. */
   const decimals = currentSummary?.decimalPlaces ?? 2;
   const valText = (val: number) => val.toFixed(decimals);
 
-  /** z-score của một điểm, định dạng như app cũ: `+0.40s` / `-1.20s` (có dấu,
-   * hậu tố 's').
+  /** z-score của một điểm: `+0.40s` / `-1.20s` (có dấu, hậu tố 's').
    *
    * Ưu tiên Mean/SD đã CHỐT lúc nhập (`qc_mean`/`qc_sd`) đúng thứ tự mà
    * `pointTarget()` ở domain dùng, rồi mới tới Mean/SD đang gán của mức. Lấy
@@ -338,8 +305,7 @@ export function EntryPage() {
     return `${z >= 0 ? '+' : ''}${z.toFixed(2)}s`;
   }
 
-  /** Preset "N ngày": đặt Đến = hôm nay, Từ = hôm nay − (N−1) ngày, đúng
-   * cách app cũ tính cửa sổ theo số ngày. */
+  /** Preset "N ngày": đặt Đến = hôm nay, Từ = hôm nay − (N−1) ngày. */
   function applyDayPreset(days: number) {
     setLjDays(days);
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -348,8 +314,7 @@ export function EntryPage() {
     setLjFrom(iso(start)); setLjTo(iso(end));
   }
 
-  // Cửa sổ mặc định 30 ngày — app cũ mở trang là đã có khoảng xem, không để
-  // trống (dòng "Khoảng xem: ..." luôn có 2 mốc ngày thật).
+  // Cửa sổ mặc định 30 ngày để khoảng xem luôn có hai mốc ngày.
   useEffect(() => { if (!ljFrom && !ljTo) applyDayPreset(30); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Điểm ĐƯỢC CHẤP NHẬN (cờ `accepted` do `analyzeLevel` tính qua
@@ -379,8 +344,7 @@ export function EntryPage() {
     setNoteErr(result.ok ? null : result.error.message);
   }
 
-  /** Lọc điểm theo cửa sổ Từ/Đến của biểu đồ. Ô trống = không giới hạn đầu
-   * tương ứng, khớp cách app cũ xử lý khoảng xem rỗng. */
+  /** Lọc điểm theo cửa sổ Từ/Đến của biểu đồ. Ô trống = không giới hạn đầu tương ứng. */
   function inLjWindow<T extends { date: string }>(points: T[]): T[] {
     return points.filter((p) => (!ljFrom || p.date >= ljFrom) && (!ljTo || p.date <= ljTo));
   }
@@ -407,9 +371,7 @@ export function EntryPage() {
     setViewYear(today.getFullYear()); setViewMonth(today.getMonth() + 1);
   }
 
-  // Trước đây bỏ qua kết quả `addPoint` hoàn toàn — thất bại (kỳ đã khoá,
-  // hoặc từ 2026-09-04 thêm cổng "nhóm lô đã dừng") không hiện gì, ô nhập
-  // vẫn tự xoá trắng như đã lưu thành công. Giờ báo lỗi thật nếu có.
+  // Chỉ xoá ô nhập khi lưu thành công; nếu thất bại thì hiển thị lỗi trả về.
   async function commitRun(column: EntryColumn, date: string, runId: string, val: number): Promise<boolean> {
     const deviation = extremeQcPointDeviation(val, column.mean, column.sd);
     if (deviation != null) {
@@ -451,14 +413,27 @@ export function EntryPage() {
     if (!testId || rangeLevel == null || !rangeMode) return;
     const minimum = rangeMode === 'apply' ? 10 : 5;
     if (rangeReason.trim().length < minimum) { setRangeSubmitError(`Cần ghi lý do tối thiểu ${minimum} ký tự.`); return; }
+    const manual = rangeMode === 'apply' && rangeSelection === 'manual';
+    const manualMean = Number(rangeManualMean), manualSd = Number(rangeManualSd);
+    if (manual && (!rangeManualMean.trim() || !rangeManualSd.trim() || !Number.isFinite(manualMean) || !Number.isFinite(manualSd) || manualSd <= 0)) {
+      setRangeSubmitError('Nhập Mean hợp lệ và SD lớn hơn 0.'); return;
+    }
     const verified = await reauthDialog({ title: 'Xác thực thay đổi dải QC', message: 'Nhập lại mật khẩu để xác nhận thay đổi Mean/SD đang dùng.' });
     if (!verified) return;
     const result = rangeMode === 'apply'
-      ? await applyLabRange(testId, rangeLevel, rangeReason.trim(), rangeCauseConfirmed, rangeBias === '' ? undefined : Number(rangeBias))
+      ? await applyLabRange(testId, rangeLevel, rangeReason.trim(), rangeCauseConfirmed, rangeBias === '' ? undefined : Number(rangeBias), manual ? manualMean : undefined, manual ? manualSd : undefined)
       : await revertManufacturerRange(testId, rangeLevel, rangeReason.trim());
     if (!result.ok) { setRangeSubmitError(result.error.message); return; }
     await Promise.all([loadLevels(testId), loadTestData(testId, levelNums), loadSummaries()]);
-    setRangeMode(null); setRangeReason(''); setRangeSubmitError(null);
+    setRangeMode(null); setRangeReason(''); setRangeSubmitError(null); setRangeSelection('proposed'); setRangeManualMean(''); setRangeManualSd('');
+  }
+
+  function openRangeWorkflow() {
+    const proposed = rangeCandidate?.proposed;
+    setRangeMode('apply'); setRangeReason(''); setRangeCauseConfirmed(false); setRangeBias(''); setRangeSubmitError(null);
+    setRangeSelection('proposed');
+    setRangeManualMean(proposed ? proposed.mean.toFixed(decimals) : '');
+    setRangeManualSd(proposed ? proposed.sd.toFixed(4) : '');
   }
 
   const days = Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) => i + 1)
@@ -562,13 +537,9 @@ export function EntryPage() {
     setVoiding(null); setVoidReason('');
   }
 
-  // 2 trạng thái rỗng của `entryModel()` app cũ — cả hai đều thay THẲNG toàn
-  // bộ thân trang (không có cây/ô tìm kiếm nào), không phải chỉ panel bên
-  // phải: chưa khai báo xét nghiệm nào (dù đã có Panel/Nhóm lô/Mean-SD hay
-  // chưa), khác hẳn có xét nghiệm nhưng CHƯA sẵn sàng nhập (thiếu Panel QC/
-  // Nhóm lô QC đang hoạt động/Mean-SD). "Chọn 1 xét nghiệm ở danh mục bên
-  // trái." trước đây là thông báo DUY NHẤT cho mọi trường hợp trống — sai
-  // với 2 thông báo tách biệt của app cũ.
+  // Hai trạng thái rỗng thay toàn bộ thân trang: chưa khai báo xét nghiệm và
+  // đã có xét nghiệm nhưng chưa sẵn sàng nhập (thiếu Panel QC, nhóm lô đang
+  // hoạt động hoặc Mean/SD). Mỗi trạng thái có hướng dẫn riêng.
   const emptyState = !tests.length
     ? { title: 'Chưa có xét nghiệm', message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.', linkLabel: 'Thêm xét nghiệm', tab: 'tests' }
     : !summaries.some((s) => isOperationalTest(s))
@@ -735,9 +706,8 @@ export function EntryPage() {
                                 .flatMap((series) => series.points.filter((point) => point.date === date && !point.voided).map((point) => ({ point, lot: series.lot, mean: series.mean, sd: series.sd })))
                                 .sort((a, b) => a.point.run_id.localeCompare(b.point.run_id, 'vi', { numeric: true }));
                               const slotKey = `${column.key}|${date}`;
-                              // App cũ TỰ mở sẵn ô nhập lần chạy kế tiếp khi
-                              // lần chạy gần nhất bị loại bỏ (`shouldShowEmptyRun`),
-                              // không cần bấm "+ Thêm" — nhắc chạy lại ngay.
+                              // Tự mở sẵn ô nhập lần chạy kế tiếp khi lần chạy
+                              // gần nhất bị loại bỏ để nhắc chạy lại ngay.
                               const lastRun = runs[runs.length - 1];
                               // Mở sẵn ô chạy lại khi lần chạy cuối của mức
                               // này THUỘC một lần chạy đã bị loại — kể cả khi
@@ -834,24 +804,19 @@ export function EntryPage() {
                   {displayColumns.map((column) => {
                     const chartPoints = inLjWindow(column.chartPoints);
                     const acceptedCount = chartPoints.filter((p) => p.accepted).length;
+                    const chartPointSummary = acceptedCount === chartPoints.length
+                      ? `${acceptedCount} điểm`
+                      : `${acceptedCount}/${chartPoints.length} dùng thống kê`;
                     // Lô cũ và lô song song đều đã có cờ `accepted` do main tính
                     // trên cùng bộ đánh giá ghép; chỉ cột chính mới phải tra lại
-                    // theo `analysisByLevel`.
                     const acceptedPoints = column.previous || column.parallel
                       ? inLjWindow(column.points.filter((point) => !point.voided && point.accepted === true))
                       : acceptedInWindow(column.level);
                     const previousChoices = column.parallel ? [] : previousLotSeries.filter((series) => series.level === column.level);
                     return (
-                      <div className={`lj-mini${!column.parallel && focusLevel === column.level ? ' on' : ''}${column.parallel ? ' lj-mini-parallel' : ''}`} key={column.key}
-                        role="button" tabIndex={0}
-                        aria-label={`Chọn mức ${column.level}, lô ${column.lot}${column.parallel ? ', lô chạy song song' : ''}`}
-                        onClick={(e) => { if ((e.target as HTMLElement).closest('button, input, select')) return; setFocusLevel(column.level); }}
-                        onKeyDown={(e) => {
-                          if ((e.target as HTMLElement).closest('button, input, select')) return;
-                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFocusLevel(column.level); }
-                        }}>
+                      <section className={`lj-mini${column.parallel ? ' lj-mini-parallel' : ''}`} key={column.key} aria-labelledby={`lj-chart-${column.key}`}>
                         <div className="lj-mini-h">
-                          <b>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="lj-point-count">{acceptedCount} điểm</span></b>
+                          <h3 id={`lj-chart-${column.key}`}>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="lj-point-count">{chartPointSummary}</span></h3>
                           {previousChoices.length ? (
                             <button type="button" className="btn ghost sm qc-old-lot-toggle" onClick={() => togglePreviousLot(column.level)}>
                               {column.previous ? 'Xem lô mới' : 'Xem lô cũ'}
@@ -877,7 +842,7 @@ export function EntryPage() {
                             decimals={decimals} height={300}
                             points={chartPoints} />
                         </div>
-                      </div>
+                      </section>
                     );
                   })}
                 </div>
@@ -885,7 +850,7 @@ export function EntryPage() {
                   <span><span className="dot qc-legend-ok" /> Trong ±2SD</span>
                   <span><span className="dot qc-legend-warn" /> Cảnh báo 2–3SD</span>
                   <span><span className="dot qc-legend-rej" /> Loại bỏ ngoài 3SD</span>
-                  <span><span className="dot qc-legend-excluded" /> Vòng rỗng · đạt nhưng lần chạy bị loại ở mức khác, không vào thống kê</span>
+                  <span><span className="dot qc-legend-excluded" /> Vòng rỗng · lần chạy bị loại, không vào thống kê</span>
                 </div>
               </div>
 
@@ -976,20 +941,22 @@ export function EntryPage() {
                   {rangeCandidate ? (
                     <>
                       <div className="range-band-note">
-                        <div className="range-band-label">Dải đang dùng:</div>
-                        <div className="range-band-source">{rangeCandidate.source === 'lab' ? 'PXN tự xây dựng' : 'Nhà sản xuất'}</div>
-                        <div className="range-band-body">· Mức {rangeCandidate.level}: Mean={rangeCandidate.current.mean != null ? rangeCandidate.current.mean.toFixed(decimals) : '—'} SD={rangeCandidate.current.sd != null ? rangeCandidate.current.sd.toFixed(4) : '—'}.
-                          {rangeCandidate.proposed
-                            ? rangeCandidate.eligible
-                              ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
-                              : ` Cần ≥20 kết quả trên ≥20 ngày độc lập và không lần chạy nào bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày, ${rangeCandidate.proposed.rejected} điểm thuộc lần chạy bị loại.`
-                            : ' Chưa có dữ liệu của lô đang vận hành.'}
+                        <div className="range-band-copy">
+                          <div className="range-band-label">Dải đang dùng:</div>
+                          <div className="range-band-source">{rangeCandidate.source === 'lab' ? 'PXN tự xây dựng' : 'Nhà sản xuất'}</div>
+                          <div className="range-band-body">· Mức {rangeCandidate.level}: Mean={rangeCandidate.current.mean != null ? rangeCandidate.current.mean.toFixed(decimals) : '—'} SD={rangeCandidate.current.sd != null ? rangeCandidate.current.sd.toFixed(4) : '—'}.
+                            {rangeCandidate.proposed
+                              ? rangeCandidate.eligible
+                                ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
+                                : ` Cần ≥20 kết quả trên ≥20 ngày độc lập và không lần chạy nào bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày, ${rangeCandidate.proposed.rejected} điểm thuộc lần chạy bị loại.`
+                              : ' Chưa có dữ liệu của lô đang vận hành.'}
+                          </div>
                         </div>
+                        {rangeCandidate.eligible && writable && <button type="button" className="btn teal range-band-action" onClick={openRangeWorkflow}>Thiết lập dải PXN</button>}
                       </div>
-                      {(rangeCandidate.eligible || rangeCandidate.canRevert) && writable && (
+                      {rangeCandidate.canRevert && writable && (
                         <div className="range-workflow-actions">
-                          {rangeCandidate.eligible && <button type="button" className="btn teal" onClick={() => { setRangeMode('apply'); setRangeReason(''); setRangeCauseConfirmed(false); setRangeBias(''); setRangeSubmitError(null); }}>Thiết lập dải PXN</button>}
-                          {rangeCandidate.canRevert && <button type="button" className="btn ghost" onClick={() => { setRangeMode('revert'); setRangeReason(''); setRangeSubmitError(null); }}>↶ Hoàn dải nhà sản xuất</button>}
+                          <button type="button" className="btn ghost" onClick={() => { setRangeMode('revert'); setRangeReason(''); setRangeSubmitError(null); }}>↶ Hoàn dải nhà sản xuất</button>
                         </div>
                       )}
                     </>
@@ -1032,26 +999,43 @@ export function EntryPage() {
         </Modal>
       )}
       {rangeMode && rangeCandidate && (
-        <Modal title={rangeMode === 'apply' ? 'Thiết lập dải QC của phòng xét nghiệm' : 'Hoàn dải QC nhà sản xuất'} onClose={() => setRangeMode(null)} className="range-workflow-modal"
-          footer={<><button className="btn ghost" onClick={() => setRangeMode(null)}>Đóng</button><button className={`btn ${rangeMode === 'apply' ? 'teal' : 'danger'}`} disabled={rangeMode === 'apply' && !rangeCandidate.eligible} onClick={submitRangeWorkflow}>{rangeMode === 'apply' ? 'Áp dụng dải đề xuất' : 'Hoàn dải'}</button></>}>
+        <Modal title={rangeMode === 'apply' ? 'Thiết lập dải QC mới' : 'Hoàn dải QC nhà sản xuất'} onClose={() => setRangeMode(null)} className="range-workflow-modal"
+          footer={<><button className="btn ghost" onClick={() => setRangeMode(null)}>Đóng</button><button className={`btn ${rangeMode === 'apply' ? 'teal' : 'danger'}`} disabled={rangeMode === 'apply' && !rangeCandidate.eligible} onClick={submitRangeWorkflow}>{rangeMode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</button></>}>
           {rangeMode === 'apply' && rangeCandidate.proposed && (
             <>
-              <div className="range-workflow-checks">
-                <div className={rangeCandidate.proposed.n >= 20 ? 'pass' : 'fail'}><b>Tổng số kết quả</b><span>{rangeCandidate.proposed.n} / tối thiểu 20</span></div>
-                <div className={rangeCandidate.proposed.days >= 20 ? 'pass' : 'fail'}><b>Số ngày độc lập</b><span>{rangeCandidate.proposed.days} / tối thiểu 20</span></div>
-                <div className={rangeCandidate.proposed.rejected === 0 ? 'pass' : 'fail'}><b>Điểm thuộc lần chạy bị loại</b><span>{rangeCandidate.proposed.rejected} / yêu cầu 0</span></div>
-                {/* Thông tin, KHÔNG phải điều kiện: với giới hạn ±2SD thì dữ
-                    liệu in-control chuẩn vẫn có ~4,6% điểm vượt ±2SD, và
-                    `1-2s` theo Westgard là luật cảnh báo chứ không phải căn
-                    cứ loại bỏ. Đòi bằng 0 thì càng gom nhiều dữ liệu càng khó
-                    lập dải (0,9545^n). */}
-                <div className="info"><b>Điểm cảnh báo 1-2s</b><span>{rangeCandidate.proposed.warnings} · không chặn</span></div>
+              <p className="range-workflow-meta">{testName || 'Xét nghiệm'} · Mức {rangeCandidate.level}{rangeCandidate.lot ? ` · Lô ${rangeCandidate.lot}` : ''}</p>
+              <section className="range-workflow-table-section" aria-labelledby="range-conditions-title">
+                <h3 id="range-conditions-title">Điều kiện</h3>
+                <div className="range-workflow-table-wrap"><table className="range-workflow-table">
+                  <thead><tr><th>Điều kiện</th><th>Hiện tại</th><th>Chuẩn kiểm tra</th><th>Kết quả</th></tr></thead>
+                  <tbody>
+                    <tr><td>Tổng số kết quả</td><td><b>{rangeCandidate.proposed.n}</b></td><td>≥20</td><td><span className={`tag ${rangeCandidate.proposed.n >= 20 ? 'ok' : 'rej'}`}>{rangeCandidate.proposed.n >= 20 ? 'Đạt' : 'Chưa đạt'}</span></td></tr>
+                    <tr><td>Số ngày độc lập</td><td><b>{rangeCandidate.proposed.days}</b></td><td>≥20 ngày</td><td><span className={`tag ${rangeCandidate.proposed.days >= 20 ? 'ok' : 'rej'}`}>{rangeCandidate.proposed.days >= 20 ? 'Đạt' : 'Chưa đạt'}</span></td></tr>
+                    <tr><td>Điểm thuộc lần chạy bị loại</td><td><b>{rangeCandidate.proposed.rejected}</b></td><td>Phải bằng 0</td><td><span className={`tag ${rangeCandidate.proposed.rejected === 0 ? 'ok' : 'rej'}`}>{rangeCandidate.proposed.rejected === 0 ? 'Đạt' : 'Chưa đạt'}</span></td></tr>
+                    <tr><td>Cảnh báo 1-2s</td><td><b>{rangeCandidate.proposed.warnings}</b></td><td>Thông tin, không chặn</td><td>{rangeCandidate.proposed.warnings ? <span className="tag warn">Theo dõi</span> : <span className="tag none">Không có</span>}</td></tr>
+                    <tr><td>SD đề xuất hợp lệ</td><td><b>{rangeCandidate.proposed.sd.toFixed(4)}</b></td><td>&gt;0</td><td><span className={`tag ${rangeCandidate.proposed.sd > 0 ? 'ok' : 'rej'}`}>{rangeCandidate.proposed.sd > 0 ? 'Đạt' : 'Chưa đạt'}</span></td></tr>
+                  </tbody>
+                </table></div>
+              </section>
+              <section className="range-workflow-table-section" aria-labelledby="range-comparison-title">
+                <h3 id="range-comparison-title">So sánh dải kiểm soát</h3>
+                <div className="range-workflow-table-wrap"><table className="range-workflow-table range-comparison-table">
+                  <thead><tr><th>Dải</th><th>Mean</th><th>SD</th><th>CV%</th><th>±2SD</th></tr></thead>
+                  <tbody>
+                    <tr><td>Đang dùng ({rangeCandidate.source === 'lab' ? 'PXN' : 'NSX'})</td><td><b>{rangeCandidate.current.mean?.toFixed(decimals) ?? '—'}</b></td><td><b>{rangeCandidate.current.sd?.toFixed(4) ?? '—'}</b></td><td><b>{rangeCandidate.current.cv?.toFixed(2) ?? '—'}</b></td><td>{rangeCandidate.current.mean != null && rangeCandidate.current.sd != null ? `${(rangeCandidate.current.mean - 2 * rangeCandidate.current.sd).toFixed(decimals)} – ${(rangeCandidate.current.mean + 2 * rangeCandidate.current.sd).toFixed(decimals)}` : '—'}</td></tr>
+                    <tr className="range-proposed-row"><td><b>Đề xuất PXN</b></td><td><b>{rangeCandidate.proposed.mean.toFixed(decimals)}</b></td><td><b>{rangeCandidate.proposed.sd.toFixed(4)}</b></td><td><b>{rangeCandidate.proposed.cv.toFixed(2)}</b></td><td><b>{(rangeCandidate.proposed.mean - 2 * rangeCandidate.proposed.sd).toFixed(decimals)} – {(rangeCandidate.proposed.mean + 2 * rangeCandidate.proposed.sd).toFixed(decimals)}</b></td></tr>
+                  </tbody>
+                </table></div>
+              </section>
+              <div className="range-workflow-note">Mean/SD đề xuất được tính trên toàn bộ tập dữ liệu đang xét; hệ thống không tự loại điểm để làm đẹp SD.</div>
+              <div className="range-apply-choice" role="group" aria-label="Chọn cách áp dụng dải">
+                <span>Giá trị áp dụng</span>
+                <div className="dayseg"><button type="button" className={rangeSelection === 'proposed' ? 'on' : ''} aria-pressed={rangeSelection === 'proposed'} onClick={() => setRangeSelection('proposed')}>Dải đề xuất</button><button type="button" className={rangeSelection === 'manual' ? 'on' : ''} aria-pressed={rangeSelection === 'manual'} onClick={() => setRangeSelection('manual')}>Chỉnh thủ công</button></div>
               </div>
-              <div className="range-workflow-compare">
-                <div><span>Dải hiện tại</span><b>Mean {rangeCandidate.current.mean?.toFixed(decimals) ?? '—'} · SD {rangeCandidate.current.sd?.toFixed(4) ?? '—'}</b></div>
-                <div><span>Dải đề xuất</span><b>Mean {rangeCandidate.proposed.mean.toFixed(decimals)} · SD {rangeCandidate.proposed.sd.toFixed(4)}</b></div>
-              </div>
-              <p className="hint">Các điểm cảnh báo hoặc loại bỏ không bị tự động loại khỏi phép tính để làm đẹp SD.</p>
+              {rangeSelection === 'manual' && <div className="range-manual-fields">
+                <label className="field"><span>Mean chốt <b>*</b></span><input aria-label="Mean chốt thủ công" type="number" inputMode="decimal" step="any" value={rangeManualMean} onChange={(e) => setRangeManualMean(e.target.value)} /></label>
+                <label className="field"><span>SD chốt <b>*</b></span><input aria-label="SD chốt thủ công" type="number" inputMode="decimal" min="0" step="any" value={rangeManualSd} onChange={(e) => setRangeManualSd(e.target.value)} /></label>
+              </div>}
               {rangeCandidate.safety.needed && (
                 <div className="alert warn range-safety-gate">
                   <b>Cổng an toàn sai số hệ thống {rangeCandidate.safety.nceId ? `· ${rangeCandidate.safety.nceId}` : ''}</b>
@@ -1070,15 +1054,12 @@ export function EntryPage() {
   );
 }
 
-/** Ô nhập 1 lần chạy trong worksheet — không kiểm soát (uncontrolled), commit
- * khi mất focus, đúng luồng "gõ giá trị rồi Tab/click ra ngoài" của bản cũ.
- * Chỉ xoá trắng ô khi LƯU THÀNH CÔNG — trước đây luôn xoá bất kể kết quả,
- * nên một lần lưu thất bại (kỳ đã khoá, nhóm lô đã dừng...) làm mất luôn
- * giá trị vừa gõ mà không có cách nào lấy lại ngoài gõ lại từ đầu.
- * `data-focus-date`/`data-focus-column` + `handleSheetKeyDown` port
- * `entrySheetKey()` app cũ: ArrowLeft/Right/Tab đi NGANG giữa các mức cùng
- * ngày, ArrowUp/Down/Enter đi DỌC giữa các ngày cùng 1 mức (Enter luôn
- * xuống hàng dưới, quay vòng về đầu cột). */
+/** Ô nhập một lần chạy trong worksheet — không kiểm soát (uncontrolled),
+ * commit khi mất focus. Chỉ xoá ô khi lưu thành công để giá trị vừa gõ không
+ * bị mất nếu kỳ đã khoá hoặc mức không còn vận hành.
+ * `data-focus-date`/`data-focus-column` cùng `handleSheetKeyDown` điều hướng
+ * ArrowLeft/Right/Tab giữa các mức cùng ngày, ArrowUp/Down/Enter giữa các
+ * ngày cùng mức; Enter xuống hàng dưới và quay vòng về đầu cột. */
 function RunSlot({ date, level, columnKey, columnOrder, onCommit }: {
   date: string; level: number; columnKey: string; columnOrder: number;
   onCommit: (val: number) => Promise<boolean>;
@@ -1094,3 +1075,5 @@ function RunSlot({ date, level, columnKey, columnOrder, onCommit }: {
     </div>
   );
 }
+
+

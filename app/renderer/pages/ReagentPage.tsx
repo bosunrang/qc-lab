@@ -26,7 +26,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { TEA_CATALOG } from '../../main/domain/tea-catalog';
 import type { ReagentComparisonResult, ReagentComparisonView, TeaRef } from '../../shared/qc-api';
 
-// App cũ dùng ĐÚNG HAI formatter khác nhau trên trang này, đối chiếu trực
+// hệ thống dùng ĐÚNG HAI formatter khác nhau trên trang này, đối chiếu trực
 // tiếp kết quả hiển thị:
 //   • phần THỐNG KÊ/tiêu chí (`rcFmt` → `pres.report.formatNumber`) bỏ số 0
 //     dư: "R² = 1", "6%", "139.2 / 140.592";
@@ -42,7 +42,7 @@ const fmtFixed = (value: unknown, decimals = 3): string => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(decimals) : '–';
 };
-/** Port `formatReagentTStatistic()` app cũ. */
+
 const fmtT = (value: unknown): string => {
   const n = Number(value);
   return Number.isFinite(n) ? Number(n.toFixed(4)).toString() : (n > 0 ? '+∞' : '−∞');
@@ -50,7 +50,7 @@ const fmtT = (value: unknown): string => {
 const equation = (slope: number, intercept: number) =>
   `y = ${fmt(slope, 4)}x ${intercept >= 0 ? '+' : '−'} ${fmt(Math.abs(intercept), 4)}`;
 
-/** Nhãn 1 phép so sánh trong ô chọn — đúng dạng app cũ: "<hóa chất> — <lô
+/** Nhãn 1 phép so sánh trong ô chọn — đúng dạng hệ thống: "<hóa chất> — <lô
  * cũ>→<lô mới>". */
 function comparisonLabel(row: ReagentComparisonView): string {
   const lots = [row.lot_old, row.lot_new].filter(Boolean).join('→');
@@ -59,7 +59,7 @@ function comparisonLabel(row: ReagentComparisonView): string {
 
 const MIN_PAIRS = 5;
 
-/** Port `resultVerdict()` app cũ — 3 mức kết luận, nguyên văn. */
+
 function verdictOf(result: ReagentComparisonResult): { cls: string; icon: string; title: string; desc: string } {
   const calibrationWarning = !result.passR2 || !result.passSlope;
   if (result.level === 'ok') {
@@ -173,7 +173,7 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
       </div>
     </div>
   );
-  // 6 tiêu chí, đúng thứ tự + câu chữ app cũ. `decision` = tiêu chí QUYẾT
+  // 6 tiêu chí, đúng thứ tự + câu chữ hệ thống. `decision` = tiêu chí QUYẾT
   // ĐỊNH (ĐẠT/KHÔNG ĐẠT), còn lại chỉ mô tả (TỐT/LƯU Ý).
   const criteria: [boolean, boolean, string, string][] = [
     [result.passBias, true, 'Độ chệch trong giới hạn cho phép (tiêu chí quyết định)',
@@ -218,10 +218,7 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
   );
 }
 
-/** Modal "Chọn nhanh" người thực hiện/loại mẫu — port `rcOpenQuick()`/
- * `reagentQuickPickerModalHtml()` app cũ: danh sách giá trị đã lưu (CHUNG
- * cho toàn app, không theo từng phép so sánh) + ô thêm mới (Enter hoặc nút
- * "Thêm"), mỗi dòng có nút "Chọn" và nút xoá "✕". */
+
 function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampleType'; onPick: (value: string) => void; onClose: () => void }) {
   // Danh sách CHUNG toàn app nên giữ ở store (`app_meta`), không phải state
   // cục bộ của modal — nhờ vậy mở lại modal không phải gọi lại IPC, và mọi
@@ -600,3 +597,5 @@ function makeTeaChoices(refs: TeaRef[]): TeaChoice[] {
   }
   return [...byKey.values()].sort((left, right) => left.section.localeCompare(right.section, 'vi') || left.name.localeCompare(right.name, 'vi'));
 }
+
+

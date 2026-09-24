@@ -1,10 +1,6 @@
-// Bo may danh gia Westgard don muc + CUSUM - tham khao thuat toan tu
-// src/domain/core/qc-core.ts (westgard/westgardByPoint/cusumScan) ban cu,
-// viet lai nguyen ven logic (khong "don lai" cau truc de giam rui ro lech
-// ket luan Westgard - xem canh bao goc o westgard-rules.ts). Danh gia
-// Có cả đánh giá từng mức và liên mức theo cùng lần chạy. Phần liên mức giữ
-// nguyên quy tắc của app cũ: R4s/2-2s/2of3-2s xét trong một run; các chuỗi
-// 3-1s/4-1s/6x… đi theo thứ tự run rồi level.
+// Bộ máy đánh giá Westgard từng mức, liên mức và CUSUM. R4s/2-2s/2of3-2s
+// được đánh giá trong cùng lần chạy; các luật chuỗi 3-1s/4-1s/6x… theo thứ tự
+// lần chạy rồi đến mức QC.
 import { WG_RUN_RULES, defaultRuleAction, wgScanRuns } from './westgard-rules';
 import type { RuleAction } from './rule-config';
 import { compareQcRunKey, qcRunKey } from './sort-order';
@@ -26,9 +22,6 @@ export interface PointTarget { mean: number; sd: number; key: string; z: number 
 
 const KEY_SEP = String.fromCharCode(0);
 
-// Moi diem QC co the mang "snapshot" Mean/SD tai thoi diem nhap (qcMean/
-// qcSd) - dung snapshot do thay vi Mean/SD hien hanh neu co, de lich su bieu
-// do khong doi nguoc khi Mean/SD duoc cap nhat sau nay.
 export function pointTarget(point: QcPointLike | null | undefined, fallbackMean: unknown, fallbackSd: unknown): PointTarget {
   const savedMean = Number(point && point.qcMean);
   const savedSd = Number(point && point.qcSd);
@@ -55,9 +48,6 @@ export type RuleVerdict = 'ok' | 'warn' | 'rej';
 export interface PointFlag { level: RuleVerdict; rules: string[]; supportRules: string[] }
 export interface WestgardResult { F: PointFlag[]; zs: number[] }
 
-// Danh gia mot chuoi diem CUNG mot muc QC theo Mean/SD chung (mean/sd truyen
-// vao) - dung khi moi diem co cung target, khong co snapshot per-point (xem
-// westgardByPoint ben duoi cho truong hop moi diem mang snapshot rieng).
 export function westgard(
   points: readonly QcPointLike[], mean: unknown, sd: unknown,
   isOn: (rule: string) => boolean = () => true,
@@ -91,11 +81,8 @@ export function westgard(
     if (isOn('1-2s') && a > 2 && (!F[i].rules.includes('1-3s') || (actionOf?.('1-2s') === 'reject' && F[i].level !== 'rej'))) set(i, 'warn', '1-2s');
     // 2of3-2s: "2 trong 3 kết quả cùng vượt một phía ±2SD" — quét CẢ cửa sổ
     // [i-2..i], KHÔNG đòi điểm hiện tại phải là một trong hai điểm vượt.
-    // App cũ đòi `zs[i]` vượt nên bỏ sót cửa sổ kiểu [+2,1; +2,2; 0]; chính
-    // nhánh LIÊN MỨC của app cũ (`westgardMultiByPoint`) lại đếm đúng
-    // `pos2.length >= 2`, nên cùng một luật cho hai kết quả khác nhau tuỳ
-    // phạm vi. Đây là lệch golden master CÓ CHỦ ĐÍCH, xem
-    // `tests/westgard-standard.test.mjs`.
+    // Cửa sổ được xét toàn bộ: không đòi điểm hiện tại phải là một trong hai
+    // điểm vượt ngưỡng, nên [+2,1; +2,2; 0] vẫn được phát hiện.
     if (isOn('2of3-2s') && i >= 2 && sameTrendTarget(points, i - 2, i)) {
       const pos: number[] = [];
       const neg: number[] = [];
@@ -118,8 +105,7 @@ export function westgard(
       flag(pos);
       flag(neg);
     }
-    // 7T: Westgard định nghĩa là BẢY phép đo QC cùng chiều (6 bước), không
-    // phải bảy bước/tám điểm như app cũ. Xem ghi chú lệch golden master ở trên.
+    // 7T là bảy phép đo QC cùng chiều, tương ứng sáu bước liên tiếp.
     if (isOn('7T') && i >= 6 && sameTrendTarget(points, i - 6, i)) {
       let inc = true;
       let dec = true;
@@ -147,36 +133,22 @@ export function westgard(
   return { F, zs };
 }
 
-/** @deprecated Chỉ giữ để đối chiếu thuật toán cũ. Luồng vận hành dùng
- * `acceptedRunPoints()` trên cùng kết luận ghép với bảng, không đánh giá lại
- * chuỗi đã lọc. Không dùng hàm này cho thống kê/biểu đồ mới.
- * Port `acceptedLotPoints()` app cũ (`src/domain/qc/accepted-lot-points.ts`)
- * — CHUỖI ĐIỂM ĐƯỢC CHẤP NHẬN của 1 mức: đi lần lượt từng điểm, điểm nào
+/** @deprecated Luồng vận hành dùng `acceptedRunPoints()` trên cùng kết luận
+ * ghép với bảng, không đánh giá lại chuỗi đã lọc. Không dùng hàm này cho
+ * thống kê hoặc biểu đồ mới.
+ * Chuỗi điểm được chấp nhận của một mức: đi lần lượt từng điểm, điểm nào
  * làm nổ luật LOẠI BỎ thì KHÔNG được vào chuỗi (và cũng không tính vào cửa
  * sổ để đánh giá các điểm sau) — nghĩa là 1 lần chạy bị loại không "làm
  * bẩn" chuỗi của những lần chạy sau.
  *
- * Dùng cho phần TRÌNH BÀY của trang Nhập QC (biểu đồ Levey-Jennings, số
- * điểm, thống kê Mean/SD/CV thực), đúng như app cũ. KHÔNG dùng cho Six
- * Sigma: mục "Confirmed business-logic decisions" của CLAUDE.md ghi rõ Sigma
- * phải dùng cohort IQC đã rà soát, không dùng helper trình bày này.
- *
- * Khác app cũ 1 chi tiết đã ghi rõ: app cũ hỏi `reject.has(rule)` theo bảng
- * hành động từng luật, app dùng `level === 'rej'` của chính engine (mô
- * hình rút gọn: hành động loại-bỏ/cảnh-báo nằm trong `WG_RULE_REGISTRY`).
- * Cửa sổ 11 điểm giữ nguyên như bản cũ.
+ * Chỉ dùng cho phần trình bày của trang Nhập QC (biểu đồ Levey-Jennings, số
+ * điểm, thống kê Mean/SD/CV thực), không dùng cho Six Sigma. Một điểm bị loại
+ * khi engine kết luận `level === 'rej'`; cửa sổ đánh giá giữ tối đa 11 điểm.
  *
  * MỖI ĐIỂM DÙNG TARGET RIÊNG của nó (`pointTarget`, ưu tiên snapshot
  * `qc_mean`/`qc_sd` đã chốt lúc nhập) — KHÔNG phải Mean/SD hiện hành dùng
- * chung. Bản đầu dùng Mean/SD chung, sai theo hai hướng: (1) khác app cũ,
- * nơi `acceptedLotPoints()` gọi `pointTarget(p, level.mean, level.sd)`; (2)
- * bất nhất ngay trong `analyzeLevel()` — verdict/z của cùng những điểm đó đi
- * qua `combinedWestgardByPoint()` → `westgardByPoint()` → `pointTarget()`,
- * tức ĐÃ theo snapshot. Hệ quả cũ: sau khi ai đó sửa Mean/SD của mức, một
- * điểm có thể hiện "Loại bỏ" mà vẫn `accepted:true` (hoặc ngược lại), làm
- * biểu đồ Levey-Jennings và thống kê Mean/SD/CV thực của trang Nhập QC lệch
- * khỏi chính bảng điểm bên cạnh. Đo được bằng đối chiếu trực tiếp với engine
- * app cũ (xem `tests/cross-app-westgard-sigma.test.mjs`). */
+ * chung. Nhờ đó, khi Mean/SD của mức thay đổi, verdict, biểu đồ và thống kê
+ * thực tế vẫn dùng cùng baseline của từng điểm. */
 export function acceptedPoints<T extends QcPointLike>(
   points: readonly T[], mean: unknown, sd: unknown, isOn: (rule: string) => boolean = () => true,
   actionOf?: (rule: string) => RuleAction,
@@ -204,9 +176,6 @@ export function acceptedPoints<T extends QcPointLike>(
   return out;
 }
 
-// Nhu westgard(), nhung moi diem dung snapshot Mean/SD rieng cua no (qua
-// pointTarget) thay vi mot Mean/SD chung - dung khi hien thi lich su dai
-// xuyen qua nhieu lan doi Mean/SD (Levey-Jennings that).
 export function westgardByPoint(
   points: readonly QcPointLike[], mean: unknown, sd: unknown,
   isOn: (rule: string) => boolean = () => true,
@@ -229,8 +198,7 @@ export interface MultiLevelSet<T extends QcPointLike = QcPointLike> {
 }
 export interface MultiWestgardResult<T extends QcPointLike = QcPointLike> extends Map<T, string[]> { support: Map<T, string[]> }
 
-/** Luật Westgard liên mức, port từ app cũ's `westgardMultiByPoint()`. Mỗi
- * điểm dùng snapshot Mean/SD của chính nó; Map giữ tham chiếu điểm gốc để
+/** Luật Westgard liên mức. Mỗi điểm dùng snapshot Mean/SD của chính nó; Map giữ tham chiếu điểm gốc để
  * caller ghép kết quả đơn mức và liên mức mà không dựa vào index toàn cục. */
 export function westgardMultiByPoint<T extends QcPointLike>(levelSets: readonly MultiLevelSet<T>[], isOn: (rule: string) => boolean = () => true): MultiWestgardResult<T> {
   type Item = { p: T; z: number; level: number; run: string; targetKey: string };
@@ -308,8 +276,7 @@ export function rejectingRules(rules: readonly string[], actionOf?: (rule: strin
   return rules.filter((rule) => (actionOf?.(rule) || defaultRuleAction(rule, true)) === 'reject');
 }
 
-/** Ghép luật từng mức và luật liên mức thành một kết luận duy nhất cho mỗi
- * điểm, cùng mô hình `createActiveWestgard()` của app cũ. */
+/** Ghép luật từng mức và liên mức thành một kết luận duy nhất cho mỗi điểm. */
 export function combinedWestgardByPoint<T extends QcPointLike>(
   levelSets: readonly MultiLevelSet<T>[], within: (rule: string) => boolean, across: (rule: string) => boolean,
   actionOf?: (rule: string) => RuleAction,
@@ -390,8 +357,6 @@ export function acceptedRunPoints<T extends QcPointLike>(byPoint: ReadonlyMap<T,
 
 export interface CusumResult { cPos: number[]; cNeg: number[]; flags: RuleVerdict[]; k: number; h: number; ma?: number[] }
 
-// Tabular CUSUM (hai phia) tren chuoi z-score chuan hoa qua pointZ - bat
-// drift/shift nho keo dai ma rule don diem kho thay.
 export function cusumScan(
   points: readonly QcPointLike[], mean: unknown, sd: unknown, k = 0.5, h = 4, maWindow = 0,
   /** Trả `true` để ĐẶT LẠI C+/C− (và MA) NGAY TRƯỚC điểm này — dùng cho mốc
@@ -453,3 +418,5 @@ export function cusum(
 ): CusumResult {
   return cusumScan(points, mean, sd, k, h, 0, resetBefore);
 }
+
+

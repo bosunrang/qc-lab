@@ -1,6 +1,5 @@
 // Bọc `sql.js` (SQLite biên dịch sang WASM) thành đúng hợp đồng
 // `SqliteLike` mà mọi handler `main/ipc/*` đang dùng — xem
-// `main/db/sqlite-like.ts`.
 //
 // Mục đích (2026-09-09, bước 1 của việc gỡ bản giả lập viết tay): bản xem
 // trước qua trình duyệt (`npm run app:dev`) sẽ chạy CHÍNH handler thật
@@ -142,3 +141,5 @@ export function createBrowserDatabase(
   applySchema(db);
   return db;
 }
+
+

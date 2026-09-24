@@ -1,27 +1,3 @@
-// Read-model trang Tổng quan — port đúng nghiệp vụ trình bày của app cũ
-// (Giai đoạn D2, docs/APP-V2-PLAN.md). Nguồn đối chiếu, tra thẳng mã nguồn
-// chứ không đoán từ mô tả: `dashboard-page-controller.ts`'s `dashboardModel()`,
-// `dashboard-shift-status.ts`, `dashboard-kpis.ts`, `dashboard-westgard-alerts.ts`,
-// `dashboard-missing-target-items.ts`, `dashboard-expiring-lot-items.ts`,
-// `dashboard-expiring-lots.ts`, `westgard-view-model.ts`'s `summarizeTestStatus()`.
-//
-// 3 điểm nghiệp vụ đã sửa ở đợt này, gate `app:ui-parity` phát hiện —
-// bản trước tự nghĩ ra cách tính, không tra app cũ:
-//
-// 1. **Báo động theo ĐIỂM CUỐI, không phải điểm xấu nhất.**
-//    `summarizeTestStatus()` của app cũ chỉ đọc `points[points.length-1]`
-//    của mỗi mức. Mức từng vi phạm hôm trước mà điểm mới nhất đã đạt thì
-//    KHÔNG còn nằm trong "Cần xử lý". Bản trước dùng `worstVerdict` (xấu
-//    nhất trong mọi điểm) nên một xét nghiệm đã khắc phục xong vẫn báo đỏ
-//    mãi. Đây là lệch NGHIỆP VỤ, không phải lệch chữ.
-// 2. **Một dòng báo động cho mỗi MỨC, không phải mỗi XÉT NGHIỆM.** App cũ
-//    (`dashboardWestgardAlerts`) đẩy 1 item cho từng mức đang báo động, kèm
-//    ĐÚNG điểm và ĐÚNG danh sách luật của mức đó — nên nhãn hiện được
-//    "Sodium (Na) · M2" và dòng meta "02/09/2026 · 109.50 mmol/L · 1-3s".
-// 3. **% hoàn tất tính theo XÉT NGHIỆM, không theo MỨC.**
-//    `dashboardKpis()`: `completeTests = testCount - missingToday`,
-//    `completionPercent = completeTests/testCount`. Bản trước chia theo tổng
-//    số MỨC nên 1 xét nghiệm 2 mức mới nhập 1 mức ra 50% thay vì 0%.
 import type { NceDetail, NceRecord, QcLot, QcPanel, Test, TestSummary } from '../../shared/qc-api';
 
 const RANK = { ok: 0, warn: 1, rej: 2 } as const;
@@ -58,11 +34,7 @@ export function normalizeDashboardSearch(value: unknown): string {
   return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 }
 
-/** Port `operationalTests()` app cũ cho riêng Tổng quan. `listTestSummaries`
- * còn được Westgard/Entry dùng nên cố ý trả cả xét nghiệm chưa vận hành;
- * Dashboard phải áp đủ 3 cổng: xét nghiệm active, nằm trong Panel active và
- * có ít nhất một mức thuộc nhóm lô đang vận hành. Điều kiện cuối đã được
- * `listTestSummaries()` thể hiện bằng `levels.length > 0`. */
+
 export function operationalDashboardSummaries(summaries: TestSummary[], tests: Test[], panels: QcPanel[]): TestSummary[] {
   const activeTests = new Set(tests.filter(test => test.active !== 0).map(test => test.id));
   const order = new Map<string, number>();
@@ -75,9 +47,7 @@ export function operationalDashboardSummaries(summaries: TestSummary[], tests: T
     .sort((a, b) => order.get(a.testId)! - order.get(b.testId)!);
 }
 
-/** Port `actionOverdue()` app cũ sang cấu trúc NCE của app. Một hồ sơ
- * nháp chưa có người phụ trách không được tính quá hạn; hồ sơ bị trả lại vẫn
- * quá hạn cho tới khi được duyệt khép vòng; hồ sơ đã hủy/đã duyệt thì không. */
+
 export function dashboardNceOverdue(record: NceRecord | null | undefined, today: string): DashboardOverdueInfo {
   let detail: NceDetail = {};
   try { detail = JSON.parse(record?.detail_json || '{}') as NceDetail; } catch { /* dữ liệu cũ lỗi JSON được coi là hồ sơ chưa ghi đủ */ }
@@ -92,7 +62,7 @@ export function dashboardNceOverdue(record: NceRecord | null | undefined, today:
   return { overdue: true, days, label: `Quá hạn ${days} ngày`, owner };
 }
 
-/** Thứ tự bảng xét nghiệm app cũ: loại bỏ → cảnh báo → chưa đủ QC hôm nay
+/** Thứ tự bảng xét nghiệm hệ thống: loại bỏ → cảnh báo → chưa đủ QC hôm nay
  * → đạt → trạng thái khác. */
 export function dashboardTestRank(test: Pick<DashboardTestItem, 'status' | 'todayCount' | 'levels'>): number {
   if (test.status === 'rej') return 0;
@@ -102,12 +72,7 @@ export function dashboardTestRank(test: Pick<DashboardTestItem, 'status' | 'toda
   return 4;
 }
 
-/** Port `qcDateFormat.daysToExpiry()` của app cũ: chuỗi `YYYY-MM-DD` được
- * đọc là NỬA ĐÊM GIỜ ĐỊA PHƯƠNG (`new Date(y, m-1, d)`), rồi trừ thời điểm
- * HIỆN TẠI kèm giờ-phút thật và `Math.round`. Không phải phép trừ 2 mốc
- * chuẩn hoá — chính giờ-phút trong ngày làm kết quả lệch 1 ngày so với
- * phép trừ ngày thuần (lô hết hạn sau 18 ngày hiện "Còn 17 ngày" nếu đang
- * là buổi chiều), và đó là con số app cũ hiển thị. */
+
 export function daysToExpiry(value: string, now: Date = new Date()): number | null {
   if (!value) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
@@ -116,8 +81,7 @@ export function daysToExpiry(value: string, now: Date = new Date()): number | nu
   return Number.isFinite(time) ? Math.round((time - now.getTime()) / 86400000) : null;
 }
 
-/** Port nguyên văn `dashboardShiftStatus()` (dashboard-shift-status.ts) —
- * copy y nguyên cả thứ tự ưu tiên lẫn từng câu chữ. */
+
 export function dashboardShiftStatus(input: { rejected: number; overdueActions: number; warnings: number; missingToday: number }): { mood: string; text: string } {
   if (input.rejected) return { mood: 'Cần xử lý ngay', text: 'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.' };
   if (input.overdueActions) return { mood: 'Có hồ sơ NCE quá hạn', text: `${input.overdueActions} hồ sơ khắc phục đã qua hạn xử lý mà chưa khép vòng.` };
@@ -148,8 +112,6 @@ export function buildDashboardViewModel<TOverdue extends NceRecord>(
     };
   });
 
-  // KPI: copy đúng `dashboardKpis()` — `completeTests`/`completionPercent`
-  // tính theo SỐ XÉT NGHIỆM, `todayPoints` là số MỨC đã có điểm hôm nay.
   const totalPoints = tests.reduce((sum, test) => sum + test.totalPoints, 0);
   const todayPoints = tests.reduce((sum, test) => sum + test.todayCount, 0);
   const rejected = tests.filter(test => test.status === 'rej').length;
@@ -202,3 +164,5 @@ export function buildDashboardViewModel<TOverdue extends NceRecord>(
     lotCount: lots.length,
   };
 }
+
+

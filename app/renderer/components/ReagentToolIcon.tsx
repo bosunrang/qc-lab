@@ -1,8 +1,3 @@
-// Port `src/react/components/ReagentToolIcon.tsx` app cũ — SVG thật (path
-// data copy nguyên), dùng cho các nút icon nhỏ ở trang So sánh hóa chất
-// (hiện chỉ cần 'user'/'sample' cho 2 nút "Chọn nhanh", 4 type còn lại giữ
-// sẵn cho lần port `.rc-toolbar`/icon-button tìm/tạo/xoá/in — xem ghi chú
-// đầu file `styles/pages/reagent.css`).
 export type ReagentToolIconType = 'search' | 'print' | 'report' | 'trash' | 'sample' | 'user';
 
 export function ReagentToolIcon({ type }: { type: ReagentToolIconType }) {
@@ -17,3 +12,5 @@ export function ReagentToolIcon({ type }: { type: ReagentToolIconType }) {
     </svg>
   );
 }
+
+

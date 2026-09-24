@@ -1,8 +1,3 @@
-// Modal "Ảnh đại diện" — port `avatar-modal-controller.ts`/`avatar-modal-html.ts`
-// app cũ: chọn tệp ảnh → resize canvas 160×160 (fit-cover, cắt vuông chính
-// giữa) → lưu làm data URL PNG. Tự phục vụ — chỉ đổi ảnh của CHÍNH tài khoản
-// đang đăng nhập (main/ipc/auth-handlers.ts's setAvatar/clearAvatar chỉ nhận
-// actor.userId, không có tham số id người khác).
 import { useRef, useState } from 'react';
 import { useAuthStore } from '../store/auth-store';
 import { Modal } from './Modal';
@@ -68,3 +63,5 @@ export function AvatarModal({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
+
+

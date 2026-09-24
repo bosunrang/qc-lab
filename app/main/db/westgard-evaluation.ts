@@ -25,3 +25,5 @@ export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, se
     rule => on(rule) && ['across', 'both'].includes(scope(rule)),
     actionOf, effectiveQcFixDates(db, testId));
 }
+
+

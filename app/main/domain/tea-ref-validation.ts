@@ -1,22 +1,10 @@
-// Validate cho tab "Bảng TEa tham chiếu" (Cấu hình chung). Phạm vi rút gọn
-// có chủ đích so với bản cũ: đây chỉ là hồ sơ TEa CHUẨN HOÁ do phòng xét
-// nghiệm tự khai (lab/lab_source/lab_prepared_by/...), KHÔNG port
-// `TEA_ANALYTE_CATALOG` (hàng trăm analyte built-in CLIA/Ricos của bản cũ,
-// `docs/tea-sources.md`) — đó là dữ liệu tham khảo tĩnh, không phải nghiệp
-// vụ, để dành cho một đợt riêng khi cần autocomplete đầy đủ. 6 trường bắt
-// buộc dưới đây tham khảo đúng `prepareLabProfile()`/`teaLabProfileSave()`
-// bản cũ (xem CLAUDE.md mục "Hồ sơ TEa chuẩn hóa").
 import { cleanText, finiteNumber } from './text-utils';
 
 export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Danh sách ĐÓNG 6 nguồn TEa hợp lệ — port `TEA_LAB_BASIS_SOURCES` app cũ.
- * Renderer (`TeaRefsTab.tsx`) giữ bản riêng cùng nhãn tiếng Việt để dựng
- * `<select>` (theo đúng quy ước "mỗi lớp giữ hằng số riêng" đã dùng cho
- * `STATUS_TEXT`/`GROUP_STATUSES` trong codebase này) — 2 danh sách phải
- * cùng 6 khoá, đổi 1 bên nhớ đổi bên kia. */
+
 export const TEA_LAB_SOURCES = ['regulation', 'pt', 'eflm', 'ricos', 'professional', 'other'] as const;
 
 /** Nhãn tiếng Việt cho từng khoá — dùng để ghi audit log đọc được, thay vì
@@ -94,3 +82,5 @@ export function validateTeaRef(input: TeaRefInput): ValidationResult<PreparedTea
   }
   return { ok: true, data: cleaned };
 }
+
+

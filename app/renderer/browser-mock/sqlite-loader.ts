@@ -97,3 +97,5 @@ export async function openPreviewDatabase(): Promise<PreviewDatabase> {
   window.addEventListener('pagehide', () => { void flushNow(); });
   return api;
 }
+
+

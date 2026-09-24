@@ -26,9 +26,6 @@ const build = spawnSync(process.execPath, [
 ], { cwd: REPO_ROOT, stdio: 'inherit' });
 if (build.status !== 0) { console.error('Build app main process thất bại — dừng, không chạy test.'); process.exit(1); }
 
-// mock-parity.test.mjs cần thêm bản CommonJS của renderer/browser-mock/* để
-// chạy được trong Node (bản thật của nó là ESM+JSX cho Vite). Build riêng —
-// xem tsconfig.app-mock.json và ghi chú đầu file test đó.
 const buildMock = spawnSync(process.execPath, [
   path.join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
   '-p', path.join(REPO_ROOT, 'tsconfig.app-mock.json'),
@@ -39,3 +36,5 @@ const args = ['--test', ...files.map(name => path.join('tests', name)), ...proce
 const res = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit' });
 if (res.error) { console.error(res.error); process.exit(1); }
 process.exit(res.status === null ? 1 : res.status);
+
+

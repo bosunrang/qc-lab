@@ -1,13 +1,3 @@
-// Chuỗi hash tamper-evident cho nhật ký hoạt động — tham khảo thuật toán từ
-// bản cũ (src/domain/core/qc-core.ts's auditCanonicalCore/auditSha256Core/
-// verifyAuditChain). Cùng thuật toán SHA-256 tiêu chuẩn nên cho ra hash
-// giống hệt bản cũ với cùng input.
-//
-// Hàm băm được import từ `./sha256` chứ KHÔNG gọi `node:crypto` tại chỗ nữa
-// (đổi 2026-09-09): đây là file thuần được bản xem trước qua trình duyệt
-// dùng lại, và `sha256.ts` là bản `node:crypto` cho main process còn
-// `sha256-browser.ts` là bản JS thuần được Vite thay vào khi build renderer.
-// Xem comment đầu 2 file đó.
 import { sha256Hex } from './sha256';
 
 export interface AuditEntry {
@@ -49,24 +39,23 @@ export function auditEntryHash(entry: Partial<AuditEntry>): string {
 export interface ChainVerifyResult {
   ok: boolean;
   checked: number;
-  legacy: number;
+  unhashed: number;
   brokenIndex: number;
   reason: string;
 }
 
-/** Xác nhận chuỗi hash liên tục từ `anchor`. Dòng "legacy" (không có hash lẫn
- * prevHash) được bỏ qua, không phá chuỗi — cho phép xen giữa các dòng đã hash. */
+/** Xác nhận chuỗi hash liên tục từ `anchor`; dòng chưa có hash được bỏ qua. */
 export function verifyAuditChain(activity: readonly Partial<AuditEntry>[] = [], anchor = ''): ChainVerifyResult {
-  let prev = String(anchor || ''), checked = 0, legacy = 0;
+  let prev = String(anchor || ''), checked = 0, unhashed = 0;
   for (let i = 0; i < activity.length; i++) {
     const a = activity[i] || {};
-    if (!a.hash && !a.prevHash) { legacy++; continue; }
-    if (a.prevHash !== prev) return { ok: false, checked, legacy, brokenIndex: i, reason: 'prevHash không khớp' };
-    if (a.hash !== auditEntryHash(a)) return { ok: false, checked, legacy, brokenIndex: i, reason: 'hash không khớp' };
+    if (!a.hash && !a.prevHash) { unhashed++; continue; }
+    if (a.prevHash !== prev) return { ok: false, checked, unhashed, brokenIndex: i, reason: 'prevHash không khớp' };
+    if (a.hash !== auditEntryHash(a)) return { ok: false, checked, unhashed, brokenIndex: i, reason: 'hash không khớp' };
     prev = a.hash;
     checked++;
   }
-  return { ok: true, checked, legacy, brokenIndex: -1, reason: '' };
+  return { ok: true, checked, unhashed, brokenIndex: -1, reason: '' };
 }
 
 /** Tính lại toàn bộ prevHash/hash theo ĐÚNG thứ tự mảng hiện tại (không sắp
@@ -90,3 +79,5 @@ export function lastHashOf(activity: readonly Partial<AuditEntry>[] = []): strin
   }
   return '';
 }
+
+

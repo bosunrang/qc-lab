@@ -1,18 +1,3 @@
-// Lịch chọn ngày TỰ VẼ — port `src/react/state/date-picker-store.ts` +
-// `DatePickerPopup.tsx` của app cũ.
-//
-// Ở Giai đoạn A1/D3.2, app cố ý KHÔNG port lịch này: nút lịch gọi
-// `showPicker()` của `<input type="date">` ẩn, với lý do "giống luồng thao
-// tác, không cần giống cách vẽ". Nhưng người dùng thấy ngay khác biệt: đó là
-// lịch NATIVE của Chromium (tháng tiếng Anh "September 2026", cột Su/Mo/Tu,
-// nút Clear/Today) thay vì lịch tiếng Việt của app cũ. Vì mục tiêu đã chốt là
-// giống app cũ 100%, port hẳn.
-//
-// Chỉ MỘT popup mở cùng lúc trên toàn app (đúng bản cũ). Store chỉ giữ THAM
-// CHIẾU DOM tới ô đang mở (box/input/native) — KHÔNG giữ "giá trị" ngày trong
-// state, vì mọi ô ngày trong app vẫn để uncontrolled ở chế độ FormData;
-// `pickDate()` ghi thẳng vào 2 input rồi gọi callback để chế độ có điều khiển
-// cập nhật React state.
 import { createStore } from 'zustand/vanilla';
 
 export type DatePickerMode = 'day' | 'month';
@@ -106,3 +91,5 @@ export function pickDate(iso: string): void {
   closeDatePicker();
   onPicked?.(iso);
 }
+
+

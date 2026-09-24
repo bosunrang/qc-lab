@@ -1,11 +1,3 @@
-// Kiểm chứng `test_levels.mean_sd_effective_from` — port effectiveFrom:
-// isoToday() app cũ (commitTargetMatrix()/applyLotGroupActivation()): MỌI
-// lần lưu Mean/SD qua Bảng Mean/SD đều đóng dấu NGÀY LƯU cho cấu hình đang
-// hoạt động, kể cả khi giá trị không đổi so với trước — khác hẳn
-// `mean_sd_history_json` (chỉ chốt khi giá trị THẬT SỰ đổi). Thiếu cột này
-// khiến tab "Lịch sử dữ liệu" không có cách nào biết cấu hình hiện hành có
-// hiệu lực từ bao giờ, luôn hiện "Không giới hạn" dù người dùng vừa lưu
-// xong (bug thật người dùng phát hiện qua ảnh chụp).
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -33,7 +25,7 @@ assert.equal(saved1.ok, true);
 assert.equal(saved1.data.mean_sd_effective_from, today, 'luu Mean/SD lan dau phai dong dau hom nay');
 
 // 3) Lưu lại Y HỆT số cũ (không đổi mean/sd) — vẫn phải đóng dấu lại hôm
-// nay, KHÔNG chỉ khi giá trị khác (đúng app cũ: mỗi lần bấm "Lưu Mean/SD
+// nay, KHÔNG chỉ khi giá trị khác (đúng hệ thống: mỗi lần bấm "Lưu Mean/SD
 // mức này" đều re-stamp effectiveFrom, không điều kiện gì).
 const saved2 = config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 100, sd: 2, qcLotId: lot1.id } }, actor);
 assert.equal(saved2.ok, true);
@@ -51,3 +43,5 @@ assert.equal(JSON.parse(saved3.data.mean_sd_history_json).some((h) => h.mean ===
   'gia tri cu (100/2) phai duoc chot vao lich su khi doi sang gia tri moi');
 
 console.log('app config-mean-sd-effective-from oracle tests passed');
+
+

@@ -29,11 +29,11 @@ main:has(.config-shell){padding-bottom:16px;}
    cuộn nên mọi thứ phía trên bảng (tiêu đề thẻ, ô tìm kiếm, 3 thẻ nguồn TEa)
    đều trôi mất khi cuộn tới dòng thứ 77. */
 .config-shell-main{flex:1 1 auto;display:flex;flex-direction:column;background:transparent;min-width:0;max-width:100%;min-height:0;overflow:hidden;}
-/* App cũ: toolbar là dải riêng của vùng nội dung, còn panel bên dưới GIỮ
+/* hệ thống: toolbar là dải riêng của vùng nội dung, còn panel bên dưới GIỮ
    viền 1px + bo góc + nền trắng (đo được: panel 874px, bảng bên trong 872px).
    Rule cũ ở đây gỡ hết viền/nền vì thời điểm đó toolbar nằm trong panel nên
    panel bị coi là lớp bọc dư. */
-/* App cũ KHÔNG zero padding cho mọi panel trong vùng nội dung — chỉ cho
+/* hệ thống KHÔNG zero padding cho mọi panel trong vùng nội dung — chỉ cho
    panel bọc bảng (`.rcfg-list:has(> table)`, khai ở trên). Rule rộng ở
    đây đè mất `padding-bottom:14px` của panel Mean/SD. */
 .config-shell-main>.panel{margin:0;overflow:visible;}
@@ -126,7 +126,6 @@ main:has(.config-shell){padding-bottom:16px;}
    thao tác. Cột số hẹp vì nội dung chỉ 1-2 chữ số. */
 /* Hai cột số phải đủ rộng cho CHÍNH CHỮ TIÊU ĐỀ của nó: "Xét nghiệm"
    rộng 46px, "Panel" 34px, cộng 2 x 12px padding => cần >=70px và >=58px.
-   Ở cửa sổ hẹp nhất (minWidth 1024) thì 1% ~ 7px, nên 11% và 9%. Trước đây
    cột Panel để 7% (~53px) nên chữ tiêu đề TRÀN ra khỏi ô và đẩy sang phải
    7px — nhìn thành lệch so với số bên dưới, dù cả hai đều canh phải. */
 .instrument-table th:nth-child(1),.instrument-table td:nth-child(1){width:23%;}
@@ -153,12 +152,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-table td:last-child .manage-actions{flex-wrap:nowrap;}
 
 .config-shell-main .empty-state{text-align:center;padding:var(--space-lg);color:var(--muted);}
-/* Bề rộng modal Cấu hình chung — port NGUYÊN tên + giá trị app cũ
-   (`assets/professional-config.css`). Trước đó app tự đặt tên riêng cho
-   từng modal (`.instrument-modal`/`.assay-modal`/…) nên mất sạch những rule
-   app cũ scope theo `.rcfg-modal`/`.rcfg-group-modal` (accent-color của
-   checkbox, focus-visible, lưới cột theo SỐ MỨC), và gate css-parity không
-   thể canh vì nó chỉ hỏi về class app đang dùng. */
+
 .rcfg-modal{width:700px;}
 /* Nhịp form chuẩn của Cấu hình chung: 12px giữa CÁC HÀNG field, 4px giữa
    nhãn và control (quy tắc `label` chung). Đặt khoảng cách ở form thay vì
@@ -316,12 +310,10 @@ main:has(.config-shell){padding-bottom:16px;}
 .config-shell-main .target-matrix-panel>.empty,
 .config-shell-main .target-matrix-panel .empty{display:grid;place-content:center;min-height:300px;margin:0;border:0;border-radius:0;background:transparent;}
 .config-shell-main .target-matrix-panel .empty-title{color:var(--ink);font-size:var(--text-base);font-weight:var(--weight-bold);}
-/* Huy hiệu trạng thái ở cột cuối được canh giữa ô (app cũ:
+/* Huy hiệu trạng thái ở cột cuối được canh giữa ô (hệ thống:
    `.target-row .tag{margin-left:auto;margin-right:auto}`). */
 .target-row .tag{margin-left:auto;margin-right:auto;text-align:center;}
-/* Port đầy đủ `.target-selector` app cũ: nó là một DẢI có nền + viền dưới
-   nằm sát mép panel (không phải khối có margin), label bỏ margin-top, ô
-   chọn cao 36px, và số cột khác nhau giữa bảng Mean/SD với tab Lịch sử. */
+
 /* Dải chọn Panel/nhóm lô/xét nghiệm là hàng đầu tiên BÊN TRONG khối trắng —
    cùng vai trò với ô tìm kiếm ở header của các thẻ khác, nên cũng nền trắng,
    chỉ một đường kẻ ngăn với bảng bên dưới. */
@@ -336,7 +328,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .target-config-panel-field{flex:0 1 380px;min-width:240px;}
 .target-config-group-field{flex:0 1 320px;min-width:240px;}
 .target-config-selector .field{margin:0;}
-/* Bảng Mean/SD của app cũ KHÔNG phải <table>: `.target-table` là hộp cuộn,
+/* Bảng Mean/SD của hệ thống KHÔNG phải <table>: `.target-table` là hộp cuộn,
    còn `.target-head`/`.target-row` là LƯỚI 7 cột (professional-config.css).
    app từng dùng <table> ở bản thí điểm nên CSS cũ ở đây style theo bảng;
    lưới hiện tại không kế thừa các selector đó. */
@@ -348,13 +340,7 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Mean/SD là lưới, không dùng thẻ <table>, nhưng hàng cột phải theo đúng
    hệ màu header bảng chung để không thành một ngoại lệ thị giác. */
 .target-head{position:sticky;top:0;z-index:2;min-height:var(--table-header-height);padding:0 10px;font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);font-weight:var(--table-head-weight);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);}
-/* `text-align:center` KHÔNG căn được vì các span này là flex container
-   (`display:flex` ở rule dưới) — chỉ `justify-content` mới có tác dụng.
-   Rule cũ chỉ có text-align nên vô hiệu, khiến tiêu đề bị lệch trái theo
-   flex mặc định trong khi ô nhập số lại có padding riêng, nhìn lệch
-   nhau. Port đúng app cũ: MỌI cột trừ 2 cột đầu (Dùng/Xét nghiệm, đã
-   có override centered/left riêng bên dưới) đều canh GIỮA cả tiêu đề
-   lẫn nội dung. */
+
 .target-head>span,.target-row>span{display:flex;align-items:center;justify-content:center;text-align:center;}
 .target-row{min-height:44px;padding:4px 10px;border-bottom:1px solid var(--border-subtle);}
 .target-row:last-child{border-bottom:0;}
@@ -366,9 +352,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .target-row input:disabled{border-color:var(--border-subtle);background:var(--surface-subtle);color:var(--text-disabled);}
 .target-table select,.target-table input{max-width:100%;}
 .target-level-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 14px;border:0;border-bottom:1px solid var(--table-head-border);border-radius:0;background:transparent;}.target-level-toolbar>div:first-child{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-body);font-size:var(--text-sm);}
-/* App cũ chỉ đặt `flex:0 0 auto` cho .dayseg ở đây, dùng nguyên kiểu
-   segmented dùng chung (nền #1c3442 khi active, không viền/bo từng nút).
-   Bản app trước 2026-09-03 tự dựng lại thành nút teal có viền + bo góc. */
+
 .target-level-toolbar .dayseg{flex:0 0 auto;}
 .target-level-toolbar>div:first-child b{font-size:var(--text-base);}.target-level-toolbar .target-level-lot{overflow:hidden;color:var(--teal);font-size:var(--text-base);font-weight:700;text-overflow:ellipsis;white-space:nowrap;}
 .target-summary{display:flex;flex:1 1 390px;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:0;}
@@ -377,10 +361,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .target-summary span.warn{border-color:var(--warning-border);background:var(--warning-bg);color:var(--warning-ink);}
 .target-summary b{font-size:var(--text-sm);}
 
-/* Port đúng % bề rộng + canh lề app cũ (professional-config.css) — bản
-   trước app tự đặt tỷ lệ khác (19/29/18/18/16, không cột nào canh trái)
-   nên cột "Chuyển lô" rộng hơn cần thiết còn "Trạng thái" hẹp hơn, và cột
-   "Panel QC" bị canh giữa thay vì trái như mọi bảng khác trong trang. */
+
 .transition-table th:nth-child(1),.transition-table td:nth-child(1){width:14%;text-align:left;}
 .transition-table th:nth-child(2),.transition-table td:nth-child(2){width:22%;}
 .transition-table th:nth-child(3),.transition-table td:nth-child(3){width:12%;}
@@ -390,25 +371,20 @@ main:has(.config-shell){padding-bottom:16px;}
 .transition-table td:last-child,.tea-ref-table td:last-child{white-space:nowrap;}
 
 /* Hộp thoại chuyển tiếp lô: giữ cấu trúc 3 + 2 trường và vùng Mean/SD
-   bên trong như app cũ. Các ô Mean/SD hiện là giao diện đối chiếu; luồng
+   bên trong như hệ thống. Các ô Mean/SD hiện là giao diện đối chiếu; luồng
    lưu tiêu chí chuyển lô sẽ được nối riêng khi triển khai nghiệp vụ. */
-/* Port nguyên tên + giá trị app cũ (`.lot-trans-row3`/`.lot-trans-row2`) —
-   trước đó app tự đặt `.transition-form-row3/2` với lưới khác. */
+
 .lot-trans-row3{display:grid;grid-template-columns:300px 1fr 1fr;gap:var(--gap-content);}
 .lot-trans-row2{display:flex;gap:var(--gap-content);margin-top:0;}
 .lot-trans-row2>div{flex:0 0 auto;width:200px;}
 .lot-trans-row3 .field,.lot-trans-row2 .field{margin:0;}
 .lot-trans-modal .lot-trans-row2+.field{margin-top:var(--space-panel);}
-/* Dòng nhắc chọn Panel/lô dùng `.hint.flow-section` dùng chung như app cũ. */
+/* Dòng nhắc chọn Panel/lô dùng `.hint.flow-section` dùng chung như hệ thống. */
 
 .history-selector .field{margin:0;}
 .history-table th,.history-table td{text-align:center;vertical-align:middle;}
 .history-table th:first-child,.history-table td:first-child{text-align:center;}
-/* 10 cột đúng bằng 100% (port nguyên % từ assets/professional-config.css) —
-   bản trước chỉ khai 9 cột cộng lại đã 104%, không còn % nào cho cột 10
-   ("Chi tiết") nên `table-layout:fixed` ép cột đó về 0 — nút bị đẩy ra
-   ngoài khung nhìn, phải cuộn ngang mới thấy (bug thật người dùng phát
-   hiện qua ảnh chụp, không phải chỉ "màn hình hẹp"). */
+
 .history-table th:nth-child(1),.history-table td:nth-child(1){width:6%;}
 .history-table th:nth-child(2),.history-table td:nth-child(2){width:17%;text-align:left;}
 .history-table th:nth-child(3),.history-table td:nth-child(3),.history-table th:nth-child(4),.history-table td:nth-child(4){width:9%;}
@@ -421,7 +397,6 @@ main:has(.config-shell){padding-bottom:16px;}
 
 .tea-ref-panel { overflow-x: auto; }
 /* Ba thẻ nguồn tham chiếu nằm giữa header và bảng, căn đúng mép bảng (lề
-   ngang 0) — trước đây thụt 16px nên không thẳng hàng với khối bảng. */
 .tea-source-registry {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -469,9 +444,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-form-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-content); margin-top: var(--gap-content); }
 
 /* Biểu mẫu xét nghiệm giữ cùng mật độ và thứ bậc thông tin với giao diện cũ. */
-/* Port nguyên app cũ: tiêu đề khối là `.assay-form-heading > h4` (không phải
-   `.assay-form-section > b` app tự đặt), và 4 trường phụ nằm ở LƯỚI RIÊNG
-   `.assay-detail-grid` cùng khuôn cột với `.assay-main-grid`. */
+
 .assay-setup-layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:12px;align-items:stretch;}
 .assay-config-card{min-width:0;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
 .assay-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:50px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--section-head-bg);box-sizing:border-box;}
@@ -542,7 +515,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .panel-qc-main-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-content);}
 .panel-qc-main-grid .field{margin:0;}
 .panel-test-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--card-head-ink);}
-/* Thiếu `grid-template-columns` — app cũ (`professional-config.css`'s
+/* Thiếu `grid-template-columns` — hệ thống (`professional-config.css`'s
    `.group-lot-picker,.lot-level-picker{grid-template-columns:repeat(auto-fit,
    minmax(min(180px,100%),1fr));}`) xếp checkbox NHIỀU CỘT theo hàng ngang;
    app chỉ có base `display:grid` không khai cột nên mặc định 1 cột, xếp
@@ -562,21 +535,19 @@ main:has(.config-shell){padding-bottom:16px;}
 .rcfg-modal .panel-test-picker+.field{margin-top:var(--space-panel);}
 .panel-active{margin:0;}
 
-/* Popup lô QC và nhóm lô QC: chia trường/lô đúng hai modal của app cũ. */
+/* Popup lô QC và nhóm lô QC: chia trường/lô đúng hai modal của hệ thống. */
 /* Popup lô QC nhỏ hơn modal cấu hình chung vì chỉ có các trường một lô.
    Các hàng `grid2` nhận nhịp 12px từ `#lot-form`, không mang margin cục bộ. */
 .lot-modal{width:min(640px,calc(100vw - 32px));}
 .lot-group-picker-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--card-head-ink);}
 .lot-level-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:300px;overflow:auto;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
-/* App cũ chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/`levels-3plus`
+/* hệ thống chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/`levels-3plus`
    trên chính modal), không phải auto-fit. */
 .rcfg-group-modal .lot-level-picker{grid-template-columns:1fr;gap:10px;max-height:none;overflow:visible;padding:10px;}
 .rcfg-group-modal.levels-2 .lot-level-picker{grid-template-columns:repeat(2,minmax(0,1fr));}
 .rcfg-group-modal.levels-3plus .lot-level-picker{grid-template-columns:repeat(3,minmax(0,1fr));}
 .lot-level-col{display:grid;align-content:start;gap:6px;min-width:0;}
-/* Port nguyên app cũ. `text-transform:uppercase` (bản trước) không chỉ làm
-   lệch hình: `innerText` của Chromium trả về CHỮ ĐÃ BIẾN ĐỔI, nên gate
-   parity báo thiếu dòng "Mức 1"/"Mức 2" trong modal nhóm lô. */
+
 .lot-level-title{letter-spacing:var(--title-overline-tracking);padding:2px 2px;color:var(--text-subtle);font-size:var(--text-2xs);font-weight:var(--weight-bold);text-transform:none;letter-spacing:0;}
 .lot-level-col label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--panel);cursor:pointer;}
 .lot-level-col label:hover{border-color:var(--accent-border-strong);}
@@ -597,10 +568,7 @@ main:has(.config-shell){padding-bottom:16px;}
   .rcfg-tools{ width:100%; justify-content:flex-start; }
   .rcfg-tools input{ max-width:none; }
 }
-/* Bù class app cũ CÓ CSS mà app để trống (2026-09-03, quét bằng đối
-   chiếu selector 2 bên; gate UI parity không thấy vì nó so TẬP class
-   trong DOM — class vẫn có ở cả 2 bản, chỉ bên app là không có rule
-   nào phía sau). Giá trị copy nguyên từ `assets/*.css`. */
+
 .lot-config-left,.lot-config-right{border:1px solid var(--surface-border);background:var(--panel);overflow:hidden;min-width:0;max-width:100%;border-radius:var(--radius-lg);box-shadow:none;contain:paint;}
 .lot-config-left:has(> .lot-table){padding:0;}
 .lot-config-left > .lot-table{margin:0;border:0;border-radius:0;border-collapse:collapse;border-spacing:0;width:100%;min-width:0;table-layout:fixed;background:transparent;}
@@ -637,15 +605,8 @@ main:has(.config-shell){padding-bottom:16px;}
 .config-shell-main .empty .empty-title{margin-bottom:2px;color:var(--text-strong);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--danger-ink);}
 
-/* Bù các rule app cũ CÓ mà app mới port MỘT PHẦN (2026-09-03). Gate
-   `app:css-parity` không thấy vì nó chỉ kiểm "class có rule nào hay
-   không" — `.lot-assay-name`/`.target-actions` đã có 1-2
-   rule ở app nên coi là đủ, trong khi thiếu đúng những rule quyết định
-   BỐ CỤC (grid/flex). Hệ quả nhìn thấy được: tên xét nghiệm + đơn vị nằm
-   cùng dòng và 3 nút cuối bảng Mean/SD dính liền nhau
-   dán số vào chữ. Giá trị copy nguyên assets/professional-config.css. */
-/* Bảng Mean/SD cho lô mới trong modal chuyển lô — port nguyên app cũ; dùng
-   LẠI `.target-head`/`.target-row` của bảng Mean/SD, chỉ chỉnh khuôn cột. */
+
+
 .lot-transition-targets{min-width:0;}
 /* Thanh tiêu đề là vùng điều khiển của bảng: tách rõ với đầu bảng để ô tìm
    không bị dính vào cột tiêu đề, đồng thời giữ cùng nhịp 10px của các bảng
@@ -671,8 +632,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 .target-actions{justify-content:flex-end;margin-top:0;padding:12px 14px;border-top:0;background:var(--panel);}
 .target-matrix-panel .target-table{margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0;margin-bottom:14px;}
 
-/* Modal "Chi tiết" của tab Lịch sử dữ liệu (2026-09-03) — port từ
-   `assets/professional-config.css`. */
+
 .history-detail-table thead th{height:var(--table-header-h);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);font-size:var(--table-head-size);text-transform:none;letter-spacing:var(--table-head-letter-spacing);}
 .history-detail-table th,.history-detail-table td{text-align:center;vertical-align:middle;padding-left:14px;padding-right:14px;}
 .history-detail-table th:first-child,.history-detail-table td:first-child{text-align:left;}
@@ -716,7 +676,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 /* .hist-meansd-table ("Mean/SD đã dùng") và .hist-points-table ("Điểm QC đã
    nhập") — 2 class riêng cho 2 bảng trong modal "Chi tiết", mỗi bảng khai
    đủ 8 cột, không dùng chung rule nth-child với các bảng khác của trang
-   Cấu hình chung (đúng lý do app cũ đã tách class từ 2026-08-05). */
+   Cấu hình chung (đúng lý do hệ thống đã tách class từ 2026-08-05). */
 .hist-meansd-table th:nth-child(1),.hist-meansd-table td:nth-child(1){width:16%;}
 .hist-meansd-table th:nth-child(2),.hist-meansd-table td:nth-child(2){width:10%;}
 .hist-meansd-table th:nth-child(3),.hist-meansd-table td:nth-child(3){width:8%;}
@@ -733,3 +693,5 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 .hist-points-table th:nth-child(6),.hist-points-table td:nth-child(6){width:18%;}
 .hist-points-table th:nth-child(7),.hist-points-table td:nth-child(7){width:11%;}
 .hist-points-table th:nth-child(8),.hist-points-table td:nth-child(8){width:10%;}
+
+

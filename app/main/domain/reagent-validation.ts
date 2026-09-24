@@ -1,4 +1,3 @@
-// Validate cho ho so so sanh lo hoa chat (reagent lot comparison).
 import { cleanText } from './text-utils';
 
 export interface ReagentMetadataInput {
@@ -57,11 +56,6 @@ export function validateReagentMetadata(input: ReagentMetadataInput, existing?: 
   return { ok: true, data: prepareReagentMetadata(input, existing) };
 }
 
-// "Chọn nhanh" người thực hiện/loại mẫu — port `reagent-comparison-service.ts`
-// bản cũ (`ensureQuickList`/`addQuick`/`removeQuick`, state top-level
-// `reagentOperators`/`reagentSampleTypes`, KHÔNG gắn theo từng phép so sánh
-// — 1 danh sách CHUNG cho toàn app). Loại mẫu có 3 giá trị mặc định sẵn,
-// người thực hiện bắt đầu rỗng, người dùng tự gõ thêm dần theo thời gian.
 export type QuickValueType = 'operator' | 'sampleType';
 export const DEFAULT_SAMPLE_TYPES: readonly string[] = ['Mẫu bệnh nhân', 'Mẫu nội kiểm (IQC)', 'Mẫu ngoại kiểm (EQA)'];
 
@@ -74,7 +68,7 @@ export function cleanQuickValueType(value: unknown): QuickValueType | null {
 }
 
 /** Thêm giá trị mới vào danh sách — không thêm trùng (so khớp không phân
- * biệt hoa/thường/dấu, khớp `searchKey()` app cũ), trả lại giá trị đã có
+ * biệt hoa/thường/dấu, khớp `searchKey()` hệ thống), trả lại giá trị đã có
  * nếu trùng thay vì tạo thêm 1 dòng giống nhau. */
 export function addQuickValue(list: readonly string[], value: unknown): { items: string[]; value: string; added: boolean } | { error: 'empty-value' } {
   const clean = cleanText(value, 120).trim();
@@ -93,3 +87,5 @@ export function prepareReagentRows(rows: unknown): ReagentRow[] {
     return [String(r[0] ?? ''), String(r[1] ?? '')] as ReagentRow;
   });
 }
+
+

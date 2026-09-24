@@ -1,7 +1,3 @@
-// Validate cho khoa/mo khoa ky bao cao (bang `period_locks`). Tham khao chinh
-// sach tu PeriodService/entry-service.js ban cu: khoa 1 ky (YYYY-MM) chan
-// them/sua/huy diem QC co ngay roi vao ky do, tren TAT CA xet nghiem - khong
-// phai theo tung xet nghiem rieng.
 import { cleanText } from './text-utils';
 
 const YM_RE = /^\d{4}-\d{2}$/;
@@ -12,7 +8,6 @@ export function isValidYm(value: unknown): value is string {
   return YM_RE.test(String(value || ''));
 }
 
-/** Ky (YYYY-MM) cua 1 ngay QC (YYYY-MM-DD) - dung de tra cuu period_locks. */
 export function ymOfDate(date: string): string {
   return String(date || '').slice(0, 7);
 }
@@ -37,3 +32,5 @@ export function validateUnlockPeriod(input: UnlockPeriodInput): ValidationResult
   if (note.length < 5) return { ok: false, code: 'missing-note', message: 'Nhập lý do mở khoá (ít nhất 5 ký tự).' };
   return { ok: true, data: { ym, note } };
 }
+
+

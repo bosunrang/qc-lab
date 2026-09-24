@@ -1,12 +1,8 @@
 // Tiện ích dùng chung cho MỌI IPC handler: Actor/IpcResult, writeAudit (ghi 1
 // dòng vào chuỗi hash tamper-evident `activity`), và notifyChanged
-// (`store:changed` — invalidation có phạm vi cho renderer, xem
-// docs/APP-V2-PLAN.md Giai đoạn A1). Trước khi có file này, config/entry/
-// nce/reagent/sigma/westgard-handlers.ts mỗi file tự khai báo lại y hệt —
-// gom về đây khi thêm handler thứ 7 (auth-handlers.ts) thay vì nhân bản lần
-// nữa.
+// (`store:changed` — thông báo làm mới theo phạm vi cho renderer). Các handler
+// nghiệp vụ dùng chung phần này để tránh lặp lại cùng một cách khai báo.
 import type { Db } from '../db/sqlite-like';
-// Kiểu dòng nhật ký lấy từ hợp đồng dùng chung — trước đây hàm này trả
 // `{id: unknown, ...}` nên renderer nhận `unknown` cho mọi trường.
 import type { ActivityEntry } from '../../shared/qc-api';
 import { uid } from '../domain/text-utils';
@@ -39,7 +35,7 @@ let broadcastWindow: BroadcastTarget | null = null;
 let cloudChangeNotifier: (() => void) | null = null;
 let lanChangeNotifier: ((payload: StoreChangedPayload) => void) | null = null;
 
-/** Cùng giới hạn vận hành app cũ: không để bảng nhật ký sống phình vô hạn.
+/** Cùng giới hạn vận hành hệ thống: không để bảng nhật ký sống phình vô hạn.
  * Người dùng vẫn có đường lưu trữ thủ công có CSV; xoay vòng chỉ là phao an
  * toàn khi thao tác đó bị bỏ quên. */
 export const AUDIT_HARD_CAP = 50_000;
@@ -75,33 +71,6 @@ export function notifyChanged(tables: string[], testIds: string[] = []): void {
   lanChangeNotifier?.(payload);
 }
 
-// ── Quyền ghi ──────────────────────────────────────────────────────────────
-// Ranh giới quyền THẬT của app nằm ở ĐÂY, không phải ở renderer: main
-// process giữ actor đã đăng nhập (`requireActor()` trong main/index.ts), nên
-// nó là chỗ duy nhất không thể bị bỏ qua. Ẩn/disable nút ở renderer chỉ là
-// hiển thị — bất kỳ ai gọi thẳng `window.qcApi.*` từ DevTools đều đi qua đây.
-// Khác app cũ: app cũ chỉ có `requireWrite()`/`requireAdmin()` phía trình
-// duyệt (xem CLAUDE.md "Storage and sync model" — đánh đổi đã chấp nhận của
-// app client-only, không có tiến trình nào để chặn thật). app có main
-// process thật nên KHÔNG kế thừa đánh đổi đó.
-//
-// Ánh xạ vai trò → mức quyền copy đúng theo từng chỗ gọi của app cũ (tra
-// từng call site `deps.requireWrite()`/`deps.requireAdmin()`, không suy
-// diễn): admin+KTV được ghi dữ liệu QC (nhập/huỷ điểm, kỳ Sigma, hồ sơ NCE,
-// so sánh hoá chất); CHỈ admin được đụng cấu hình (máy/xét nghiệm/lô/panel/
-// Mean/SD/TEa), khoá-mở kỳ báo cáo, xoá phép so sánh hoá chất, cài đặt,
-// lưu trữ nhật ký hoạt động và xuất backup.
-//
-// Chặn ĐỌC: mặc định các hàm đọc KHÔNG bị chặn (6 trang mở cho mọi vai trò),
-// trừ đúng hai chỗ mà bản thân DỮ LIỆU là thứ chỉ admin được xem: xuất backup
-// (chứa chuỗi mật khẩu PBKDF2 của mọi người dùng) và 4 hàm đọc nhật ký hoạt
-// động `audit:query`/`audit:previewArchive`/`audit:exportCsv`/
-// `audit:verifyChainNow` (chặn từ
-// 2026-09-12). Trang Nhật ký là ADMIN_ONLY trong `page-roles.ts`, nhưng
-// route guard của renderer chỉ là hiển thị — trước bản đó, gọi thẳng
-// `window.qcApi.queryActivity()` từ DevTools vẫn đọc được toàn bộ nhật ký.
-// Vì thế 3 hàm đó trả `IpcResult` thay vì trả thẳng dữ liệu như các hàm đọc
-// khác; `role-gating.test.mjs` mục 7 khoá lại.
 export type PermissionDenied = { ok: false; error: { code: string; message: string } };
 
 // Không tự so chuỗi vai trò ở đây — dùng chung đúng 1 định nghĩa với
@@ -160,7 +129,7 @@ function insertAudit(db: Db, actor: Actor, type: string, detail: string, target 
 
 /** Cắt mềm nhật ký vượt ngưỡng, giữ anchor ở hash cuối của phần bị gỡ. Hàm
  * này không gọi `writeAudit()` để tránh đệ quy; thay vào đó ghi đúng một dòng
- * giải thích sau khi cắt, như app cũ. */
+ * giải thích sau khi cắt, như hệ thống. */
 function rotateAuditOverflow(db: Db, actor: Actor): void {
   const count = Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n);
   if (count <= AUDIT_HARD_CAP) return;
@@ -184,3 +153,4 @@ export function writeAudit(db: Db, actor: Actor, type: string, detail: string, t
   notifyChanged(['activity']);
   cloudChangeNotifier?.();
 }
+

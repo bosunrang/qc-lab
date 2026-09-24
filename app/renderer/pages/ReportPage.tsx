@@ -26,13 +26,13 @@ function isoToday(): string {
 }
 function isoMonth(): string { return isoToday().slice(0, 7); }
 
-/** `monthVN()` app cũ: `2026-09` → `09/2026`. */
+/** `monthVN()` hệ thống: `2026-09` → `09/2026`. */
 function monthVN(ym: string): string {
   const m = /^(\d{4})-(\d{2})/.exec(ym || '');
   return m ? `${m[2]}/${m[1]}` : ym || '';
 }
 
-/** `formatDateTimeVN()` app cũ. */
+/** `formatDateTimeVN()` hệ thống. */
 function dateTimeVN(value: string): string {
   const date = new Date(value);
   return isNaN(+date) ? '' : `${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${date.toLocaleDateString('vi-VN')}`;
@@ -42,8 +42,7 @@ function normalize(value: unknown): string {
   return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 }
 
-/** Port `qcOperationalAccess.selectLabel()`: tên · LOT các lô đang gắn · tên
- * máy (chỉ thêm máy khi có ≥2 xét nghiệm TRÙNG TÊN, để phân biệt). */
+
 function testSelectLabel(test: TestSummary, all: TestSummary[]): string {
   const lots = [...new Set(test.levels.map((l) => l.lot).filter(Boolean))];
   const sameName = all.filter((t) => normalize(t.testName) === normalize(test.testName)).length > 1;
@@ -124,7 +123,7 @@ function download(content: string, filename: string, type: string) {
 
 export function ReportPage() {
   const { summaries, loadSummaries } = useWestgardStore();
-  const { locks, loadLocks, lock, unlock } = useReportStore();
+  const { locks, template, loadLocks, loadTemplate, saveTemplate, lock, unlock } = useReportStore();
   const admin = isAdmin(useAuthStore((s) => s.user)?.role);
 
   const [query, setQuery] = useState('');
@@ -135,9 +134,12 @@ export function ReportPage() {
   const [lockYm, setLockYm] = useState(isoMonth());
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [formCode, setFormCode] = useState('');
+  const [formVersion, setFormVersion] = useState('');
 
-  useEffect(() => { loadSummaries(); loadLocks(); }, [loadSummaries, loadLocks]);
-  useStoreInvalidation(['period_locks', 'tests', 'qc_points'], undefined, () => { loadLocks(); loadSummaries(); });
+  useEffect(() => { loadSummaries(); loadLocks(); loadTemplate(); }, [loadSummaries, loadLocks, loadTemplate]);
+  useEffect(() => { if (template) { setFormCode(template.formCode); setFormVersion(template.version); } }, [template]);
+  useStoreInvalidation(['period_locks', 'report_templates', 'tests', 'qc_points'], undefined, () => { loadLocks(); loadTemplate(); loadSummaries(); });
 
   const matched = useMemo(() => {
     const q = normalize(query);
@@ -145,7 +147,7 @@ export function ReportPage() {
   }, [summaries, query]);
 
   // Giữ lựa chọn hợp lệ: mất khỏi danh sách khớp thì nhảy về phần tử đầu —
-  // đúng `reportModel()` app cũ (nó tự sửa `reportTest` mỗi lần dựng model).
+  // đúng `reportModel()` hệ thống (nó tự sửa `reportTest` mỗi lần dựng model).
   const selectedId = matched.some((t) => t.testId === testId) ? testId : (matched[0]?.testId || '');
   useEffect(() => { if (selectedId !== testId) setTestId(selectedId); }, [selectedId, testId]);
 
@@ -160,10 +162,10 @@ export function ReportPage() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 3 + i);
   const already = locks.some((l) => l.ym === lockYm);
 
-  /** Lấy dữ liệu theo lựa chọn hiện tại — app cũ không có bước "Xem" riêng,
+  /** Lấy dữ liệu theo lựa chọn hiện tại — hệ thống không có bước "Xem" riêng,
    * mỗi lần xuất/in là truy vấn lại đúng lúc đó. */
   async function collect() {
-    // Truy vấn TỨC THỜI cho đúng lần xuất/in này (app cũ cũng không có bước
+    // Truy vấn TỨC THỜI cho đúng lần xuất/in này (hệ thống cũng không có bước
     // "Xem" riêng) — trang không có bảng xem trước, dữ liệu chỉ tồn tại đủ
     // lâu để dựng tệp nên không vào store.
     const points = await window.qcApi.queryReport({ testId: selectedId, from: start, to: end });
@@ -232,9 +234,27 @@ export function ReportPage() {
     await infoDialog(`Đã khóa kỳ ${label}.`, { type: 'success' });
   }
 
+  async function saveTemplateSettings() {
+    const result = await saveTemplate({ formCode, version: formVersion });
+    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
+    await infoDialog('Đã lưu biểu mẫu báo cáo Six Sigma.', { type: 'success' });
+  }
+
   return (
     <>
       <PageHeader title="Báo cáo & Biểu mẫu" subtitle={summaries.length ? 'Tổng hợp hồ sơ nội kiểm theo khoảng ngày lựa chọn' : ''} />
+
+      {admin && <section className="panel report-template-panel">
+        <h2 className="panel-title">Biểu mẫu báo cáo Six Sigma</h2>
+        <div className="report-template-body">
+          <p className="hint">Dùng cho PDF Six Sigma theo kỳ và PDF tổng hợp. Tên đơn vị, logo và địa chỉ vẫn lấy từ Cài đặt &amp; Đồng bộ.</p>
+          <div className="report-template-fields">
+            <div className="field"><label htmlFor="reportFormCode">Mã biểu mẫu</label><input id="reportFormCode" value={formCode} maxLength={40} onChange={(event) => setFormCode(event.target.value)} placeholder="BM-SS-01" /></div>
+            <div className="field"><label htmlFor="reportFormVersion">Phiên bản</label><input id="reportFormVersion" value={formVersion} maxLength={20} onChange={(event) => setFormVersion(event.target.value)} placeholder="1.0" /></div>
+            <div className="report-template-action"><button className="btn teal" onClick={saveTemplateSettings} disabled={busy || !template}>Lưu biểu mẫu</button></div>
+          </div>
+        </div>
+      </section>}
 
       {summaries.length ? (
         <div className="panel">
@@ -332,8 +352,8 @@ export function ReportPage() {
   );
 }
 
-/** Mở khóa đi qua modal nhập lý do — app cũ dùng `unlockModalHtml()` +
- * `unlockReason()` (bắt buộc có lý do); main của app cũng đòi ghi chú
+/** Mở khóa đi qua modal nhập lý do — hệ thống dùng `unlockModalHtml()` +
+ * `unlockReason()` (bắt buộc có lý do); main của hệ thốngng đòi ghi chú
  * ≥5 ký tự, nên đây là cùng một cổng ở 2 tầng. */
 function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void; onDone: (note: string) => Promise<boolean> }) {
   const [note, setNote] = useState('');
@@ -356,3 +376,5 @@ function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void;
     </Modal>
   );
 }
+
+

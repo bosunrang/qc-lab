@@ -1,5 +1,5 @@
 // Chính sách từng luật Westgard THEO TỪNG XÉT NGHIỆM. Cấu hình chung vẫn là
-// boolean bật/tắt; ghi đè riêng xét nghiệm có đủ ba hành động như app cũ:
+// boolean bật/tắt; ghi đè riêng xét nghiệm có đủ ba hành động như hệ thống:
 // không dùng / cảnh báo / loại bỏ. Boolean cũ vẫn được đọc để dữ liệu đã lưu
 // trước khi nâng cấp không bị mất nghĩa.
 import { WG_DEFAULT_ON, WG_RULES, WG_RULE_BY_ID, allowedRuleScopes, defaultRuleAction, defaultRuleScope, isAllowedRuleScope, type RuleScope } from './westgard-rules';
@@ -30,23 +30,21 @@ export function serializeRuleActions(overrides: RuleActionsMap): string {
   return JSON.stringify(overrides);
 }
 
-/** Phân giải luật ĐÚNG 2 TẦNG như app cũ (`resolveRuleAction(rule,
- * enabled(rule), test.ruleActions[rule])`):
+/** Phân giải luật ĐÚNG 2 TẦNG như hệ thống (`resolveRuleAction(rule,
  *   1. Ghi đè RIÊNG của xét nghiệm (`tests.rule_actions_json`) — chỉnh ở
  *      modal "Sửa xét nghiệm" của trang Cấu hình chung;
- *   2. Cấu hình CHUNG toàn phòng xét nghiệm (`app_meta.westgardRules`, app cũ
+ *   2. Cấu hình CHUNG toàn phòng xét nghiệm (`app_meta.westgardRules`, hệ thống
  *      là `state.westgardRules`) — chỉnh ở panel "Cấu hình chung của luật"
  *      trên trang Phân tích Westgard;
  *   3. Mặc định của `WG_RULE_REGISTRY` (`defaultOn`).
- * Trước đây app chỉ có tầng 1: checkbox trên trang Westgard ghi thẳng vào
- * `rule_actions_json` của RIÊNG xét nghiệm đang chọn, trong khi app cũ đổi
+ * `rule_actions_json` của RIÊNG xét nghiệm đang chọn, trong khi hệ thống đổi
  * MẶC ĐỊNH CHO MỌI XÉT NGHIỆM — sai hẳn phạm vi tác động. */
 export function makeIsOnLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap): (ruleId: string) => boolean {
   const actionOf = makeRuleActionLayered(globalRules, overrides);
   return (ruleId: string) => actionOf(ruleId) !== 'inactive';
 }
 
-/** Phân giải đúng thứ tự app cũ: hành động riêng của xét nghiệm → trạng thái
+/** Phân giải đúng thứ tự hệ thống: hành động riêng của xét nghiệm → trạng thái
  * chung → mặc định registry. `true` cũ mang hành động mặc định của luật. */
 export function makeRuleActionLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap): (ruleId: string) => RuleAction {
   return (ruleId: string) => {
@@ -79,8 +77,7 @@ export function parseRuleScopes(json: string | null | undefined): RuleScopesMap 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const clean: RuleScopesMap = {};
     for (const [ruleId, value] of Object.entries(parsed)) {
-      // `protocol` từng xuất hiện trong backup app cũ nhưng có nghĩa là dùng
-      // phạm vi SOP mặc định, nên không giữ nó như một scope thật.
+      // Chỉ giữ các phạm vi hợp lệ cho luật hiện tại.
       if (WG_RULE_BY_ID[ruleId] && isAllowedRuleScope(ruleId, value)) clean[ruleId] = value;
     }
     return clean;
@@ -108,11 +105,9 @@ export function makeScopeOf(overrides: RuleScopesMap, levelCount: number): (rule
  * đang vận hành) và `defaultAction` (hành động theo cấu hình chung toàn phòng
  * xét nghiệm).
  *
- * Hai trường `default*` tồn tại vì modal "Sửa xét nghiệm" trước đây chỉ ghi
  * "Phạm vi SOP khuyến nghị"/"Theo cấu hình chung" mà không nói khuyến nghị đó
  * LÀ GÌ — người dùng không có màn hình nào đọc ra được luật đang chạy phạm vi
- * nào. Đó chính là lý do `6x` chạy sai phạm vi một thời gian dài mà không ai
- * thấy (xem mục 3.4 `docs/APP-V2-PLAN.md`). */
+ * nào. Vì vậy danh sách này luôn trả cả phạm vi và hành động hiệu lực. */
 export function effectiveRuleConfigList(
   overrides: RuleScopesMap, levelCount: number, globalRules: RuleActionsMap = {}, actionOverrides: RuleActionsMap = {},
 ): { id: string; scope: RuleScope; scopeMin: number; desc: string; allowedScopes: readonly RuleScope[]; defaultScope: RuleScope; defaultAction: RuleAction; action: RuleAction }[] {
@@ -132,3 +127,4 @@ export function effectiveRuleConfigList(
     action: actionOf(id),
   }));
 }
+

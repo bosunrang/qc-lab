@@ -25,14 +25,16 @@ Electron uses `node:sqlite` and excludes the WASM asset.
 
 ## Development rules
 
-- Read the relevant section of `docs/APP-PLAN.md` before changing app.
-- Keep read IPC rows in SQLite `snake_case`; form drafts use `camelCase`.
-- Every write handler performs authorization first, then pure validation,
-  transaction, `writeAudit()`, and `notifyChanged()`.
-- Do not hard-delete QC points; use the existing void workflow.
-- Run `npm test`, `npm run typecheck`, and `npm run build` for code changes.
-- `docs/WESTGARD-REVIEW-*.md` and `docs/SIGMA-REVIEW-*.md` record the business
-  reviews and the decisions taken; read the matching one before touching the
-  Westgard or Six Sigma logic. The `*-probes-*.cjs` beside them capture the
-  PRE-FIX state on purpose and are expected to fail — the live regressions are
-  in `app/tests/`, run by `npm test`.
+- Viết chú thích giải thích mã bằng tiếng Việt có đầy đủ dấu. Giữ nguyên tên định danh,
+  trường giao thức, SQL và các chuỗi máy đọc; chỉ dùng tiếng Anh khi đó là thuật ngữ kỹ thuật bắt buộc.
+- Đọc phần liên quan trong `docs/APP-PLAN.md` trước khi sửa ứng dụng.
+- Dòng IPC đọc từ SQLite giữ `snake_case`; dữ liệu nháp biểu mẫu dùng `camelCase`.
+- Mỗi handler ghi dữ liệu phải lần lượt kiểm tra quyền, kiểm tra dữ liệu thuần,
+  transaction, `writeAudit()` và `notifyChanged()`.
+- Không xoá cứng điểm QC; dùng quy trình huỷ điểm hiện có.
+- Chạy `npm test`, `npm run typecheck` và `npm run build` khi sửa mã nguồn.
+- `docs/WESTGARD-REVIEW-*.md` và `docs/SIGMA-REVIEW-*.md` lưu các đợt rà soát
+  nghiệp vụ cùng quyết định đã chốt. Đọc tài liệu phù hợp trước khi sửa logic
+  Westgard hoặc Six Sigma. Các tệp `*-probes-*.cjs` ghi lại trạng thái trước khi
+  sửa nên được phép thất bại; hồi quy chính thức nằm trong `app/tests/` và chạy
+  qua `npm test`.

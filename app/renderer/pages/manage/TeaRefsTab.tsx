@@ -8,17 +8,14 @@ import { confirmDialog, infoDialog } from '../../state/dialog-store';
 import { useAuthStore } from '../../store/auth-store';
 import { EmptyState } from './shared';
 
-/** 3 trạng thái của một dòng TEa — copy nguyên nhãn app cũ (`TEA_STATUS`). */
+
 const TEA_STATUS: Record<string, { cls: string; label: string }> = {
   default: { cls: 'none', label: 'Mặc định' },
   override: { cls: 'warn', label: 'Đã sửa' },
   lab: { cls: 'ok', label: 'TEa PXN' },
 };
 
-/** Danh sách ĐÓNG 6 nguồn TEa — port `TEA_LAB_BASIS_SOURCES` app cũ, khớp
- * đúng 6 khoá `TEA_LAB_SOURCES` ở `main/domain/tea-ref-validation.ts` (cổng
- * chặn thật nằm ở đó — danh sách này chỉ để dựng `<select>`). Trước đây ô
- * "Nguồn" là input gõ tự do, không khớp bất kỳ danh sách chuẩn nào. */
+
 const TEA_LAB_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: 'regulation', label: 'Quy định pháp lý / CLIA / quốc gia' },
   { value: 'pt', label: 'Chương trình ngoại kiểm / PT' },
@@ -41,9 +38,6 @@ export function TeaRefsTab() {
   const canManage = role === 'admin';
   const [prefill, setPrefill] = useState<{ name: string; unit: string; section: string } | null>(null);
   const [editing, setEditing] = useState<'new' | string | null>(null);
-  // Modal "Thêm xét nghiệm tham chiếu" (thêm 1 DÒNG analyte mới vào danh
-  // mục) — TÁCH BIỆT với modal hồ sơ TEa PXN ở trên. app trước đây thiếu
-  // hẳn nghiệp vụ này và nút toolbar mở sai sang modal hồ sơ.
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -61,8 +55,7 @@ export function TeaRefsTab() {
     .filter((ref) => !catalogNames.has(normalizeTeaKey(ref.name)))
     .filter((ref) => normalizeTeaKey(`${ref.name} ${ref.unit} ${ref.section} ${ref.lab_source}`).includes(normalizedQuery)), [catalogNames, normalizedQuery, teaRefs]);
 
-  /** Ghi đè TEa CLIA%/Ricos% của 1 analyte trong danh mục — port
-   * `teaRefEdit()` app cũ: lưu khi ô mất focus, để trống = bỏ ghi đè. */
+
   async function commitTeaValue(ref: { id: string; name: string; unit: string; section: string }, field: 'clia' | 'ricos', input: HTMLInputElement) {
     const result = await setTeaRefValue({ analyteId: ref.id, field, value: input.value, name: ref.name, unit: ref.unit, section: ref.section });
     if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được TEa' }); }
@@ -79,11 +72,7 @@ export function TeaRefsTab() {
     if (await confirmDialog(`Xoá hồ sơ TEa "${name}"?`, { danger: true })) await removeTeaRef(id);
   }
 
-  /** Xoá RIÊNG hồ sơ TEa PXN — port nút "Xóa TEa chuẩn hóa" trong modal app
-   * cũ (`hasProfile` là điều kiện DUY NHẤT để hiện, không phân biệt analyte
-   * built-in hay tự thêm). Trước đây analyte có sẵn trong danh mục tích hợp
-   * (built-in) không có đường nào xoá hồ sơ PXN — chỉ "Khôi phục" (chỉ xoá
-   * CLIA/Ricos% ghi đè, giữ nguyên hồ sơ PXN). */
+
   async function removeLabProfile(id: string, name: string) {
     if (!(await confirmDialog(`Xoá hồ sơ TEa chuẩn hóa của "${name}"?`, { title: 'Xóa TEa chuẩn hóa', confirmLabel: 'Xóa', danger: true }))) return;
     const result = await removeTeaLabProfile(id);
@@ -103,15 +92,9 @@ export function TeaRefsTab() {
             const override = overrideByAnalyte.get(ref.id);
             const labRef = override && override.lab != null ? override : labRefsByName.get(normalizeTeaKey(ref.name));
             const hasOverride = !!override && (override.clia != null || override.ricos != null);
-            // Thứ tự ưu tiên: `override` (đã sửa CLIA/Ricos%) THẮNG `lab` (có
-            // hồ sơ PXN) khi cả hai cùng đúng — port đúng `teaReferenceKind()`
-            // app cũ (`if(!isDefault)return'custom';if(externallyChanged)
-            // return'override';if(hasLabValue)return'lab';`, kiểm override
-            // TRƯỚC lab). Bản trước kiểm ngược lại, hiện "TEa PXN" thay vì
-            // "Đã sửa" cho dòng vừa ghi đè CLIA/Ricos% vừa có hồ sơ PXN.
             const kind = hasOverride ? 'override' : labRef?.lab != null ? 'lab' : 'default';
             const status = TEA_STATUS[kind];
-            // App cũ chỉ ghép viết tắt khi nó KHÁC tên (bỏ qua khác biệt
+            // hệ thống chỉ ghép viết tắt khi nó KHÁC tên (bỏ qua khác biệt
             // hoa/thường): "Sodium (Na)" nhưng chỉ "Urea", "pH", "D-dimer".
             const sameAbbr = !ref.abbr || ref.abbr.trim().toLocaleLowerCase('vi') === ref.name.trim().toLocaleLowerCase('vi');
             const displayName = sameAbbr ? ref.name : `${ref.name} (${ref.abbr})`;
@@ -199,3 +182,5 @@ export function TeaRefsTab() {
     </>
   );
 }
+
+

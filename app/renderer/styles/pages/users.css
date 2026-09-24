@@ -1,8 +1,4 @@
-/* Trang Người dùng — port từ assets/professional-users.css của app cũ
-   (Giai đoạn D3.1). Giữ đúng giá trị: bề rộng 4 cột của .user-table, thẻ
-   .user-create-card, lưới checkbox .user-perm-grid và 2 breakpoint 980/760px.
-   Token dùng lại của app (tokens.css) — các mã hex một-lần ở đây giữ
-   nguyên như app cũ vì app cũ cũng không tách token cho chúng. */
+
 
 .user-table{
   width:100%; min-width:0; table-layout:fixed;
@@ -90,3 +86,5 @@
 .user-create-layout{
   display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:20px; align-items:stretch; margin:var(--panel-content-gap) 16px 16px; padding:0;
 }
+
+

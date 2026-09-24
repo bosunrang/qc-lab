@@ -4,7 +4,6 @@
 // không (`SigmaPage.tsx` lọc `cohortStatus === 'eligible'`). Trước 2026-09-11
 // `savePeriod()` chỉ `cleanText()` chuỗi đó rồi lưu, và chỉ kiểm `cohortN` là
 // số nguyên không âm — nghĩa là một lời gọi
-// `window.qcApi.saveSigmaPeriod({ ... cohortStatus: 'eligible', cohortN: 999 })`
 // là qua được. App đóng gói Electron bật F12 (xem CLAUDE.md, `electron/` —
 // "F12 toggles DevTools"), nên đây không phải giả thuyết API từ xa.
 //
@@ -137,3 +136,5 @@ const savedLevel = (sigma, test) => sigma.listPeriods(test.id).find((p) => p.per
 }
 
 console.log('app: main tự dựng lại cohort IQC, không tin payload — tests passed');
+
+

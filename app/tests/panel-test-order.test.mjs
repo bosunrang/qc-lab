@@ -22,7 +22,6 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 
 const { applySchema } = require('../../app-dist/main/db/schema.js');
-const { mapLegacyStateToTables } = require('../../app-dist/main/domain/migrate-legacy.js');
 
 const NA = 'j24t1sc', K = 'b9nwjaf', CL = 'mm9fzkt'; // id thật, cố ý KHÔNG theo thứ tự chữ cái
 const doc = (db, panelId) => db.prepare(
@@ -81,18 +80,7 @@ db.exec("INSERT INTO qc_panels(id,name,instrument_id) VALUES ('p3','Phuc hoi bac
 for (const t of [K, CL, NA]) db.prepare('INSERT INTO qc_panel_tests(panel_id,test_id,position) VALUES (?,?,NULL)').run('p3', t);
 assert.deepEqual(doc(db, 'p3'), [K, CL, NA], 'dong position NULL phai giu thu tu trong backup (tie-break bang rowid)');
 
-// ── 4. Di trú từ backup app cũ ────────────────────────────────────────────
-assert.deepEqual(
-  mapLegacyStateToTables({ qcPanels: [{ id: 'pan9', name: 'DG', instrumentId: 'i1', testIds: ['na', 'k', 'cl'] }] }).qc_panel_tests,
-  [
-    { panel_id: 'pan9', test_id: 'na', position: 0 },
-    { panel_id: 'pan9', test_id: 'k', position: 1 },
-    { panel_id: 'pan9', test_id: 'cl', position: 2 },
-  ],
-  'di tru tu app cu phai chep nguyen thu tu testIds sang cot position',
-);
-
-// ── 5. Qua HANDLER thật: savePanel/listPanels phải giữ thứ tự ─────────────
+// ── 4. Qua HANDLER thật: savePanel/listPanels phải giữ thứ tự ─────────────
 // Nửa này khoá câu `ORDER BY position, rowid` trong `listPanels()`. Thiếu nó
 // thì SQLite đọc từ index khoá chính và trả theo test_id — 4 phép kiểm ở trên
 // vẫn xanh (chúng tự viết SQL) trong khi app thì sai.
@@ -118,3 +106,5 @@ assert.equal(handlers.savePanel({ id: panel.data.id, data: { name: 'Điện gi�
 assert.deepEqual(docPanel(), daoNguoc, 'luu lai voi thu tu khac thi listPanels phai tra ve thu tu MOI');
 
 console.log('app panel test order tests passed');
+
+

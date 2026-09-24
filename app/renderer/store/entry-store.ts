@@ -1,6 +1,6 @@
 // Zustand store cho trang Nhập QC — chỉ EntryPage.tsx dùng, tự do đổi hình
 // dạng. Viết lại để nạp điểm QC + phân tích cho TẤT CẢ mức của 1 xét nghiệm
-// cùng lúc (bảng worksheet + biểu đồ LJ dạng bản cũ hiển thị mọi mức song
+// cùng lúc (bảng worksheet + biểu đồ LJ hiển thị mọi mức song
 // song, không chỉ 1 mức đang chọn như bản thí điểm trước). `loadAnalysis`
 // gọi `westgard:analyzeLevel` (đã có sẵn từ module Westgard) để lấy z-score/
 // CUSUM cho `<QcChart>`, không tính lại ở renderer.
@@ -27,7 +27,7 @@ interface EntryState {
     pointId: string, reason: string, kind: 'analytical' | 'data-entry' | 'other', openNce: boolean, testId: string, level: number,
   ) => Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }>>;
   loadRangeCandidate: (testId: string, level: number) => Promise<void>;
-  applyLabRange: (testId: string, level: number, reason: string, causeConfirmed?: boolean, bias?: number) => Promise<IpcResult<RangeCandidateView>>;
+  applyLabRange: (testId: string, level: number, reason: string, causeConfirmed?: boolean, bias?: number, mean?: number, sd?: number) => Promise<IpcResult<RangeCandidateView>>;
   revertManufacturerRange: (testId: string, level: number, reason: string) => Promise<IpcResult<RangeCandidateView>>;
 }
 
@@ -114,8 +114,8 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     if (request !== rangeRequestSerial) return;
     set(result.ok ? { rangeCandidate: result.data, rangeError: null } : { rangeCandidate: null, rangeError: result.error.message });
   },
-  applyLabRange: async (testId, level, reason, causeConfirmed, bias) => {
-    const result = await window.qcApi.applyLabRange({ data: { testId, level, reason, causeConfirmed, bias } });
+  applyLabRange: async (testId, level, reason, causeConfirmed, bias, mean, sd) => {
+    const result = await window.qcApi.applyLabRange({ data: { testId, level, reason, causeConfirmed, bias, mean, sd } });
     if (result.ok) set({ rangeCandidate: result.data, rangeError: null });
     else set({ rangeError: result.error.message });
     return result;
@@ -127,3 +127,5 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     return result;
   },
 }));
+
+

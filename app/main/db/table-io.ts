@@ -1,9 +1,3 @@
-// Đọc/ghi TOÀN BỘ bảng SQLite một cách TỔNG QUÁT qua `sqlite_master`/
-// `PRAGMA table_info` — không hard-code danh sách bảng/cột, để không lệch
-// mỗi khi schema.ts thêm bảng/cột mới. Tách ra từ `ipc/backup-handlers.ts`
-// (Giai đoạn C3) khi Giai đoạn C4 (di trú dữ liệu từ app cũ) cần DÙNG LẠI
-// đúng transaction phục hồi đó cho một nguồn dữ liệu khác (đã ánh xạ từ
-// định dạng app cũ), không phải chép lại lần hai.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Db } from './sqlite-like';
@@ -27,10 +21,7 @@ export function dumpAllTables(db: Db): Record<string, Record<string, unknown>[]>
   return out;
 }
 
-/** Tự động chốt 1 bản backup "trước khi thay đổi" ra đĩa thật TRƯỚC khi xoá
- * bất cứ gì — dùng chung cho cả phục hồi backup app (C3) lẫn di trú dữ
- * liệu từ app cũ (C4), cả hai đều là thao tác THAY THẾ TOÀN BỘ dữ liệu nên
- * cùng cần đúng 1 đường lùi này. */
+/** Chốt một bản sao an toàn trước khi thay thế toàn bộ dữ liệu. */
 export function writeSafetySnapshot(db: Db, userDataDir: string, filePrefix: string): string {
   const envelope = buildBackupEnvelope(dumpAllTables(db), SCHEMA_VERSION, 'app', new Date().toISOString());
   const path = join(userDataDir, `${filePrefix}-${Date.now()}.json`);
@@ -38,11 +29,7 @@ export function writeSafetySnapshot(db: Db, userDataDir: string, filePrefix: str
   return path;
 }
 
-/** Xoá TOÀN BỘ bảng rồi nạp lại từ `dataByTable` trong 1 transaction thật —
- * dùng chung cho cả phục hồi backup CÙNG định dạng (C3) lẫn nạp dữ liệu đã
- * ÁNH XẠ từ định dạng khác (C4, di trú từ app cũ). `dataByTable` chỉ cần có
- * đúng tên bảng/cột hiện tại — bảng không có trong `dataByTable` chỉ bị xoá
- * rỗng (không lỗi), đúng ngữ nghĩa "thay thế toàn bộ". */
+/** Thay thế toàn bộ bảng bằng dữ liệu đã kiểm tra trong một transaction. */
 export function restoreAllTables(db: Db, dataByTable: Record<string, Record<string, unknown>[] | undefined>): void {
   db.exec('PRAGMA foreign_keys = OFF');
   db.exec('BEGIN');
@@ -72,3 +59,5 @@ export function restoreAllTables(db: Db, dataByTable: Record<string, Record<stri
     db.exec('PRAGMA foreign_keys = ON');
   }
 }
+
+

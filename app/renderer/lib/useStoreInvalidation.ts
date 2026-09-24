@@ -1,6 +1,6 @@
 // Đăng ký refetch khi main báo `store:changed` đúng phạm vi (bảng nào vừa
-// đổi) — dùng ở MỌI store Giai đoạn B thay cho "fetch 1 lần khi mount" hiện
-// tại (xem docs/APP-V2-PLAN.md Giai đoạn A1, mục 3). `tables` là danh sách
+// đổi) — dùng ở mọi store thay cho việc chỉ nạp một lần khi mở trang.
+// `tables` là danh sách
 // bảng trang này quan tâm; `testId` (tuỳ chọn) lọc thêm theo xét nghiệm đang
 // mở — bỏ qua (undefined) nếu trang không có khái niệm "đang xem 1 xét
 // nghiệm", hoặc nếu trang cần biết MỌI thay đổi của bảng đó bất kể testId
@@ -22,3 +22,4 @@ export function useStoreInvalidation(tables: string[], testId: string | undefine
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tablesKey, testId]);
 }
+

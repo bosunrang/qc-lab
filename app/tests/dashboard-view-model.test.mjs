@@ -1,13 +1,3 @@
-// Oracle cho read-model trang Tổng quan. Viết lại ở Giai đoạn D2 để chốt 4
-// quy tắc nghiệp vụ được port từ app cũ — TRƯỚC đó bản app tự nghĩ ra
-// cách tính và gate `app:ui-parity` mới lộ ra:
-//   1. Báo động theo ĐIỂM CUỐI của mỗi mức (`summarizeTestStatus()` app cũ),
-//      không phải điểm xấu nhất trong toàn bộ lịch sử.
-//   2. Mỗi MỨC đang báo động là 1 dòng riêng, kèm đúng điểm + luật của mức đó
-//      (`dashboardWestgardAlerts()`).
-//   3. % hoàn tất tính theo SỐ XÉT NGHIỆM (`dashboardKpis()`), không theo mức.
-//   4. Số ngày tới hạn đọc ngày là NỬA ĐÊM GIỜ ĐỊA PHƯƠNG rồi trừ thời điểm
-//      hiện tại kèm giờ-phút (`qcDateFormat.daysToExpiry()`).
 import assert from 'node:assert/strict';
 import {
   buildDashboardViewModel, normalizeDashboardSearch, daysToExpiry, dashboardShiftStatus, levelTargetOk,
@@ -91,7 +81,6 @@ assert.equal(shared.expiringLots.length, 1, 'lo dung chung chi hien 1 dong; lo c
 assert.equal(shared.expiringLots[0].count, 2, 'dem dung 2 muc dung chung lo L1');
 assert.equal(shared.expiringLots[0].days, 17);
 
-// ── 6) dashboardShiftStatus: copy nguyên văn app cũ, đúng thứ tự ưu tiên ──
 assert.deepEqual(dashboardShiftStatus({ rejected: 1, overdueActions: 9, warnings: 9, missingToday: 9 }), {
   mood: 'Cần xử lý ngay', text: 'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.',
 });
@@ -165,3 +154,5 @@ assert.deepEqual([
 ]);
 
 console.log('app dashboard view-model tests passed');
+
+

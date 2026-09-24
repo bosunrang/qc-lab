@@ -10,7 +10,7 @@ export type TeaTestCore = {
    * coi là TEa EFLM khi xét nghiệm thật sự khai nguồn EFLM hoặc có ít nhất
    * một dấu vết tra cứu (analyte/tài liệu/ngày). Thiếu cổng này, mọi xét
    * nghiệm có `tea` (kể cả TEa gõ tay cho nguồn khác) đều hiện thành "TEa
-   * EFLM đã truy vết" — đúng `hasEflmTrace` của app cũ. */
+   * EFLM đã truy vết". */
   tea_source?: string; eflm_analyte?: string; eflm_ref?: string; eflm_lookup_date?: string;
   eflm_tea?: number | null;
 };
@@ -87,11 +87,11 @@ export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: re
   if (source === 'ricos') return { value: Number.isFinite(percent) && percent > 0 ? percent : null, criterion: 'Ricos / Westgard biological variation', catalog, note: null, criterionDetail: null };
   // Hồ sơ PXN có thể ghi đè cả quy tắc/giới hạn tuyệt đối CLIA. Catalog tích
   // hợp chỉ là fallback; không được bỏ qua dữ liệu đã được phòng xét nghiệm
-  // phê duyệt và import từ app cũ.
+  // phê duyệt.
   const rawRule = String(ref?.clia_rule || '').trim();
   const refAbsolute = Number(ref?.clia_absolute);
   const absolute = Number.isFinite(refAbsolute) && refAbsolute > 0 ? refAbsolute : catalog?.cliaAbsolute;
-  // Không khai `clia_rule` thì SUY từ dữ liệu, đúng `sgTeaInfo()` app cũ:
+  // Không khai `clia_rule` thì suy từ dữ liệu:
   // chỉ có giới hạn tuyệt đối là 'absolute', có cả hai mới là 'greater-of'.
   // Mặc định cứng 'greater-of' cho ra cùng CON SỐ (nhánh đó tự rơi về
   // absolute khi thiếu %) nhưng in sai NHÃN tiêu chí.
@@ -119,13 +119,13 @@ export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: re
 
 const criterionNum = (value: number | null, digits: number) => (value == null ? '—' : value.toFixed(digits));
 
-/** Nhãn tiêu chí để HIỂN THỊ — port `sgTeaCriterionText()` app cũ. Với CLIA
- * dạng tuyệt đối, in nguyên giới hạn ("±4.0000 mmol/L") thay vì con số % đã
+/** Nhãn tiêu chí để hiển thị. Với CLIA dạng tuyệt đối, in nguyên giới hạn
+ * ("±4.0000 mmol/L") thay vì con số % đã
  * quy đổi: TEa% chỉ đúng tại đúng MỘT Mean, nên in một số % ở thẻ thiết lập
  * (chưa gắn với mức QC nào) là nói sai. Nguồn khác vẫn in giá trị %.
  *
- * Nằm ở file KHÔNG import gì này (không phải ở adapter renderer) để test
- * đối chiếu app cũ nạp thẳng được trên `.ts` qua type-stripping. */
+ * Nằm trong file thuần, không import adapter renderer, để có thể kiểm thử
+ * trực tiếp bằng TypeScript. */
 export function teaCriterionText(resolved: Pick<ResolvedTeaCore, 'value' | 'criterionDetail'>): string {
   const c = resolved.criterionDetail;
   if (!c) return resolved.value != null ? `${resolved.value.toFixed(2)}%` : 'chưa có';
@@ -137,3 +137,5 @@ export function teaCriterionText(resolved: Pick<ResolvedTeaCore, 'value' | 'crit
   if (c.rule === 'greater-of') return `mức lớn hơn giữa ±${criterionNum(c.percent, 2)}% và ±${criterionNum(c.absolute, 4)} ${c.unit || 'đơn vị'}`;
   return c.percent != null ? `±${criterionNum(c.percent, 2)}%` : 'chưa có';
 }
+
+

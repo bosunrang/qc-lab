@@ -1,8 +1,3 @@
-// IPC handler cho trang Six Sigma. Moi ky (period) luu CV/Bias/u(cal) da
-// duoc ky thuat vien REVIEW thu cong (khong tu dong suy tu diem QC - dung
-// chinh sach da chot: CV/Bias la gia tri da duoc xem xet, khong phai
-// trung binh tho). sigma/MU tinh SONG lai tu du lieu da luu, khong cache
-// cung, de doi TEa/CV/Bias sau nay luon phan anh dung.
 import type { Db } from '../db/sqlite-like';
 import type { Test } from '../../shared/qc-api';
 import { sigmaMetric, uncertaintyBudget, eqaRoundsStats, sigmaQualityDesign, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
@@ -25,10 +20,8 @@ export interface SigmaLevelInput {
 }
 export interface SigmaPeriodInput { testId: unknown; period: unknown; tea?: unknown; teaSource?: unknown; levels: SigmaLevelInput[]; createOnly?: unknown }
 
-/** Một vòng EQA/EQC phải giữ cả kết quả PXN và giá trị đích.  `bias` chỉ là
- * giá trị tính lại để không mất khả năng đọc các kỳ thử nghiệm cũ từng lưu
- * trực tiếp Bias%. */
-export interface SigmaEqaRound { lab: number | null; target: number | null; bias: number }
+/** Một vòng EQA/EQC lưu kết quả PXN, giá trị đích và Bias% tính từ hai số đó. */
+export interface SigmaEqaRound { lab: number; target: number; bias: number }
 
 export interface SigmaLevelResult {
   muBiasMode?: 'include' | 'exclude'; cohortReviewed?: boolean; cohortReviewBy?: string; cohortReviewAt?: string; cohortStale?: boolean; teaCriterion?: string;
@@ -38,7 +31,7 @@ export interface SigmaLevelResult {
 }
 export interface SigmaPeriodView { id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[] }
 
-interface StoredLevel { level: number; /** TEa% snapshot theo mức QC; kỳ v1 thiếu field này dùng fallback tea của kỳ. */ tea: number | null; /** Mean mục tiêu snapshot, không dùng Mean hiện tại để sửa lịch sử MU. */ targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; /** Độ không đảm bảo của GIÁ TRỊ GÁN EQA/CRM (%), do nhà cung cấp công bố — không suy từ chuỗi bias. */ uCref: number | null; uCal: number | null; muBiasMode: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number | null; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }
+interface StoredLevel { level: number; /** TEa% đã chụp theo mức QC; nếu không có, dùng TEa cấp kỳ. */ tea: number | null; /** Mean mục tiêu snapshot, không dùng Mean hiện tại để sửa lịch sử MU. */ targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; /** Độ không đảm bảo của GIÁ TRỊ GÁN EQA/CRM (%), do nhà cung cấp công bố — không suy từ chuỗi bias. */ uCref: number | null; uCal: number | null; muBiasMode: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number | null; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }
 
 type TeaBasis = Pick<ReturnType<typeof resolveTea>, 'value' | 'criterion' | 'criterionDetail'> & { source: string; reference?: string; capturedAt?: string };
 interface StoredLevel {
@@ -68,24 +61,14 @@ function normalizeEqaRounds(raw: unknown): { ok: true; rounds: SigmaEqaRound[] }
         rounds.push({ lab, target, bias: (lab - target) / Math.abs(target) * 100 });
         continue;
       }
-      // Legacy rounds have neither lab nor target; a partially filled real
-      // round must not silently fall back to its stale calculated bias.
-      if (row.lab != null || row.target != null) return { ok: false };
-      const legacyBias = finiteNumber(row.bias, NaN);
-      if (!Number.isFinite(legacyBias)) return { ok: false };
-      rounds.push({ lab: null, target: null, bias: legacyBias });
-      continue;
+      return { ok: false };
     }
-    // Tương thích kỳ cũ: chỉ có Bias% đã tính, không còn cặp KQ/Target.
-    const bias = finiteNumber(value, NaN);
-    if (!Number.isFinite(bias)) return { ok: false };
-    rounds.push({ lab: null, target: null, bias });
+    return { ok: false };
   }
   return { ok: true, rounds };
 }
 
-/** Chuẩn hoá JSON của kỳ cũ ở một chỗ. `tea` theo mức chỉ có từ v2.2; bản
- * ghi trước đó để null để `computeLevel()` dùng snapshot TEa cấp kỳ. */
+/** Chuẩn hoá dữ liệu mức đã lưu trước khi tính lại Sigma và MU. */
 function readStoredLevels(raw: string): StoredLevel[] {
   const parsed = JSON.parse(raw || '[]') as Array<Omit<StoredLevel, 'tea' | 'targetMean' | 'eqaRounds'> & { tea?: unknown; targetMean?: unknown; eqaRounds?: unknown }>;
   return parsed.map((level) => {
@@ -99,22 +82,15 @@ function readStoredLevels(raw: string): StoredLevel[] {
 /** Bias từ vòng EQA thắng số nhập tay; SEM chỉ tham khảo, KHÔNG là u(Cref). */
 /** Thứ tự lấy TEa của một mức, KHÔNG được đảo:
  *   1. snapshot `lv_json.tea` của chính mức đó — kỳ đã chốt thì không bị kéo
- *      lại theo Bảng TEa tham chiếu hôm nay (cùng nguyên tắc `force=false`
- *      trong `sgSetLevelTeaSnapshot()` của app cũ);
+ *      lại theo Bảng TEa tham chiếu hiện hành;
  *   2. GIẢI từ nguồn TEa đang khai, tại Mean của CHÍNH mức đó;
  *   3. mới đến `periodTea` (một con số dùng chung cho cả kỳ).
  *
- * Bước 2 trước đây KHÔNG có, và đó là lỗi nghiệp vụ thật: với tiêu chí CLIA
+ * Giải theo mức là bắt buộc với tiêu chí CLIA
  * dạng TUYỆT ĐỐI (vd Sodium ±4,0000 mmol/L) thì TEa% = |giới hạn / Mean| ×
  * 100, tức mỗi mức phải ra MỘT SỐ KHÁC NHAU. Rơi thẳng về `periodTea` nghĩa
- * là dùng một TEa% dùng chung, chỉ có thể đúng tại đúng một Mean. Đo được với
- * bộ seed của gate parity: Mean 140/100 cho ra TEa 2,857%/4,000% và Sigma
- * 0,29/0,56 ở app cũ, còn app dùng 10% cho cả hai mức nên ra 2,67/1,89 —
- * một bên đọc là "chấp nhận được", một bên là "dưới 3σ, phải siết luật".
- * Bản ghi thiếu snapshot theo mức là chuyện có thật: kỳ tạo ở bản v1 (xem
- * comment của `StoredLevel.tea`), kỳ ghi qua IPC bởi caller không truyền TEa
- * theo mức, dữ liệu di trú hoặc đồng bộ về. Với nguồn dạng % (Ricos/EFLM/
- * PXN) thì bước 2 và bước 3 cho cùng kết quả nên không đổi gì. */
+ * là dùng một TEa% dùng chung, chỉ có thể đúng tại một Mean. Với nguồn dạng
+ * % (Ricos/EFLM/PXN), giải theo mức và TEa cấp kỳ cho cùng kết quả. */
 function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLevelTea?: (level: number, targetMean: number | null) => number | null, levelCount?: number, resolveFallbackTea?: (level: number, targetMean: number | null) => number | null): SigmaLevelResult {
   // Thứ tự: snapshot của mức → giải theo nguồn ĐÃ CHỐT của kỳ → snapshot cấp
   // kỳ → (cuối cùng) giải theo nguồn ĐANG KHAI của xét nghiệm. Bậc cuối chỉ
@@ -126,8 +102,8 @@ function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLeve
   const roundsStats = stored.eqaRounds && stored.eqaRounds.length ? eqaRoundsStats(stored.eqaRounds.map((round) => round.bias)) : null;
   const biasEqa = roundsStats ? roundsStats.rms : stored.biasEqa;
   const biasSem = roundsStats ? roundsStats.biasSem : null;
-  // Bias chưa được đánh giá không đồng nghĩa Bias = 0. Không được hiển thị
-  // Sigma lạc quan từ giả định này; khớp `sgComp()` của app cũ.
+  // Bias chưa được đánh giá không đồng nghĩa Bias = 0; không suy ra Sigma
+  // từ một giả định lạc quan.
   const sigma = tea != null && stored.cv != null && biasEqa != null ? sigmaMetric(tea, biasEqa, stored.cv) : null;
   const mu = stored.cv != null
     ? uncertaintyBudget({ cv: stored.cv, bias: biasEqa, uCref: stored.uCref, includeBias: stored.muBiasMode !== 'exclude', uCal: stored.uCal, tea: tea ?? undefined, target: stored.targetMean ?? undefined })
@@ -150,11 +126,10 @@ export function createSigmaHandlers(db: Db) {
    * khắc phục duyệt xong + hiệu quả (`resolvedPointIds`).
    *
    * CỐ Ý KHÔNG băm cấu hình luật Westgard (`tests.rule_*_json`,
-   * `app_meta.westgardRules`) như bản trước: cổng duy nhất của cohort là
+   * `app_meta.westgardRules`): cổng duy nhất của cohort là
    * |z| > 3 tính từ snapshot của chính điểm, nó KHÔNG đọc bảng luật. Hệ quả
-   * đo được của bản cũ: bật một luật ở panel "Cấu hình chung của luật" là gỡ
-   * hiệu lực rà soát IQC của MỌI xét nghiệm và xoá sạch gợi ý thiết kế QC,
-   * dù không con số nào của nhóm đổi. Ảnh hưởng THẬT của việc đổi luật (điểm
+   * Thay đổi luật không làm thay đổi dữ liệu của cohort. Ảnh hưởng THẬT của
+   * việc đổi luật (điểm
    * bị loại → có người mở NCE) đi vào đây qua `actions`, đã có sẵn.
    *
    * `actions` cũng được thu hẹp về đúng các dòng gắn điểm QC: hồ sơ quản lý
@@ -175,11 +150,8 @@ export function createSigmaHandlers(db: Db) {
    *
    * Phải là THIẾT KẾ QC ĐANG VẬN HÀNH (`countOperationalLevels()`, nguồn dùng
    * chung với Nhập QC và Phân tích Westgard), KHÔNG phải số dòng người dùng đã
-   * tạo trong kỳ. Bản trước truyền `stored.length`, nên một phòng chạy 3 mức
-   * mà kỳ đó chỉ nhập được 2 dòng (vd chưa có EQA cho mức 3) sẽ nhận nguyên
-   * bảng 2 mức: `1-3s/2-2s/R4s/4-1s/8x · N=4 R=2` thay cho
-   * `1-3s/2of3-2s/R4s/3-1s/6x · N=6 R=1` — một thiết kế QC khác hẳn, và
-   * `SigmaPage` còn in ra "xét nghiệm đang có 2 mức".
+   * tạo trong kỳ. Một phòng chạy 3 mức nhưng kỳ đó chỉ nhập 2 dòng phải dùng
+   * bảng 3 mức, không được suy thành thiết kế 2 mức.
    *
    * Ba bậc, KHÔNG được đảo: mức đang vận hành → mức đã khai trong
    * `test_levels` (nhóm lô đã dừng thì thiết kế QC vẫn là ngần ấy mức) → số
@@ -217,7 +189,7 @@ export function createSigmaHandlers(db: Db) {
    * nghiệm, lớp phủ hồ sơ TEa của phòng xét nghiệm và Mean hiện hành của từng
    * mức, rồi trả về hàm thuần. Mean ưu tiên snapshot của kỳ
    * (`stored.targetMean`, truyền vào từ ngoài) rồi mới tới Mean hiện hành —
-   * đúng `sgLevelTarget()` của app cũ. */
+   * để giữ báo cáo đã chốt ổn định khi cấu hình thay đổi. */
   function makeLevelTeaResolver(testId: string) {
     // Phải đọc cả 4 cột truy vết EFLM: cổng `hasTrace` của `resolveTea()`
     // đọc chúng, thiếu thì mọi xét nghiệm có `tea` đều được coi là "TEa EFLM
@@ -286,22 +258,6 @@ export function createSigmaHandlers(db: Db) {
     return buildSigmaCohorts(rows, period, safeLevels, isoLocalDate(), resolved).map(cohort => ({
       ...cohort, fingerprint: cohortFingerprint(testId, period, cohort.level, cohort.lot, actionsDigest),
     }));
-  }
-
-  /** Thêm/bỏ khỏi Sigma chỉ đổi danh sách theo dõi, không xóa danh mục hay
-   * dữ liệu QC của xét nghiệm — đúng ý nghĩa nút "Xóa" app cũ. */
-  function setTracking(input: { testId?: unknown; tracked?: unknown }, actor: Actor): IpcResult<{ testId: string; tracked: boolean }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
-    const testId = cleanId(input?.testId), tracked = input?.tracked === true;
-    const test = db.prepare('SELECT id,name,sigma_tracked FROM tests WHERE id=?').get(testId) as { id: string; name: string; sigma_tracked: number } | undefined;
-    if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
-    if ((test.sigma_tracked === 1) === tracked) return { ok: true, data: { testId, tracked } };
-    inTransaction(() => {
-      db.prepare('UPDATE tests SET sigma_tracked=? WHERE id=?').run(tracked ? 1 : 0, testId);
-      writeAudit(db, actor, tracked ? 'Theo dõi Six Sigma' : 'Bỏ theo dõi Six Sigma', `Xét nghiệm "${test.name}"`, test.name);
-    });
-    notifyChanged(['tests'], [testId]);
-    return { ok: true, data: { testId, tracked } };
   }
 
   function saveTeaConfig(input: { testId?: unknown; source?: unknown; tea?: unknown; eflmAnalyte?: unknown; eflmAps?: unknown; eflmLookupDate?: unknown; eflmRef?: unknown }, actor: Actor): IpcResult<Test> {
@@ -378,12 +334,11 @@ export function createSigmaHandlers(db: Db) {
       if (level.cohortN != null && (!Number.isInteger(level.cohortN) || level.cohortN < 0)) return { ok: false, error: { code: 'invalid-cohort', message: 'Số điểm IQC của lô không hợp lệ.' } };
     }
     if (new Set(stored.map((level) => level.level)).size !== stored.length) return { ok: false, error: { code: 'duplicate-level', message: 'Mỗi mức QC chỉ được có một bộ số liệu trong một kỳ.' } };
-    // Mức phải thật sự được khai cho xét nghiệm. Trước đây cổng này chỉ đòi số
+    // Mức phải thật sự được khai cho xét nghiệm. Cổng này không chỉ kiểm số
     // nguyên ≥ 1, nên gọi thẳng IPC với `level: 7` cho một xét nghiệm 1 mức là
     // lưu được, và dòng ma đó cũng tính vào số mức chọn bảng Sigma Rules.
-    // CHỈ chặn mức MỚI thêm: mức đã nằm trong bản ghi cũ (vì cấu hình đổi sau
-    // khi kỳ được chốt) vẫn phải sửa được CV/Bias/MU, không thì kỳ lịch sử bị
-    // khoá cứng.
+    // Chỉ chặn mức chưa từng có trong kỳ: mức đã chốt nhưng sau đó bị gỡ khỏi
+    // cấu hình vẫn cần sửa được CV/Bias/MU để hồ sơ không bị khóa cứng.
     const declaredLevels = new Set((db.prepare('SELECT level FROM test_levels WHERE test_id=?').all(testId) as { level: number }[]).map((row) => row.level));
     const priorLevels = new Set(prior.map((level) => level.level));
     const unknown = stored.filter((level) => !declaredLevels.has(level.level) && !priorLevels.has(level.level)).map((level) => level.level);
@@ -393,7 +348,7 @@ export function createSigmaHandlers(db: Db) {
     // (`SigmaPage.tsx` lọc theo `cohortStatus === 'eligible'`), mà app
     // Electron có F12 nên gọi thẳng
     // `window.qcApi.saveSigmaPeriod({ ... cohortStatus: 'eligible' })` là
-    // qua được — trước đây main chỉ `cleanText()` chuỗi đó rồi lưu.
+    // qua được — mã nguồn chỉ nhận một trong các giá trị được công bố.
     //
     // Người dùng CHỌN lô (`sourceLot`); mọi con số mô tả nhóm đó thì main tự
     // dựng lại từ chính `qc_points` qua `listCohorts()`. Đường dùng thật
@@ -403,13 +358,12 @@ export function createSigmaHandlers(db: Db) {
     if (fromCohort.length) {
       const cohorts = listCohorts(testId, period, fromCohort.map((level) => level.level));
       for (const level of fromCohort) {
-        const old = prior.find(item => item.level === level.level);
+        const previousLevel = prior.find(item => item.level === level.level);
         const draft = input.levels.find(item => item.level === level.level)!;
-        if (old?.cvSource === 'iqc-cohort' && old.sourceLot === level.sourceLot && draft.refreshCohort !== true) {
-          // Editing Bias/MU is not permission to refresh an IQC snapshot.
-          Object.assign(level, { cv: old.cv, targetMean: old.targetMean, tea: old.tea, teaBasis: old.teaBasis,
-            cohortN: old.cohortN, sourceStart: old.sourceStart, sourceEnd: old.sourceEnd, cohortStatus: old.cohortStatus,
-            cohortFingerprint: old.cohortFingerprint, cohortReview: old.cohortReview });
+        if (previousLevel?.cvSource === 'iqc-cohort' && previousLevel.sourceLot === level.sourceLot && draft.refreshCohort !== true) {
+          Object.assign(level, { cv: previousLevel.cv, targetMean: previousLevel.targetMean, tea: previousLevel.tea, teaBasis: previousLevel.teaBasis,
+            cohortN: previousLevel.cohortN, sourceStart: previousLevel.sourceStart, sourceEnd: previousLevel.sourceEnd, cohortStatus: previousLevel.cohortStatus,
+            cohortFingerprint: previousLevel.cohortFingerprint, cohortReview: previousLevel.cohortReview });
           continue;
         }
         const found = cohorts.find((c) => c.level === level.level && c.lot === level.sourceLot);
@@ -420,19 +374,19 @@ export function createSigmaHandlers(db: Db) {
         level.sourceEnd = found.end;
         level.cohortStatus = found.status;
         level.targetMean = found.targetMean;
-        if (old && old.tea != null && !old.teaBasis && old.targetMean !== found.targetMean) {
-          return { ok: false, error: { code: 'cohort-tea-unresolved', message: 'Snapshot kỳ cũ thiếu tiêu chí TEa để đổi nồng độ. Hãy tạo đánh giá mới với nguồn TEa đã xác nhận; không suy lại lịch sử từ cấu hình hiện tại.' } };
+        if (previousLevel && previousLevel.tea != null && !previousLevel.teaBasis && previousLevel.targetMean !== found.targetMean) {
+          return { ok: false, error: { code: 'cohort-tea-unresolved', message: 'Snapshot thiếu tiêu chí TEa để đổi nồng độ. Hãy tạo đánh giá mới với nguồn TEa đã xác nhận; không suy lại hồ sơ đã chốt từ cấu hình hiện tại.' } };
         }
-        // New lot: reuse the saved criterion, never the old concentration's TEa%.
-        const basis = old?.teaBasis ?? resolver.basis(teaSource, level.level, found.targetMean);
-        if (old && old.tea != null && !old.teaBasis) {
-          level.tea = old.tea;
+        // Khi đổi lô, tái dùng tiêu chí đã chốt thay vì TEa% của nồng độ trước.
+        const basis = previousLevel?.teaBasis ?? resolver.basis(teaSource, level.level, found.targetMean);
+        if (previousLevel && previousLevel.tea != null && !previousLevel.teaBasis) {
+          level.tea = previousLevel.tea;
         } else if (basis && (basis.value != null || basis.criterionDetail?.absoluteUsable)) {
           level.teaBasis = basis;
           level.tea = teaAtMean(basis, found.targetMean);
           if (level.tea == null) return { ok: false, error: { code: 'cohort-tea-unresolved', message: 'Chưa xác định được TEa tại Mean của lô đã chọn. Kiểm tra Mean, đơn vị và nguồn TEa.' } };
-        } else if (old && old.targetMean !== found.targetMean) {
-          return { ok: false, error: { code: 'cohort-tea-unresolved', message: 'Kỳ cũ thiếu tiêu chí TEa để đổi nồng độ. Hãy tạo đánh giá mới với nguồn TEa đã xác nhận.' } };
+        } else if (previousLevel && previousLevel.targetMean !== found.targetMean) {
+          return { ok: false, error: { code: 'cohort-tea-unresolved', message: 'Snapshot thiếu tiêu chí TEa để đổi nồng độ. Hãy tạo đánh giá mới với nguồn TEa đã xác nhận.' } };
         }
         level.cohortFingerprint = cohortFingerprint(testId, period, level.level, level.sourceLot || '');
         // Xác nhận rà soát là dấu vết thao tác của người dùng, không phải kết
@@ -451,10 +405,10 @@ export function createSigmaHandlers(db: Db) {
       level.cohortN = null; level.sourceLot = ''; level.sourceStart = ''; level.sourceEnd = ''; level.cohortStatus = '';
     }
     for (const level of stored) {
-      const old = prior.find(item => item.level === level.level);
-      if (!level.teaBasis && (!old || old.teaBasis || old.tea == null)) {
-        const basis = old?.teaBasis ?? resolver.basis(teaSource, level.level, level.targetMean);
-        // Do not invent provenance for a conflicting historical/manual value.
+      const previousLevel = prior.find(item => item.level === level.level);
+      if (!level.teaBasis && (!previousLevel || previousLevel.teaBasis || previousLevel.tea == null)) {
+        const basis = previousLevel?.teaBasis ?? resolver.basis(teaSource, level.level, level.targetMean);
+        // Không tự tạo nguồn gốc cho một giá trị nhập tay đang mâu thuẫn.
         if (basis?.value != null && (level.tea == null || Math.abs(level.tea - basis.value) < 1e-10)) {
           level.teaBasis = basis;
           level.tea ??= basis.value;
@@ -463,7 +417,7 @@ export function createSigmaHandlers(db: Db) {
     }
     // Mã nguồn được chuẩn hóa riêng, mô tả tiêu chí nằm trong snapshot mức.
     // Luồng "+ Thêm kỳ" chọn trực tiếp tháng/năm nhưng tuyệt đối không ghi đè
-    // bản đã có. Cổng lưu chung vẫn cho phép cập nhật CV/Bias/MU của kỳ cũ.
+    // bản đã có. Cổng lưu chung vẫn cho phép cập nhật CV/Bias/MU của kỳ đã chốt.
     inTransaction(() => {
       if (existing) {
         db.prepare('UPDATE sigma_data SET tea=?, tea_source=?, lv_json=? WHERE id=?').run(tea, teaSource, JSON.stringify(stored), id);
@@ -477,7 +431,7 @@ export function createSigmaHandlers(db: Db) {
     return { ok: true, data: listPeriods(testId).find(item => item.id === id)! };
   }
 
-  /** Đổi kỳ phải là một giao dịch duy nhất. Không dùng "lưu mới rồi xoá cũ"
+  /** Đổi kỳ phải là một giao dịch duy nhất. Không dùng "lưu mới rồi xoá bản trước"
    * vì KTV được sửa Sigma nhưng không có quyền xóa kỳ, dễ để lại hai bản ghi. */
   function renamePeriod(input: { id?: unknown; period?: unknown }, actor: Actor): IpcResult<SigmaPeriodView> {
     const denied = requireWrite(actor); if (denied) return denied;
@@ -510,7 +464,7 @@ export function createSigmaHandlers(db: Db) {
     return { ok: true, data: { id: nextId, testId: row.test_id, period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea, renamedChain.bySource, designLevelCount(row.test_id, stored), renamedChain.fallback)) } };
   }
 
-  /** Xoá 1 kỳ Sigma — chỉ admin, khớp `sgDelPeriod` app cũ. */
+  /** Xoá một kỳ Sigma — chỉ quản trị viên. */
   function removePeriod(input: { data: { id: string } }, actor: Actor): IpcResult<{ id: string }> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = cleanText(input.data?.id, 200).trim();
@@ -525,7 +479,9 @@ export function createSigmaHandlers(db: Db) {
     return { ok: true, data: { id } };
   }
 
-  return { listPeriods, listCohorts, setTracking, saveTeaConfig, savePeriod, renamePeriod, removePeriod };
+  return { listPeriods, listCohorts, saveTeaConfig, savePeriod, renamePeriod, removePeriod };
 }
 
 export type SigmaHandlers = ReturnType<typeof createSigmaHandlers>;
+
+

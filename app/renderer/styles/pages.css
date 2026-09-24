@@ -14,5 +14,7 @@
 .dash-list .shift-item.warn .meta {color:var(--warning-ink);}
 .dash-main .panel > .alert, .panel > .panel-title:first-child + .dash-list, .panel > .panel-title:first-child ~ .dash-list {margin:var(--panel-content-gap) 16px 14px;}
 
-/* ── D3.9: Phân tích Westgard — port từ assets/professional-westgard.css. */
+
 .wg-export-actions { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+
+

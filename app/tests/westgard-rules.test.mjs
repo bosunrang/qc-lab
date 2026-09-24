@@ -70,3 +70,5 @@ for (const r of REG) {
 }
 
 console.log('app Westgard rules oracle tests passed');
+
+

@@ -1,14 +1,10 @@
-// Bảng đăng ký luật Westgard — NGUỒN DUY NHẤT cho toàn app mới. Nội dung mô
-// tả/gợi ý xử lý là dữ liệu lâm sàng tham khảo từ bản cũ
-// (src/domain/core/qc-core.ts's WG_RULE_REGISTRY) — giữ nguyên vì đây là nội
-// dung nghiệp vụ đúng, không phải kiến trúc cũ. Mọi danh sách dẫn xuất
+// Bảng đăng ký luật Westgard — nguồn duy nhất cho toàn ứng dụng. Mọi danh sách dẫn xuất
 // (WG_RULES, WG_DEFAULT_ON, WG_ALERT_RULES, WG_RULE_DESCRIPTIONS, thứ tự ưu
 // tiên của primaryErrorRule, họ WG_RUN_RULES) đều tính từ bảng này — thêm
 // một luật chỉ cần thêm một dòng, không sửa nhiều nơi.
 //
 // `alert: true` = luật CHỈ cảnh báo, không loại điểm. Theo Westgard chỉ `1-2s`
-// thuộc loại này; `6x`/`7T` là luật LOẠI BỎ (app cũ để cả hai là cảnh báo —
-// lệch chuẩn, đã bỏ 2026-09-11 theo quyết định người dùng). Phòng xét nghiệm
+// thuộc loại này; `6x`/`7T` là luật loại bỏ. Phòng xét nghiệm
 // muốn hạ một luật xuống cảnh báo thì đặt ghi đè theo TỪNG xét nghiệm ở cột
 // "Hành động" trong modal Danh mục xét nghiệm, không sửa mặc định ở đây.
 //
@@ -18,24 +14,13 @@
 //
 // Cả họ luật đếm chuỗi liên tiếp (`2-2s` `3-1s` `4-1s` `6x` `8x` `9x` `10x`
 // `12x`) đều là `both`, vì định nghĩa chuẩn cho phép đếm theo CẢ HAI chiều:
-//   4-1s: "These 4 may be from one control material or they may also be the
-//          last 2 points from a high level control material and the last 2
-//          points from a normal level control material, thus the rule may
-//          ALSO be applied across materials."
-//   10x:  "The 10x rule usually has to be applied ACROSS RUNS and OFTEN
-//          across materials."
 // tức chiều cơ bản là qua nhiều lần chạy của cùng một mức, còn gộp mức là
-// phần mở rộng — không phải phần thay thế. Sửa 2026-09-11: trước đó `3-1s`
-// `6x` `8x` `9x` `10x` `12x` để `across` THUẦN trong khi `2-2s`/`4-1s` cùng
-// họ lại để `both` — tự mâu thuẫn, và hệ quả thật là một mức trôi dần một
-// phía trong khi mức kia ổn định quanh Mean thì KHÔNG luật nào bắt (chuỗi
-// gộp bị xen kẽ dấu nên triệt tiêu tín hiệu). app cũ cũng sai y hệt, nên
-// `cross-app-westgard-sigma.test.mjs` không thể phát hiện — lệch có chủ
-// đích, chốt tường minh ở mục 4d của file đó.
+// phần mở rộng — không phải phần thay thế. Vì vậy các luật chuỗi đều dùng
+// `both`: một mức trôi dần một phía vẫn phải được phát hiện dù mức khác ổn
+// định quanh Mean.
 //
 // Hai ngoại lệ CỐ Ý giữ nguyên:
 //   `R4s`  — `across`: Westgard ghi rõ "should only be interpreted
-//            within-run, not between-run".
 //   `7T`   — `within`: xu hướng tăng/giảm đều chỉ có nghĩa trong cùng một
 //            mức; gộp mức thì thứ tự M1/M2 tự tạo ra răng cưa giả.
 export type RuleScope = 'within' | 'across' | 'both';
@@ -118,13 +103,11 @@ export function primaryErrorRule(ruleIds: readonly string[]): string | null {
  * SE/RE/'—', luật không phân loại như `1-2s` KHÔNG bị dán nhãn RE).
  *
  * `desc` lấy theo luật có `priority` NHỎ NHẤT — nhưng CHỈ trong số các luật
- * CÙNG loại sai số với `type`. App cũ (`errorTypeDetailParts()`) chọn primary
- * trên TOÀN BỘ danh sách, nên hai nửa có thể mô tả hai luật khác nhau: với
+ * cùng loại sai số với `type`; điều này giúp nhãn và mô tả luôn nhất quán.
+ * Với
  * `['1-3s','2-2s']`, `errorType()` trả SE (vì 2-2s là SE) còn primary lại là
  * 1-3s (priority 1) — một luật RE. Bảng điểm khi đó in
- * "SE — Sai số hệ thống" kèm mô tả "1 điểm QC vượt ±3SD", tự mâu thuẫn.
- * Đây là lệch golden master CÓ CHỦ ĐÍCH; `errorType()` và `primaryErrorRule()`
- * giữ nguyên hợp đồng cũ nên mọi chỗ khác không đổi. */
+ * "SE — Sai số hệ thống" kèm mô tả của một luật RE sẽ tự mâu thuẫn. */
 export function errorTypeDetail(ruleIds: readonly string[]): { type: string; desc: string } {
   const type = errorType(ruleIds);
   if (type === '—') return { type, desc: '' };
@@ -147,17 +130,15 @@ export function errorType(ruleIds: readonly string[]): string {
 }
 
 /** Mã bền vững để lưu NCE. Chuỗi mô tả chỉ dùng khi hiển thị, không phải dữ
- * liệu vì backup cũ từng lưu cả "SE — Sai số hệ thống". */
+ * liệu lưu trữ. */
 export function errorClass(ruleIds: readonly string[]): 'SE' | 'RE' | '' {
   for (const id of ruleIds) if (WG_RULE_BY_ID[id]?.err === 'SE') return 'SE';
   for (const id of ruleIds) if (WG_RULE_BY_ID[id]?.err === 'RE') return 'RE';
   return '';
 }
 
-/** Đọc lại một giá trị `actions.error_type` BẤT KỲ về mã chuẩn. Phải chịu
- * được cả dữ liệu cũ ("SE — Sai số hệ thống", "Quản lý dải kiểm soát") lẫn
- * backup app cũ. Bước di trú idempotent trong `applySchema()` dùng ĐÚNG phép
- * ánh xạ này bằng SQL; sửa ở đây thì phải sửa ở đó. */
+/** Chuẩn hoá giá trị `actions.error_type` về mã lưu trữ. Nhận cả mã và nhãn
+ * hiển thị để dữ liệu đã lưu luôn có thể được đọc nhất quán. */
 export function normalizeErrorClass(value: unknown): 'SE' | 'RE' | '' {
   const text = String(value ?? '').trim().toUpperCase();
   if (text === 'SE' || text.startsWith('SE ') || text.includes('SAI SỐ HỆ THỐNG')) return 'SE';
@@ -185,3 +166,5 @@ export function wgScanRuns(
     }
   });
 }
+
+

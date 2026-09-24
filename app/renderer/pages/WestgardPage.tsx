@@ -1,10 +1,5 @@
-// Phân tích Westgard — viết lại theo đúng bố cục app cũ (professional-westgard.css
-// + WestgardPage.tsx cũ): KHÔNG có bảng "Tổng quan tất cả xét nghiệm" phẳng
-// (bản cũ không có khái niệm đó) — panel "Thiết lập phân tích" (chọn xét
-// nghiệm + bật/tắt luật + hướng dẫn luật + tab LJ/CUSUM) rồi 1 panel riêng
-// cho MỖI mức của xét nghiệm đang chọn (bảng điểm đúng 7 cột, tiêu đề mức +
-// Mean/SD/n điểm). Tab "Nhóm lô đã dừng" đọc lại `lotGroups` đã có (không
-// domain mới), đúng nguyên tắc "không domain mới nếu đã có API phù hợp".
+// Phân tích Westgard theo xét nghiệm và từng mức QC, gồm cấu hình luật,
+// hướng dẫn, biểu đồ Levey-Jennings/CUSUM và lịch sử nhóm lô.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
@@ -22,7 +17,7 @@ import { displayedWestgardBlocks, observedStats, statText, westgardExportRows, W
 import type { ArchivedBlock } from '../../shared/qc-api';
 
 const VERDICT_LABEL: Record<string, string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
-/** `vnDate()` app cũ. */
+/** Định dạng ngày ISO theo cách hiển thị tiếng Việt. */
 const vnDate = (iso: string) => formatVnDate(iso, '—');
 /** Mã chạy tự sinh có dạng YYYY-MM-DD-1; trong bảng chỉ cần số lần chạy.
  * Mã nguyên vẹn vẫn có ở tooltip để truy vết và với mã LIS tự do. */
@@ -37,8 +32,7 @@ export function WestgardPage() {
   const { tests, instruments, lots, levelsByTestId, loadTests, loadInstruments, loadLevels, loadLots, lotGroups, loadLotGroups } = useManageStore();
   const { summaries, loadSummaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, previousLotBlocks: loadedPrevious, analysisTestId, analysisLoading, analysisError } = useWestgardStore();
   // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`) — vai trò
-  // chỉ-xem thấy đúng trạng thái luật nhưng không đổi được (checkbox
-  // disabled, không ẩn, để bảng hướng dẫn giữ nguyên bố cục như app cũ).
+  // chỉ-xem thấy đúng trạng thái luật nhưng không thay đổi được.
   const role = useAuthStore((s) => s.user)?.role;
   const writable = canWrite(role);
   const admin = isAdmin(role);
@@ -48,8 +42,7 @@ export function WestgardPage() {
   selectedTestRef.current = testId;
   const [query, setQuery] = useState('');
   const [chartMode, setChartMode] = useState<'lj' | 'cusum'>('lj');
-  // Công tắc "Xem lô cũ" theo TỪNG mức, khoá `testId|level` đúng như
-  // `wgPrevOpen` app cũ — gộp testId vào khoá để lựa chọn của xét nghiệm này
+  // Công tắc "Xem lô cũ" theo từng mức; khoá `testId|level` để lựa chọn của xét nghiệm này
   // không dính sang xét nghiệm khác cùng số mức.
   const [prevOpen, setPrevOpen] = useState<ReadonlySet<string>>(new Set());
   // Khi có từ hai mức, CUSUM có thể xem chung để so sánh hoặc tách theo mức
@@ -66,10 +59,8 @@ export function WestgardPage() {
   const loadedArchivedGroupRef = useRef('');
 
   useEffect(() => { loadTests(); loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadRuleSettings(); }, [loadTests, loadInstruments, loadLots, loadLotGroups, loadSummaries, loadRuleSettings]);
-  // Tự chọn xét nghiệm đầu tiên như app cũ (`selTest` rơi về xét nghiệm
-  // đầu khi lựa chọn không hợp lệ) — để rỗng thì cả trang chỉ hiện vỏ.
-  // Đây là lần thứ 4 cùng lớp lỗi này trong Giai đoạn D (Nhập QC, Six
-  // Sigma, So sánh hoá chất, Westgard) — xem ghi chú D3.5.
+  // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ; để rỗng
+  // thì cả trang chỉ hiện vỏ.
   useEffect(() => {
     if (!summaries.length) return;
     if (testId && summaries.some((s) => s.testId === testId)) return;
@@ -124,7 +115,7 @@ export function WestgardPage() {
     [lotGroups],
   );
   const archivedNeedle = archivedQuery.trim().toLocaleLowerCase('vi');
-  // App cũ tìm nhóm theo tên nhóm hoặc số lô. Nếu không khớp nhóm nào (vd
+  // Tìm nhóm theo tên nhóm hoặc số lô. Nếu không khớp nhóm nào (ví dụ
   // người dùng đang tìm tên xét nghiệm), vẫn giữ toàn bộ danh sách để ô chọn
   // xét nghiệm tự xử lý phần lọc thay vì biến màn hình thành "không có dữ liệu".
   const archivedGroupOptions = useMemo(() => {
@@ -159,7 +150,7 @@ export function WestgardPage() {
   const archivedGroup = archivedGroups.find((group) => group.id === archivedGroupId);
   const archivedStatusLabel = archivedGroup?.active === 0 ? 'Đã lưu trữ' : 'Đã dừng';
 
-  // Tab lịch sử phải có một lựa chọn dùng được ngay khi mở, giống app cũ.
+  // Tab lịch sử phải có một lựa chọn dùng được ngay khi mở.
   // Không ràng buộc theo chuỗi tìm kiếm rỗng để người dùng vẫn tự đổi nhóm.
   useEffect(() => {
     if (view !== 'archived' || !archivedGroupOptions.length) return;
@@ -169,8 +160,7 @@ export function WestgardPage() {
 
   // Nhóm lô đã dừng/lưu trữ: nạp danh sách xét nghiệm THẬT SỰ có lô của
   // nhóm này (không phải mọi xét nghiệm trong hệ thống), rồi phân tích
-  // Westgard thật cho xét nghiệm+nhóm đang chọn — port `wgLotBlockModel()`
-  // app cũ, thay bảng metadata phẳng trước đây.
+  // Phân tích Westgard cho xét nghiệm và nhóm đang chọn.
   useEffect(() => {
     setArchivedBlocks([]);
     const groupChanged = loadedArchivedGroupRef.current !== archivedGroupId;
@@ -228,8 +218,7 @@ export function WestgardPage() {
     const instrument = instruments.find((candidate) => candidate.id === instrumentName)?.name;
     return instrument ? `${item.label} · ${instrument}` : item.label;
   };
-  /** Lọc theo ô "Tìm nhanh" — tên xét nghiệm, LOT hoặc máy, đúng bộ field
-   * app cũ dùng. */
+  /** Lọc theo ô "Tìm nhanh": tên xét nghiệm, LOT hoặc máy. */
   const matchedTests = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return summaries;
@@ -265,8 +254,8 @@ export function WestgardPage() {
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
-  // Bật "Xem lô cũ" THÊM một đường cho lô đã chuyển tiếp (không thay đường
-  // hiện hành) — đúng `buildMultiViews()` app cũ; riêng BẢNG của mức thì
+  // Bật "Xem lô cũ" thêm một đường cho lô đã chuyển tiếp (không thay đường
+  // hiện hành); riêng bảng của mức thì
   // THAY hẳn sang lô cũ. Hai hành vi khác nhau có chủ đích.
   const multiSeries: QcMultiLevelSeries[] = useMemo(
     () => levels.flatMap((l) => {
@@ -278,7 +267,7 @@ export function WestgardPage() {
     }),
     [levels, lots, analysisByLevel, prevOpen, previousLotBlocks, testId],
   );
-  // Như app cũ: đếm SỐ ĐƯỜNG chứ không đếm số mức — một xét nghiệm 1 mức đang
+  // Đếm số đường chứ không đếm số mức — một xét nghiệm một mức đang
   // mở lô cũ cũng có 2 đường để so sánh.
   const showMultiChart = multiSeries.length >= 2;
   // Chuỗi CUSUM của từng mức đã được main tính ĐỘC LẬP. Cấu trúc này chỉ
@@ -291,8 +280,8 @@ export function WestgardPage() {
   // từng mức — mọi mức cùng trả về đúng 1 giá trị `cusumOn`.
   const cusumOn = !!analysisByLevel[levels[0]?.level]?.cusumOn;
 
-  /** "Khôi phục mặc định": bật lại đúng trạng thái mặc định của từng luật
-   * theo `WG_RULE_REGISTRY` — app cũ dùng `wgReset()`. Đây là cấu hình
+  /** Khôi phục đúng trạng thái mặc định của từng luật theo `WG_RULE_REGISTRY`.
+   * Đây là cấu hình
    * CHUNG (toàn phòng xét nghiệm), không riêng xét nghiệm đang chọn. */
   async function resetRules() {
     try {
@@ -459,9 +448,8 @@ export function WestgardPage() {
 
       {view === 'current' && testId && !analysisReady && <div className="panel"><p className="empty-state">{analysisError || 'Đang tải phân tích…'}{analysisError && <button className="btn ghost sm" onClick={() => loadAnalysis(testId, levelNums)}>Thử lại</button>}</p></div>}
 
-      {/* Tab CUSUM: xu hướng CỘNG DỒN vẫn tính RIÊNG từng mức (không quy đổi
-          chung 1 trục như LJ), và cả trang chỉ hiện khi xét nghiệm ĐÃ BẬT
-          CUSUM (`tests.cusum_on`) — port `CusumPage` app cũ. */}
+      {/* CUSUM vẫn tính riêng từng mức (không quy đổi chung một trục như LJ)
+          và chỉ hiện khi xét nghiệm đã bật CUSUM. */}
       {view === 'current' && testId && analysisReady && chartMode === 'cusum' && !cusumOn && (
         <div className="panel"><div className="empty">
           <div className="empty-title">Chưa bật CUSUM cho xét nghiệm này</div>
@@ -522,8 +510,8 @@ export function WestgardPage() {
       )}
       {view === 'current' && testId && chartMode === 'lj' && levels.map((l) => {
         // Mở "Xem lô cũ" thì bảng của mức THAY hẳn sang lô đã chuyển tiếp
-        // (Mean/SD, điểm và kết luận đều của lô đó) — port `wgLotBlockModel()`
-        // app cũ. Chỉ lấy lô gần nhất như bản cũ; các lô xa hơn vẫn nằm ở tab
+        // (Mean/SD, điểm và kết luận đều của lô đó). Chỉ lấy lô gần nhất;
+        // các lô xa hơn vẫn nằm ở tab
         // "Nhóm lô đã dừng".
         const prevBlocks = prevBlocksFor(l.level);
         const prevBlock = prevBlocks.length && isPrevOpen(l.level) ? prevBlocks[0] : null;
@@ -657,3 +645,5 @@ export function WestgardPage() {
     </div>
   );
 }
+
+

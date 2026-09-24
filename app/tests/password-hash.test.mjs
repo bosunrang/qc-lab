@@ -1,6 +1,5 @@
 // password-hash.ts không import module nào khác trong main/ (chỉ node:crypto)
 // nên test thẳng trên .ts được, không cần bản build — cùng quy ước với
-// westgard-rules.test.mjs/audit-chain.test.mjs.
 import assert from 'node:assert/strict';
 import { hashPassword, verifyPassword, isPbkdf2Hash, PASSWORD_HASH_ITERATIONS } from '../main/domain/password-hash.ts';
 
@@ -18,7 +17,6 @@ const stored2 = hashPassword('mat-khau-test-123');
 assert.notEqual(stored, stored2, 'salt ngẫu nhiên mỗi lần hash phải cho chuỗi khác nhau');
 assert.equal(verifyPassword('mat-khau-test-123', stored2), true);
 
-// 4) số vòng lặp đúng chính sách OWASP tối thiểu (khớp bản cũ)
 assert.equal(PASSWORD_HASH_ITERATIONS, 600000);
 assert.ok(stored.startsWith(`pbkdf2$${PASSWORD_HASH_ITERATIONS}$`));
 
@@ -29,3 +27,5 @@ for (const bad of ['', 'khong-phai-hash', 'pbkdf2$abc$salt$hash', 'md5$1$salt$ha
 }
 
 console.log('app password-hash tests passed');
+
+

@@ -10,3 +10,5 @@ assert.deepEqual(paginateActivity(rows, 1, 1).rows, [rows[0]]);
 assert.deepEqual(updateAuditDateRange({ from: '2026-08-10', to: '' }, 'to', '2026-08-05'), { from: '2026-08-05', to: '2026-08-05' });
 assert.equal(formatAuditDetailVN('Điểm QC mức 1, ngày 2026-09-06, giá trị 3.69'), 'Điểm QC mức 1, ngày 06/09/2026, giá trị 3.69');
 console.log('app audit-filter tests passed');
+
+

@@ -42,7 +42,6 @@ test('khớp node:crypto trên mọi lớp input đáng lo', () => {
     'Điểm QC mức 1, ngày 2026-09-09, giá trị 109.5',
     'Máy Hóa sinh AU680 · Khoa Xét nghiệm · Bệnh viện Đa khoa',
     'Hủy điểm QC · Lý do: Kết quả QC thực tế không hợp lệ',
-    // Emoji (4 byte UTF-8, surrogate pair trong JS).
     'kết quả 🧪 đạt',
     // Đúng biên block: 55/56/57 byte là 3 nhánh đệm khác nhau.
     'x'.repeat(55), 'x'.repeat(56), 'x'.repeat(57),
@@ -89,3 +88,5 @@ test('chuỗi audit vẫn verify được — dùng qua audit-chain thật', () 
   const tampered = rows.map((r, i) => (i === 0 ? { ...r, detail: r.detail.replace('109.5', '109.6') } : r));
   assert.equal(verifyAuditChain(tampered, '').ok, false);
 });
+
+

@@ -1,6 +1,5 @@
-// Validate cho module Users/Auth. 3 vai trò cố định admin/technician/viewer
-// (khớp app cũ) CỘNG `pagePerms` — quyền theo từng trang, thêm ở Giai đoạn
-// D3.1 (trước đó cố ý chưa làm, xem docs/APP-V2-PLAN.md mục A2).
+// Kiểm tra dữ liệu cho module Người dùng/Xác thực. Ba vai trò cố định
+// `admin`/`technician`/`viewer` kết hợp với `pagePerms` — quyền theo từng trang.
 //
 // `pagePerms` LUÔN được thu hẹp theo vai trò ngay tại đây
 // (`selectUserPermissions` + `rolePageIds`), không tin danh sách renderer
@@ -26,8 +25,8 @@ export interface UserCreateInput { username?: unknown; name?: unknown; initials?
 export interface PreparedUserCreate { username: string; name: string; initials: string; role: Role; password: string; pagePerms: string[] }
 
 /** Thu hẹp danh sách thẻ theo vai trò; KHÔNG gửi gì lên = mặc định toàn bộ
- * thẻ của vai trò đó (khớp `collectUserPerms()` app cũ khi không tìm thấy
- * hộp checkbox). Chọn rỗng thì báo lỗi đúng câu chữ app cũ. */
+ * thẻ của vai trò đó (khớp `collectUserPerms()` hệ thống khi không tìm thấy
+ * hộp checkbox). Chọn rỗng thì báo lỗi đúng câu chữ hệ thống. */
 function preparePagePerms(value: unknown, role: Role): ValidationResult<string[]> {
   if (value == null) return { ok: true, data: rolePageIds(role) };
   const picked = selectUserPermissions(value, rolePageIds(role));
@@ -86,7 +85,7 @@ export function validateNewPassword(value: unknown): ValidationResult<string> {
 }
 
 // Ảnh đại diện luôn là canvas 160×160 do renderer tự resize trước khi gửi
-// (`AvatarModal.tsx`, cùng cỡ `avatar-modal-controller.ts` app cũ) nên PNG
+// (`AvatarModal.tsx`, cùng cỡ `avatar-modal-controller.ts` hệ thống) nên PNG
 // data URL không bao giờ tới gần mốc này thật — chỉ là chặn an toàn với một
 // request tự dựng gửi thẳng lên IPC, không phải giới hạn nghiệp vụ.
 const AVATAR_MAX_LENGTH = 500_000;
@@ -107,3 +106,4 @@ export function validateLoginInput(input: LoginInput): ValidationResult<Prepared
   if (!username || !password) return { ok: false, code: 'missing-credentials', message: 'Nhập tên đăng nhập và mật khẩu.' };
   return { ok: true, data: { username, password } };
 }
+

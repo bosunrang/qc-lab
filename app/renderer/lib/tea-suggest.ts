@@ -1,16 +1,3 @@
-// Gợi ý TEa khi gõ tên xét nghiệm (modal "Thêm/Sửa xét nghiệm" ở trang Cấu
-// hình chung) — port `configAssayFindRef`/`configAssaySuggestionInput` +
-// `effectiveTeaRefs()` của app cũ.
-//
-// App cũ: gõ tên/viết tắt/bí danh → tìm đúng analyte trong bảng TEa tham
-// chiếu → TỰ ĐIỀN tên chuẩn hoá, đơn vị, TEa% và 2 trường nguồn
-// (`teaSource`/`teaRefKey`). app có sẵn danh mục (`main/domain/tea-catalog.ts`)
-// và bảng ghi đè (`tea_refs`) nhưng modal chưa dùng tới → người dùng phải tự
-// gõ đơn vị/TEa, và `tea_source`/`tea_ref_key` luôn rỗng khi thêm mới.
-//
-// Thứ tự ưu tiên TEa copy nguyên app cũ: **CLIA% trước, Ricos% sau**
-// (`tea = ref[2] != null ? ref[2] : ref[3]`) — KHÔNG lấy giá trị TEa PXN
-// (`lab`), vì đó là hồ sơ riêng của phòng, chọn ở trang Six Sigma.
 import { TEA_CATALOG, type TeaCatalogItem } from '../../main/domain/tea-catalog';
 import type { TeaRef } from '../../shared/qc-api';
 
@@ -30,23 +17,21 @@ export interface TeaSuggestion {
 }
 
 /** Chuẩn hoá để so khớp: bỏ dấu, hạ chữ thường, gộp khoảng trắng — cùng vai
- * trò `searchText()` của app cũ (accent-insensitive). */
+ * trò `searchText()` của hệ thống (accent-insensitive). */
 export function normalizeName(value: unknown): string {
   return String(value ?? '')
     .normalize('NFD').replace(new RegExp('[\u0300-\u036f]', 'g'), '')
     .toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-/** App cũ chỉ ghép viết tắt khi nó KHÁC tên (bỏ khác biệt hoa/thường):
+/** hệ thống chỉ ghép viết tắt khi nó KHÁC tên (bỏ khác biệt hoa/thường):
  * "Sodium (Na)" nhưng chỉ "Urea", "pH", "D-dimer". */
 export function analyteDisplayName(item: { name: string; abbr: string }): string {
   const same = !item.abbr || normalizeName(item.abbr) === normalizeName(item.name);
   return same ? item.name : `${item.name} (${item.abbr})`;
 }
 
-/** Danh mục sau khi phủ ghi đè của phòng xét nghiệm — port `effectiveTeaRefs()`:
- * hàng `tea_refs` khớp `analyte_id` thay thế tên/đơn vị/nhóm/CLIA/Ricos của
- * hàng mặc định. */
+
 export function effectiveTeaCatalog(teaRefs: readonly TeaRef[]): TeaCatalogItem[] {
   const overrides = new Map<string, TeaRef>();
   for (const ref of teaRefs) if (ref.analyte_id) overrides.set(ref.analyte_id, ref);
@@ -88,7 +73,7 @@ export function teaSuggestions(teaRefs: readonly TeaRef[]): TeaSuggestion[] {
 }
 
 /** Tìm analyte khớp CHÍNH XÁC (sau khi chuẩn hoá) với tên/viết tắt/tên kèm
- * viết tắt người dùng vừa gõ — app cũ cũng so khớp tuyệt đối sau chuẩn hoá,
+ * viết tắt người dùng vừa gõ — hệ thống cũng so khớp tuyệt đối sau chuẩn hoá,
  * không so khớp một phần (tránh gõ "Na" mà nhảy sang "Natri niệu"). */
 export function findTeaSuggestion(value: unknown, teaRefs: readonly TeaRef[]): TeaSuggestion | null {
   const key = normalizeName(value);
@@ -99,3 +84,5 @@ export function findTeaSuggestion(value: unknown, teaRefs: readonly TeaRef[]): T
   }
   return null;
 }
+
+

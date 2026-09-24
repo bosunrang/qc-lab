@@ -1,7 +1,3 @@
-// Kiem chung end-to-end trang Bao cao: khoa/mo khoa ky bao cao va xem lai
-// diem QC theo khoang ngay. Kiem chung viec KHOA THAT SU chan them/huy diem
-// QC nam o tests/period-lock-enforcement.test.mjs (giao giua entry-handlers
-// va report-handlers), khong lap lai o day.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
@@ -18,41 +14,43 @@ const config = createConfigHandlers(db);
 const entry = createEntryHandlers(db);
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'admin', clientId: 'test-client' };
 
-// 1) Dinh dang ky sai phai bi chan
+// Biểu mẫu Sigma được cấu hình ngay tại thẻ Báo cáo & Biểu mẫu, không cất
+// lẫn trong hồ sơ đơn vị. Giá trị mặc định đảm bảo PDF cũ vẫn in được khi DB
+// chưa từng mở thẻ cấu hình.
+assert.deepEqual(report.getReportTemplateSettings(), { formCode: 'BM-SS-01', version: '1.0' });
+assert.equal(report.saveReportTemplateSettings({ data: { formCode: 'BM-SS-02', version: '2.0' } }, { ...actor, role: 'staff' }).ok, false);
+assert.equal(report.saveReportTemplateSettings({ data: { formCode: '', version: '2.0' } }, actor).ok, false);
+const savedTemplate = report.saveReportTemplateSettings({ data: { formCode: 'BM-SS-02', version: '2.0' } }, actor);
+assert.deepEqual(savedTemplate, { ok: true, data: { formCode: 'BM-SS-02', version: '2.0' } });
+assert.deepEqual(report.getReportTemplateSettings(), { formCode: 'BM-SS-02', version: '2.0' });
+
 const badFormat = report.lockPeriod({ data: { ym: '2026/08' } }, actor);
 assert.equal(badFormat.ok, false);
 assert.equal(badFormat.error.code, 'invalid-period');
 
-// 2) Khoa hop le
 const locked = report.lockPeriod({ data: { ym: '2026-08', note: 'Da chot bao cao thang 8' } }, actor);
 assert.equal(locked.ok, true);
 assert.equal(locked.data.ym, '2026-08');
 assert.equal(report.isPeriodLocked('2026-08'), true);
 
-// 3) Khoa lai ky da khoa phai bi chan
 const dupLock = report.lockPeriod({ data: { ym: '2026-08' } }, actor);
 assert.equal(dupLock.ok, false);
 assert.equal(dupLock.error.code, 'already-locked');
 
-// 4) Mo khoa thieu ly do (< 5 ky tu) phai bi chan
 const shortNote = report.unlockPeriod({ data: { ym: '2026-08', note: 'x' } }, actor);
 assert.equal(shortNote.ok, false);
 assert.equal(shortNote.error.code, 'missing-note');
 
-// 5) Mo khoa ky CHUA khoa phai bi chan
 const notLocked = report.unlockPeriod({ data: { ym: '2099-01', note: 'Ly do hop le du dai' } }, actor);
 assert.equal(notLocked.ok, false);
 assert.equal(notLocked.error.code, 'not-locked');
 
-// 6) Mo khoa hop le
 const unlocked = report.unlockPeriod({ data: { ym: '2026-08', note: 'Phat hien can bo sung them so lieu' } }, actor);
 assert.equal(unlocked.ok, true);
 assert.equal(report.isPeriodLocked('2026-08'), false);
 
-// 7) listPeriodLocks phan anh dung trang thai hien tai (da mo khoa nen rong)
 assert.equal(report.listPeriodLocks().length, 0);
 
-// 8) queryReport: loc dung theo xet nghiem + khoang ngay, bo qua xet nghiem khac
 const instrument = config.saveInstrument({ data: { name: 'May Report' } }, actor).data;
 const testA = config.saveTest({ data: { name: 'Test A', instrumentId: instrument.id } }, actor).data;
 const testB = config.saveTest({ data: { name: 'Test B', instrumentId: instrument.id } }, actor).data;
@@ -119,6 +117,14 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
   // Khoảng ngày đảo ngược bị chặn ở nút xuất, kèm giải thích.
   assert.match(page, /const rangeInvalid = !!start && !!end && start > end;/);
   assert.match(page, /const disabled = !matched\.length \|\| busy \|\| rangeInvalid;/);
+  assert.match(page, /Biểu mẫu báo cáo Six Sigma/);
+  assert.match(page, /Mã biểu mẫu/);
+  assert.match(page, /Phiên bản/);
+  assert.match(page, /saveTemplate\(\{ formCode, version: formVersion \}\)/);
+  const reportCss = readFileSync(new URL('../renderer/styles/pages/report.css', import.meta.url), 'utf8');
+  assert.match(reportCss, /\.report-template-fields input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)\{height:var\(--control-h-action\);min-height:var\(--control-h-action\);\}/);
 }
 
 console.log('app report-handlers end-to-end tests passed');
+
+

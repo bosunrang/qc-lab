@@ -71,3 +71,5 @@ assert.equal(verify.ok, true, 'chuỗi audit phải hợp lệ: ' + JSON.stringi
 assert.equal(verify.checked, 4);
 
 console.log('app config-handlers end-to-end tests passed');
+
+

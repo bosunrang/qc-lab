@@ -1,5 +1,3 @@
-// IPC handler cho trang So sanh hoa chat (reagent lot comparison). Renderer
-// khong bao gio dung SQL truc tiep — chi goi cac ham dat ten ro rang o day.
 import type { Db } from '../db/sqlite-like';
 import { cleanId, cleanText, uid } from '../domain/text-utils';
 import {
@@ -170,3 +168,5 @@ export function createReagentHandlers(db: Db) {
 }
 
 export type ReagentHandlers = ReturnType<typeof createReagentHandlers>;
+
+

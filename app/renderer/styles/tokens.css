@@ -447,7 +447,7 @@
 }
 
 *,*::before,*::after{box-sizing:border-box;}
-/* Thanh cuộn dùng chung, port nguyên quy cách app cũ: mảnh 8px, track xám
+/* Thanh cuộn dùng chung: mảnh 8px, track xám
    rất nhạt và thumb bo tròn có viền cùng màu track. Áp cho cả trục dọc lẫn
    kéo ngang của mọi vùng cuộn (bảng, biểu đồ, modal, textarea); từng vùng
    cố ý ẩn scrollbar vẫn có selector riêng ghi đè. */

@@ -7,7 +7,6 @@
 // `test_levels`), toàn bộ 75/75 test vẫn xanh trong khi hai trang đang cho hai
 // kết luận khác nhau. Một bài test chỉ soi MỘT phía không bao giờ bắt được
 // lệch giữa HAI phía — đây chính là đề nghị "thêm test đối xứng Entry ↔
-// Westgard" trong docs/validation/SIGMA-WESTGARD-AUDIT-2026-09-10.md.
 //
 // Bài này KHÔNG khoá một verdict cụ thể là 'rej' hay 'warn' (đó là việc của
 // westgard-standard/westgard-active-levels); nó khoá tính CHẤT: hai đường đọc
@@ -28,7 +27,7 @@ const actor = { userId: 'u1', username: 'admin', name: 'Quan tri', role: 'admin'
  * của mức 1 phụ thuộc việc mức 2 có được coi là đang vận hành hay không.
  * Ghi điểm thẳng vào bảng: cổng `addPoint()` chặn mức không vận hành, mà ở
  * đây cần dữ liệu đã tồn tại sẵn (nhóm lô bị dừng SAU khi đã nhập, hoặc dữ
- * liệu di trú). */
+ * liệu được nạp sẵn). */
 function scenario({ groupBStatus = '', groupBActive = 1, panelActive = 1 } = {}) {
   const db = openDatabase(':memory:');
   const config = createConfigHandlers(db);
@@ -95,7 +94,6 @@ function assertSymmetric({ westgard, entry, test }, label) {
 // 2) Nhóm lô của mức 2 không còn vận hành (3 nhánh) — mức đó phải rời khỏi
 //    đánh giá liên mức ở CẢ HAI trang, nên mức 1 chỉ còn cảnh báo `1-2s`.
 //    Đây chính là ca lệch đo được trước bản sửa: Entry `rej [1-2s,2-2s]` vs
-//    Westgard `warn [1-2s]`.
 for (const state of [{ groupBStatus: 'stopped' }, { groupBStatus: 'planned' }, { groupBStatus: '', groupBActive: 0 }]) {
   const label = `nhóm lô mức 2 = ${JSON.stringify(state)}`;
   const s = scenario(state);
@@ -105,9 +103,8 @@ for (const state of [{ groupBStatus: 'stopped' }, { groupBStatus: 'planned' }, {
   assertSymmetric(s, label);
 }
 
-// 3) Panel QC tắt: app cũ giữ mức trong danh sách nhưng không đánh giá điểm
-//    nào. Trước bản sửa, cây Nhập QC nói "0 điểm / Đạt" trong khi bảng
-//    worksheet cùng màn hình vẫn chấm "Loại bỏ".
+// 3) Panel QC tắt: mức vẫn có trong danh sách nhưng không đánh giá điểm nào.
+//    Cây Nhập QC phải nói "0 điểm / Đạt" nhất quán với bảng worksheet.
 {
   const s = scenario({ panelActive: 0 });
   assert.deepEqual(s.entry.queryPoints(s.test.id, 1), [], 'Panel tắt thì Nhập QC không đánh giá điểm nào');
@@ -133,3 +130,5 @@ for (const state of [{ groupBStatus: 'stopped' }, { groupBStatus: 'planned' }, {
 }
 
 console.log('app Entry ↔ Westgard symmetry tests passed');
+
+

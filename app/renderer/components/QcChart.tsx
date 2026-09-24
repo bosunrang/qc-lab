@@ -1,20 +1,6 @@
 import { qcRunKey, compareQcRunKey } from '../../main/domain/sort-order';
-// Biểu đồ Levey-Jennings + CUSUM dùng chung.
-//
-// LỊCH SỬ: bản đầu (Giai đoạn A1) cố ý "vẽ lại từ đầu, giống nội dung không
-// giống cách vẽ" — chỉ có 7 đường kẻ ±SD và đường nối điểm. Khi đối chiếu
-// thật với app cũ ở Giai đoạn D (2026-09-03) thì đó là chỗ lệch hình LỚN NHẤT
-// của trang Nhập QC: app cũ có dải màu ±1/±2/±3SD, nhãn trục Y HAI BÊN (bậc SD
-// bên trái, GIÁ TRỊ THẬT bên phải), nhãn ngày ở trục X và tiêu đề trong khung
-// vẽ. Gate `app:ui-parity` không thấy vì nó chỉ đo class + dòng chữ trong
-// DOM, còn toàn bộ biểu đồ nằm trong bitmap canvas.
-//
-// Bản này port ĐÚNG hình học/màu/nhãn của app cũ (`leveyJenningsGeometry`,
-// `leveyJenningsBandRects`, `LEVEY_JENNINGS_COLORS`,
-// `createLeveyJenningsYAxisLabels`, `leveyJenningsGridLines`,
-// `createLeveyJenningsTicks` trong `src/presentation/chart/`) — vẫn dựng bằng
-// canvas ref chuẩn React thay vì thao tác DOM tay như `qc-chart-renderer.ts`,
-// nhưng các con số hình học không còn là "tự nghĩ".
+// Biểu đồ Levey-Jennings và CUSUM dùng chung. Levey-Jennings có dải màu
+// ±1/±2/±3SD, nhãn bậc SD bên trái, giá trị thật bên phải và nhãn ngày trục X.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { vnDate, vnDayMonth } from '../lib/format';
 
@@ -44,7 +30,7 @@ export interface QcChartCusum {
 type LjHover = { left: number; top: number; level?: number; lot?: string; point: QcChartPoint };
 const VERDICT_TEXT: Record<QcChartPoint['verdict'], string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
 
-/** Tooltip điểm QC kiểu app cũ. Canvas không có phần tử điểm riêng để browser
+/** Tooltip điểm QC. Canvas không có phần tử điểm riêng để browser
  * tự hover, nên hit-test bằng đúng hình học đang dùng khi vẽ. */
 function LjTooltip({ hit, decimals = 2 }: { hit: LjHover | null; decimals?: number }) {
   if (!hit) return null;
@@ -65,7 +51,7 @@ function LjTooltip({ hit, decimals = 2 }: { hit: LjHover | null; decimals?: numb
   </div>;
 }
 
-/** Màu app cũ — `LEVEY_JENNINGS_COLORS`, copy nguyên giá trị. */
+/** Bảng màu chuẩn của biểu đồ Levey-Jennings. */
 const LJ = {
   okBand: '#e8f6ef', okMid: '#ffffff', warnBand: '#fff3cf', rejectBand: '#f9d6d5',
   grid: '#5d6b76', mean: '#17212b', line: '#0e8f8f',
@@ -87,7 +73,7 @@ const CUSUM_COLORS = { pos: '#0b747d', neg: '#4f789d', warn: '#dd8b1f', rej: '#c
 
 export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, height = 220, responsiveHeight = false, className }: {
   mode: 'lj' | 'cusum'; points: QcChartPoint[]; cusum?: QcChartCusum;
-  /** Mean/SD ĐÍCH của mức — cần để in giá trị thật ở trục Y bên phải như app cũ. */
+  /** Mean/SD đích của mức, dùng để in giá trị thật ở trục Y bên phải. */
   mean?: number | null; sd?: number | null; lot?: string; decimals?: number;
   height?: number; responsiveHeight?: boolean; className?: string;
 }) {
@@ -117,15 +103,9 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
       : height;
     const dpr = window.devicePixelRatio || 1;
     // CHỈ đặt độ phân giải bitmap (thuộc tính `width`/`height`, không phải
-    // CSS `style.width/height`) — kích thước HIỂN THỊ do CSS `width:100%`
-    // dưới JSX quyết định, KHÔNG phụ thuộc hàm này có chạy lại kịp hay
-    // không. Trước đây gán cứng `canvas.style.width='Npx'` mỗi lần vẽ: nếu
-    // vì lý do gì đó (ResizeObserver/resize không kích hoạt) hàm này không
-    // chạy lại, ô canvas bị KẸT ở đúng bề rộng cũ, để lại khoảng trắng lớn
-    // bên cạnh dù khung chứa đã rộng ra thật — đúng lỗi người dùng gặp phải.
-    // Giờ nếu lỡ không vẽ lại kịp, canvas vẫn co giãn ĐÚNG THEO CSS (trình
-    // duyệt tự giãn bitmap cũ cho khớp khung, có thể hơi mờ tạm thời), không
-    // còn bị kẹt nhỏ.
+    // CSS `style.width/height`) — kích thước hiển thị do CSS `width:100%`
+    // dưới JSX quyết định. Không gán `canvas.style.width` tại đây để canvas
+    // vẫn co giãn theo khung chứa khi kích thước thay đổi.
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(renderHeight * dpr);
     const ctx = canvas.getContext('2d');
@@ -198,9 +178,13 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
     setLjHover({ left: Math.max(12, left), top: Math.max(12, top), lot, point: hit });
   }, []);
 
+  const chartAriaLabel = mode === 'lj'
+    ? `Biểu đồ Levey-Jennings${lot ? ` lô ${lot}` : ''}, ${points.length} điểm QC trong khoảng xem.`
+    : `Biểu đồ CUSUM, ${points.length} điểm QC trong khoảng xem.`;
+
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>
-      <canvas ref={canvasRef} className={className} onPointerMove={(event) => { updateCusumTooltip(event); updateLjTooltip(event); }}
+      <canvas ref={canvasRef} className={className} role="img" aria-label={chartAriaLabel} onPointerMove={(event) => { updateCusumTooltip(event); updateLjTooltip(event); }}
         onPointerLeave={() => { if (canvasRef.current) canvasRef.current.title = ''; setLjHover(null); }}
         style={{ width: '100%', height: responsiveHeight ? 'auto' : height, display: 'block' }} />
       <LjTooltip hit={ljHover} decimals={decimals} />
@@ -208,7 +192,7 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
   );
 }
 
-/** Hình học app cũ — `leveyJenningsGeometry`: chừa 56px bên trái cho bậc SD,
+/** Hình học biểu đồ: chừa 56px bên trái cho bậc SD,
  * 78px bên phải cho giá trị thật, 34px trên cho tiêu đề, 48px dưới cho ngày;
  * trục Y phủ ±3.25SD (rộng hơn ±3 để dải "ngoài 3SD" có chỗ hiện). */
 function geometry(width: number, height: number, count: number, mean: number, sd: number) {
@@ -242,7 +226,7 @@ function plotValue(point: QcChartPoint, hasTarget: boolean, mean: number, sd: nu
   return Number.isFinite(point.z) ? mean + point.z * sd : point.val;
 }
 
-/** Nhãn trục X app cũ — `createLeveyJenningsTicks`: tối đa 5 mốc, nhãn dd/mm. */
+/** Nhãn trục X: tối đa 5 mốc, định dạng dd/mm. */
 function ticksOf(points: QcChartPoint[], maxTicks = 5) {
   const count = points.length;
   if (!count) return [] as { index: number; label: string }[];
@@ -259,8 +243,7 @@ function drawLJ(
   ctx: CanvasRenderingContext2D, width: number, height: number,
   points: QcChartPoint[], meanIn?: number | null, sdIn?: number | null, decimals = 2,
 ) {
-  // Không có Mean/SD đích thì vẽ theo thang z (mean 0, sd 1) — cùng cách app cũ
-  // vẽ biểu đồ tổng hợp nhiều mức (`drawLJMultiZ`).
+  // Không có Mean/SD đích thì vẽ theo thang z (mean 0, sd 1).
   const hasTarget = meanIn != null && sdIn != null && sdIn > 0;
   const mean = hasTarget ? (meanIn as number) : 0;
   const sd = hasTarget ? (sdIn as number) : 1;
@@ -349,8 +332,7 @@ function drawLJ(
   for (const tick of ticksOf(points)) ctx.fillText(tick.label, x(tick.index), padT + ch + 10);
 }
 
-/** Màu theo MỨC cho biểu đồ tổng hợp nhiều mức — `LEVEY_JENNINGS_MULTI_COLORS`
- * app cũ, copy nguyên giá trị (`src/presentation/chart/levey-jennings-multi-colors.ts`). */
+/** Màu theo mức cho biểu đồ tổng hợp nhiều mức. */
 const MULTI_COLORS = ['#0e8f8f', '#7a4f9a', '#c47d12', '#2f7d5b', '#5369a6', '#9a5b3c'];
 const MULTI_CUSUM_COLORS = [
   ['#0e8f8f', '#5369a6'], ['#7a4f9a', '#c47d12'], ['#2f7d5b', '#9a5b3c'],
@@ -360,10 +342,8 @@ const MULTI_CUSUM_COLORS = [
  * "Xem lô cũ"): thiếu nó chú giải in "Mức 1" hai lần với hai màu. */
 export interface QcMultiLevelSeries { level: number; lot?: string; label?: string; points: QcChartPoint[] }
 
-/** Biểu đồ "Levey-Jennings tổng hợp" — quy đổi MỌI mức về Z-score để so sánh
- * trên cùng trục, mỗi mức 1 màu (port `drawLJMultiZ` app cũ, đơn giản hoá
- * trục X: thay vì gộp theo "run" thật, dùng trục theo NGÀY chung của mọi mức
- * — cùng tinh thần "giống nội dung, khác cách vẽ" đã áp dụng cho `drawLJ`).
+/** Biểu đồ "Levey-Jennings tổng hợp" — quy đổi mọi mức về Z-score để so sánh
+ * trên cùng trục, mỗi mức một màu. Trục X dùng ngày chung của mọi mức.
  * Chỉ hiện khi có ≥2 mức (trang gọi component này có điều kiện đó). */
 export function QcMultiChart({ series, height = 220, responsiveHeight = false, className, decimals = 2 }: { series: QcMultiLevelSeries[]; height?: number; responsiveHeight?: boolean; className?: string; decimals?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -524,7 +504,7 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
   const tickIdx = total === 1 ? [0] : [...new Set(Array.from({ length: total }, (_, i) => Math.round((i * (n - 1)) / (total - 1))))];
   for (const i of tickIdx) { const raw = dates[i].split('\u0000')[0]; ctx.fillText(vnDayMonth(raw, raw.slice(0, 5)), x(i), padT + ch + 10); }
 
-  // Chú giải màu theo mức — `leveyJenningsLegendLayout` app cũ.
+  // Chú giải màu theo mức.
   let lx = padL + 8; const ly = 10;
   ctx.font = '800 11.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   series.forEach((s, li) => {
@@ -571,7 +551,7 @@ function drawCusum(ctx: CanvasRenderingContext2D, width: number, height: number,
   }
   const x = (i: number) => (n <= 1 ? padL + cw / 2 : padL + markPad + (i / (n - 1)) * (cw - markPad * 2));
   // Khi có nhiều tháng dữ liệu, giữ biểu đồ nhẹ nhưng không bao giờ bỏ điểm
-  // vượt ngưỡng; cùng nguyên tắc display-plan của app cũ.
+  // vượt ngưỡng.
   const maxPoints = Math.max(80, Math.floor(Math.max(240, cw / 2) / 3));
   const sampled = n <= maxPoints ? Array.from({ length: n }, (_, i) => i) : (() => {
     const keep = new Set<number>([0, n - 1]);
@@ -702,3 +682,5 @@ function drawMultiCusum(ctx: CanvasRenderingContext2D, width: number, height: nu
     for (const [label, color] of [[`M${item.level}+`, positive], [`M${item.level}−`, negative]] as const) { ctx.fillStyle = color; ctx.fillRect(lx, ly - 2, 14, 4); ctx.fillStyle = '#17212b'; ctx.fillText(label, lx + 20, ly); lx += 20 + ctx.measureText(label).width + 12; }
   });
 }
+
+

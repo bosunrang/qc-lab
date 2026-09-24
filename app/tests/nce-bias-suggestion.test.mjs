@@ -10,3 +10,5 @@ assert.deepEqual(latestNceSigmaBias(periods, 1), { value: 1.8, period: '2026-05'
 assert.equal(latestNceSigmaBias(periods, 2), null, 'kỳ mới nhất chưa có Bias thì không lùi về kỳ cũ');
 assert.equal(latestNceSigmaBias(periods, 0), null, 'mức QC không hợp lệ không được gợi ý');
 console.log('app nce-bias-suggestion tests passed');
+
+

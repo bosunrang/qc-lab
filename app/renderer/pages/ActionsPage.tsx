@@ -1,7 +1,3 @@
-// Khắc phục sự cố (NCE/CAPA): protocol-v3 8 phần port theo luồng app cũ
-// (nhận diện → kiểm soát → FMEA → checklist → nguyên nhân/hành động →
-// release → ảnh hưởng bệnh nhân → hiệu lực/rủi ro còn lại). JSX chỉ giữ
-// state trình bày; điều kiện khép vòng được xác thực lại ở main process.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
@@ -20,9 +16,9 @@ import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
 import type { NceBiasSuggestion } from '../../main/domain/nce-bias-suggestion';
 import { errorClass, normalizeErrorClass } from '../../main/domain/westgard-rules';
 
-/** Nhãn trạng thái NGẮN của app cũ (`reportLabels.stateName`). */
+/** Nhãn trạng thái NGẮN của hệ thống (`reportLabels.stateName`). */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
-/** `vnDate()` app cũ. */
+/** `vnDate()` hệ thống. */
 const vnDate = (iso: string) => formatVnDate(iso, '—');
 
 const GUIDE_STEPS = [
@@ -53,7 +49,7 @@ export function ActionsPage() {
   const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
 
-  /** Hủy hồ sơ ngay từ bảng nhật ký — app cũ có nút này trên từng dòng. Hủy
+  /** Hủy hồ sơ ngay từ bảng nhật ký — hệ thống có nút này trên từng dòng. Hủy
    * CÓ LƯU VẾT (soft-delete + lý do), không xoá dữ liệu. */
   async function cancelRecord(id: string) {
     const note = 'Hủy từ bảng nhật ký';
@@ -81,14 +77,6 @@ export function ActionsPage() {
   const testName = (id: string | null) => tests.find((t) => t.id === id)?.name ?? '(không rõ)';
   const detailRecord = store.records.find((r) => r.id === detailId) || null;
 
-  // "Sự cố cần xử lý" — mọi mức đang cảnh báo/vi phạm (từ Westgard) mà CHƯA
-  // có hồ sơ NCE nào còn active gắn đúng test+mức đó, giống bố cục
-  // "IssuesPanel" bản cũ. Không domain/IPC mới — chỉ lọc lại 2 nguồn dữ liệu
-  // đã có sẵn (testSummaries + NCE records), giữ đúng nguyên tắc "không domain
-  // mới nếu đã có API phù hợp" đã dùng cho Dashboard/Westgard.
-  // Gom theo XÉT NGHIỆM + NGÀY của điểm mới nhất, đúng `issue-group` app cũ.
-  // KHÔNG lọc bỏ mức đã có hồ sơ NCE: app cũ vẫn hiện dòng đó, chỉ đổi nút
-  // thành "Tiếp tục hồ sơ" — ẩn đi là mất cảnh báo đang tồn tại.
   const issueGroups = useMemo(() => {
     const groups: {
       key: string; testName: string; date: string; severity: 'warn' | 'rej'; count: number;
@@ -102,7 +90,7 @@ export function ActionsPage() {
       const items = s.levels
         .filter((lv) => (lv.latestVerdict === 'warn' || lv.latestVerdict === 'rej') && lv.latest)
         .map((lv) => {
-          // App cũ gắn hồ sơ với dòng sự cố theo ĐIỂM QC (`pointId`), không
+          // hệ thống gắn hồ sơ với dòng sự cố theo ĐIỂM QC (`pointId`), không
           // theo test+mức: một hồ sơ chưa gắn điểm nào thì dòng vi phạm vẫn
           // hiện "Chưa ghi khắc phục" và nút "Lập hồ sơ".
           const open = lv.latest
@@ -332,7 +320,7 @@ function NceSelect({ value, onChange, options, disabled = false }: { value: stri
   return <select disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>;
 }
 
-/** Form protocol-v3 đặt ngay trong panel như app cũ. Modal chỉ còn dùng cho
+/** Form protocol-v3 đặt ngay trong panel như hệ thống. Modal chỉ còn dùng cho
  * xem chi tiết/bằng chứng, tránh một form dài bị bó hẹp trong cửa sổ popup. */
 function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | null; record: NceRecord | null; onClose: () => void }) {
   const { tests } = useManageStore(); const store = useNceStore();
@@ -575,3 +563,5 @@ function errorClassLabel(value: unknown): string {
   const kind = normalizeErrorClass(value);
   return kind === 'SE' ? 'Sai số hệ thống' : kind === 'RE' ? 'Sai số ngẫu nhiên' : 'Chưa phân loại';
 }
+
+

@@ -1,17 +1,3 @@
-// SHA-256 thuần JavaScript, ĐỒNG BỘ — bản dùng trong trình duyệt.
-//
-// Vì sao không dùng WebCrypto: `crypto.subtle.digest` là async, còn
-// `writeAudit()`/`auditEntryHash()`/`verifyAuditChain()` đều đồng bộ và được
-// gọi từ trong transaction SQLite — đổi chúng sang async sẽ lan ra toàn bộ
-// 16 file handler. Xem `sha256.ts` để biết bản main process.
-//
-// Vì sao không port nguyên bản nén của app cũ (`src/domain/core/qc-core.ts`'s
-// `auditSha256Core`): bản đó dùng `unescape(encodeURIComponent(...))` (API đã
-// deprecated) và viết một dòng theo quy ước code dày đặc của app cũ. Bản dưới
-// đây viết rõ ràng theo FIPS 180-4 và dùng `TextEncoder`; đúng đắn được bảo
-// đảm bằng `app/tests/sha256-parity.test.mjs` — đối chiếu từng input với
-// `node:crypto` (oracle), gồm cả tiếng Việt nhiều byte, chuỗi rỗng và chuỗi
-// dài hơn một block.
 
 /** Hằng số K của SHA-256: 32 bit đầu của phần thập phân căn bậc ba 64 số
  * nguyên tố đầu tiên (FIPS 180-4 §4.2.2). */
@@ -100,3 +86,5 @@ export function sha256Bytes(message: Uint8Array): Uint8Array {
   for (let i = 0; i < 8; i++) outView.setUint32(i * 4, h[i]);
   return out;
 }
+
+

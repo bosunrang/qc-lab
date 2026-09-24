@@ -3,13 +3,12 @@ import { AppRouter } from './router';
 import { installBrowserMockIfNeeded } from './browser-mock/install';
 import { createLanHttpApi } from './lan/http-api';
 
-// Chỉ cài khi KHÔNG chạy trong Electron thật (vd `vite dev` mở qua
-// localhost) — xem docs/APP-V2-PLAN.md mục "Xem qua localhost". Trong
-// Electron, hàm này trả `false` ngay lập tức (không nạp WASM, không tốn gì).
+// Chỉ cài khi không chạy trong Electron thật, ví dụ `vite dev` mở qua
+// localhost. Ở Electron, hàm này trả `false` ngay lập tức (không nạp WASM,
+// không tốn gì).
 //
 // PHẢI `await`: bản xem trước mở SQLite thật bằng sql.js/WASM nên việc dựng
 // `window.qcApi` là bất đồng bộ. Render trước khi nó xong thì mọi trang thấy
-// `window.qcApi === undefined`.
 const rootEl = document.getElementById('root');
 
 async function start(): Promise<void> {

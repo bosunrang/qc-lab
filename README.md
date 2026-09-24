@@ -5,7 +5,7 @@ tiếng Việt: Westgard, Six Sigma, Levey–Jennings, CUSUM, so sánh lô thu�
 hồ sơ khắc phục và audit trail.
 
 Mã nguồn hiện hành là **app**: Electron hai tiến trình, React và SQLite.
-Mã nguồn app cũ đã được loại khỏi repository.
+Mã nguồn sản phẩm nằm trong thư mục `app/`.
 
 ## Phát triển
 

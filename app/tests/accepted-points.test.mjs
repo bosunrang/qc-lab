@@ -1,5 +1,4 @@
-// Oracle cho `acceptedPoints()` — chuỗi điểm ĐƯỢC CHẤP NHẬN của 1 mức QC
-// (Giai đoạn D3.5). Port từ `src/domain/qc/accepted-lot-points.ts` app cũ:
+// Oracle cho `acceptedPoints()` — chuỗi điểm được chấp nhận của một mức QC:
 // điểm làm nổ luật LOẠI BỎ không được vào chuỗi VÀ không tính vào cửa sổ
 // đánh giá các điểm sau — nhờ vậy 1 lần chạy bị loại không "làm bẩn" chuỗi.
 //
@@ -66,8 +65,7 @@ assert.deepEqual(acceptedPoints([], MEAN, SD), []);
 //
 //    Bản đầu dùng Mean/SD chung nên sau khi ai đó sửa Mean/SD của mức, một
 //    điểm có thể hiện "Loại bỏ" mà vẫn `accepted:true`. Lệch này chỉ lộ ra
-//    khi đối chiếu trực tiếp với app cũ (cross-app-westgard-sigma.test.mjs);
-//    nhóm dưới đây giữ nó bị canh cả sau khi app cũ được cắt bỏ.
+//    nhóm dưới đây giữ hành vi này ổn định.
 {
   // Điểm 106 lệch +3SD theo snapshot của chính nó (mean 100, sd 2) → phải bị
   // loại, DÙ Mean/SD hiện hành (mean 106, sd 2) khiến nó nằm đúng tâm.
@@ -87,3 +85,5 @@ assert.deepEqual(acceptedPoints([], MEAN, SD), []);
 }
 
 console.log('accepted-points: 7 nhom kiem tra dat.');
+
+

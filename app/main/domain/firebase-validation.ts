@@ -57,3 +57,5 @@ export function cleanFirebaseEmail(value: unknown): string {
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Nhập email Firebase Authentication hợp lệ.');
   return email;
 }
+
+

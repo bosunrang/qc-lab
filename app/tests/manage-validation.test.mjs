@@ -14,7 +14,6 @@ const {
   appendMeanSdHistory, validateLot, validateLotGroup, validatePanel, validateLotTransition,
 } = require('../../app-dist/main/domain/manage-validation.js');
 
-// prepareInstrument
 {
   const p = prepareInstrument({ name: '  Máy A  ', active: undefined });
   assert.equal(p.name, 'Máy A');
@@ -22,7 +21,6 @@ const {
   assert.equal(prepareInstrument({ active: false }).active, false);
 }
 
-// validateInstrument
 {
   const missing = validateInstrument({ name: '' }, []);
   assert.equal(missing.ok, false);
@@ -37,7 +35,6 @@ const {
   assert.equal(ok.data.name, 'Máy B');
 }
 
-// validateTest
 {
   const knownIds = new Set(['I1']);
   const noInstrument = validateTest({ name: 'Glucose', instrumentId: 'I2' }, knownIds, []);
@@ -48,9 +45,6 @@ const {
   assert.equal(dup.ok, false);
   assert.equal(dup.code, 'duplicate-name');
 
-  // TEa âm phải BỊ CHẶN rõ ràng ('invalid-tea'), không âm thầm kẹp về 0 —
-  // port đúng `validateAssay()` app cũ ("TEa không được âm."). Trước đây
-  // app kẹp về 0 và vẫn cho lưu, một bug thật tìm được khi audit.
   const negativeTea = validateTest({ name: 'Ure', instrumentId: 'I1', tea: -1 }, knownIds, ['Glucose']);
   assert.equal(negativeTea.ok, false);
   assert.equal(negativeTea.code, 'invalid-tea');
@@ -79,7 +73,6 @@ const {
   assert.equal(cusumValid.cusumH, 6);
 }
 
-// prepareTestLevel / validateTestLevel
 {
   const p = prepareTestLevel({ level: 9, mean: '5.5', sd: '0.1' });
   assert.equal(p.level, 6, 'level phải bị kẹp về tối đa 6');
@@ -97,8 +90,6 @@ const {
   assert.equal(validateTestLevel({ level: 1, mean: 5, sd: 0.2, low: 6, high: 4 }).code, 'invalid-range');
   assert.equal(validateTestLevel({ level: 1, qcLotId: 'L1' }).code, 'missing-target');
 
-  // saveTestLevel la UPSERT theo (testId, level) - luu lai DUNG mot muc da
-  // ton tai (vi du Muc 1 tu tao luc them xet nghiem) khong con bi coi la loi.
   const resave = validateTestLevel({ level: 1, mean: 6, sd: 0.3 });
   assert.equal(resave.ok, true);
 
@@ -121,7 +112,6 @@ const {
   assert.equal(JSON.parse(third).length, 2, 'mỗi lần đổi thật sự phải cộng dồn, không ghi đè');
 }
 
-// validateLot
 {
   const missing = validateLot({ lotNo: '' });
   assert.equal(missing.ok, false);
@@ -148,7 +138,6 @@ const {
   assert.equal(automaticName.data.name, '1101/1102', 'tên trống phải dùng tên tự sinh từ các số lô');
 }
 
-// validatePanel
 {
   const knownIds = new Set(['I1']);
   const noInstrument = validatePanel({ name: 'Panel A' }, knownIds);
@@ -160,7 +149,6 @@ const {
   assert.deepEqual(ok.data.testIds, ['T1', 'T2']);
 }
 
-// validateLotTransition
 {
   const sameLot = validateLotTransition({ panelId: 'P1', fromLotId: 'L1', toLotId: 'L1' });
   assert.equal(sameLot.ok, false);
@@ -175,3 +163,5 @@ const {
 }
 
 console.log('app manage-validation tests passed');
+
+

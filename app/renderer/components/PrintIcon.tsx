@@ -1,6 +1,3 @@
-// Icon máy in cho nút "Tạo báo cáo & In" — copy nguyên path SVG từ
-// `src/react/components/PrintIcon.tsx` của app cũ (Giai đoạn D3.2), không
-// tự vẽ lại.
 export function PrintIcon() {
   return (
     <svg className="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -11,3 +8,5 @@ export function PrintIcon() {
     </svg>
   );
 }
+
+

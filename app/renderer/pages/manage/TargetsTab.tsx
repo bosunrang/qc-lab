@@ -35,15 +35,11 @@ export function TargetsTab() {
     () => lots.filter((lot) => !selectedGroup || selectedGroup.lotIds.includes(lot.id)),
     [lots, selectedGroup],
   );
-  /** Các mức QC lấy từ CHÍNH các lô của nhóm lô đang chọn — port
-   * `targetLevelSelection(groupLots, …)` app cũ. Trước 2026-09-03 app lấy
-   * từ những mức ĐÃ TỒN TẠI trong `test_levels`, mà xét nghiệm mới chỉ được
-   * tạo sẵn Mức 1 — nên nhóm lô 2 mức vẫn chỉ hiện tab "Mức 1" và không có
-   * đường nào nhập Mean/SD cho Mức 2 (bẫy con-gà-quả-trứng). */
+
   const groupLevels = useMemo(() => [...new Set(groupLots.map((lot) => lot.level).filter((value) => Number.isFinite(value)))]
     .sort((left, right) => left - right), [groupLots]);
   const levelLots = groupLots.filter((lot) => lot.level === level);
-  // Mức đang chọn phải luôn nằm trong các mức của nhóm lô (app cũ:
+  // Mức đang chọn phải luôn nằm trong các mức của nhóm lô (hệ thống:
   // `targetLevelSelection()` tự rơi về mức đầu tiên khi mức hiện tại không
   // còn hợp lệ, ví dụ vừa đổi sang nhóm lô chỉ có Mức 2).
   useEffect(() => {
@@ -62,9 +58,7 @@ export function TargetsTab() {
   const empty = rows.filter(({ target }) => !target?.qc_lot_id).length;
   const missing = rows.filter(({ target }) => target?.mean == null || target?.sd == null || target.sd <= 0).length;
 
-  /** Bỏ tick 1 hàng thì khoá luôn 4 ô số của hàng đó (port
-   * `toggleTargetRow()` app cũ) — người dùng thấy ngay hàng nào sẽ không được
-   * lưu, thay vì phải nhớ. */
+
   function toggleTargetRow(box: HTMLInputElement) {
     const row = box.closest('.target-row');
     if (!row) return;
@@ -81,12 +75,12 @@ export function TargetsTab() {
   }
 
   /** Lưu cả mức: đọc DOM từng hàng đang tick → chuẩn hoá qua
-   * `normalizeTargetPick()` (cùng công thức/câu chữ app cũ) → nếu có hàng
-   * đang gắn LÔ KHÁC thì hỏi trước (app cũ mở modal "chuyển lô") → xác thực
+   * `normalizeTargetPick()` (cùng công thức/câu chữ hệ thống) → nếu có hàng
+   * đang gắn LÔ KHÁC thì hỏi trước (hệ thống mở modal "chuyển lô") → xác thực
    * lại mật khẩu → ghi từng mức qua `config:saveTestLevel` (chính handler đó
    * tự chốt Mean/SD cũ vào `mean_sd_history_json`).
    *
-   * KHÁC app cũ có chủ đích: app cũ còn "điền lô/Mean-SD cho điểm QC cũ chưa
+   * KHÁC hệ thống có chủ đích: hệ thống còn "điền lô/Mean-SD cho điểm QC cũ chưa
    * ghi lô" (`targetPickBackfillPoints`) và hỏi thêm nếu việc đó đụng kỳ đã
    * khoá. app KHÔNG cần: từ Giai đoạn B2, `entry:addPoint` đã chốt
    * `qc_mean`/`qc_sd`/`lot` vào từng điểm ngay lúc nhập, nên không có điểm
@@ -94,11 +88,6 @@ export function TargetsTab() {
   async function saveTargetMatrix() {
     const rowEls = [...document.querySelectorAll<HTMLElement>('.target-table .target-row')];
     const picked: { testId: string; level: number; mean: number; sd: number; low: number | null; high: number | null; qcLotId: string; name: string; switching: boolean }[] = [];
-    // Bỏ tick 1 hàng ĐANG THẬT SỰ gắn đúng lô của hàng đó (không phải hàng
-    // "chưa gán"/"đang gắn lô khác") thì GỠ hẳn liên kết lô — port
-    // `applyTargetPick()`'s nhánh `!pick.use` app cũ: `linked` (mức đang gắn
-    // ĐÚNG lô đang xét) mới bị gỡ, giữ nguyên Mean/SD đã có. Trước đây bỏ
-    // tick chỉ khoá ô nhập trên giao diện, không đụng gì tới DB.
     const unlink: { testId: string; level: number; mean: number | null; sd: number | null; low: number | null; high: number | null }[] = [];
     for (const row of rowEls) {
       const use = row.querySelector<HTMLInputElement>('.tm-use');
@@ -127,9 +116,6 @@ export function TargetsTab() {
     if (!picked.length && !unlink.length) { await infoDialog('Chưa chọn xét nghiệm nào để lưu Mean/SD.', { title: 'Chưa lưu được Mean/SD' }); return; }
 
     const switching = picked.filter((item) => item.switching);
-    // 3 đường đi khi mức QC đang gắn lô của nhóm KHÁC — port nguyên văn
-    // `targetSwitchModalHtml()` app cũ (Hủy / Dự kiến / Chuyển qua nhóm lô
-    // này), không phải `confirmDialog` 2 nút.
     let mode: 'switch' | 'planned' = 'switch';
     if (switching.length) {
       const choice = await choiceDialog({
@@ -179,7 +165,7 @@ export function TargetsTab() {
     }
   }
 
-  /** Nhãn ô chọn Panel QC gồm cả tên máy như app cũ ("Panel Hóa sinh ·
+  /** Nhãn ô chọn Panel QC gồm cả tên máy như hệ thống ("Panel Hóa sinh ·
    * EasyLyte Expand") — cùng một tên panel có thể tồn tại trên 2 máy. */
   const panelLabel = (item: QcPanel) => {
     const instrument = instruments.find((machine) => machine.id === item.instrument_id);
@@ -206,7 +192,7 @@ export function TargetsTab() {
               const ready = target?.mean != null && target?.sd != null && target.sd > 0;
               const linkedLot = target ? groupLots.find((lot) => lot.id === target.qc_lot_id) : undefined;
               // Ưu tiên lô đang gắn; nếu chưa gắn thì chọn lô còn dùng đầu
-              // tiên của mức. `targetRowState()` app cũ khoá lô `depleted`.
+              // tiên của mức. `targetRowState()` hệ thống khoá lô `depleted`.
               const rowLot = linkedLot || levelLots.find((lot) => !lot.depleted) || levelLots[0];
               const locked = !!rowLot?.depleted;
               // Số DỰ KIẾN (nếu có) là thứ phải hiện trong 4 ô, không phải số
@@ -229,15 +215,6 @@ export function TargetsTab() {
               // phải cảm nhận (tái hiện: đổi Mức 1 → Mức 2, ô Mean/SD vẫn là
               // số của Mức 1).
               const lotId = rowLot?.id || target?.qc_lot_id || '';
-              // Tick mặc định — port `targetRowState()` app cũ:
-              // `checked = locked ? false : !!linked || !assigned`. Hàng đang
-              // gắn LÔ KHÁC (`status==='other'`, không phải lô của nhóm đang
-              // chọn) mặc định BỎ TICK — trước đây LUÔN tick sẵn, khiến bấm
-              // "Lưu Mean/SD mức này" vô tình chuyển cả những xét nghiệm KHÔNG
-              // liên quan sang lô của nhóm đang xem.
-              // Hàng đã có số dự kiến thì mặc định TICK sẵn — nếu không, bấm
-              // "Lưu Mean/SD mức này" sẽ âm thầm bỏ qua đúng thứ người dùng
-              // vừa chuẩn bị lần trước.
               const checked = !locked && (!target?.qc_lot_id || !!linkedLot || !!planned);
               const shownMean = planned ? planned.mean : target?.mean;
               const shownSd = planned ? planned.sd : target?.sd;
@@ -266,3 +243,5 @@ export function TargetsTab() {
 }
 
 // ---------------- Chuyển tiếp lô ----------------
+
+

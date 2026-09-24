@@ -55,8 +55,8 @@ test('SG01: actual Add period sends an enum for each TEa source, with per-level 
   }
 });
 
-test('SG01b: sửa kỳ cũ dùng nguồn TEa hiện hành nếu mã snapshot đã lỗi thời', async () => {
-  const teaSources = section(page, 'const TEA_SOURCES', '/** `formatSigmaDpmo()');
+test('SG01b: sửa kỳ dùng nguồn TEa hiện hành nếu mã snapshot không hợp lệ', async () => {
+  const teaSources = section(page, 'const TEA_SOURCES', 'function formatDpmo');
   const saveOwned = section(page, '  function saveOwnedPeriod(', '  function periodTeaText(');
   let payload;
   const save = evaluate(teaSources + saveOwned + '\nsaveOwnedPeriod', {
@@ -85,7 +85,7 @@ test('SG02/11: actual blur handlers preserve unchanged values; switching test re
   period.levels[0].cvSource = 'iqc-cohort';
   const payload = section(page, '  function levelPayload(', '  function periodTeaText(');
   const cv = section(page, '  async function commitCv(', '  /** Kỳ mới');
-  const bias = section(page, '  async function commitBias(', '  async function setTracking(');
+  const bias = section(page, '  async function commitBias(', '  if (!sigmaTests.length)');
   let calls = 0, confirmations = 0, accept = false;
   const currentTest = { current: period.testId };
   const methods = evaluate(payload + cv + bias + '\n({commitCv,commitBias})', {
@@ -114,7 +114,7 @@ test('SG03: blank EQA is not zero; actual zero stays valid; partial objects cann
   assert.equal(zero.hasIncompleteRound, false);
   assert.equal(save([{ level: 1, cv: 1, eqaRounds: zero.parsedRounds }]).data.levels[0].biasEqa, -100);
   assert.equal(save([{ level: 1, eqaRounds: [{ lab: '', target: 100, bias: 0 }] }]).ok, false);
-  assert.equal(save([{ level: 1, eqaRounds: [{ lab: null, target: null, bias: -2 }] }]).ok, true);
+  assert.equal(save([{ level: 1, eqaRounds: [{ lab: null, target: null, bias: -2 }] }]).ok, false);
 });
 
 test('SG03c: Bias RMS giữ thêm trung bình có dấu để truy xuất hướng lệch', t => {
@@ -123,7 +123,8 @@ test('SG03c: Bias RMS giữ thêm trung bình có dấu để truy xuất hướ
   assert.equal(result.data.levels[0].biasEqa, Math.sqrt(17));
   assert.equal(result.data.levels[0].biasMean, -4, 'RMS là độ lớn; trung bình có dấu phải còn để truy xuất');
   assert.match(page, /Bias RMS EQA\/EQC/);
-  assert.match(page, /Bias TB có dấu%/);
+  const printReport = readFileSync(new URL('../renderer/lib/sigma-print-report.ts', import.meta.url), 'utf8');
+  assert.match(printReport, /Bias TB có dấu%/);
 });
 
 test('SG03b: lỗi nhập Bias dùng thông báo trung tâm, không chen vào phía trên bảng', () => {
@@ -153,9 +154,9 @@ test('SG05: EFLM survives source switches; old shared value is never migrated as
   assert.equal(resolveTea(restored, [], [], 'eflm').value, 10);
   db.exec('ALTER TABLE tests DROP COLUMN eflm_tea');
   applySchema(db); applySchema(db);
-  const legacy = db.prepare('SELECT * FROM tests WHERE id=?').get(assay.id);
-  assert.equal(legacy.tea, 10); assert.equal(legacy.eflm_tea, null);
-  assert.equal(resolveTea(legacy, [], [], 'eflm').value, null);
+  const restoredRow = db.prepare('SELECT * FROM tests WHERE id=?').get(assay.id);
+  assert.equal(restoredRow.tea, 10); assert.equal(restoredRow.eflm_tea, null);
+  assert.equal(resolveTea(restoredRow, [], [], 'eflm').value, null);
 });
 
 test('SG06: lot changes rescale saved criterion, independent of current catalog; untouched snapshots freeze', t => {
@@ -194,7 +195,7 @@ test('SG07: enough points alone cannot unlock QC; review has attribution and inv
   assert.ok(db.prepare("SELECT detail FROM activity WHERE type='Sửa kỳ Six Sigma'").all().some(row => row.detail.includes('rà soát')));
 });
 
-test('SG06 legacy: missing historical criterion is not guessed from current catalog', t => {
+test('SG06: missing historical criterion is not guessed from the current catalog', t => {
   const { db, save, seed } = scenario(t);
   const period = save([{ level: 1, tea: 3, targetMean: 140, cv: 1, biasEqa: 0 }]).data;
   seed('OLD', 100);
@@ -244,7 +245,6 @@ test('SG10: every Sigma write rolls back when audit fails, including rename', t 
     () => save([{ level: 1, cv: 2 }], { period: '2026-07' }),
     () => sigma.renamePeriod({ id: existing.id, period: '2026-06' }, actor),
     () => sigma.removePeriod({ data: { id: existing.id } }, actor),
-    () => sigma.setTracking({ testId: assay.id, tracked: false }, actor),
     () => sigma.saveTeaConfig({ testId: assay.id, source: 'eflm', tea: 3 }, actor),
   ];
   for (const write of writes) {
@@ -279,7 +279,9 @@ test('SG12 and supplementary: units, draft preview, no clipped trend, and shared
   assert.match(page, /u = U\/k/); assert.match(page, /chỉ chia 2 khi k = 2/);
   assert.match(page, /100 × u \/ \|giá trị tham chiếu\|/);
   assert.match(page, /const preview = uncertaintyBudget\(\{ cv: level.cv, bias: level.biasEqa, uCref, uCal, includeBias/);
-  assert.match(page, /\.\.\.sigmaMuExport\(lv\)/);
+  const printReport = readFileSync(new URL('../renderer/lib/sigma-print-report.ts', import.meta.url), 'utf8');
+  assert.match(page, /buildSigmaPeriodPrintHtml\(\{/);
+  assert.match(printReport, /mu\?\.complete \? number\(mu\.U, 4\) : '—'/);
   assert.match(page, /saveOwnedPeriod\(biasModal.period/); assert.match(page, /saveOwnedPeriod\(muModal.period/);
   const charts = readFileSync(new URL('../renderer/components/SigmaCharts.tsx', import.meta.url), 'utf8');
   assert.match(charts, /mdcRatios\(levelData\)/);
@@ -329,3 +331,5 @@ test('actual MU modal renders the edited draft, not stored MU, and marks incompl
   assert.match(render(['', '', true, null]), /Tạm tính chưa đầy đủ/);
   assert.match(render(['', '', true, null]), /không dùng để kết luận đạt TEa/);
 });
+
+

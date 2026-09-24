@@ -1,11 +1,5 @@
 // Hợp đồng IPC lộ ra qua preload.ts — dùng chung giữa main và renderer để
 // renderer có type an toàn khi gọi window.qcApi.*
-export interface MigrationSummary {
-  instruments: number; tests: number; qcLots: number; lotGroups: number; qcPanels: number;
-  lotTransitions: number; qcPoints: number; users: number; activity: number; actions: number;
-  reagentTests: number; periodLocks: number; teaRefs: number; sigmaPeriods: number;
-}
-
 export interface LisGatewaySettings { enabled: boolean; url: string; token: string }
 export interface LisResolved {
   ok: boolean; code: string; reason?: string;
@@ -48,7 +42,6 @@ export interface Test {
   eflm_lookup_date: string;
   eflm_ref: string;
   eflm_tea?: number | null;
-  sigma_tracked: 0 | 1;
   method: string;
   reagent: string;
   cusum_on: 0 | 1;
@@ -67,9 +60,8 @@ export interface QcLot {
 export interface LotGroup {
   id: string; name: string; manufacturer: string; material: string; catalog: string; note: string;
   active: 0 | 1;
-  /** '' = không có trạng thái tự đặt — "Đang hoạt động"/"Chưa dùng" SUY từ
-   * `inUse`, không phải literal 'active' nào được lưu (port đúng app cũ,
-   * xem manage-validation.ts). */
+  /** '' = không có trạng thái tự đặt — "Đang hoạt động"/"Chưa dùng" suy từ
+   * `inUse`, không lưu thành literal 'active'. */
   status: '' | 'stopped' | 'planned'; stopped_at: string; lotIds: string[];
   /** Có lô nào của nhóm đang được gán (`test_levels.qc_lot_id`) cho xét
    * nghiệm nào không — tính ở `listLotGroups()`, KHÔNG lưu trong DB. */
@@ -78,8 +70,7 @@ export interface LotGroup {
 
 /** Mean/SD "Dự kiến": số đã nhập sẵn cho lô của một nhóm lô CHƯA dùng, chờ
  * tới khi bấm "Kích hoạt nhóm lô" mới áp vào `test_levels`. Bảng riêng
- * (`planned_targets`), KHÔNG phải một mốc trong lịch sử Mean/SD — xem
- * `main/db/schema.ts`. */
+ * (`planned_targets`), không phải một mốc trong lịch sử Mean/SD. */
 export interface PlannedTarget {
   id: string; test_id: string; level: number; qc_lot_id: string;
   mean: number | null; sd: number | null; low: number | null; high: number | null;
@@ -262,7 +253,7 @@ export interface TestSummary {
     /** CV QUAN SÁT ĐƯỢC của các điểm QC (SD mẫu n-1 chia |mean| thực tế),
      * không phải CV suy từ Mean/SD đích. `null` khi mức chưa có điểm nào. */
     cv: number | null;
-    // `id` cần cho trang Khắc phục sự cố: app cũ gắn dòng sự cố với hồ sơ
+    // `id` cần cho trang Khắc phục sự cố: hệ thống gắn dòng sự cố với hồ sơ
     // NCE theo ĐIỂM QC, không theo test+mức (xem D3.8).
     latest: { id: string; date: string; runId: string; val: number } | null;
   }[];
@@ -339,10 +330,9 @@ export interface PreviousLotSeries {
  * xét nghiệm nào) — panel "Cấu hình chung của luật" trang Phân tích Westgard. */
 export interface RuleSetting { id: string; desc: string; on: boolean; fix: string; alert: boolean; }
 
-/** Phân tích Westgard THẬT cho 1 lô thuộc 1 nhóm lô đã dừng/lưu trữ — tab
- * "Nhóm lô đã dừng" trang Phân tích Westgard (port `wgLotBlockModel()` app
- * cũ): tính lại theo bộ luật ĐANG BẬT hiện nay, dùng Mean/SD ĐÃ CHỐT của
- * đúng lô đó (không phải Mean/SD hiện hành của mức). */
+/** Phân tích Westgard cho một lô thuộc nhóm lô đã dừng/lưu trữ. Kết quả được
+ * tính lại theo bộ luật đang bật, dùng Mean/SD đã chốt của lô thay vì
+ * Mean/SD hiện hành của mức. */
 export interface ArchivedBlock {
   level: number; lotId: string; lotNo: string; mean: number; sd: number; analysis: LevelAnalysis;
 }
@@ -356,7 +346,7 @@ export interface UncertaintyBudgetResult {
   target: number | null; absoluteUc: number | null; absoluteU: number | null;
   tea: number | null; teaRatio: number | null; withinTea: boolean | null;
 }
-export interface SigmaEqaRound { lab: number | null; target: number | null; bias: number }
+export interface SigmaEqaRound { lab: number; target: number; bias: number }
 export interface SigmaLevelResult {
   muBiasMode?: 'include' | 'exclude';
   cohortReviewed?: boolean;
@@ -375,9 +365,6 @@ export interface SigmaLevelResult {
   uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
   sigma: SigmaMetricResult | null; mu: UncertaintyBudgetResult | null;
-  /** Goi y thiet ke QC theo bang Westgard Sigma Rules. `levels` la BANG duoc
-   * ap (Westgard cong bo hai bang khac nhau cho 2 muc va 3 muc QC);
-   * `levelCount` la so muc QC that cua xet nghiem. */
   qualityDesign: {
     capable: boolean; tier: string; levels: 2 | 3; levelCount: number;
     rules: string[]; n: number; r: number;
@@ -391,7 +378,6 @@ export interface SigmaCohortView {
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
   targetMean: number | null; targetSd: number | null; issues: string[];
   excluded: { voided: number; invalidValue: number };
-  /** Diem vuot +/-3SD trong nhom, va bao nhieu trong so do CHUA co ho so khac phuc da duyet + ket luan hieu qua. Khong diem nao bi loai khoi CV. */
   outOfControl: { rejected: number; unresolved: number };
   status: 'insufficient' | 'provisional' | 'eligible' | 'unstable' | 'out-of-control';
 }
@@ -408,8 +394,7 @@ export interface NceDetail {
   /** Nhóm nguyên nhân gốc, tách khỏi `NceRecord.error_type` (SE/RE). */
   causeCategory?: 'qc' | 'operator' | 'instrument' | 'reagent' | 'calibration' | 'environment' | 'unknown' | '';
   cause?: string; /** Tên cũ để đọc dữ liệu thí điểm trước protocol-v3. */ causeDescription?: string; action?: string;
-  /** Người phụ trách hồ sơ — app cũ lưu ở trường `by` của bản ghi; app
-   * chưa có cột riêng nên giữ trong `detail_json` (mục còn treo từ D2). */
+
   owner?: string;
   releaseDecision?: 'held' | 'released'; releaseNote?: string; releaseDecidedAt?: string; releaseDecidedBy?: string;
   rerunPointId?: string; rerunNote?: string; rerunSnapshot?: { date: string; runId: string; val: number; level: number };
@@ -468,6 +453,7 @@ export interface StorageInfo {
   schemaVersion: number;
   storageMode: 'file' | 'memory' | 'browser-preview';
 }
+export interface ReportTemplateSettings { formCode: string; version: string }
 export interface FirebaseSettings {
   labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
 }
@@ -502,7 +488,7 @@ export interface QcApi {
   resetUserPassword(input: { id: string; data: { newPassword: string } }): Promise<IpcResult<{ id: string }>>;
   changeOwnPassword(input: { data: { oldPassword: string; newPassword: string } }): Promise<IpcResult<{ id: string }>>;
   verifyOwnPassword(input: { data: { password: string } }): Promise<IpcResult<{ ok: true }>>;
-  /** Chỉ tự phục vụ (không nhận id người khác) — khớp app cũ, đổi ảnh đại
+  /** Chỉ tự phục vụ (không nhận id người khác) — khớp hệ thống, đổi ảnh đại
    * diện không phải thao tác quản trị. */
   setAvatar(input: { data: { dataUrl: string } }): Promise<IpcResult<{ avatar: string }>>;
   clearAvatar(): Promise<IpcResult<{ avatar: string }>>;
@@ -529,9 +515,8 @@ export interface QcApi {
    * gì. Renderer hỏi người dùng bằng đúng con số này TRƯỚC khi gọi `saveLot`
    * (số lô là nhãn tĩnh trên từng điểm QC, xem config-handlers.ts). */
   previewLotRename(input: { id: string; lotNo: string }): Promise<IpcResult<{ rename: null } | { rename: { oldLotNo: string; newLotNo: string; affected: number; lockedCount: number; lockedPeriods: string[] } }>>;
-  /** Giai đoạn D3.4 — thao tác app cũ có mà app chưa có. Cổng chặn
-   * (lô/nhóm đang gán Mean/SD, hồ sơ đã kết luận) nằm ở main, xem
-   * config-handlers.ts. */
+  /** Thao tác hệ thống có cổng chặn ở main khi lô/nhóm đang gán Mean/SD
+   * hoặc hồ sơ đã kết luận. */
   setTeaRefValue(input: { analyteId: string; field: 'clia' | 'ricos'; value: string; name?: string; unit?: string; section?: string }): Promise<IpcResult<{ analyteId: string }>>;
   restoreTeaRefDefaults(input: { analyteId: string }): Promise<IpcResult<{ analyteId: string }>>;
   /** Thêm 1 DÒNG analyte mới vào bảng TEa tham chiếu (khác `saveTeaRef` —
@@ -544,7 +529,7 @@ export interface QcApi {
   removeLotGroup(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   stopLotGroup(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   /** Kích hoạt nhóm lô: áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
-   * mức QC tương ứng và dừng nhóm bị thay thế. 3 trạng thái như app cũ:
+   * mức QC tương ứng và dừng nhóm bị thay thế. 3 trạng thái như hệ thống:
    * `applied` / `already-active` / `unready` (chưa mức nào có Mean/SD hợp lệ
    * cho lô của nhóm — KHÔNG đụng gì tới cấu hình). `unready` là một nhánh
    * THÀNH CÔNG trả về, không phải mã lỗi: hợp đồng thiếu nó tới 2026-09-10
@@ -555,7 +540,7 @@ export interface QcApi {
   listPanels(): Promise<QcPanel[]>;
   savePanel(input: { id?: string; data: QcPanelDraft }): Promise<IpcResult<QcPanel>>;
   listLotTransitions(): Promise<LotTransition[]>;
-  /** MỘT hàm lưu duy nhất cho hồ sơ chuyển lô — đúng mô hình app cũ
+  /** Một hàm lưu duy nhất cho hồ sơ chuyển lô — đúng mô hình hệ thống
    * (`saveLotTransitionV2`): modal có 1 ô "Trạng thái" chọn được cả 4 giá
    * trị (`data.status`) + 1 nút Lưu, không phải các nút hành động tách rời.
    * `id` có → SỬA hồ sơ (nút "Sửa"). Hồ sơ đã 'accepted' thì khoá vĩnh viễn
@@ -565,8 +550,7 @@ export interface QcApi {
    * mật khẩu TRƯỚC khi gọi hàm này (không có tham số reauth riêng — main
    * không giữ trạng thái phiên xác thực). Chỉ 'accepted' mới thật sự áp
    * `criteria` (Mean/SD ứng viên) vào `test_levels` + đánh dấu lô cũ hết
-   * dùng; thiếu Mean/SD cho dù chỉ 1 xét nghiệm đang dùng lô cũ sẽ bị chặn
-   * (`missing-target`). */
+   * dùng; thiếu Mean/SD cho dù chỉ một xét nghiệm đang dùng lô cũ sẽ bị chặn. */
   createLotTransition(input: { id?: string; data: { panelId: string; fromLotId: string; toLotId: string; startDate?: string; note?: string; status?: 'planned' | 'active' | 'accepted' | 'rejected'; criteria?: { testId: string; level: number; mean: number; sd: number }[] } }): Promise<IpcResult<LotTransition>>;
   listTeaRefs(): Promise<TeaRef[]>;
   saveTeaRef(input: { id?: string; data: Record<string, unknown> }): Promise<IpcResult<TeaRef>>;
@@ -583,7 +567,7 @@ export interface QcApi {
   queryActivity(input: { query?: string; from?: string; to?: string; page?: number; pageSize?: number }): Promise<IpcResult<ActivityPage>>;
   previewArchiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<ActivityArchivePreview>>;
   exportActivityCsv(input: { query?: string; from?: string; to?: string }): Promise<IpcResult<string>>;
-  verifyActivityChainNow(): Promise<IpcResult<{ ok: boolean; checked: number; legacy: number; brokenIndex: number; reason: string }>>;
+  verifyActivityChainNow(): Promise<IpcResult<{ ok: boolean; checked: number; unhashed: number; brokenIndex: number; reason: string }>>;
   archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }>>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */
@@ -592,7 +576,10 @@ export interface QcApi {
   listParallelEntryColumns(testId: string): Promise<ParallelEntryColumn[]>;
   listPreviousEntryLotSeries(testId: string): Promise<PreviousLotSeries[]>;
   getRangeCandidate(testId: string, level: number): Promise<IpcResult<RangeCandidateView>>;
-  applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number } }): Promise<IpcResult<RangeCandidateView>>;
+  /** `mean` + `sd` chỉ được gửi cùng nhau khi người duyệt chọn điều chỉnh
+   * thủ công dải đề xuất. Main vẫn áp đầy đủ cổng 20/20, run bị loại và an
+   * toàn sai số hệ thống; đây không phải đường bỏ qua điều kiện lập dải. */
+  applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): Promise<IpcResult<RangeCandidateView>>;
   revertManufacturerRange(input: { data: { testId: string; level: number; reason: string } }): Promise<IpcResult<RangeCandidateView>>;
   addPoint(input: { data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string } }): Promise<IpcResult<QcPointView>>;
   /** `kind` quyết định có tự mở/dùng lại hồ sơ NCE hay không
@@ -603,7 +590,7 @@ export interface QcApi {
   setDayNote(input: { data: { testId: string; date: string; note: string } }): Promise<IpcResult<{ note: string; updated: number }>>;
   listTestSummaries(): Promise<TestSummary[]>;
   analyzeLevel(testId: string, level: number): Promise<LevelAnalysis>;
-  saveRuleAction(testId: string, ruleId: string, action: boolean | 'inactive' | 'alert' | 'reject' | ''): Promise<IpcResult<{ ruleId: string; action: 'inactive' | 'alert' | 'reject' | '' }>>;
+  saveRuleAction(testId: string, ruleId: string, action: 'inactive' | 'alert' | 'reject' | ''): Promise<IpcResult<{ ruleId: string; action: 'inactive' | 'alert' | 'reject' | '' }>>;
   listRuleSettings(): Promise<RuleSetting[]>;
   saveRuleSetting(ruleId: string, on: boolean): Promise<IpcResult<{ ruleId: string; on: boolean }>>;
   resetRuleSettings(): Promise<IpcResult<RuleSetting[]>>;
@@ -614,9 +601,8 @@ export interface QcApi {
   listPreviousLotBlocks(testId: string): Promise<ArchivedBlock[]>;
   listSigmaPeriods(testId: string): Promise<SigmaPeriodView[]>;
   listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
-  setSigmaTracking(input: { testId: string; tracked: boolean }): Promise<IpcResult<{ testId: string; tracked: boolean }>>;
   saveSigmaTeaConfig(input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }): Promise<IpcResult<Test>>;
-  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
+  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
   renameSigmaPeriod(input: { id: string; period: string }): Promise<IpcResult<SigmaPeriodView>>;
   removeSigmaPeriod(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
   listNceRecords(): Promise<NceRecord[]>;
@@ -645,6 +631,8 @@ export interface QcApi {
   getLoginBrand(): Promise<LoginBrand>;
   saveLabProfile(input: { data: { name?: string; dept?: string; address?: string; brandTitle?: string; brandSub?: string; logoText?: string; logoData?: string; clearLogo?: boolean } }): Promise<IpcResult<LabProfile>>;
   getStorageInfo(): Promise<StorageInfo>;
+  getReportTemplateSettings(): Promise<ReportTemplateSettings>;
+  saveReportTemplateSettings(input: { data: { formCode?: string; version?: string } }): Promise<IpcResult<ReportTemplateSettings>>;
   getFirebaseSettings(): Promise<FirebaseSettings>;
   connectFirebase(input: { data: { labCode?: string; email?: string; password?: string; config?: string } }): Promise<IpcResult<FirebaseConnectResult>>;
   syncFirebase(input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>>;
@@ -657,40 +645,24 @@ export interface QcApi {
    * renderer tự tạo Blob + tải về, không cần hộp thoại lưu file native (nhẹ
    * hơn, khớp cơ chế `downloadCsv` đã dùng ở Audit/Report). */
   exportTableXlsx(input: { sheetName: string; headers: string[]; rows: (string | number | null)[][] }): Promise<IpcResult<string>>;
-  /** Giai đoạn C1 — in PDF thật qua `webContents.printToPDF`, có hộp thoại
-   * lưu file native (khác Excel — PDF là "kết xuất trình bày" nên giữ đúng
-   * luồng "Lưu PDF" của bản cũ, không tải ngầm qua Blob). */
-  printHtmlToPdf(input: { html: string; defaultFileName: string }): Promise<IpcResult<{ path: string }>>;
-  /** Giai đoạn C3 — xuất/phục hồi toàn bộ dữ liệu app (định dạng RIÊNG,
-   * không đọc được backup app cũ — xem `main/domain/backup.ts`). */
+
+  printHtmlToPdf(input: { html: string; defaultFileName: string; pageNumbers?: boolean }): Promise<IpcResult<{ path: string }>>;
+  /** Xuất/phục hồi toàn bộ dữ liệu QC Lab. */
   exportBackup(): Promise<IpcResult<string>>;
   importBackup(input: { data: { json: string } }): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
-  /** Giai đoạn D3.3 — 2 công cụ quản trị app cũ có mà app chưa có.
-   * `verifyBackup` CHỈ ĐỌC file, không chạm DB đang dùng.
-   * `resetOperationalData` xoá dữ liệu vận hành nhưng GIỮ tài khoản + nhật ký
-   * hoạt động (ánh xạ `ResetOperationalDataCommand` app cũ). */
+  /** Công cụ kiểm tra và khởi tạo lại dữ liệu vận hành.
+   * `verifyBackup` chỉ đọc tệp; `resetOperationalData` giữ tài khoản và nhật ký. */
   backupStatus(): Promise<{ lastBackupAt: string | null; lastBackupBytes: number; maxImportBytes: number }>;
   verifyBackup(input: { data: { json: string } }): Promise<IpcResult<{ tables: number; rows: number; points: number; schemaVersion: number; createdAt: string }>>;
   resetOperationalData(): Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
-  /** Giai đoạn C4 — di trú dữ liệu từ backup app CŨ (định dạng
-   * `'qclab-backup'`, KHÁC hẳn `'qclab-v2-backup'` ở trên — xem
-   * `main/domain/migrate-legacy.ts`). `previewLegacyBackup` chỉ ánh xạ +
-   * đếm, KHÔNG ghi DB — dùng để hiện rõ "sẽ nhập bao nhiêu..." trước khi xác
-   * nhận thao tác THAY THẾ TOÀN BỘ dữ liệu hiện có. */
-  previewLegacyBackup(input: { data: { json: string } }): Promise<IpcResult<MigrationSummary>>;
-  importLegacyBackup(input: { data: { json: string } }): Promise<IpcResult<{ preMigrationSnapshotPath: string; summary: MigrationSummary }>>;
-  /** Giai đoạn C5 — client cho LIS Gateway prototype (`lis-gateway/`, server
-   * độc lập không đóng gói cùng Electron — xem CLAUDE.md "LIS Gateway").
-   * Cấu hình lưu ở `app_meta` (thay `localStorage` bản cũ), chỉ admin sửa.
-   * `importLisResult` ghi điểm QC cục bộ TRƯỚC, chỉ báo gateway 'imported'
-   * SAU KHI ghi thành công — xem `main/domain/lis-client.ts`. */
+
   getLisSettings(): Promise<LisGatewaySettings>;
   saveLisSettings(input: { data: { enabled: boolean; url: string; token: string } }): Promise<IpcResult<LisGatewaySettings>>;
   pullLisQueue(): Promise<IpcResult<{ pending: LisQueueRecord[]; unresolved: LisQueueRecord[] }>>;
   importLisResult(input: { data: { record: LisQueueRecord } }): Promise<IpcResult<{ pointId: string; gatewayWarning?: string }>>;
   rejectLisResult(input: { data: { messageId: string; note?: string } }): Promise<IpcResult<{ messageId: string }>>;
-  /** `store:changed` — invalidation có phạm vi (xem docs/APP-V2-PLAN.md Giai
-   * đoạn A1): main phát bảng nào vừa đổi sau mỗi transaction ghi thành công.
+  /** `store:changed` có phạm vi: main phát bảng nào vừa đổi sau mỗi transaction
+   * ghi thành công.
    * Trả về hàm huỷ đăng ký, gọi trong cleanup của `useEffect`. */
   onStoreChanged(callback: (payload: { tables: string[]; testIds: string[] }) => void): () => void;
 }

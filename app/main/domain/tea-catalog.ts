@@ -1,6 +1,3 @@
-// Danh mục TEa chuẩn port nguyên giá trị CLIA/Ricos từ app cũ
-// (`TEA_ANALYTE_CATALOG`). Đây là dữ liệu tham chiếu chỉ đọc; hồ sơ TEa PXN
-// trong SQLite được hiển thị như lớp phủ riêng, không ghi đè catalog này.
 export type TeaCatalogItem = {
   id: string; name: string; abbr: string; unit: string; section: string;
   clia: number | null; ricos: number | null;
@@ -42,7 +39,7 @@ export const TEA_CATALOG: readonly TeaCatalogItem[] = TEA_CATALOG_ROWS.map(
   }),
 );
 
-/** Các giới hạn tuyệt đối có trong `TEA_ANALYTE_CATALOG` của app cũ. Tách
+/** Các giới hạn tuyệt đối có trong `TEA_ANALYTE_CATALOG` của hệ thống. Tách
  * riêng khỏi tuple 77 dòng giúp phần danh mục dễ rà soát; giá trị là nguồn
  * tham chiếu, tuyệt đối không phải TEa% đã quy đổi. */
 const CLIA_ABSOLUTE: Readonly<Record<string, readonly [number, string]>> = {
@@ -71,3 +68,5 @@ export const TEA_SOURCE_CARDS = [
   { label: 'Ricos / Westgard BV', detail: '2014 · rà soát 16/07/2026', tag: 'Nguồn cũ', tone: 'retired', url: 'https://westgard.com/clia-and-quality-regulation-requirements/quality-requirements/biodatabase1.html' },
   { label: 'EFLM Biological Variation Database', detail: 'Live database · rà soát 16/07/2026', tag: 'Cập nhật liên tục', tone: 'dynamic', url: 'https://biologicalvariation.eu/' },
 ] as const;
+
+

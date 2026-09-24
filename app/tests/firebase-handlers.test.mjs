@@ -65,3 +65,5 @@ assert.equal(invalid.ok, false);
 assert.match(invalid.error.message, /Mã phòng/);
 
 console.log('app firebase-handlers end-to-end tests passed');
+
+

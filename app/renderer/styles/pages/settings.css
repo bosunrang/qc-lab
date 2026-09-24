@@ -1,8 +1,4 @@
-/* Trang Cài đặt — port từ assets/professional-settings.css + phần
-   .admin-tools/.brand-preview/.file-pick nằm rải ở assets/app.css và
-   .admin-tool ở assets/components.css của app cũ (Giai đoạn D3.3).
-   Firebase/Rules được hoàn thiện ở C2: giữ cấu trúc lưới và trạng thái của
-   app cũ, nhưng toàn bộ thao tác vẫn đi qua IPC an toàn ở main process. */
+
 
 .settings-profile-grid{
   display:grid;
@@ -145,7 +141,7 @@
 
 .lis-gateway-body{display:grid;gap:var(--gap-control);margin:var(--panel-content-gap) 16px 0}
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
-   chỉ còn nửa bề rộng trang — giữ đúng lý do app cũ ghi tại chỗ. */
+   chỉ còn nửa bề rộng trang — giữ đúng lý do hệ thống ghi tại chỗ. */
 .lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--gap-content)}
 .lis-gateway-grid label{margin-top:0}
 .lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
@@ -155,11 +151,7 @@
 .lis-gateway-status.ok{border-color:var(--success-border);border-left-color:var(--success-border)}
 .lis-gateway-status.rej{border-color:var(--danger-border);border-left-color:var(--danger-border)}
 
-/* Giữ góc bo của panel khi dải nền `.panel-title` bám sát mép (margin âm bù
-   padding panel — xem app.css). Port từ `assets/professional-settings.css`.
-   Các rule `.firebase-sync-panel > label`/`> .hint` của bản cũ KHÔNG cần port:
-   app bọc nội dung trong `.firebase-body` nên không có label nào là con
-   trực tiếp của panel. */
+
 .firebase-sync-panel{overflow:hidden}
 .firebase-body{display:grid;gap:var(--gap-content);margin:var(--panel-content-gap) 16px 0}
 .firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-content)}
@@ -190,3 +182,5 @@
   grid-template-columns:1fr;
 }
 }
+
+

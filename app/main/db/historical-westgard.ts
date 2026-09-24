@@ -48,9 +48,8 @@ export function createHistoricalWestgard(db: Db) {
     return [...byId.values()];
   }
 
-  /** Xét nghiệm nào từng dùng ÍT NHẤT 1 lô của nhóm này — port điều kiện chọn
-   * xét nghiệm trong tab "Nhóm lô đã dừng" app cũ (chỉ hiện xét nghiệm có dữ
-   * liệu thật để phân tích, không phải mọi xét nghiệm trong hệ thống). */
+  /** Xét nghiệm nào từng dùng ít nhất một lô của nhóm này. Chỉ hiện xét
+   * nghiệm có dữ liệu thật để phân tích, không phải mọi xét nghiệm hệ thống. */
   function listArchivedGroupTests(groupId: string): { id: string; label: string }[] {
     const lotIds = new Set(lotsOfArchivedGroup(groupId).map(l => l.id));
     if (!lotIds.size) return [];
@@ -69,14 +68,9 @@ export function createHistoricalWestgard(db: Db) {
     return [...matched.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }
 
-  /** Phân tích Westgard THẬT cho 1 xét nghiệm trong 1 nhóm lô đã dừng/lưu
-   * trữ — port `wgLotBlockModel()` app cũ: TÍNH LẠI theo bộ luật đang bật
-   * HIỆN NAY (không phải cấu hình luật tại thời điểm nhóm lô còn hoạt động —
-   * đúng hint app cũ hiện ngay trên trang), dùng Mean/SD ĐÃ CHỐT của đúng lô
-   * đó (không phải Mean/SD hiện hành của mức, vốn có thể đã đổi sang lô
-   * khác). Trước đây tab này chỉ liệt kê Số lô/Mức/Hạn dùng — không có
-   * verdict/luật/biểu đồ nào, tức "phân tích Westgard" chưa từng tồn tại ở
-   * đây dù đúng là tên trang. */
+  /** Phân tích Westgard cho một xét nghiệm trong nhóm lô đã dừng/lưu trữ.
+   * Kết quả được tính lại theo bộ luật đang bật, dùng Mean/SD đã chốt của
+   * đúng lô thay vì Mean/SD hiện hành có thể thuộc lô khác. */
   function analyzeHistoricalLots(testId: string, lots: { id: string; lot_no: string; level: number }[]): ArchivedBlock[] {
     const archived = lots.flatMap((lot) => {
       const target = lotMeanSd(testId, lot.level, lot.id);
@@ -135,3 +129,5 @@ export function createHistoricalWestgard(db: Db) {
 
   return { listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks };
 }
+
+

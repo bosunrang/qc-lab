@@ -47,3 +47,5 @@ export function createFirebaseClient(fetchImpl: FetchLike = fetch as unknown as 
 
   return { signIn, read, write };
 }
+
+

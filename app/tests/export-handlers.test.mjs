@@ -2,10 +2,14 @@
 // bằng chính exceljs để xác nhận header/hàng đúng, không chỉ kiểm tra chuỗi
 // base64 không rỗng). printHtmlToPdf() cần BrowserWindow thật (Electron),
 // không test được ở Node thuần — đã xác nhận qua Playwright `_electron` tạm
-// (xem CLAUDE.md).
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
+
+const exportHandlerSource = require('node:fs').readFileSync(new URL('../../app/main/ipc/export-handlers.ts', import.meta.url), 'utf8');
+assert.match(exportHandlerSource, /displayHeaderFooter: pageNumbers/);
+assert.match(exportHandlerSource, /class="pageNumber"/);
+assert.match(exportHandlerSource, /class="totalPages"/);
 
 const { buildXlsxBase64 } = require('../../app-dist/main/ipc/export-handlers.js');
 const ExcelJS = require('exceljs');
@@ -34,3 +38,5 @@ await wb2.xlsx.load(Buffer.from(longName, 'base64'));
 assert.ok(wb2.worksheets[0].name.length <= 31);
 
 console.log('app export-handlers oracle tests passed');
+
+

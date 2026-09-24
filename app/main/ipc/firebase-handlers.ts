@@ -56,7 +56,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     if (!value) return { ok: false, message: 'empty' };
     const row = value as Partial<FirebasePayload>;
     if (row._format !== 'qclab-v2-firebase' || !row.backup) {
-      return { ok: false, message: 'Dữ liệu Firebase này không phải định dạng app. Hãy xuất backup từ app cũ rồi dùng mục Di trú dữ liệu.' };
+      return { ok: false, message: 'Dữ liệu Firebase này không đúng định dạng backup được hỗ trợ.' };
     }
     const checked = validateBackupEnvelope(row.backup, SCHEMA_VERSION);
     return checked.ok ? { ok: true, data: row as FirebasePayload } : { ok: false, message: checked.message };
@@ -170,3 +170,5 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
 }
 
 export type FirebaseHandlers = ReturnType<typeof createFirebaseHandlers>;
+
+

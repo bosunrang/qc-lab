@@ -29,19 +29,19 @@ function todayIso(): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-/** `vnDate()` của app cũ. */
+/** `vnDate()` của hệ thống. */
 function dateText(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value || '—';
 }
 
-/** `fmtPointValue(point, test)` của app cũ — giá trị theo số thập phân của
+/** `fmtPointValue(point, test)` của hệ thống — giá trị theo số thập phân của
  * xét nghiệm. */
 function pointValue(val: number, decimalPlaces: number): string {
   return val.toFixed(decimalPlaces);
 }
 
-/** `fmt(x, 2)` của app cũ. */
+/** `fmt(x, 2)` của hệ thống. */
 function num2(value: number): string {
   return value.toFixed(2);
 }
@@ -68,7 +68,7 @@ function ShiftItem({ tone, title, meta, action }: { tone: 'rej' | 'warn'; title:
 }
 
 /** Nhãn + meta của 1 mức đang báo động — dùng chung cho nhóm "loại bỏ" và
- * nhóm "cảnh báo", đúng như app cũ dùng cùng một cặp title/meta cho cả hai. */
+ * nhóm "cảnh báo", đúng như hệ thống dùng cùng một cặp title/meta cho cả hai. */
 function alertMeta(item: DashboardAlertItem) {
   return <>{dateText(item.point.date)} · {pointValue(item.point.val, item.test.decimalPlaces)} {item.test.unit || ''} · {item.rules.join(', ') || '—'}</>;
 }
@@ -180,9 +180,11 @@ export function DashboardPage() {
   const subtitle = (profile?.name || 'Khoa Xét nghiệm') + (profile?.dept ? ` · ${profile.dept}` : '');
   if (loading) return <LoadingView subtitle={subtitle} />;
   const today = todayIso(), model = buildDashboardViewModel(testSummaries, lots, overdueActions, today);
-  // `safePercent` của app cũ — kẹp 0..100 trước khi vẽ thanh tiến độ.
+  // `safePercent` của hệ thống — kẹp 0..100 trước khi vẽ thanh tiến độ.
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{[
     ['Xét nghiệm', model.tests.length, ''], ['Điểm QC', model.kpi.totalPoints, ''], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'teal'],
   ].map(([label, value, tone]) => <div className="dash-kpi" key={String(label)}><div className="k">{label}</div><div className={`v ${tone}`}>{value}</div></div>)}</div></div><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
 }
+
+

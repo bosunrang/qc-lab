@@ -1,28 +1,3 @@
-// Ô chọn ngày dùng chung. **Viết lại ở Giai đoạn D3.2** theo đúng DOM của
-// app cũ (`src/react/components/DateField.tsx`): `.datebox` bọc 1 ô văn bản
-// `.date-text` gõ dd/mm/yyyy + nút lịch `.datepick` + 1 `<input type="date">`
-// ẩn `.native-date`. Bản trước đó dùng thẳng `<input type="date">` trần —
-// quyết định "đơn giản hoá" của Giai đoạn A1 — nhưng đó là KHÁC BIỆT NHÌN
-// THẤY ĐƯỢC (ô ngày trần hiển thị theo locale của trình duyệt, có icon
-// riêng, không gõ được dd/mm/yyyy), và gate parity phát hiện thiếu đúng 4
-// class này. Đây là component nền tảng nên sửa 1 lần ở đây thay vì vá riêng
-// cho trang Báo cáo (xem quy trình D3 trong docs/APP-V2-PLAN.md).
-//
-// **2026-09-03**: lịch tự vẽ ĐÃ ĐƯỢC PORT. Trước đó nút `.datepick` gọi
-// `showPicker()` của `<input type="date">` ẩn với lý do "giống luồng thao
-// tác, không cần giống cách vẽ" — nhưng người dùng thấy ngay: đó là lịch
-// NATIVE của Chromium (tháng tiếng Anh, cột Su/Mo/Tu, nút Clear/Today), khác
-// hẳn lịch tiếng Việt của app cũ. Giờ nút mở
-// `components/DatePickerPopup.tsx` (port từ app cũ), và ô `.native-date`
-// quay lại đúng vai trò của nó ở app cũ: chỉ CHỨA giá trị ISO cho FormData,
-// `display:none`.
-//
-// Hai chế độ, giữ nguyên như trước để mọi chỗ gọi cũ không phải sửa:
-//   - CÓ ĐIỀU KHIỂN: `value` (ISO) + `onChange` (nhận ISO).
-//   - KHÔNG ĐIỀU KHIỂN: `name` + `defaultValue`, đọc qua FormData lúc submit.
-//     `name` được đặt trên `.native-date` (ô giữ giá trị ISO), KHÔNG phải ô
-//     văn bản dd/mm/yyyy — nếu đặt sai chỗ, FormData sẽ nhận "01/09/2026"
-//     thay vì "2026-09-01" và mọi form CRUD lưu sai ngày.
 import { useRef, useState, type MouseEvent } from 'react';
 import { vnDate } from '../lib/format';
 import { openDatePicker } from '../state/date-picker-store';
@@ -36,7 +11,7 @@ function CalendarIcon() {
 }
 
 /** ISO `yyyy-mm-dd` → `dd/mm/yyyy` để hiện; giá trị khác giữ nguyên. Khớp
- * `vnDate()`/`formatDisplay()` app cũ. */
+ * `vnDate()`/`formatDisplay()` hệ thống. */
 export function formatDateDisplay(value: unknown): string {
   if (!value) return '';
   return vnDate(String(value));
@@ -107,3 +82,5 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   if (label === undefined) return box;
   return <div className="field">{label && <label htmlFor={id}>{label}</label>}{box}</div>;
 }
+
+

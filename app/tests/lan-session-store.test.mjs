@@ -15,3 +15,5 @@ const next = store.create(actor);
 store.revoke(next.token);
 assert.equal(store.get(next.token), null, 'đăng xuất phải thu hồi phiên ngay');
 console.log('app LAN session store tests passed');
+
+

@@ -22,3 +22,5 @@ export function writeGlobalRules(db: Db, map: RuleActionsMap): void {
   db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
     .run(RULES_META_KEY, serializeRuleActions(map));
 }
+
+

@@ -28,8 +28,7 @@ interface SettingsState {
   lisQueue: { pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null;
   firebase: FirebaseSettings | null;
 
-  /** Nạp mọi thứ trang Cài đặt cần — dùng cho cả lần mount đầu lẫn
-   * `useStoreInvalidation()`. */
+  /** Nạp mọi dữ liệu trang Cài đặt cần, dùng khi mở trang và khi làm mới. */
   loadAll: () => Promise<void>;
   load: () => Promise<void>;
   loadStorage: () => Promise<void>;
@@ -111,7 +110,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   importLisResult: async (record) => {
     const result = await window.qcApi.importLisResult({ data: { record } });
     // Làm mới hàng chờ TỪ NGUỒN THẬT thay vì tự suy đoán trạng thái mới —
-    // cùng nguyên tắc app cũ dùng (xem CLAUDE.md, Giai đoạn C5).
+    // cùng nguyên tắc hệ thống dùng (xem CLAUDE.md, Giai đoạn C5).
     if (result.ok) await get().pullLisQueue();
     return result;
   },
@@ -139,3 +138,4 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     return result;
   },
 }));
+

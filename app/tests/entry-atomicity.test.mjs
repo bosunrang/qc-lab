@@ -50,3 +50,5 @@ assert.equal(db.prepare('SELECT voided FROM qc_points WHERE id=?').get(second.id
 assert.equal(db.prepare('SELECT COUNT(*) n FROM actions').get().n, actionCount, 'hủy lỗi không được tạo NCE dở dang');
 
 console.log('app entry atomicity + NCE id regression tests passed');
+
+

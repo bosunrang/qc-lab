@@ -1,8 +1,3 @@
-// Băm/kiểm mật khẩu — PBKDF2-SHA256, cùng định dạng chuỗi lưu trữ với bản cũ
-// (src/domain/auth/pbkdf2-password-service.ts: `pbkdf2$<iterations>$<salt>$<hash>`)
-// để giữ tính liên tục nếu sau này cần import user từ backup cũ, nhưng dùng
-// `node:crypto` thật thay vì phải chạy được trong trình duyệt — app mới chỉ
-// chạy trong main process nên không có ràng buộc đó.
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'node:crypto';
 
 export const PASSWORD_HASH_ITERATIONS = 600000; // OWASP minimum cho PBKDF2-SHA256
@@ -37,3 +32,5 @@ export function verifyPassword(password: string, stored: string): boolean {
 export function isPbkdf2Hash(value: string): boolean {
   return /^pbkdf2\$\d+\$[0-9a-f]+\$[0-9a-f]+$/.test(String(value || ''));
 }
+
+

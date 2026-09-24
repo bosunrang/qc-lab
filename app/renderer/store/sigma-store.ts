@@ -7,7 +7,7 @@ import type { SigmaPeriodView, SigmaCohortView, IpcResult } from '../../shared/q
 
 export interface SigmaLevelSaveInput {
   refreshCohort?: boolean; cohortReviewed?: boolean; cohortFingerprint?: string;
-  level: number; /** TEa% snapshot của riêng mức QC (CLIA tuyệt đối phụ thuộc Mean). */ tea?: number; /** Mean mục tiêu tại thời điểm đánh giá, dùng đổi MU% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; /** u(Cref)% - do khong dam bao cua GIA TRI GAN EQA/CRM, do nha cung cap cong bo. */ uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude';
+  level: number; /** TEa% snapshot của riêng mức QC (CLIA tuyệt đối phụ thuộc Mean). */ tea?: number; /** Mean mục tiêu tại thời điểm đánh giá, dùng đổi MU% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; /** u(Cref)% - do khong dam bao cua GIA TRI GAN EQA/CRM, do nha cung cap cong bo. */ uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude';
   cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string;
 }
 
@@ -15,7 +15,6 @@ interface SigmaState {
   testId: string;
   loading: boolean;
   error: string;
-  setTracking: (testId: string, tracked: boolean) => Promise<IpcResult<{ testId: string; tracked: boolean }>>;
   saveTeaConfig: (input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }) => Promise<IpcResult<unknown>>;
   periods: SigmaPeriodView[];
   loadPeriods: (testId: string) => Promise<void>;
@@ -28,13 +27,6 @@ interface SigmaState {
 let requestRevision = 0;
 export const useSigmaStore = create<SigmaState>((set, get) => ({
   testId: '', loading: false, error: '',
-  /** Bật/tắt theo dõi Six Sigma (ghi `tests.sigma_tracked`, chỉ admin). */
-  setTracking: async (testId, tracked) => {
-    const result = await window.qcApi.setSigmaTracking({ testId, tracked });
-    if (result.ok && get().testId === testId) await get().loadPeriods(testId);
-    return result;
-  },
-
   /** Nguồn + giá trị TEa: đổi TEa làm mọi kỳ Sigma tính lại, nên nạp lại
    * danh sách kỳ ngay sau khi lưu. */
   saveTeaConfig: async (input) => {
@@ -74,3 +66,5 @@ export const useSigmaStore = create<SigmaState>((set, get) => ({
     return result;
   },
 }));
+
+

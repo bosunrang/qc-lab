@@ -1,13 +1,3 @@
-// Lịch chọn ngày TỰ VẼ — port `src/react/components/DatePickerPopup.tsx` của
-// app cũ (xem lý do port ở đầu `state/date-picker-store.ts`). Mount đúng 1
-// lần trong `AppShell`, portal vào `#datePickerRoot` (cùng mẫu #modalRoot/
-// #dialogRoot). `position:fixed; z-index:1400` nên nổi trên cả modal (1000)
-// và dialog (1100) — ô ngày nằm trong modal vẫn chọn được.
-//
-// KHÁC app cũ đúng 1 chi tiết, có lý do: app cũ phải dùng id `#reactDatePicker`
-// để tránh đụng singleton `#vnDatePicker` của bản cổ điển còn sống song song.
-// app không có bản cổ điển nào, nên dùng thẳng id `#vnDatePicker` như
-// nguyên bản.
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
@@ -105,7 +95,7 @@ export function DatePickerPopup() {
   const selected = state.input ? parseFlexibleDate(state.input.value) : '';
   const today = todayIso();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  // Tuần bắt đầu THỨ HAI (đúng app cũ): getDay() trả 0=CN nên +6 rồi %7.
+  // Tuần bắt đầu THỨ HAI (đúng hệ thống): getDay() trả 0=CN nên +6 rồi %7.
   const offset = (new Date(year, month, 1).getDay() + 6) % 7;
   const cells: Array<{ key: string; day: number | null; iso: string }> = [];
   for (let index = 0; index < offset; index += 1) cells.push({ key: `blank-${index}`, day: null, iso: '' });
@@ -134,3 +124,5 @@ export function DatePickerPopup() {
       </div>
     </div>, root);
 }
+
+

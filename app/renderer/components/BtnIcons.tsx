@@ -1,12 +1,3 @@
-// Icon nhỏ trong nút — copy NGUYÊN path SVG của app cũ
-// (`src/presentation/router/router-icons.ts`'s `icoDownload`/`icoPrint` và
-// `CalcIcon` trong `src/react/pages/SigmaPage.tsx`).
-//
-// LƯU Ý về class `btn-ico`: nó là class của CHÍNH THẺ <svg> (15×15,
-// `flex:0 0 auto`), KHÔNG phải của <button>. Trước 2026-09-03 app gắn
-// `btn-ico` lên nút (Sigma "Bias EQA% Mức n", Westgard "Xuất Excel"/"In PDF"),
-// làm nút co lại còn 26px và chữ bị vắt thành nhiều dòng chồng lên tiêu đề
-// panel — đúng loại lỗi mà gate UI parity không thấy (chữ vẫn có trong DOM).
 const COMMON = {
   className: 'btn-ico',
   viewBox: '0 0 24 24',
@@ -72,3 +63,5 @@ export function TrashIcon() {
     </svg>
   );
 }
+
+

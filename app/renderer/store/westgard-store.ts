@@ -6,8 +6,7 @@ import type { TestSummary, LevelAnalysis, RuleSetting, ArchivedBlock } from '../
 // Phân tích Westgard hiển thị 1 panel cho mỗi mức chứ không phải 1 mức đang
 // chọn. `ruleSettings` là cấu hình luật CHUNG toàn phòng xét nghiệm (panel
 // "Cấu hình chung của luật" + bảng hướng dẫn) — KHÔNG phụ thuộc xét nghiệm
-// đang chọn, khác hẳn `analysisByLevel` (đọc theo giọng nói `saveRuleAction`
-// cũ trước đây nhầm lẫn 2 khái niệm này, xem westgard-handlers.ts).
+// đang chọn; vì thế không dùng thay cho `analysisByLevel`.
 interface WestgardState {
   summaries: TestSummary[];
   analysisTestId: string;
@@ -64,7 +63,7 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
     set({ ruleSettings: await window.qcApi.listRuleSettings() });
   },
   // Bật/tắt 1 luật ở tầng CHUNG đổi verdict của MỌI xét nghiệm trong hệ
-  // thống (đúng app cũ's `wgSet()`/`state.westgardRules`). Store nạp lại
+  // thống. Store nạp lại
   // danh sách tổng quan; WestgardPage nạp lại phân tích các mức đang xem vì
   // chỉ trang đó biết test/mức hiện hành.
   saveRuleSetting: async (ruleId: string, on: boolean) => {
@@ -80,3 +79,5 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
     await get().loadSummaries();
   },
 }));
+
+

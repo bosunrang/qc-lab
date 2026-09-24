@@ -29,6 +29,10 @@ function RuntimeIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h.01M8 15h.01M12 9h4M12 15h4" /></svg>;
 }
 
+/** Dòng trạng thái ở chân thanh điều hướng. Phiên bản do Vite thay từ
+ * `package.json` trong cả preview lẫn gói cài, không viết cứng. */
+const RUNTIME_LABEL = `Cổng 3200 · V${import.meta.env.VITE_APP_VERSION}`;
+
 export function AppShell() {
   const { user } = useAuthStore();
   const { profile, load } = useSettingsStore();
@@ -78,12 +82,12 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="sidebar-footer" role="status" aria-live="polite" title={collapsed ? 'Máy chủ cục bộ · Cổng 3200 · V1.0.1' : undefined}>
+        <div className="sidebar-footer" role="status" aria-live="polite" title={collapsed ? `Máy chủ cục bộ · ${RUNTIME_LABEL}` : undefined}>
           <div className="sidebar-runtime">
             <span className="sidebar-runtime-icon"><RuntimeIcon /></span>
             <div className="sidebar-runtime-copy">
               <b>Máy chủ cục bộ</b>
-              <span>Cổng 3200 · V1.0.1</span>
+              <span>{RUNTIME_LABEL}</span>
             </div>
           </div>
         </div>
@@ -96,3 +100,5 @@ export function AppShell() {
     </div>
   );
 }
+
+

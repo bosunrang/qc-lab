@@ -38,6 +38,11 @@ assert.equal(candidate.data.eligible, true);
 assert.equal(candidate.data.proposed.rejected, 0);
 assert.equal(candidate.data.proposed.warnings, 0);
 
+// Chỉnh thủ công vẫn phải đi qua CÙNG cổng đủ dữ liệu, đồng thời main không
+// nhận Mean/SD lẻ hoặc SD không hợp lệ từ bất kỳ client IPC nào.
+assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Chỉnh dải sau rà soát chuyên môn', mean: 10.1 } }, actor).error.code, 'incomplete-manual-range');
+assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Chỉnh dải sau rà soát chuyên môn', mean: 10.1, sd: 0 } }, actor).error.code, 'invalid-manual-range');
+
 const applied = entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Đủ hai mươi ngày độc lập để lập dải' } }, actor);
 assert.equal(applied.ok, true, JSON.stringify(applied));
 assert.equal(applied.data.source, 'lab');
@@ -59,7 +64,16 @@ assert.equal(reverted.mean, 10);
 assert.equal(reverted.sd, 1);
 assert.equal(JSON.parse(reverted.mean_sd_history_json).length, 2);
 
-// Nếu có NCE sai số hệ thống, app cũ yêu cầu xác nhận nguyên nhân và Bias
+const manualApplied = entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Điều chỉnh sau khi rà soát hồ sơ hiệu chuẩn', mean: 10.05, sd: 0.25 } }, actor);
+assert.equal(manualApplied.ok, true, JSON.stringify(manualApplied));
+const afterManual = config.listTestLevels(test.id)[0];
+assert.equal(afterManual.mean, 10.05);
+assert.equal(afterManual.sd, 0.25);
+const manualAction = db.prepare("SELECT detail_json FROM actions WHERE rule='Thiết lập dải QC mới' ORDER BY created_at DESC LIMIT 1").get();
+assert.equal(JSON.parse(manualAction.detail_json).selection, 'chỉnh thủ công');
+assert.deepEqual(JSON.parse(manualAction.detail_json).applied, { mean: 10.05, sd: 0.25 });
+
+// Nếu có NCE sai số hệ thống, hệ thống yêu cầu xác nhận nguyên nhân và Bias
 // nằm trong TEa/4 trước khi cho đổi dải.
 db.prepare("INSERT INTO actions(id,date,created_at,test_id,level,rule,nce_id) VALUES ('se-gate','2026-07-20','2026-07-20',?,?, '2-2s','NCE-SE-01')").run(test.id, 1);
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống' } }, actor).error.code, 'cause-not-confirmed');
@@ -108,3 +122,5 @@ assert.equal(blocked.data.proposed.rejected, 1, 'đếm điểm thuộc lần ch
 assert.equal(blocked.data.eligible, false, 'lần chạy bị loại thì chưa được lập dải');
 
 console.log('app range workflow end-to-end tests passed');
+
+

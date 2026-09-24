@@ -123,3 +123,5 @@ test('WG17: lý do lần chạy bị loại đọc từ main, không tự dò l�
   assert.equal((page.match(/runExclusionLabel\(p\)/g) || []).length, 2, 'cả bảng lô hiện hành lẫn tab nhóm lô đã dừng đều dùng chung nhãn');
   assert.doesNotMatch(page, /candidate\.verdict === 'rej'/, 'không còn vòng dò lại ở renderer');
 });
+
+

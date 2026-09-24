@@ -8,3 +8,5 @@ assert.equal(result.N, 6); assert.ok(Math.abs(result.bias - 1) < 1e-9); assert.e
 assert.equal(calculateReagentComparison({ rows: [[10, 10], [20, 20]] }, 5), null);
 assert.deepEqual(reagentValidPairs([['12abc', '13'], ['12.5', '13.5'], [-2, '-1']]), { o: [12.5, -2], n: [13.5, -1] });
 console.log('app reagent-stats tests passed');
+
+

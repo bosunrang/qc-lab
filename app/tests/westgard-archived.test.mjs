@@ -64,3 +64,5 @@ assert.deepEqual(blocks.map((block) => block.analysis.points[0].runRejectedBy), 
   'cả hai mức của lần chạy R4s đều là lý do lần chạy bị loại');
 
 console.log('app archived Westgard history end-to-end tests passed');
+
+

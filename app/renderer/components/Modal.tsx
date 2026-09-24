@@ -1,23 +1,3 @@
-// Modal form dùng chung (CRUD: máy/xét nghiệm/lô/panel/...) — portal thật
-// vào #modalRoot, KHÔNG dangerouslySetInnerHTML/chuỗi HTML như app cũ đang
-// phải strangler-fig dần (xem docs/APP-V2-PLAN.md mục "Giống app cũ nghĩa
-// là gì" → mục 3). Tách lớp với Dialog (confirm/info/reauth, #dialogRoot) để
-// dialog luôn nổi trên modal, đúng lý do bản cũ đã ghi lại.
-//
-// **2026-09-03**: đổi TÊN CLASS về đúng app cũ (`.modal-bg`/`.modal`/
-// `.modal-h`/`.modal-b`/`.modal-f`/`.modal-close`) thay cho bộ tên tự đặt
-// (`.overlay-backdrop`/`.modal-box`/`.modal-box-header`/…). Giá trị CSS
-// trước đó đã copy đúng, nhưng TÊN khác làm app mất sạch những rule của
-// app cũ scope theo tên đó — `.modal-b>label:first-child{margin-top:0}`,
-// `.modal-h h3`, `.rcfg-modal input[type=checkbox]`, breakpoint 760px biến
-// modal thành sheet dán đáy (`.modal{width:100%;border-radius:12px 12px 0 0}`)
-// — và làm gate `css-parity` không thể canh (nó chỉ hỏi về class app ĐANG
-// dùng). Phát hiện khi đo thật bên trong modal: KHÔNG một class modal nào của
-// app cũ tồn tại ở app, mà cả 3 gate đều xanh vì không gate nào MỞ modal.
-//
-// `width` (prop số) vẫn giữ cho các chỗ gọi cũ, nhưng mặc định giờ là 560px
-// đúng `.modal` app cũ; cách app cũ làm là mỗi modal thêm 1 class riêng
-// (`.rcfg-modal{width:700px}`) — `className` phục vụ đúng việc đó.
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from './useFocusTrap';
@@ -89,3 +69,5 @@ export function Modal({ title, onClose, children, footer, width, className }: {
     root,
   );
 }
+
+

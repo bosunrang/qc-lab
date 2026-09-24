@@ -7,7 +7,6 @@
 // 'node:fs'` ở đầu file là cả handler không nạp được trong tab.
 //
 // Bản trình duyệt: `db-file-size-browser.ts`, thay vào bởi plugin
-// `swap-node-only-modules-for-browser` trong vite.app-renderer.config.mjs.
 import { statSync } from 'node:fs';
 
 export function dbFileBytes(dbPath: string): number {
@@ -18,3 +17,5 @@ export function dbFileBytes(dbPath: string): number {
     return 0;
   }
 }
+
+

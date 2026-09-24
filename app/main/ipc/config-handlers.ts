@@ -78,12 +78,6 @@ export function createConfigHandlers(db: Db) {
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy máy xét nghiệm.' } };
     const testCount = (db.prepare('SELECT COUNT(*) AS n FROM tests WHERE instrument_id=?').get(id) as { n: number }).n;
     if (testCount > 0) return { ok: false, error: { code: 'in-use', message: `Không thể xoá — máy này đang gắn với ${testCount} xét nghiệm. Xoá/chuyển các xét nghiệm đó trước.` } };
-    // Port `instrumentRemoval()` app cũ — 2 cổng ĐỘC LẬP (xét nghiệm VÀ Panel
-    // QC có thể gắn trực tiếp vào máy mà không qua xét nghiệm nào, vd Panel
-    // tạo trước khi thêm xét nghiệm). Thiếu cổng này thì xoá máy còn Panel
-    // gắn sẽ ném lỗi FOREIGN KEY constraint thô (schema bật `PRAGMA
-    // foreign_keys=ON`, `qc_panels.instrument_id` không có ON DELETE CASCADE)
-    // thay vì trả `IpcResult` báo lỗi rõ ràng như mọi handler khác.
     const panelCount = (db.prepare('SELECT COUNT(*) AS n FROM qc_panels WHERE instrument_id=?').get(id) as { n: number }).n;
     if (panelCount > 0) return { ok: false, error: { code: 'in-use', message: `Không thể xoá — máy này đang gắn với ${panelCount} Panel QC. Xoá/chuyển các Panel QC đó trước.` } };
     inTransaction(() => {
@@ -94,11 +88,11 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { id } };
   }
 
-  // App cũ KHÔNG sắp xếp `state.tests` ở đâu cả (`manageAssaysModel()`/
+  // hệ thống KHÔNG sắp xếp `state.tests` ở đâu cả (`manageAssaysModel()`/
   // `PanelModal.tsx`'s `allTests` chỉ `.filter()`/`.map()` thẳng lên mảng) —
   // thứ tự hiển thị (danh mục xét nghiệm, danh sách chọn trong Panel QC...)
   // LÀ thứ tự tạo (xét nghiệm thêm trước nằm trước). `ORDER BY name` trước
-  // đây tự sắp lại theo alphabet, sai với hành vi app cũ. `rowid` (ngầm định
+  // đây tự sắp lại theo alphabet, sai với hành vi hệ thống. `rowid` (ngầm định
   // của SQLite cho bảng có PK dạng TEXT) chính là thứ tự chèn.
   function listTests() {
     return db.prepare('SELECT * FROM tests ORDER BY rowid').all();
@@ -227,10 +221,6 @@ export function createConfigHandlers(db: Db) {
           tea_source=?,tea_ref_key=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
           .run(name, result.data.instrumentId, unit, decimalPlaces, tea, section,
             teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0, id);
-        // Port đúng `saveAssay()` app cũ: khi đổi máy của xét nghiệm, tự gỡ
-        // xét nghiệm khỏi mọi Panel QC thuộc máy KHÁC máy mới. Nếu không,
-        // thao tác sửa xét nghiệm tự tạo ra trạng thái mà `savePanel()` vốn
-        // từ chối (`wrong-instrument`) và Panel vẫn âm thầm chứa dữ liệu sai.
         if (existing.instrument_id !== result.data.instrumentId) {
           removedPanelMemberships = Number(db.prepare(`DELETE FROM qc_panel_tests
             WHERE test_id=? AND panel_id IN (SELECT id FROM qc_panels WHERE instrument_id!=?)`)
@@ -251,8 +241,6 @@ export function createConfigHandlers(db: Db) {
       db.prepare(`INSERT INTO tests(id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,method,reagent,cusum_on,cusum_k,cusum_h,active)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(newId, name, result.data.instrumentId, unit, decimalPlaces, tea, section, teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0);
-      // Mức mặc định: mọi xét nghiệm mới bắt đầu với đúng 1 Mức 1, chưa gán lô
-      // (tham khảo defaultAssayLevels() bản cũ) — thêm mức khác qua saveTestLevel.
       db.prepare('INSERT INTO test_levels(id,test_id,level) VALUES (?,?,1)').run(`${newId}:1`, newId);
       writeAudit(db, actor, 'Thêm xét nghiệm', `Tạo xét nghiệm "${name}"`, name);
       db.exec('COMMIT');
@@ -280,13 +268,7 @@ export function createConfigHandlers(db: Db) {
     return rows.map((row) => ({ ...row, operational: operational.has(row.level) ? 1 : 0 })) as unknown as TestLevel[];
   }
 
-  /** Sau khi một mức QC rời lô của nhóm A sang lô của nhóm B: nhóm A nếu
-   * KHÔNG CÒN mức nào dùng nữa thì đánh dấu "Đã dừng"; nhóm B đang chạy thật
-   * nên gỡ mọi nhãn (`stopped`/`planned`). Port `commitTargetMatrix` app cũ,
-   * nhưng có MỘT khác biệt có chủ đích: app cũ dừng nhóm A ngay cả khi nhóm đó
-   * còn xét nghiệm khác đang dùng — mà nhóm `stopped` bị loại khỏi "mức QC
-   * đang vận hành", nên những xét nghiệm ở lại sẽ biến mất khỏi thẻ Nhập QC và
-   * Westgard. Ở đây chỉ dừng khi nhóm thật sự hết được dùng. */
+
   function syncLotGroupStatusAfterMove(fromLotId: string, toLotId: string, at: string): void {
     const groupIdOf = (lotId: string) => (db.prepare('SELECT group_id FROM qc_lots WHERE id=?').get(lotId) as { group_id: string | null } | undefined)?.group_id || '';
     const fromGroup = groupIdOf(fromLotId);
@@ -313,7 +295,7 @@ export function createConfigHandlers(db: Db) {
       if (selectedLot.level !== level) {
         return { ok: false, error: { code: 'wrong-lot-level', message: `Lô QC đã chọn thuộc Mức ${selectedLot.level}, không thể gán cho Mức ${level}.` } };
       }
-      // `targetRowState()` app cũ khoá toàn bộ hàng của lô đã hết dùng.
+      // `targetRowState()` hệ thống khoá toàn bộ hàng của lô đã hết dùng.
       if (selectedLot.depleted) return { ok: false, error: { code: 'depleted-lot', message: 'Lô QC đã hết dùng, không thể gán Mean/SD mới.' } };
     }
     const levelId = `${testId}:${level}`;
@@ -357,9 +339,6 @@ export function createConfigHandlers(db: Db) {
       // hết nghĩa — giữ lại sẽ thành số mồ côi, và lần kích hoạt nhóm sau đó
       // áp đè một giá trị cũ hơn cả giá trị vừa lưu.
       if (qcLotId) db.prepare('DELETE FROM planned_targets WHERE test_id=? AND level=? AND qc_lot_id=?').run(testId, level, qcLotId);
-      // Đổi lô sang nhóm khác thì trạng thái 2 nhóm phải đi theo — port
-      // `commitTargetMatrix(mode:'switch')` app cũ: nhóm bị thay đánh dấu
-      // "Đã dừng", nhóm vừa nhận gỡ nhãn (đang chạy thật rồi).
       if (existing && qcLotId && existing.qc_lot_id && existing.qc_lot_id !== qcLotId) {
         syncLotGroupStatusAfterMove(existing.qc_lot_id, qcLotId, today);
       }
@@ -443,11 +422,6 @@ export function createConfigHandlers(db: Db) {
             saved_at=excluded.saved_at, saved_by=excluded.saved_by`)
           .run(row.id, row.testId, row.level, row.lotId, row.mean, row.sd, row.low, row.high, at, actor.username || actor.name || '');
       }
-      // Nhãn "Dự kiến" trên thẻ nhóm lô — port `options.group.status='planned'`
-      // app cũ, để ở tab Lô & Nhóm QC nhìn ra ngay nhóm nào đã có sẵn Mean/SD
-      // chờ kích hoạt. Chỉ đặt cho nhóm CHƯA được dùng: nhóm `planned` bị loại
-      // khỏi "mức QC đang vận hành", nên gắn nhãn này lên một nhóm đang chạy
-      // sẽ làm các xét nghiệm của nó biến mất khỏi Nhập QC/Westgard.
       for (const groupId of new Set(prepared.map((row) => groupOfLot(row.lotId)).filter(Boolean))) {
         const lotIds = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(groupId) as { id: string }[]).map((r) => r.id);
         if (!lotGroupInUse(lotIds)) db.prepare("UPDATE lot_groups SET status='planned', stopped_at='' WHERE id=?").run(groupId);
@@ -514,7 +488,7 @@ export function createConfigHandlers(db: Db) {
    * khỏi mọi bộ lọc theo lô (Nhập QC/Westgard/Sigma): không khớp lô hiện tại
    * (chuỗi đã đổi) mà cũng không hiện ở "lô cũ" (không có hồ sơ chuyển tiếp
    * nào giữa 2 TÊN GỌI của cùng một lô). Đây là VIẾT LẠI HÀNG LOẠT bản ghi
-   * lịch sử, nên người dùng phải thấy con số TRƯỚC khi làm — đúng cách app cũ
+   * lịch sử, nên người dùng phải thấy con số TRƯỚC khi làm — đúng cách hệ thống
    * hỏi trong `saveConfigLot()`. */
   function previewLotRename(input: { id: string; lotNo: unknown }): IpcResult<
     { rename: null } | { rename: { oldLotNo: string; newLotNo: string; affected: number; lockedCount: number; lockedPeriods: string[] } }
@@ -549,8 +523,6 @@ export function createConfigHandlers(db: Db) {
         return { ok: false, error: { code: 'level-in-use', message: 'Lô QC đang gắn với xét nghiệm nên không thể đổi mức QC. Hãy bỏ gán lô trong Mean/SD trước.' } };
       }
     }
-    // Chặn trùng số lô ở CÙNG mức — port đúng `validateLot()` app cũ
-    // (`sameText()`, không phân biệt hoa/thường/dấu).
     const sameLevelLots = db.prepare('SELECT id, lot_no FROM qc_lots WHERE level=?').all(level) as { id: string; lot_no: string }[];
     if (sameLevelLots.some(row => row.id !== id && sameText(row.lot_no, lotNo))) {
       return { ok: false, error: { code: 'duplicate-lot', message: 'Số lô QC này đã tồn tại ở cùng mức QC.' } };
@@ -599,9 +571,7 @@ export function createConfigHandlers(db: Db) {
   }
 
   // ---- Nhóm lô QC ----
-  /** "Đang hoạt động" là trạng thái SUY, không lưu cứng — port
-   * `lotGroupInUse()` app cũ: true khi có ÍT NHẤT 1 lô của nhóm đang được
-   * gán (`test_levels.qc_lot_id`) cho xét nghiệm nào đó. */
+
   function lotGroupInUse(lotIds: string[]): boolean {
     if (!lotIds.length) return false;
     const placeholders = lotIds.map(() => '?').join(',');
@@ -637,7 +607,7 @@ export function createConfigHandlers(db: Db) {
     const requestedLotIds = Array.isArray(input.data.lotIds)
       ? [...new Set(input.data.lotIds.map(cleanId).filter(Boolean))]
       : [];
-    // `prepareLotGroup()` app cũ: tên trống tự ghép từ số lô theo đúng thứ
+    // `prepareLotGroup()` hệ thống: tên trống tự ghép từ số lô theo đúng thứ
     // tự người dùng chọn, ví dụ 1101/1102.
     const fallbackName = requestedLotIds.map(lotId => lotNoById.get(lotId)).filter(Boolean).join('/');
     const result = validateLotGroup(input.data, fallbackName);
@@ -646,9 +616,6 @@ export function createConfigHandlers(db: Db) {
     const knownLots = new Set(lotRows.map(r => r.id));
     const validLotIds = lotIds.filter(l => knownLots.has(l));
     if (validLotIds.length < 2) return { ok: false, error: { code: 'not-enough-lots', message: 'Nhóm lô QC cần ít nhất 2 lô hợp lệ.' } };
-    // Chặn trùng nhóm lô — port đúng `validateLotGroup()` app cũ: trùng TÊN
-    // (không phân biệt hoa/thường/dấu) HOẶC trùng NGUYÊN BỘ LÔ (không kể thứ
-    // tự) với một nhóm khác đã có.
     const otherGroups = (db.prepare('SELECT id, name FROM lot_groups WHERE id!=?').all(id || '') as { id: string; name: string }[]);
     const validLotIdSet = new Set(validLotIds);
     const sameLotSet = (otherId: string) => {
@@ -694,7 +661,6 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { ...groupRow, lotIds: validLotIds, inUse: lotGroupInUse(validLotIds) } };
   }
 
-  // ---- Panel QC ----
   function listPanels() {
     const panels = db.prepare('SELECT * FROM qc_panels ORDER BY name').all() as Omit<QcPanel, 'testIds'>[];
     // `ORDER BY` là BẮT BUỘC, không phải trang trí: thiếu nó thì SQLite đọc
@@ -718,7 +684,7 @@ export function createConfigHandlers(db: Db) {
     const knownTests = new Set(testRows.map((t) => t.id));
     const validTestIds = testIds.filter((t) => knownTests.has(t));
     if (!validTestIds.length) return { ok: false, error: { code: 'missing-tests', message: 'Chọn ít nhất một xét nghiệm hợp lệ.' } };
-    // App cũ coi MỌI id không tồn tại như một xét nghiệm không thuộc máy đã
+    // hệ thống coi MỌI id không tồn tại như một xét nghiệm không thuộc máy đã
     // chọn và từ chối TOÀN BỘ lần lưu. Không được âm thầm bỏ id hỏng rồi lưu
     // phần còn lại: kết quả sẽ khác với lựa chọn mà người dùng vừa xác nhận.
     if (validTestIds.length !== testIds.length) {
@@ -772,22 +738,7 @@ export function createConfigHandlers(db: Db) {
     planned: 'Dự kiến', active: 'Đang chạy song song', accepted: 'Chấp nhận lô mới', rejected: 'Không chấp nhận',
   };
 
-  /** Hồ sơ chuyển lô — MỘT hàm lưu duy nhất, đúng mô hình app cũ
-   * (`saveLotTransitionV2`/`ManageLotTransitionCommand.prepare/acceptanceGate/
-   * execute`): modal có 1 ô "Trạng thái" chọn được cả 4 giá trị + 1 nút Lưu
-   * duy nhất, KHÔNG phải các nút hành động tách rời (Kích hoạt/Chấp nhận/
-   * Không chấp nhận) như bản trước trong phiên này — bản đó tự nghĩ ra một
-   * luồng khác app cũ, người dùng đã yêu cầu sửa lại cho giống.
-   * `finalChanged` (đang chuyển SANG accepted/rejected LẦN ĐẦU) là điều
-   * kiện duy nhất cần re-auth (đã kiểm tra ở phía renderer TRƯỚC khi gọi
-   * hàm này, giống app cũ gọi `reauthenticateCurrentUser()` trước khi lưu).
-   * Chỉ 'accepted' mới thật sự áp Mean/SD ứng viên (`criteria`) vào
-   * `test_levels`, đánh dấu lô cũ hết dùng (`depleted`), và chuyển lô mới
-   * vào đúng nhóm lô của lô cũ — port `applyAcceptedLotTransition` app cũ,
-   * rút gọn theo mô hình FK `qc_lots.group_id` của app. Một khi đã
-   * 'accepted' thì KHÔNG đổi được status nữa (`accepted-immutable`, đúng
-   * `validateLotTransition()` app cũ: `switchesLot(old) && status!=='accepted'`)
-   * — 'rejected' thì KHÔNG khoá (app cũ cho sửa lại một hồ sơ đã từ chối). */
+
   function createLotTransition(
     input: { id?: string; data: LotTransitionInput & { criteria?: { testId: string; level: number; mean: number; sd: number; low?: number | null; high?: number | null }[] } },
     actor: Actor,
@@ -824,9 +775,6 @@ export function createConfigHandlers(db: Db) {
     const criteria = input.data.criteria || [];
 
     if (status === 'accepted' && finalChanged) {
-      // Cổng "acceptanceGate": mọi xét nghiệm trong Panel ĐANG DÙNG lô cũ
-      // phải có Mean/SD ứng viên hợp lệ mới cho chấp nhận — port nguyên văn
-      // 2 nhánh lỗi của `ManageLotTransitionCommand.acceptanceGate()`.
       const panelTests = db.prepare(`SELECT t.id, t.name FROM tests t
         JOIN qc_panel_tests pt ON pt.test_id=t.id WHERE pt.panel_id=?
         ORDER BY pt.position, pt.rowid`).all(panelId) as { id: string; name: string }[];
@@ -835,7 +783,7 @@ export function createConfigHandlers(db: Db) {
         .filter((row) => row.level);
       if (!rows.length) return { ok: false, error: { code: 'no-target-tests', message: 'Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.' } };
       // Mean có thể bằng 0 hoặc âm (ví dụ Base excess); chỉ SD bắt buộc >0.
-      // App cũ kiểm `Number.isFinite(mean)` qua snapshot Mean/SD, không kiểm
+      // hệ thống kiểm `Number.isFinite(mean)` qua snapshot Mean/SD, không kiểm
       // `mean > 0`. Điều kiện cũ làm hồ sơ hợp lệ không thể được chấp nhận.
       const missing = rows.filter((row) => !criteria.some((c) => c.testId === row.t.id
         && c.level === row.level!.level && Number.isFinite(Number(c.mean))
@@ -856,7 +804,7 @@ export function createConfigHandlers(db: Db) {
         // trong modal chuyển lô là số của NHÀ SẢN XUẤT cho lô mới, không đi
         // qua luồng "Xây dựng dải PXN" riêng (`rangeCandidate()`/
         // `applyNewRange()` ở trang Nhập QC & Biểu đồ) — đúng
-        // `applyPlannedTarget()` app cũ luôn ghi `source:'mfg'` cho Mean/SD
+        // `applyPlannedTarget()` hệ thống luôn ghi `source:'mfg'` cho Mean/SD
         // nhập trong modal chuyển lô. Ghi 'lab' ở đây là bug thật (người
         // dùng phát hiện qua cột "Nguồn" của tab Lịch sử dữ liệu hiện PXN
         // cho lô vừa chuyển tiếp, dù chưa hề qua trang Nhập QC).
@@ -871,18 +819,6 @@ export function createConfigHandlers(db: Db) {
             toLot.opened || startDate || at.slice(0, 10), level.id);
       }
       db.prepare('UPDATE qc_lots SET depleted=1 WHERE id=?').run(fromLotId);
-      // Port ĐÚNG `applyAcceptedLotTransition()` app cũ — KHÔNG chỉ đơn
-      // giản là "gỡ group_id của lô cũ": app cũ LƯU TRỮ nguyên trạng thái
-      // CŨ của nhóm thành một bản ghi RIÊNG (tên/hãng/vật liệu/mã hàng cũ,
-      // vẫn giữ lô cũ làm thành viên, đánh dấu "Đã lưu trữ" kèm ghi chú
-      // "Đã dùng khi chuyển tiếp lô X sang Y"), còn nhóm ĐANG HOẠT ĐỘNG giữ
-      // NGUYÊN id gốc — chỉ thay lô cũ bằng lô mới trong danh sách thành
-      // viên (các lô KHÁC trong nhóm không phải di chuyển đi đâu vì nhóm
-      // gốc vẫn còn đó) và tự đổi tên theo tổ hợp lô mới NẾU tên đang là tên
-      // tự đặt (không đổi nếu người dùng đã đặt tên riêng). Bản trước trong
-      // phiên này chỉ gỡ group_id của lô cũ về NULL — sai theo ảnh chụp
-      // người dùng gửi (app cũ giữ lô cũ lại trong một nhóm "Đã lưu trữ",
-      // không thả nó ra khỏi mọi nhóm).
       if (fromLot.group_id) {
         const group = db.prepare('SELECT * FROM lot_groups WHERE id=?').get(fromLot.group_id) as
           { id: string; name: string; manufacturer: string; material: string; catalog: string } | undefined;
@@ -891,10 +827,6 @@ export function createConfigHandlers(db: Db) {
           const oldName = members.map((m) => m.lot_no).join('/');
           const autoNamed = !group.name || group.name === oldName;
           const archivedId = cleanId(uid());
-          // Ảnh chụp NGUYÊN VẸN thành viên cũ (kể cả lô KHÔNG chuyển tiếp,
-          // vd lô B khi A→C) — port đúng `applyAcceptedLotTransition()` app
-          // cũ (`lotIds: oldIds`). Không chốt lại thì card "Đã lưu trữ" chỉ
-          // còn đúng lô đã chuyển tiếp, thiếu lô B dù tên nhóm vẫn "A/B".
           const archivedLotIdsJson = JSON.stringify(members.map((m) => m.id));
           db.prepare(`INSERT INTO lot_groups(id,name,manufacturer,material,catalog,note,active,status,stopped_at,archived_lot_ids_json)
             VALUES (?,?,?,?,?,?,0,'stopped',?,?)`)
@@ -960,10 +892,6 @@ export function createConfigHandlers(db: Db) {
     const { name, unit, section, labValue, labSource, reference, reason, effectiveDate, approvedDate, nextReviewDate, preparedBy, approvedBy } = result.data;
     const sourcesJson = JSON.stringify({ reference, reason, effectiveDate, approvedDate, approvedBy });
     const sourceLabel = TEA_LAB_SOURCE_LABELS[labSource] || labSource;
-    // Đầy đủ trường tuân thủ trong `detail` — port đúng `saveLabProfile()`
-    // app cũ. Trước đây chỉ ghi "Cập nhật X"/"Tạo X", không có gì để đối
-    // chiếu khi rà soát ISO 15189 dù toàn bộ các trường này đã có sẵn lúc
-    // lưu (nguồn/tham chiếu/lý do/ngày hiệu lực-duyệt/người chuẩn bị-duyệt).
     const detailOf = (before: number | null) =>
       `${name} · ${before ?? '—'}% → ${labValue}% · ${sourceLabel} · ${reference} · Hiệu lực ${dmy(effectiveDate)}`
       + ` · Xây dựng: ${preparedBy} · Phê duyệt: ${approvedBy} (${dmy(approvedDate)})`
@@ -991,11 +919,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: saved };
   }
 
-  /** Sửa trực tiếp TEa CLIA%/Ricos% của MỘT analyte trong danh mục tích hợp
-   * — port `teaRefEdit(analyteId, field, value)` app cũ. Ghi đè được lưu
-   * thành 1 hàng `tea_refs` khoá theo `analyte_id`; để trống ô = xoá ghi đè
-   * (nếu hàng đó cũng không có hồ sơ TEa PXN thì xoá luôn hàng, để bảng quay
-   * về đúng giá trị mặc định của danh mục thay vì giữ một hàng rỗng). */
+
   function setTeaRefValue(
     input: { analyteId: unknown; field: unknown; value: unknown; name?: unknown; unit?: unknown; section?: unknown },
     actor: Actor,
@@ -1037,13 +961,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { analyteId } };
   }
 
-  /** Thêm một DÒNG analyte mới vào bảng TEa tham chiếu (nút "＋ Thêm xét
-   * nghiệm" ở tab TEa, modal "Thêm xét nghiệm tham chiếu" của app cũ —
-   * `teaRefAddSubmit()`). Khác hẳn `saveTeaRef` (hồ sơ TEa CHUẨN HOÁ của
-   * PXN, bắt buộc 6 trường gồm giá trị > 0 và lý do ≥10 ký tự): ở đây chỉ
-   * khai một analyte danh mục mới, TEa CLIA%/Ricos% đều có thể để trống.
-   * app trước đó thiếu hẳn nghiệp vụ này và nút toolbar mở sai modal (mở
-   * "Thêm hồ sơ TEa"), phát hiện khi dò trigger modal cho gate parity. */
+
   function addTeaAnalyte(
     input: { name: unknown; abbreviation?: unknown; matrix?: unknown; unit?: unknown; section?: unknown; clia?: unknown; ricos?: unknown; cliaRule?: unknown; cliaAbsolute?: unknown; cliaAbsoluteUnit?: unknown },
     actor: Actor,
@@ -1058,7 +976,7 @@ export function createConfigHandlers(db: Db) {
       return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
     };
     // Khoá analyte suy từ tên (bỏ dấu, gạch nối) — cùng quy ước
-    // `teaAnalyteKey()` app cũ để hồ sơ PXN và ghi đè CLIA/Ricos khớp nhau.
+    // `teaAnalyteKey()` hệ thống để hồ sơ PXN và ghi đè CLIA/Ricos khớp nhau.
     const analyteId = cleanId(name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || uid());
     const existing = db.prepare('SELECT id FROM tea_refs WHERE analyte_id=?').get(analyteId) as { id: string } | undefined;
     if (existing) return { ok: false, error: { code: 'duplicate', message: `Đã có xét nghiệm tham chiếu "${name}".` } };
@@ -1078,7 +996,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { analyteId } };
   }
 
-  /** Bỏ MỌI ghi đè CLIA/Ricos của 1 analyte (nút "Khôi phục" app cũ) — giữ
+  /** Bỏ MỌI ghi đè CLIA/Ricos của 1 analyte (nút "Khôi phục" hệ thống) — giữ
    * lại hồ sơ TEa PXN nếu có, chỉ trả 2 giá trị tham chiếu về mặc định. */
   function restoreTeaRefDefaults(input: { analyteId: unknown }, actor: Actor): IpcResult<{ analyteId: string }> {
     const denied = requireAdmin(actor); if (denied) return denied;
@@ -1108,15 +1026,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { id } };
   }
 
-  /** Xoá RIÊNG hồ sơ TEa PXN (khác `removeTeaRef` — xoá cả dòng analyte) —
-   * port `teaLabProfileRemove()`/`removeLabProfile()` app cũ: chỉ xoá 5 cột
-   * `lab*`/`sources_json`, GIỮ LẠI dòng nếu nó còn mang thông tin khác
-   * (CLIA/Ricos% ghi đè, HOẶC `abbreviation`/`matrix` — 2 cột chỉ được ghi
-   * qua `addTeaAnalyte()`, tức đây là 1 analyte TỰ THÊM, không phải chỉ tồn
-   * tại vì có hồ sơ PXN). Trước đây app KHÔNG có đường nào xoá hồ sơ PXN
-   * của một analyte có sẵn trong danh mục tích hợp — chỉ xoá được cả dòng
-   * (`removeTeaRef`, dùng cho analyte tự thêm) hoặc "Khôi phục" (chỉ xoá
-   * CLIA/Ricos% ghi đè, không đụng hồ sơ PXN). */
+
   function removeTeaLabProfile(input: { id: unknown }, actor: Actor): IpcResult<{ id: string; removedRecord: boolean }> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = String(input.id || '');
@@ -1135,18 +1045,12 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { id, removedRecord } };
   }
 
-  // ── Xoá lô / nhóm lô / hồ sơ chuyển lô (Giai đoạn D3.4) ──────────────────
-  // App cũ có nút "Xóa" trên từng dòng ở cả 3 chỗ này; app trước đó KHÔNG
-  // có đường nào xoá. Cổng chặn port nguyên văn cả thông báo từ
-  // `lotRemoval()`/`lotGroupRemoval()` của `manage-config-service.ts` app cũ
-  // — đây là lời giải thích cho người dùng biết phải sửa gì trước khi xoá,
-  // không phải chuỗi tuỳ ý.
 
   /** Chặn xoá lô đang được gán Mean/SD cho một mức QC, hoặc lô đã đi qua một
-   * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (app cũ: "đã CHẤP NHẬN", tức đã áp vào
+   * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (hệ thống: "đã CHẤP NHẬN", tức đã áp vào
    * cấu hình/Mean-SD) — xoá thẳng sẽ để lại mức QC trỏ vào lô không còn tồn
    * tại. Xoá được thì dọn luôn các hồ sơ chuyển lô còn dở dang trỏ tới nó,
-   * đúng như `removeLot()` app cũ làm. */
+   * đúng như `removeLot()` hệ thống làm. */
   /** Kỳ báo cáo đã khoá hay chưa — đọc thẳng `period_locks` bằng SQL RIÊNG
    * của handler này, chỉ dùng chung hàm thuần `ymOfDate()` với
    * entry-handlers (quy ước "handler không import handler khác", xem
@@ -1202,9 +1106,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { id, pointsCount: 0 } };
   }
 
-  /** Xoá Panel QC — port `panelRemoval()` app cũ: chặn khi panel còn hồ sơ
-   * chuyển tiếp lô. Các xét nghiệm bên trong GIỮ NGUYÊN (chỉ gỡ bảng nối),
-   * đúng chi tiết app cũ ghi trong hộp xác nhận. */
+
   function removePanel(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = String(input.id || '');
@@ -1259,7 +1161,7 @@ export function createConfigHandlers(db: Db) {
   }
 
   /** Xoá NHÓM lô nhưng GIỮ NGUYÊN các lô bên trong (chỉ gỡ `group_id`) —
-   * đúng chi tiết app cũ hiện trong hộp xác nhận: "Các lô QC bên trong vẫn
+   * đúng chi tiết hệ thống hiện trong hộp xác nhận: "Các lô QC bên trong vẫn
    * được giữ nguyên." */
   function removeLotGroup(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
     const denied = requireAdmin(actor); if (denied) return denied;
@@ -1291,10 +1193,6 @@ export function createConfigHandlers(db: Db) {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name, status FROM lot_groups WHERE id=?').get(id) as { id: string; name: string; status: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy nhóm lô QC.' } };
-    // Chỉ dừng được nhóm đang THẬT SỰ hoạt động — port `lotGroupToggleAction()`
-    // app cũ: nút "Dừng" chỉ hiện khi status không phải 'stopped'/'planned' VÀ
-    // nhóm đang được dùng (`inUse`). Trước đây kiểm `status==='active'`, một
-    // literal KHÔNG BAO GIỜ được lưu nữa từ khi sửa mô hình trạng thái.
     const lotIds = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(id) as { id: string }[]).map(r => r.id);
     if (existing.status === 'stopped' || existing.status === 'planned' || !lotGroupInUse(lotIds)) {
       return { ok: false, error: { code: 'not-stoppable', message: 'Chỉ dừng được nhóm lô đang chạy.' } };
@@ -1307,11 +1205,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { id } };
   }
 
-  /** Ảnh chụp Mean/SD đã lưu cho ĐÚNG lô này — port `qcLotTargetSnapshot()`
-   * app cũ: ưu tiên giá trị đang gắn nếu mức đang dùng chính lô đó, nếu không
-   * thì tìm NGƯỢC trong `mean_sd_history_json` bản ghi khớp `qcLotId`. Không
-   * suy ra từ điểm QC — kích hoạt nhóm lô phải dùng Mean/SD ĐÃ ĐƯỢC PHÊ
-   * DUYỆT, không phải số tính lại. */
+
   function lotTargetSnapshot(level: { qc_lot_id?: string | null; mean: number | null; sd: number | null; low: number | null; high: number | null; mean_sd_history_json?: string | null }, lotId: string) {
     const finite = (value: unknown) => Number.isFinite(Number(value));
     if (level.qc_lot_id === lotId && finite(level.mean) && finite(level.sd)) {
@@ -1323,16 +1217,7 @@ export function createConfigHandlers(db: Db) {
     return found ? { mean: Number(found.mean), sd: Number(found.sd), low: found.low ?? null, high: found.high ?? null } : null;
   }
 
-  /** Kích hoạt nhóm lô: áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các mức
-   * QC tương ứng, chuyển các mức đó sang dùng lô của nhóm này, và DỪNG những
-   * nhóm lô bị thay thế. Port `activateLotGroup`/`applyLotGroupActivation` app
-   * cũ — app trước đó chỉ có `stopLotGroup` (một chiều), nên một nhóm đã
-   * dừng không có đường bật lại và nhóm mới không có đường áp Mean/SD.
-   *
-   * 3 trạng thái trả về, y hệt app cũ vì mỗi cái cần một thông báo khác:
-   * `applied` (đã áp N mức), `already-active` (không có gì mới để áp nhưng
-   * nhóm đang được dùng — vẫn gỡ nhãn "đã dừng"), `unready` (chưa mức nào có
-   * Mean/SD hợp lệ cho lô của nhóm, KHÔNG đụng gì). */
+
   function activateLotGroup(input: { id: unknown }, actor: Actor): IpcResult<{ status: 'applied' | 'already-active' | 'unready'; applied: number; stoppedGroups: string[] }> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = String(input.id || '');
@@ -1378,8 +1263,6 @@ export function createConfigHandlers(db: Db) {
       if (!lotGroupInUse(lots.map(lot => lot.id))) {
         return { ok: false, error: { code: 'unready', message: 'Chưa mức QC nào có Mean/SD đã lưu cho lô của nhóm này. Hãy nhập Mean/SD cho lô mới trước khi kích hoạt.' } };
       }
-      // status='' (không phải 'active') — "Đang hoạt động" giờ SUY từ
-      // `inUse`, không phải literal lưu cứng (port đúng app cũ).
       inTransaction(() => {
         db.prepare("UPDATE lot_groups SET status='', stopped_at='' WHERE id=?").run(id);
         writeAudit(db, actor, 'Kích hoạt nhóm lô QC', `Nhóm "${group.name}" đã đang được dùng, không có mức nào cần áp thêm`, group.name);
@@ -1390,7 +1273,7 @@ export function createConfigHandlers(db: Db) {
 
     // Nhóm lô nào đang giữ các mức bị thay thế thì bị DỪNG — nhưng chỉ khi
     // nó KHÔNG CÒN mức QC nào dùng nữa (kiểm lại SAU khi đã áp, bên trong
-    // transaction). App cũ dừng ngay không kiểm: nếu chỉ một phần xét nghiệm
+    // transaction). hệ thống dừng ngay không kiểm: nếu chỉ một phần xét nghiệm
     // có Mean/SD cho lô mới thì nhóm cũ vẫn bị gắn "Đã dừng" trong khi những
     // xét nghiệm ở lại vẫn dùng lô của nó — mà nhóm `stopped` bị loại khỏi
     // "mức QC đang vận hành", nên các xét nghiệm đó BIẾN MẤT khỏi thẻ Nhập QC
@@ -1411,9 +1294,9 @@ export function createConfigHandlers(db: Db) {
           { lot_no: string; opened: string } | undefined : undefined;
         const nextFrom = lots.find((lot) => lot.id === candidate.lotId)?.opened || at.slice(0, 10);
         // `test_levels` KHÔNG có cột `lot` — số lô lấy qua `qc_lot_id`
-        // (khác app cũ, nơi mức QC giữ cả nhãn lô dạng chuỗi).
+        // (khác hệ thống, nơi mức QC giữ cả nhãn lô dạng chuỗi).
         // Nguồn 'mfg' (NSX), KHÔNG phải 'lab' — cùng bug/lý do đã sửa ở
-        // `createLotTransition`'s cascade: `applyTargetPick()` app cũ (dùng
+        // `createLotTransition`'s cascade: `applyTargetPick()` hệ thống (dùng
         // chung bởi Mean/SD tab VÀ kích hoạt nhóm lô) LUÔN ghi `source:'mfg'`;
         // 'lab' (PXN) chỉ dành riêng cho luồng "Xây dựng dải PXN" ở trang
         // Nhập QC & Biểu đồ (`RangeWorkflowCommand`).
@@ -1448,8 +1331,7 @@ export function createConfigHandlers(db: Db) {
 
   /** Xoá hồ sơ chuyển lô. Hồ sơ ĐÃ KẾT LUẬN không xoá được: kết luận là bản
    * ghi đã áp vào cấu hình, xoá đi thì mất dấu vết vì sao Mean/SD đổi. */
-  /** Nhãn lô đọc được ("1101 · Mức 1"), thay id thô — port `manageLotLabel()`
-   * app cũ, dùng cho mọi dòng audit liên quan tới lô/hồ sơ chuyển lô. */
+
   function lotLabel(lotId: string): string {
     const lot = db.prepare('SELECT lot_no, level FROM qc_lots WHERE id=?').get(lotId) as { lot_no: string; level: number } | undefined;
     return lot ? `${lot.lot_no} · Mức ${lot.level}` : 'Chưa chọn lô';
@@ -1464,9 +1346,6 @@ export function createConfigHandlers(db: Db) {
     if (existing.status === 'accepted') {
       return { ok: false, error: { code: 'accepted-applied', message: 'Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xóa trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công.' } };
     }
-    // Nhãn lô đọc được thay id thô — port đúng app cũ (`lotLabel()`, xem
-    // manage-lot-transition-command.ts: target là tên loại thao tác tĩnh,
-    // detail nêu rõ lô nào → lô nào, không phải id nội bộ không ai đọc được.
     const detail = `${lotLabel(existing.from_lot_id)} → ${lotLabel(existing.to_lot_id)}`;
     inTransaction(() => {
       db.prepare('DELETE FROM lot_transitions WHERE id=?').run(id);
@@ -1487,3 +1366,5 @@ export function createConfigHandlers(db: Db) {
 }
 
 export type ConfigHandlers = ReturnType<typeof createConfigHandlers>;
+
+

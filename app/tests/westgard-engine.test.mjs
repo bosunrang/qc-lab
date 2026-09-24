@@ -10,3 +10,5 @@ const verdict = westgard([{ val: 10 }, { val: 14 }], 10, 1, rule => rule === '1-
 assert.deepEqual(verdict.F[1], { level: 'rej', rules: ['1-3s'], supportRules: [] });
 assert.deepEqual(cusumScan([{ val: 11 }, { val: 11 }], 10, 1, .5, 4, 5).cPos, [.5, 1]);
 console.log('app westgard-engine tests passed');
+
+

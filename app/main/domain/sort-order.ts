@@ -10,8 +10,8 @@
 // cùng cờ numeric, chỉ khác ở chỗ collator được tạo một lần.
 const RUN_COLLATOR = new Intl.Collator('vi', { numeric: true });
 
-/** So sánh mã lần chạy ("2026-03-02-10" phải đứng sau "...-9", nên cần
- * `numeric:true`). */
+/** So sánh mã lần chạy theo thứ tự tự nhiên, để "2026-03-02-10" đứng sau
+ * "2026-03-02-9". */
 export function compareRunId(a: string, b: string): number {
   return RUN_COLLATOR.compare(a, b);
 }
@@ -38,3 +38,4 @@ export function compareIsoDate(a: string, b: string): number {
 export function compareQcPointOrder(a: { date: string; run_id: string }, b: { date: string; run_id: string }): number {
   return compareIsoDate(a.date, b.date) || compareRunId(a.run_id, b.run_id);
 }
+

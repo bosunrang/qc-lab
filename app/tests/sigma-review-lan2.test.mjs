@@ -173,7 +173,6 @@ test('SG18: MDC vẽ đúng vị trí thật của điểm ngoài thang mặc đ
   const level = { level: 1, tea: 10, cv: 9.5, biasEqa: 13, sigma: { tea: 10, sigma: (10 - 13) / 9.5 } };
   const svg = renderToStaticMarkup(React.createElement(components.SigmaMdcChart, { periods: [{ id: 'p', period: '2026-08', tea: 10, levels: [level] }] }));
   const [circle] = [...svg.matchAll(/<circle[^>]*cx="([^"]+)"[^>]*cy="([^"]+)"/g)].map((m) => [Number(m[1]), Number(m[2])]);
-  // xMax = 100, yMax = 150 → x = 45 + 939·0,95 ; y = 233 − 210·130/150
   assert.ok(Math.abs(circle[0] - (45 + 939 * 0.95)) < 1e-6, `cx thật, không phải mép: ${circle[0]}`);
   assert.ok(Math.abs(circle[1] - (233 - 210 * 130 / 150)) < 1e-6, `cy thật, không phải mép: ${circle[1]}`);
   assert.notEqual(circle[0], 45 + 939, 'không được kẹp về xMax cũ (60%)');
@@ -194,3 +193,5 @@ test('SG19: u(Cref) chỉ được báo cáo khi thật sự vào ngân sách MU
   assert.equal(withBias.uCref, 0.8);
   assert.ok(Math.abs(withBias.uBias - Math.hypot(1.5, 0.8)) < 1e-12);
 });
+
+

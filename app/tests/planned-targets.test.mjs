@@ -157,8 +157,8 @@ const levelOf = (testId, level = 1) => cfg.listTestLevels(testId).find((row) => 
   assert.equal(cfg.listPlannedTargets().length, 0, 'xoá lô phải kéo theo dòng dự kiến của lô đó');
 }
 
-// ---- 9) Trạng thái nhóm lô đi theo, đúng nghiệp vụ app cũ
-// App cũ: lưu "Dự kiến" thì nhóm nhận số mang nhãn 'planned'; "Chuyển qua nhóm
+// ---- 9) Trạng thái nhóm lô đi theo, đúng nghiệp vụ hệ thống
+// hệ thống: lưu "Dự kiến" thì nhóm nhận số mang nhãn 'planned'; "Chuyển qua nhóm
 // lô này" thì nhóm bị thay mang nhãn 'stopped' còn nhóm mới gỡ nhãn.
 {
   const t1 = un(cfg.saveTest({ data: { name: 'Natri', instrumentId: ins.id } }, admin));
@@ -184,7 +184,7 @@ const levelOf = (testId, level = 1) => cfg.listTestLevels(testId).find((row) => 
   un(cfg.saveTestLevel({ testId: t1.id, data: { level: 1, mean: 141, sd: 2.1, qcLotId: b1.id } }, admin));
   assert.equal(statusOf(gB.id), '', 'nhóm vừa nhận mức QC phải gỡ nhãn "Dự kiến"');
   assert.equal(statusOf(gA.id), '', 'nhóm cũ CÒN xét nghiệm khác dùng thì không được đánh dấu "Đã dừng"');
-  // ^ Lệch app cũ CÓ CHỦ ĐÍCH: app cũ dừng nhóm cũ ngay, mà nhóm 'stopped' bị
+  // ^ Lệch hệ thống CÓ CHỦ ĐÍCH: hệ thống dừng nhóm cũ ngay, mà nhóm 'stopped' bị
   // loại khỏi "mức QC đang vận hành" nên Kali sẽ biến mất khỏi Nhập QC/
   // Westgard dù lô của nó vẫn còn nguyên.
 
@@ -232,3 +232,5 @@ const levelOf = (testId, level = 1) => cfg.listTestLevels(testId).find((row) => 
 }
 
 console.log('app planned-targets tests passed');
+
+

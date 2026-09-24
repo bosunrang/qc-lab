@@ -1,9 +1,5 @@
-// IPC handler cho trang Cai dat: ho so phong xet nghiem (bang `lab`, 1 dong
-// duy nhat id=1 - da duoc chen san boi openDatabase() lan dau) + logo/brand +
-// kiem tra dung luong luu tru (kich thuoc file SQLite that tren dia). Pham
-// vi rut gon: Firebase connection/LIS Gateway settings/backup-restore vẫn
-// CHƯA làm — thuộc Giai đoạn C (docs/APP-V2-PLAN.md), cần đồng bộ Firebase/
-// hạ tầng backup thật trước, không phải chỉ thêm form.
+// Handler cài đặt tập trung hồ sơ đơn vị, biểu mẫu báo cáo, sao lưu, Firebase
+// và LIS Gateway. Các luồng ghi đều dùng chung cổng quyền và nhật ký kiểm toán.
 import { dbFileBytes } from './db-file-size';
 import type { Db } from '../db/sqlite-like';
 import { prepareLabProfile, type LabProfileInput } from '../domain/settings-validation';
@@ -75,3 +71,4 @@ export function createSettingsHandlers(db: Db, dbPath: string) {
 }
 
 export type SettingsHandlers = ReturnType<typeof createSettingsHandlers>;
+

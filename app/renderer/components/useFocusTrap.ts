@@ -1,11 +1,6 @@
-// Bẫy focus dùng chung cho Modal/Dialog: Escape đóng, Tab/Shift+Tab quẩn
-// trong hộp thoại, trả focus về phần tử trước khi mở lại sau khi đóng — cùng
-// hợp đồng với modal-focus-trap.ts của app cũ, viết lại thành hook React
-// chuẩn (không thao tác DOM ngoài React như bản cũ phải làm để tương thích
-// ngược với code cổ điển).
 import { useEffect, useRef } from 'react';
 
-// Cùng hợp đồng `queryFocusable()`/`createFocusTrapKeydown()` của app cũ
+// Cùng hợp đồng `queryFocusable()`/`createFocusTrapKeydown()` của hệ thống
 // (`src/presentation/modal/modal-focus-trap.ts`) — loại `[disabled]` NGAY
 // TRONG selector (không phải lọc sau, tránh sót ở lượt tìm phần tử focus
 // đầu tiên khi mở) và loại phần tử đang ẩn (`offsetParent!==null`, vd nằm
@@ -31,7 +26,7 @@ export function useFocusTrap(active: boolean, onClose: () => void, boxRef: React
     const box = boxRef.current;
     // Ưu tiên phần tử mang `autoFocus` (vd ô nhập chính của form) trước khi
     // rơi về phần tử focusable đầu tiên trong DOM — khớp `ModalOverlay.tsx`
-    // app cũ (`container.querySelector('[autofocus]')`).
+    // hệ thống (`container.querySelector('[autofocus]')`).
     const preferred = box?.querySelector<HTMLElement>('[autofocus]');
     (preferred || (box && queryFocusable(box)[0]))?.focus();
 
@@ -53,3 +48,5 @@ export function useFocusTrap(active: boolean, onClose: () => void, boxRef: React
     };
   }, [active, boxRef]);
 }
+
+

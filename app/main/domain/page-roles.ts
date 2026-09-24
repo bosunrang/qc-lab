@@ -8,21 +8,18 @@
 // File này KHÔNG import gì để test được thẳng trên `.ts` qua ESM
 // (app/tests/page-roles.test.mjs) — thêm import vào đây sẽ phá bài test đó.
 //
-// Đối chiếu app cũ: `ROUTER_PAGE_DEFS` + `rolePageIds`/`userPageIds`/
-// `canAccessPage`/`firstAccessPage` (src/presentation/router/router-page-policy.ts),
-// `selectUserPermissions` (src/domain/auth/user-permission-selection.ts),
-// `role`/`canWrite`/`roleLabel` (src/presentation/router/router-permission.ts).
+// Đối chiếu hệ thống: `ROUTER_PAGE_DEFS` + `rolePageIds`/`userPageIds`/
 
 export type Role = 'admin' | 'technician' | 'viewer';
 
-/** Thứ tự hiện trong mọi ô chọn vai trò — khớp `ROUTER_ROLE_LIST` app cũ. */
+/** Thứ tự hiện trong mọi ô chọn vai trò — khớp `ROUTER_ROLE_LIST` hệ thống. */
 export const ROLE_LIST: readonly Role[] = ['admin', 'technician', 'viewer'];
 
 export interface PageDef {
-  /** Khớp id trang của app cũ (`dash`, `entry`...) — cũng là id icon sidebar
+  /** Khớp id trang của hệ thống (`dash`, `entry`...) — cũng là id icon sidebar
    * và là giá trị lưu trong `users.page_perms_json`. */
   id: string;
-  /** Route của app (HashRouter) — app cũ không có path nên field này là mới. */
+  /** Route của app (HashRouter) — hệ thống không có path nên field này là mới. */
   path: string;
   label: string;
   roles: readonly Role[];
@@ -32,11 +29,7 @@ const ALL: readonly Role[] = ['admin', 'technician', 'viewer'];
 const STAFF: readonly Role[] = ['admin', 'technician'];
 const ADMIN_ONLY: readonly Role[] = ['admin'];
 
-/** Thứ tự, id, nhãn và danh sách vai trò khớp ĐÚNG `ROUTER_PAGE_DEFS` app cũ.
- * Nhãn được dùng ở 2 nơi nhìn thấy được: sidebar và lưới "Thẻ được phép
- * dùng" của trang Người dùng — nên phải giữ nguyên văn app cũ, kể cả
- * "Cài đặt & Đám mây" (Firebase C2 đã hoàn tất; tên giữ nguyên để khớp
- * bị bỏ; đổi nhãn ở đây là lệch golden master ngay trong lưới quyền). */
+
 export const PAGE_DEFS: readonly PageDef[] = [
   { id: 'dash', path: '/dashboard', label: 'Tổng quan', roles: ALL },
   { id: 'entry', path: '/entry', label: 'Nhập QC & Biểu đồ', roles: ALL },
@@ -52,13 +45,13 @@ export const PAGE_DEFS: readonly PageDef[] = [
 ];
 
 /** Vai trò khi chưa biết gì (chưa nạp xong phiên, dữ liệu hỏng, vai trò lạ)
- * là vai trò HẸP NHẤT — khớp `role()` app cũ trả 'viewer' khi `currentUser`
+ * là vai trò HẸP NHẤT — khớp `role()` hệ thống trả 'viewer' khi `currentUser`
  * rỗng. Không mặc định mở. */
 export function roleOf(role: string | null | undefined): Role {
   return role === 'admin' || role === 'technician' ? role : 'viewer';
 }
 
-/** admin + KTV. Khớp `canWrite()` app cũ. */
+/** admin + KTV. Khớp `canWrite()` hệ thống. */
 export function canWriteRole(role: string | null | undefined): boolean {
   const r = roleOf(role);
   return r === 'admin' || r === 'technician';
@@ -79,19 +72,14 @@ export function rolePageIds(role: string | null | undefined): string[] {
   return PAGE_DEFS.filter((page) => page.roles.includes(r)).map((page) => page.id);
 }
 
-/** Port `selectUserPermissions()` app cũ: giữ lại đúng những id vừa được
- * chọn VÀ nằm trong tập cho phép, bỏ trùng. Đây là chỗ chặn "renderer gửi
- * lên id trang mà vai trò đó không được xem". */
+
 export function selectUserPermissions(selectedIds: unknown, allowedIds: unknown): string[] {
   const allowed = new Set(Array.isArray(allowedIds) ? allowedIds.map((value) => String(value)) : []);
   const selected = Array.isArray(selectedIds) ? selectedIds : [];
   return [...new Set(selected.map((value) => String(value)).filter((id) => allowed.has(id)))];
 }
 
-/** Tập trang MỘT TÀI KHOẢN được phép = trần theo vai trò, thu hẹp bằng
- * `pagePerms` nếu có. Port `userPageIds()` app cũ, gồm cả nhánh phòng thân:
- * nếu thu hẹp xong ra rỗng thì trả về trang ĐẦU TIÊN của vai trò — không để
- * một tài khoản không vào được trang nào. */
+
 export function userPageIds(user: { role?: string | null; pagePerms?: unknown } | null | undefined): string[] {
   if (!user) return rolePageIds('viewer');
   const base = rolePageIds(user.role);
@@ -113,8 +101,7 @@ export function canUserAccessPage(id: string, user: { role?: string | null; page
   return !!pageById(id) && userPageIds(user).includes(id);
 }
 
-/** Trang đầu tiên tài khoản này vào được — đích điều hướng khi ai đó mở
- * route không có quyền (thay vì trang trắng). Port `firstAccessPage()`. */
+
 export function firstAccessPath(user: { role?: string | null; pagePerms?: unknown } | null | undefined): string {
   const allowed = new Set(userPageIds(user));
   const page = PAGE_DEFS.find((def) => allowed.has(def.id));
@@ -125,3 +112,5 @@ export function roleLabel(role: string | null | undefined): string {
   const r = roleOf(role);
   return r === 'admin' ? 'Quản trị' : r === 'technician' ? 'KTV' : 'Chỉ xem';
 }
+
+

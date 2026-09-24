@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in this repository.
+Tệp này hướng dẫn Claude Code khi làm việc trong repository này.
 
 # QC Lab app
 
-Only `app/` is product source. It is an Electron desktop app with a React
-renderer and SQLite in the main process. The renderer uses `HashRouter`; IPC
-types live exclusively in `app/shared/qc-api.d.ts`.
+Chỉ `app/` là mã nguồn sản phẩm. Đây là ứng dụng Electron desktop với React ở
+renderer và SQLite ở main process. Renderer dùng `HashRouter`; kiểu IPC chỉ
+nằm tại `app/shared/qc-api.d.ts`.
 
 ## Commands
 
@@ -19,20 +19,23 @@ npm run build
 npm run dist
 ```
 
-`npm run dev` serves the browser preview on port 5174. `npm start` builds and
-opens Electron. The preview uses sql.js/WASM only in the browser; packaged
-Electron uses `node:sqlite` and excludes the WASM asset.
+`npm run dev` phục vụ bản xem trước trên cổng 5174. `npm start` build và mở
+Electron. Bản xem trước dùng sql.js/WASM trong trình duyệt; Electron đóng gói
+dùng `node:sqlite` và không kèm tài nguyên WASM.
 
 ## Development rules
 
-- Read the relevant section of `docs/APP-PLAN.md` before changing app.
-- Keep read IPC rows in SQLite `snake_case`; form drafts use `camelCase`.
-- Every write handler performs authorization first, then pure validation,
-  transaction, `writeAudit()`, and `notifyChanged()`.
-- Do not hard-delete QC points; use the existing void workflow.
-- Run `npm test`, `npm run typecheck`, and `npm run build` for code changes.
-- `docs/WESTGARD-REVIEW-*.md` and `docs/SIGMA-REVIEW-*.md` record the business
-  reviews and the decisions taken; read the matching one before touching the
-  Westgard or Six Sigma logic. The `*-probes-*.cjs` beside them capture the
-  PRE-FIX state on purpose and are expected to fail — the live regressions are
-  in `app/tests/`, run by `npm test`.
+- Đọc phần liên quan trong `docs/APP-PLAN.md` trước khi sửa ứng dụng.
+- Viết chú thích giải thích mã bằng tiếng Việt có đầy đủ dấu. Giữ nguyên tên
+  định danh, trường giao thức, SQL và chuỗi máy đọc; chỉ dùng tiếng Anh khi đó
+  là thuật ngữ kỹ thuật bắt buộc.
+- Dòng IPC đọc từ SQLite giữ `snake_case`; dữ liệu nháp biểu mẫu dùng `camelCase`.
+- Mỗi handler ghi dữ liệu phải lần lượt kiểm tra quyền, kiểm tra dữ liệu thuần,
+  transaction, `writeAudit()` và `notifyChanged()`.
+- Không xoá cứng điểm QC; dùng quy trình huỷ điểm hiện có.
+- Chạy `npm test`, `npm run typecheck` và `npm run build` khi sửa mã nguồn.
+- `docs/WESTGARD-REVIEW-*.md` và `docs/SIGMA-REVIEW-*.md` lưu các đợt rà soát
+  nghiệp vụ cùng quyết định đã chốt. Đọc tài liệu phù hợp trước khi sửa logic
+  Westgard hoặc Six Sigma. Các tệp `*-probes-*.cjs` ghi lại trạng thái trước khi
+  sửa nên được phép thất bại; hồi quy chính thức nằm trong `app/tests/` và chạy
+  qua `npm test`.
