@@ -196,11 +196,12 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
       <h2 className="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2>
       <div className="rc-criteria-content">
         {criteria.map(([ok, decision, title, why]) => {
-          const cls = decision ? (ok ? 'pass' : 'fail') : (ok ? 'info' : 'note');
+          // Tiêu chí quyết định: đạt/không đạt; tiêu chí tham khảo: tốt/lưu ý.
+          const tone = decision ? (ok ? 'ok' : 'rej') : (ok ? 'ok' : 'warn');
           const text = decision ? (ok ? 'ĐẠT' : 'KHÔNG ĐẠT') : (ok ? 'TỐT' : 'LƯU Ý');
           return (
             <div className="rc-crit-item" key={title}>
-              <span className={`rc-crit-badge ${cls}`}>{text}</span>
+              <span className={`tag rc-crit-status ${tone}`}>{text}</span>
               <div className="rc-crit-text">{title}<div>{why}</div></div>
             </div>
           );
@@ -270,7 +271,7 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
   const needle = query.trim().toLowerCase();
   const rows = comparisons.filter((c) => !needle || comparisonLabel(c).toLowerCase().includes(needle));
   return (
-    <Modal title="Chọn phép so sánh" onClose={onClose} width={560} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
+    <Modal title="Chọn phép so sánh" onClose={onClose} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." autoFocus />
       <div className="flow-control rc-picker-list">
         {rows.length ? rows.map((comparison) => (
@@ -308,7 +309,7 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
   }
 
   return (
-    <Modal title="Thêm hóa chất" onClose={onClose} width={560} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
+    <Modal title="Thêm hóa chất" onClose={onClose} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hóa chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." autoFocus />
       <div className="flow-control">
         <button className="refrow rc-create-typed" onClick={() => create(query.trim() || 'Hóa chất mới')}>+ Tạo {query.trim() ? `"${query.trim()}"` : 'hóa chất trống'}</button>

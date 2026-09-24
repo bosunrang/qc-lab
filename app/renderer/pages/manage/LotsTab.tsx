@@ -241,7 +241,7 @@ export function LotsTab() {
       </div>
 
       {editingLot && (
-        <Modal title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} className="rcfg-modal lot-modal"
+        <Modal title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
           footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-form">{editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
           <form id="lot-form" onSubmit={(e) => { e.preventDefault(); submitLot(e.currentTarget); }}>
             {lotErr && <p className="field-error">{lotErr}</p>}
@@ -267,7 +267,7 @@ export function LotsTab() {
       )}
 
       {editingGroup && (
-        <Modal title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
+        <Modal title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
           footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-group-form">{editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
           <form id="lot-group-form" onSubmit={(e) => { e.preventDefault(); submitGroup(e.currentTarget); }}>
             {groupErr && <p className="field-error">{groupErr}</p>}

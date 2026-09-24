@@ -205,7 +205,7 @@ export function HistoryTab() {
         return (
           <Modal
             title={`${selectedTest?.name || ''}${selectedInstrument?.name ? ` · ${selectedInstrument.name}` : ''} · Mức ${detail.level}${detail.lotNo ? ` · Lô ${detail.lotNo}` : ''}`}
-            onClose={() => setDetail(null)} className="rcfg-history-detail-modal"
+            onClose={() => setDetail(null)} size="xl" className="rcfg-history-detail-modal"
           >
             <h4 className="history-detail-heading">Mean/SD đã dùng</h4>
             {historyEntries.length ? (

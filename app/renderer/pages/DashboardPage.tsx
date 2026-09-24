@@ -130,7 +130,9 @@ function ExpiringLots({ model }: { model: Model }) {
 function LevelPill({ level }: { level: DashboardTestItem['levels'][number] }) {
   const targetOk = levelTargetOk(level);
   return (
-    <span className={`dash-level-pill${level.todayPointCount ? ' done' : ''}${targetOk ? '' : ' missing-target'}`}
+    // Thiếu Mean/SD là cảnh báo và thắng trạng thái "đã nhập hôm nay", đúng
+    // thứ tự ưu tiên của hai lớp cũ `.done`/`.missing-target`.
+    <span className={`tag ${!targetOk ? 'warn' : level.todayPointCount ? 'ok' : 'none'}`}
       title={targetOk ? undefined : 'Chưa có Mean/SD hợp lệ — không đánh giá Westgard'}>
       M{level.level}{level.lot ? ` · ${level.lot}` : ''}{level.cv != null ? ` · CV ${num2(level.cv)}%` : ''}{targetOk ? '' : ' · thiếu Mean/SD'}
     </span>

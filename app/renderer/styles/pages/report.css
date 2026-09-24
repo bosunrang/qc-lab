@@ -7,7 +7,7 @@
 .report-template-panel{margin-bottom:var(--gap-panel);}
 .report-template-body{padding:var(--space-1) var(--panel-padding) var(--panel-padding);}
 .report-template-body>.hint{display:block;margin:0;color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);}
-.report-template-fields{display:grid;grid-template-columns:minmax(220px,320px) minmax(160px,220px) max-content;align-items:end;gap:var(--space-3);margin-top:var(--space-4);}
+.report-template-fields{display:grid;grid-template-columns:minmax(220px,320px) minmax(160px,220px) max-content;align-items:end;gap:var(--field-gap);margin-top:var(--space-4);}
 /* Thẻ này là thanh cấu hình gọn như bộ lọc/báo cáo: ô nhập đi cùng nút hành
    động 36px, không dùng chiều cao form đầy đủ 40px của màn Cài đặt. */
 .report-template-fields input:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
@@ -16,7 +16,7 @@
 .report-filter-grid.grid4{
   grid-template-columns:minmax(180px,.9fr) minmax(300px,1.35fr) minmax(176px,.7fr) minmax(176px,.7fr);
   align-items:end;
-  gap:var(--space-4);
+  gap:var(--field-gap);
 }
 
 .report-filter-grid .field,
@@ -108,7 +108,7 @@
   display:grid;
   grid-template-columns:minmax(180px,220px) minmax(140px,180px) max-content;
   align-items:end;
-  gap:var(--space-3);
+  gap:var(--field-gap);
   margin-top:var(--space-4);
 }
 

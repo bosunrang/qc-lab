@@ -596,7 +596,7 @@ export function EntryPage() {
                         tabIndex={0} onKeyDown={handleTreeKeyDown}
                         onClick={() => setOpenTests((s) => { const next = new Set(s); next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey); return next; })}>
                         <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={open} /></span>{group.name}
-                        <span className={`state ${groupWorst === 'none' ? '' : groupWorst}`}>{TREE_STATE[groupWorst]}</span>
+                        <span className={`tag ${groupWorst}`}>{TREE_STATE[groupWorst]}</span>
                       </div>
                       {open && group.tests.map((s) => {
                         const state = latestOf(s);
@@ -605,7 +605,7 @@ export function EntryPage() {
                             tabIndex={0} onKeyDown={handleTreeKeyDown}
                             aria-current={testId === s.testId ? 'true' : 'false'} onClick={() => selectLeaf(s.testId)}>
                             <span className="config-name">{s.testName}</span>
-                            <span className={`state ${state === 'none' ? '' : state}`}>{TREE_STATE[state]}</span>
+                            <span className={`tag ${state}`}>{TREE_STATE[state]}</span>
                           </div>
                         );
                       })}
@@ -723,7 +723,7 @@ export function EntryPage() {
                                   <div className={`qc-run-grid${showAddBtn ? ' has-add-btn' : ''}`}>
                                     {previousRuns.map(({ point, lot, mean, sd }) => (
                                       <div className="qc-run-slot prev-lot-slot" key={`previous:${lot}:${point.id}`} title={`Lô cũ ${lot} · đã chuyển tiếp · chỉ đọc`}>
-                                        <b className="qc-value-chip prev">{valText(point.val)}</b>
+                                        <b className="qc-value-cell prev">{valText(point.val)}</b>
                                         <small>{zText(point, { mean, sd })} · Lô {lot}</small>
                                       </div>
                                     ))}
@@ -738,7 +738,7 @@ export function EntryPage() {
                                       const excluded = runExcludedNote(p);
                                       return (
                                         <div className="qc-run-slot" key={p.id} title={excluded || undefined}>
-                                          <b className={`qc-value-chip${p.verdict !== 'ok' ? ' ' + p.verdict : ''}${excluded ? ' run-excluded' : ''}`}>{valText(p.val)}</b>
+                                          <b className={`qc-value-cell${p.verdict !== 'ok' ? ' ' + p.verdict : ''}${excluded ? ' run-excluded' : ''}`}>{valText(p.val)}</b>
                                           <small>{zText(p, column)} · {VERDICT_LABEL[p.verdict]}</small>
                                         </div>
                                       );
@@ -759,7 +759,7 @@ export function EntryPage() {
                               );
                             })}
                             <td className="qc-staff-cell">{staff.length
-                              ? staff.map((s, i) => <span key={s}>{i > 0 ? <span className="qc-staff-sep">/</span> : null}<span className="qc-staff" title={s}>{s}</span></span>)
+                              ? staff.map((s, i) => <span key={s}>{i > 0 ? <span className="qc-staff-sep">/</span> : null}<span className="pill qc-staff" title={s}>{s}</span></span>)
                               : '—'}</td>
                             <td>{warnRules.join(', ') || '—'}</td>
                             <td>{rejRules.join(', ') || '—'}</td>
@@ -999,7 +999,7 @@ export function EntryPage() {
         </Modal>
       )}
       {rangeMode && rangeCandidate && (
-        <Modal title={rangeMode === 'apply' ? 'Thiết lập dải QC mới' : 'Hoàn dải QC nhà sản xuất'} onClose={() => setRangeMode(null)} className="range-workflow-modal"
+        <Modal title={rangeMode === 'apply' ? 'Thiết lập dải QC mới' : 'Hoàn dải QC nhà sản xuất'} onClose={() => setRangeMode(null)} size="lg" className="range-workflow-modal"
           footer={<><button className="btn ghost" onClick={() => setRangeMode(null)}>Đóng</button><button className={`btn ${rangeMode === 'apply' ? 'teal' : 'danger'}`} disabled={rangeMode === 'apply' && !rangeCandidate.eligible} onClick={submitRangeWorkflow}>{rangeMode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</button></>}>
           {rangeMode === 'apply' && rangeCandidate.proposed && (
             <>

@@ -51,7 +51,7 @@ main:has(.config-shell){padding-bottom:16px;}
        không sọc xen kẽ; nút thao tác dạng icon hiện thường trực.
    Muốn đổi diện mạo cả trang thì sửa Ở ĐÂY, đừng thêm ngoại lệ cho một thẻ —
    đó đúng là thứ đã tạo ra tình trạng 8 thẻ 8 kiểu trước đợt này. */
-.rcfg-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--form-row-gap) 16px;min-height:0;margin:0;padding:20px 0 var(--panel-content-gap);background:transparent;border-bottom:0;box-shadow:none;color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--section-heading-weight);letter-spacing:0;text-transform:none;}
+.rcfg-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3) 16px;min-height:0;margin:0;padding:20px 0 var(--panel-content-gap);background:transparent;border-bottom:0;box-shadow:none;color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--section-heading-weight);letter-spacing:0;text-transform:none;}
 .config-shell-main > .rcfg-toolbar{align-items:center;}
 .rcfg-toolbar h2{margin:0;font-size:var(--title-panel);font-weight:var(--section-heading-weight);line-height:var(--line-heading);letter-spacing:-.01em;color:var(--ink);}
 .rcfg-toolbar p{margin:2px 0 0;max-width:520px;color:var(--text-faint);font-size:var(--text-sm);font-weight:500;}
@@ -100,7 +100,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .config-shell-main .rcfg-list>table th.num{text-align:center;font-variant-numeric:tabular-nums;}
 /* Trạng thái là nhãn có nền rất nhạt: đủ nổi để quét nhanh theo hàng, nhưng
    không lấn át dữ liệu. Mục đã ngừng dùng nhãn trung tính, không báo động. */
-.config-shell-main .instrument-status{min-width:108px;padding-block:2px;text-align:center;}
+.config-shell-main .instrument-status{min-width:108px;justify-content:center;}
 .config-shell-main .cell-missing{color:var(--warning-ink);}
 /* Nút thao tác HIỆN THƯỜNG TRỰC (chốt 2026-09-13). Bản trước cho cụm icon
    `opacity:0` và chỉ hiện khi rê chuột/Tab tới — bảng lúc nghỉ sạch hơn,
@@ -151,14 +151,14 @@ main:has(.config-shell){padding-bottom:16px;}
 
 .config-shell-main .empty-state{text-align:center;padding:var(--space-lg);color:var(--muted);}
 
-.rcfg-modal{width:700px;}
+
 /* Nhịp form chuẩn của Cấu hình chung: 12px giữa CÁC HÀNG field, 4px giữa
    nhãn và control (quy tắc `label` chung). Đặt khoảng cách ở form thay vì
    cộng margin từng hàng để tránh margin-collapse làm một hàng sát hơn hàng
    khác. Các form phức tạp (xét nghiệm/TEa PXN) giữ cấu trúc riêng bên dưới. */
-:is(#instrument-form,#lot-form,#tea-add-form,#transition-form,#panel-form,#lot-group-form){display:grid;row-gap:var(--form-row-gap);}
+:is(#instrument-form,#lot-form,#tea-add-form,#transition-form,#panel-form,#lot-group-form){display:grid;row-gap:var(--field-gap);}
 :is(#instrument-form,#lot-form,#tea-add-form,#transition-form,#panel-form,#lot-group-form)>.field-error{margin:0;}
-:is(#instrument-form,#lot-form,#tea-add-form)>.grid2{column-gap:var(--gap-content);}
+:is(#instrument-form,#lot-form,#tea-add-form)>.grid2{column-gap:var(--field-gap);}
 :is(#instrument-form,#lot-form,#tea-add-form)>.grid2 .field>label,
 #transition-form>:is(.lot-trans-row3,.lot-trans-row2) .field>label,
 #panel-form>.panel-qc-main-grid .field>label,
@@ -169,19 +169,19 @@ main:has(.config-shell){padding-bottom:16px;}
 #panel-form>.panel-active,
 #lot-group-form>.lot-group-picker-label{margin:0;}
 #tea-add-form>.hint{margin-top:0;}
-.tea-lab-profile-modal{width:min(660px,calc(100vw - 24px));}
+
 .tea-lab-profile-modal textarea{width:100%;resize:vertical;}
-.rcfg-assay-modal{width:min(860px,calc(100vw - 32px));}
+
 .rcfg-assay-modal .modal-b{scrollbar-gutter:stable;}
-.lot-trans-modal{width:min(1040px,94vw);}
+
 .lot-trans-modal .modal-b{max-height:76vh;overflow:auto;}
-.rcfg-group-modal{width:min(520px,94vw);}
-.rcfg-group-modal.levels-2{width:min(720px,94vw);}
-.rcfg-group-modal.levels-3plus{width:min(960px,94vw);}
+
+
+
 .rcfg-group-modal .modal-b{max-height:72vh;overflow:auto;}
 .rcfg-group-modal .lot-level-col label{min-height:62px;}
 .rcfg-modal input[type=checkbox],.config-shell input[type=checkbox]{accent-color:var(--teal);}
-.rcfg-modal .field-row{gap:var(--gap-content);}
+.rcfg-modal .field-row{gap:var(--field-gap);}
 .rcfg-check{display:flex;align-items:center;gap:var(--gap-control);margin:0;color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .rcfg-check input{accent-color:var(--teal);}
 .instrument-active{margin:0;}
@@ -312,7 +312,7 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Dải chọn Panel/nhóm lô/xét nghiệm là hàng đầu tiên BÊN TRONG khối trắng —
    cùng vai trò với ô tìm kiếm ở header của các thẻ khác, nên cũng nền trắng,
    chỉ một đường kẻ ngăn với bảng bên dưới. */
-.target-selector{display:grid;gap:10px;padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--panel);align-items:end;}
+.target-selector{display:grid;gap:var(--field-gap);padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--panel);align-items:end;}
 .target-selector label{margin-top:0;}
 .target-selector select,.target-selector input{height:var(--control-h);}
 .target-selector.history-selector{grid-template-columns:minmax(240px,320px);}
@@ -351,9 +351,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .target-level-toolbar .dayseg{flex:0 0 auto;}
 .target-level-toolbar>div:first-child b{font-size:var(--text-base);}.target-level-toolbar .target-level-lot{overflow:hidden;color:var(--teal);font-size:var(--text-base);font-weight:700;text-overflow:ellipsis;white-space:nowrap;}
 .target-summary{display:flex;flex:1 1 390px;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:0;}
-.target-summary span{display:flex;align-items:center;gap:4px;padding:6px 8px;border:1px solid var(--neutral-border);border-radius:var(--radius-pill);background:var(--neutral-bg);color:var(--neutral-ink);font-size:var(--text-xs);font-weight:var(--weight-bold);}
-.target-summary span.ok{border-color:var(--success-border);background:var(--success-bg);color:var(--success-ink);}
-.target-summary span.warn{border-color:var(--warning-border);background:var(--warning-bg);color:var(--warning-ink);}
+.target-summary .tag{gap:var(--space-1);}
 .target-summary b{font-size:var(--text-sm);}
 
 
@@ -369,8 +367,8 @@ main:has(.config-shell){padding-bottom:16px;}
    bên trong như hệ thống. Các ô Mean/SD hiện là giao diện đối chiếu; luồng
    lưu tiêu chí chuyển lô sẽ được nối riêng khi triển khai nghiệp vụ. */
 
-.lot-trans-row3{display:grid;grid-template-columns:300px 1fr 1fr;gap:var(--gap-content);}
-.lot-trans-row2{display:flex;gap:var(--gap-content);margin-top:0;}
+.lot-trans-row3{display:grid;grid-template-columns:300px 1fr 1fr;gap:var(--field-gap);}
+.lot-trans-row2{display:flex;gap:var(--field-gap);margin-top:0;}
 .lot-trans-row2>div{flex:0 0 auto;width:200px;}
 .lot-trans-row3 .field,.lot-trans-row2 .field{margin:0;}
 .lot-trans-modal .lot-trans-row2+.field{margin-top:var(--space-panel);}
@@ -433,12 +431,12 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-form-section { margin-bottom: var(--gap-content); padding-bottom: var(--gap-content); border-bottom: 1px solid var(--line); }
 .tea-form-section-last { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .tea-form-section > b { display: block; margin-bottom: var(--gap-content); color: var(--card-head-ink); font-size: var(--text-base); }
-.tea-form-primary { display: grid; grid-template-columns: minmax(160px,1fr) 72px 88px minmax(185px,1.15fr); gap: var(--gap-content); }
+.tea-form-primary { display: grid; grid-template-columns: minmax(160px,1fr) 72px 88px minmax(185px,1.15fr); gap: var(--field-gap); }
 .tea-form-primary .field, .tea-form-dates .field, .tea-form-people .field { margin: 0; }
 .tea-form-primary .field>label,.tea-form-dates .field>label,.tea-form-people .field>label,.tea-form-section>.field>label{margin-top:0;}
-.tea-form-section > .field + .field { margin-top: var(--gap-content); }
+.tea-form-section > .field + .field { margin-top: var(--field-gap); }
 .tea-form-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-content); }
-.tea-form-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-content); margin-top: var(--gap-content); }
+.tea-form-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--field-gap); margin-top: var(--gap-content); }
 
 /* Biểu mẫu xét nghiệm giữ cùng mật độ và thứ bậc thông tin với giao diện cũ. */
 
@@ -450,7 +448,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-card-head small,.assay-advanced summary small{color:var(--muted);font-size:var(--text-xs);font-weight:500;line-height:var(--leading-snug);}
 .assay-card-body{padding:10px 12px 12px;}
 .assay-settings-column{min-width:0;}
-.assay-main-grid,.assay-detail-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(96px,1fr);gap:var(--gap-content);align-items:end;}
+.assay-main-grid,.assay-detail-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(96px,1fr);gap:var(--field-gap);align-items:end;}
 .assay-detail-grid{margin-top:var(--gap-content);}
 .assay-main-grid>div,.assay-detail-grid>div{min-width:0;}
 .assay-main-grid .field,.assay-detail-grid .field{margin:0;min-width:0;}
@@ -480,7 +478,6 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-machine-copy b,.assay-machine-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .assay-machine-copy b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .assay-machine-copy small{color:var(--muted);font-size:var(--text-xs);font-weight:400;}
-.assay-machine-lock{padding:2px 6px;border:1px solid var(--success-border);border-radius:var(--radius-pill);background:var(--success-bg);color:var(--success-ink);font-size:var(--text-2xs);font-weight:var(--weight-semibold);white-space:nowrap;}
 .assay-machine-picker>.empty-state{grid-column:1/-1;margin:0;padding:16px;}
 /* Ô chọn nằm TRONG ô bảng — dùng ở 2 chỗ: cột "Máy xét nghiệm" của thẻ Danh
    mục xét nghiệm (đổi máy thì cả dòng đổi theo), và cột "Xét nghiệm trong
@@ -504,12 +501,12 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-rule-head{padding:0 0 var(--gap-control);color:var(--muted);font-size:var(--text-xs);font-weight:var(--weight-bold);}
 .assay-rule-grid{display:grid;gap:var(--gap-control);}
 .assay-rule-row b{font-size:var(--text-sm);}
-.assay-cusum-grid{display:grid;grid-template-columns:repeat(2,minmax(0,200px));gap:var(--gap-content);justify-content:start;margin-top:var(--gap-content);}
+.assay-cusum-grid{display:grid;grid-template-columns:repeat(2,minmax(0,200px));gap:var(--field-gap);justify-content:start;margin-top:var(--gap-content);}
 .assay-cusum-grid .field{margin:0;}
 .assay-closed{margin-top:var(--space-panel);}
 
 /* Popup Panel QC: cùng cấu trúc picker/card của giao diện cũ. */
-.panel-qc-main-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-content);}
+.panel-qc-main-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap);}
 .panel-qc-main-grid .field{margin:0;}
 .panel-test-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--card-head-ink);}
 /* Thiếu `grid-template-columns` — hệ thống (`professional-config.css`'s
@@ -535,7 +532,7 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Popup lô QC và nhóm lô QC: chia trường/lô đúng hai modal của hệ thống. */
 /* Popup lô QC nhỏ hơn modal cấu hình chung vì chỉ có các trường một lô.
    Các hàng `grid2` nhận nhịp 12px từ `#lot-form`, không mang margin cục bộ. */
-.lot-modal{width:min(640px,calc(100vw - 32px));}
+
 .lot-group-picker-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--card-head-ink);}
 .lot-level-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:300px;overflow:auto;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
 /* hệ thống chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/`levels-3plus`
@@ -614,7 +611,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 .history-detail-table th,.history-detail-table td{text-align:center;vertical-align:middle;padding-left:14px;padding-right:14px;}
 .history-detail-table th:first-child,.history-detail-table td:first-child{text-align:left;}
 .rcfg-history-detail-modal .history-detail-table{width:100%;min-width:0;table-layout:fixed;}
-.modal.rcfg-history-detail-modal{width:min(1160px,94vw);max-width:94vw;}
+
 .modal.rcfg-history-detail-modal .modal-b{max-height:72vh;overflow:auto;}
 
 /* Chuẩn chiều cao điều khiển của riêng trang Cấu hình chung. Form trong

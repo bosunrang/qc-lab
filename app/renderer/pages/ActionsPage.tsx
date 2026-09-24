@@ -133,7 +133,7 @@ export function ActionsPage() {
       <div className="panel">
         <div className="action-card-head">
           <div><h2 className="panel-title">Sự cố cần xử lý</h2><p>Theo dõi cảnh báo và vi phạm QC theo đúng điểm phát sinh.</p></div>
-          {issueCount > 0 && <span className="action-chip warn">{issueCount} sự cố</span>}
+          {issueCount > 0 && <span className="tag warn">{issueCount} sự cố</span>}
         </div>
         <div className="action-issues-body">
           {!issueGroups.length
@@ -150,7 +150,7 @@ export function ActionsPage() {
                       <div className="issue-row-main">
                         <b>{item.levelLabel} · {item.state}</b>
                         <div className="meta">{item.meta}</div>
-                        <div className="action-chipline"><span className={`action-chip ${item.severity === 'rej' ? 'bad' : 'warn'}`}>{item.footer}</span></div>
+                        <div className="action-chipline"><span className={`tag ${item.severity === 'rej' ? 'rej' : 'warn'}`}>{item.footer}</span></div>
                         <div className="hint">{item.guidance}</div>
                       </div>
                       {item.openRecordId
@@ -261,13 +261,13 @@ function ActionLogPanel({
                       <div className="action-sub">Phụ trách: {detail.owner || '—'}{record.due_date ? ` · hạn ${vnDate(record.due_date)}` : ''}</div>
                     </td>
                     <td><div className="action-status-stack">
-                      <span className={`action-chip ${cancelled ? 'none' : record.approval_status === 'approved' ? 'ok' : record.approval_status === 'returned' ? 'bad' : 'warn'}`}>
+                      <span className={`tag ${cancelled ? 'none' : record.approval_status === 'approved' ? 'ok' : record.approval_status === 'returned' ? 'rej' : 'warn'}`}>
                         {cancelled ? 'Đã huỷ' : record.approval_status === 'approved' ? 'Đã duyệt' : record.approval_status === 'returned' ? 'Trả lại' : 'Chờ duyệt'}
                       </span>
-                      <span className={`action-chip ${record.effectiveness_status === 'effective' ? 'ok' : record.effectiveness_status === 'ineffective' ? 'bad' : 'none'}`}>
+                      <span className={`tag ${record.effectiveness_status === 'effective' ? 'ok' : record.effectiveness_status === 'ineffective' ? 'rej' : 'none'}`}>
                         {record.effectiveness_status === 'effective' ? 'Hiệu quả' : record.effectiveness_status === 'ineffective' ? 'Không hiệu quả' : 'Chưa đánh giá'}
                       </span>
-                      {record.parent_nce_id ? <span className="action-chip none">vòng tiếp</span> : null}
+                      {record.parent_nce_id ? <span className="tag none">vòng tiếp</span> : null}
                     </div></td>
                     <td><div className="action-row-actions">
                       <button type="button" className="btn ghost sm" onClick={() => onDetail(record.id)}>Chi tiết</button>
@@ -289,7 +289,7 @@ function ActionLogPanel({
 
 function NceGuideModal({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title="Quy trình xử lý sự cố — 8 bước" className="action-guide-modal" onClose={onClose}>
+    <Modal title="Quy trình xử lý sự cố — 8 bước" size="lg" onClose={onClose}>
       <div className="action-guide-intro">Thực hiện theo thứ tự để hồ sơ NCE đủ bằng chứng, kiểm soát được nguy cơ và có thể khép vòng độc lập.</div>
       <ol className="action-guide-steps">
         {GUIDE_STEPS.map((step, index) => <li className="action-guide-step" key={step.title}>
@@ -398,7 +398,7 @@ function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | n
         {field('Xử lý tức thời đã thực hiện', <textarea disabled={disabled} rows={2} value={protocol.correction || ''} onChange={(event) => set('correction', event.target.value)} placeholder="Dừng trả kết quả, cô lập vật liệu và thông báo phụ trách…" />)}
       </div>
     </details>
-    <details className="action-form-section"><summary className="action-form-section-title"><span>3</span><div><b>Đánh giá nguy cơ FMEA</b><small>RPN = S × O × D; nêu căn cứ theo SOP của đơn vị</small></div><span className="action-chip neutral">RPN {initialRpn}</span></summary>
+    <details className="action-form-section"><summary className="action-form-section-title"><span>3</span><div><b>Đánh giá nguy cơ FMEA</b><small>RPN = S × O × D; nêu căn cứ theo SOP của đơn vị</small></div><span className="tag none">RPN {initialRpn}</span></summary>
       <div className="action-risk-grid">{scale('riskSeverity', 'Mức độ ảnh hưởng (S)')}{scale('riskOccurrence', 'Khả năng xảy ra (O)')}{scale('riskDetectability', 'Khả năng không phát hiện (D)')}
         {field('Phân loại theo SOP', <NceSelect disabled={disabled} value={protocol.riskLevel || ''} onChange={(value) => set('riskLevel', value as never)} options={NCE_RISK} />)}
         {field('Căn cứ phân loại', <input disabled={disabled} value={protocol.riskBasis || ''} onChange={(event) => set('riskBasis', event.target.value)} placeholder="VD: SOP-QC-07, ma trận nguy cơ bảng 3" />)}
@@ -413,7 +413,7 @@ function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | n
       {protocol.containmentStatus === 'held' && <div className="action-release-block"><div className="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>Chỉ được cho phép sau khi có bằng chứng QC rerun đạt</small></div><div className="action-release-grid">{field('Quyết định', <NceSelect disabled={disabled} value={protocol.releaseStatus || ''} onChange={(value) => set('releaseStatus', value as never)} options={[['', '— Chưa quyết định —'], ['released', 'Đã cho phép trở lại']]} />)}{field('Ngày cho phép', <DateField value={protocol.releaseDate || ''} onChange={(value) => set('releaseDate', value)} disabled={disabled} />)}{field('Người cho phép', <input disabled={disabled} value={protocol.releaseBy || ''} onChange={(event) => set('releaseBy', event.target.value)} />)}{field('Căn cứ', <input disabled={disabled} value={protocol.releaseNote || ''} onChange={(event) => set('releaseNote', event.target.value)} placeholder="QC chạy lại được chấp nhận" />)}</div></div>}
     </details>
     <details className="action-form-section"><summary className="action-form-section-title"><span>7</span><div><b>Đánh giá ảnh hưởng bệnh nhân</b><small>Ghi rõ phạm vi và cách xử lý khi có kết quả liên quan</small></div></summary><div className="action-patient-grid">{field('Kết luận ảnh hưởng', <NceSelect disabled={disabled} value={protocol.patientImpact || ''} onChange={(value) => set('patientImpact', value as never)} options={NCE_PATIENT} />)}{field('Xử lý mẫu/kết quả liên quan', <textarea disabled={disabled} rows={2} value={protocol.patientAction || ''} onChange={(event) => set('patientAction', event.target.value)} />)}</div></details>
-    <details className="action-form-section"><summary className="action-form-section-title"><span>8</span><div><b>Đánh giá hiệu lực và nguy cơ còn lại</b><small>Kết luận “hiệu quả” bắt buộc có FMEA còn lại, không vượt RPN ban đầu</small></div><span className="action-chip neutral">RPN {residualRpn}</span></summary>
+    <details className="action-form-section"><summary className="action-form-section-title"><span>8</span><div><b>Đánh giá hiệu lực và nguy cơ còn lại</b><small>Kết luận “hiệu quả” bắt buộc có FMEA còn lại, không vượt RPN ban đầu</small></div><span className="tag none">RPN {residualRpn}</span></summary>
       <div className="action-effectiveness-grid">{field('Kết luận hiệu lực', <NceSelect disabled={disabled} value={protocol.effectivenessStatus || 'pending'} onChange={(value) => set('effectivenessStatus', value as never)} options={[['pending', 'Chưa đánh giá'], ['effective', 'Có hiệu lực'], ['ineffective', 'Không hiệu lực']]} />)}{field('Ngày đánh giá', <DateField value={protocol.effectivenessDate || ''} onChange={(value) => set('effectivenessDate', value)} disabled={disabled} />)}{field('Bằng chứng/nhận xét', <textarea disabled={disabled} rows={2} value={protocol.effectivenessNote || ''} onChange={(event) => set('effectivenessNote', event.target.value)} />)}</div>
       {protocol.effectivenessStatus === 'effective' && <div className="action-residual-block"><div className="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div className="action-residual-grid">{scale('residualSeverity', 'Mức độ (S)')}{scale('residualOccurrence', 'Khả năng xảy ra (O)')}{scale('residualDetectability', 'Khả năng không phát hiện (D)')}{field('Phân loại theo SOP', <NceSelect disabled={disabled} value={protocol.residualRiskLevel || ''} onChange={(value) => set('residualRiskLevel', value as never)} options={NCE_RISK} />)}{field('Căn cứ đánh giá lại', <input disabled={disabled} value={protocol.residualRiskBasis || ''} onChange={(event) => set('residualRiskBasis', event.target.value)} />)}</div></div>}
     </details>
@@ -462,7 +462,7 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
   const canReview = record.record_status !== 'cancelled';
 
   return (
-    <Modal title={`Hồ sơ ${record.nce_id} — ${testName}`} onClose={onClose} width={640}
+    <Modal title={`Hồ sơ ${record.nce_id} — ${testName}`} onClose={onClose}
       footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
       {err && <p className="field-error">{err}</p>}
 
@@ -531,7 +531,7 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
       )}
       {record.effectiveness_status !== 'pending' && (
         <>
-          <p><span className={`badge ${record.effectiveness_status === 'effective' ? 'ok' : 'rej'}`}>{record.effectiveness_status === 'effective' ? 'Hiệu quả' : 'Không hiệu quả'}</span> {detail.effectivenessNote}</p>
+          <p><span className={`tag ${record.effectiveness_status === 'effective' ? 'ok' : 'rej'}`}>{record.effectiveness_status === 'effective' ? 'Hiệu quả' : 'Không hiệu quả'}</span> {detail.effectivenessNote}</p>
           {detail.residualRisk && <p className="action-detail-muted">Rủi ro còn lại: {detail.residualRisk}</p>}
           {record.effectiveness_status === 'ineffective' && !record.follow_up_nce_id && canReview && (
             <button className="btn ghost sm" onClick={() => guard(() => store.reopen(record.id, 'Chưa hiệu quả, mở vòng tiếp theo'))}>Mở vòng tiếp theo</button>

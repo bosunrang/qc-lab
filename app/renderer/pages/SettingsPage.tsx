@@ -404,7 +404,6 @@ export function SettingsPage() {
         <Modal
           title="Hàng chờ QC từ LIS Gateway"
           onClose={() => setLisQueueOpen(false)}
-          width={640}
           footer={<>
             <button className="btn ghost sm" onClick={refreshLisQueue}>Làm mới</button>
             <button className="btn ghost sm" onClick={() => setLisQueueOpen(false)}>Đóng</button>

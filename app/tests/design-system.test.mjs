@@ -636,10 +636,7 @@ test('chiều cao control và hàng bảng nằm trên thang, không tự đặt
   const EXEMPT = {
     '.dash-test-filterbar button b': 'badge đếm số trong tab lọc',
     '.settings-admin-icon': 'icon SVG',
-    '.action-chip': 'pill trạng thái',
     '.rc-pending-icon svg': 'icon SVG',
-    '.qc-staff': 'badge viết tắt người nhập',
-    '.dash-level-pill': 'pill mức QC',
     '.sg-chart-empty-icon svg': 'icon SVG',
     '.confirm-modal-icon': 'icon cảnh báo của hộp xác nhận',
     '.sg-chart-empty-icon': 'khung icon minh hoạ',
@@ -746,4 +743,160 @@ test('không comment nào nuốt mất rule CSS', () => {
     }
   }
   assert.deepEqual(swallowed, [], 'đóng comment bằng */ trước rule tiếp theo');
+});
+
+// Khoảng cách GIỮA các field từng lẫn 8/10/12/14/16/20px tuỳ trang (cùng một
+// thẻ Cài đặt: cột trái 16px, cột phải 12px), cộng thêm margin-top 8px của
+// nhãn ở mọi nơi ngoài <form>. Luật: khối cha tạo khoảng cách bằng
+// `gap:var(--field-gap)`; nhãn trong `.field` không mang margin-top.
+test('khoảng cách giữa các field: một token, do khối cha tạo', () => {
+  assert.equal(flat('--field-gap'), '16px');
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(app, /(?:^|\})\s*\.field>label\{margin:0 0 var\(--field-label-gap\);\}/, 'nhãn trong .field không có margin-top ở bất kỳ đâu');
+
+  // Khối cha = thẻ HTML chứa trực tiếp từ hai `.field` trở lên.
+  const RENDERER = join(ROOT, 'renderer');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const counts = new Map();
+  for (const file of tsxFiles(RENDERER)) {
+    const src = readFileSync(file, 'utf8');
+    const stack = [];
+    const tagRe = /<\/?([A-Za-z][\w.]*)((?:[^>"'{}]|"[^"]*"|'[^']*'|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*?)(\/?)>/g;
+    for (let m; (m = tagRe.exec(src));) {
+      const [whole, name, attrs, selfClose] = m;
+      if (whole.startsWith('</')) {
+        const i = stack.map((s) => s.name).lastIndexOf(name);
+        if (i >= 0) stack.length = i;
+        continue;
+      }
+      const cls = (attrs.match(/className="([^"]*)"/) || [])[1] || '';
+      const parent = stack[stack.length - 1];
+      if (/(^|\s)field(\s|$)/.test(cls) && parent && /^[a-z]/.test(parent.name)) {
+        for (const c of parent.cls.split(/\s+/).filter(Boolean)) counts.set(c, (counts.get(c) || 0) + 1);
+      }
+      if (!selfClose && !['input', 'img', 'br', 'hr'].includes(name)) stack.push({ name, cls });
+    }
+  }
+  const containers = [...counts].filter(([, n]) => n >= 2).map(([c]) => c);
+  assert.ok(containers.length >= 15, 'không nhận ra khối chứa field nào — bộ đọc TSX hỏng?');
+
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      for (const part of m[1].split(',').map((p) => p.trim()).filter(Boolean)) {
+        const compounds = part.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+        const last = compounds.at(-1) || '';
+        if (containers.some((c) => new RegExp(`\.${c}(?![\w-])`).test(last))) {
+          for (const d of m[2].matchAll(/(?:^|;)\s*((?:row-|column-)?gap)\s*:\s*([^;]+)/g)) {
+            if (d[2].trim() !== 'var(--field-gap)') bad.push(`${relative(ROOT, file)}: ${part} ${d[1]}:${d[2].trim()}`);
+          }
+        }
+        // Nhãn của field không được tự thêm margin-top để giãn nhịp.
+        if (/^label(?:[.:\[]|$)/.test(last) && compounds.slice(0, -1).some((c) => /\.field(?![\w-])/.test(c))) {
+          const top = m[2].match(/(?:^|;)\s*margin-top\s*:\s*([^;]+)/);
+          const short = m[2].match(/(?:^|;)\s*margin\s*:\s*([^;]+)/);
+          const value = top ? top[1].trim() : short ? short[1].trim().split(/\s+/)[0] : null;
+          if (value !== null && value !== '0') bad.push(`${relative(ROOT, file)}: ${part} margin-top:${value}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(bad, [], 'khối chứa field dùng gap:var(--field-gap); nhãn field không có margin-top');
+});
+
+// Badge từng có 7 bản tự dựng (`.badge`, `.action-chip`, `.rc-crit-badge`,
+// `.dash-level-pill`, `.qc-staff`…) với chiều cao 20/22/25/26px, và `.tag`
+// gốc ăn theo dãn dòng của phần tử cha. `.action-chip` còn dùng lớp `bad`
+// không có trong CSS, nên chip "trả lại/không hiệu quả" hiện không màu.
+test('badge: hai kiểu .tag/.pill, một chiều cao, trang không đổi hình dạng', () => {
+  assert.equal(flat('--badge-h'), '24px');
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(app, /\.tag,\.pill\{[^}]*display:inline-flex;[^}]*min-height:var\(--badge-h\)/);
+  for (const tone of ['ok', 'warn', 'rej', 'none']) assert.match(app, new RegExp(`\.tag\.${tone}\{`), `thiếu tông .tag.${tone}`);
+
+  const RENDERER = join(ROOT, 'renderer');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const TONES = ['ok', 'warn', 'rej', 'none'];
+  const markup = [];
+  for (const file of tsxFiles(RENDERER)) {
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+      const raw = m[1] ?? m[2];
+      const names = raw.replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter(Boolean);
+      for (const name of names) {
+        if (name === 'badge' || /-(?:chip|pill|badge)$/.test(name)) markup.push(`${relative(ROOT, file)}: lớp "${name}"`);
+      }
+      if (!names.includes('tag')) continue;
+      // Tông của `.tag` phải là một trong bốn lớp có CSS — `bad` từng lọt qua.
+      if (m[1] !== undefined && !names.some((n) => TONES.includes(n))) markup.push(`${relative(ROOT, file)}: "tag" thiếu tông ok|warn|rej|none`);
+      if (m[2] !== undefined) {
+        // Chỉ đọc giá trị trả về của phép chọn (`? 'x'` / `: 'y'`), không đọc
+        // chuỗi đem so sánh (`=== 'approved'`).
+        for (const q of raw.matchAll(/[?:]\s*'([a-z-]+)'/g)) if (!TONES.includes(q[1])) markup.push(`${relative(ROOT, file)}: tông lạ '${q[1]}' cho .tag`);
+      }
+    }
+  }
+  assert.deepEqual(markup, [], 'dùng .tag + ok|warn|rej|none cho trạng thái, .pill cho nhãn thông tin');
+
+  const SHAPE = /^(?:height|min-height|max-height|padding(?:-[a-z]+)?|font(?:-[a-z]+)?|line-height|letter-spacing|border(?:-[a-z]+)?|background(?:-[a-z]+)?|color|box-shadow)$/;
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      const parts = m[1].split(',').map((p) => p.trim()).filter(Boolean);
+      if (parts.some((p) => /\.badge(?![\w-])|\.[\w-]+-(?:chip|pill|badge)(?![\w-])/.test(p))) bad.push(`${relative(ROOT, file)}: ${m[1].trim()} dựng badge riêng`);
+      if (file.endsWith('app.css')) continue;
+      const targetsBadge = parts.some((p) => /\.(?:tag|pill)(?![\w-])/.test(p.split(/\s*[>+~]\s*|\s+/).pop() || ''));
+      if (!targetsBadge) continue;
+      for (const d of m[2].matchAll(/(?:^|;)\s*([a-z-]+)\s*:\s*([^;]+)/g)) {
+        if (SHAPE.test(d[1])) bad.push(`${relative(ROOT, file)}: ${m[1].trim()} đổi ${d[1]}`);
+        if (d[1] === 'display' && !['flex', 'inline-flex', 'none'].includes(d[2].trim())) bad.push(`${relative(ROOT, file)}: ${m[1].trim()} display:${d[2].trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], 'CSS trang chỉ chỉnh bố cục quanh badge, không đổi kích thước, chữ hay màu');
+});
+
+// Modal từng có 16 độ rộng khác nhau (400–1160px): mỗi trang tự đặt `width`
+// cho lớp modal của mình, và `<Modal width={…}>` nhận số tuỳ ý. Luật: bốn cỡ
+// sm/md/lg/xl chọn qua prop `size`; chỉ app.css đặt độ rộng.
+test('modal: bốn cỡ qua prop size, trang không tự đặt độ rộng', () => {
+  assert.deepEqual(['sm', 'md', 'lg', 'xl'].map((k) => flat(`--modal-w-${k}`)), ['440px', '600px', '800px', '1120px']);
+  const modalSrc = readFileSync(join(ROOT, 'renderer', 'components', 'Modal.tsx'), 'utf8');
+  assert.match(modalSrc, /size = 'md'/, 'cỡ mặc định là md');
+  assert.doesNotMatch(modalSrc, /width\?:|style=\{width/, 'Modal không nhận độ rộng tự do');
+
+  const RENDERER = join(ROOT, 'renderer');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const markup = [];
+  for (const file of tsxFiles(RENDERER)) {
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/<Modal\b((?:[^>"'{}]|"[^"]*"|'[^']*'|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*)>/g)) {
+      if (/\bwidth=|\bstyle=/.test(m[1])) markup.push(`${relative(ROOT, file)}: <Modal> tự đặt độ rộng`);
+      const size = m[1].match(/\bsize="([a-z]+)"/);
+      if (size && !['sm', 'md', 'lg', 'xl'].includes(size[1])) markup.push(`${relative(ROOT, file)}: size="${size[1]}"`);
+    }
+  }
+  assert.deepEqual(markup, [], 'chọn cỡ bằng size="sm|md|lg|xl"');
+
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    if (file.endsWith('app.css')) continue;
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      const targetsModal = m[1].split(',').some((p) => /\.(?:modal|[\w-]+-modal)(?![\w-])/.test(p.trim().split(/\s*[>+~]\s*|\s+/).pop() || ''));
+      if (targetsModal && /(?:^|;)\s*(?:min-|max-)?width\s*:/.test(m[2])) bad.push(`${relative(ROOT, file)}: ${m[1].trim()}`);
+    }
+  }
+  assert.deepEqual(bad, [], 'độ rộng modal chỉ đặt ở app.css theo 4 cỡ');
 });

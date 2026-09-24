@@ -167,7 +167,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
           </tbody>
         </table> : <EmptyState title="Chưa có hồ sơ chuyển lô">Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.</EmptyState>}
         {creating && (
-          <Modal title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} className="rcfg-modal lot-trans-modal"
+          <Modal title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
             footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Hủy</button><button className="btn teal" type="submit" form="transition-form">{creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
             <form id="transition-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}

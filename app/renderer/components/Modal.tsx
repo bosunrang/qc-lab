@@ -18,8 +18,16 @@ function primaryButton(box: HTMLElement | null): HTMLButtonElement | null {
   return null;
 }
 
-export function Modal({ title, onClose, children, footer, width, className }: {
-  title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; width?: number; className?: string;
+/** Bốn cỡ modal, khoá bằng design-system.test.mjs — không đặt độ rộng riêng:
+ * `sm` 440px hộp hỏi nhanh, 1–2 ô; `md` 600px form thường (mặc định);
+ * `lg` 800px form nhiều cột; `xl` 1120px modal chứa bảng dữ liệu.
+ * Trước 2026-09-24 có 16 độ rộng khác nhau, từ 400 đến 1160px. */
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+
+export function Modal({ title, onClose, children, footer, size = 'md', className }: {
+  title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; size?: ModalSize;
+  /** Chỉ cho bố cục bên trong modal; độ rộng lấy theo `size`. */
+  className?: string;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   useFocusTrap(true, onClose, boxRef);
@@ -57,7 +65,7 @@ export function Modal({ title, onClose, children, footer, width, className }: {
 
   return createPortal(
     <div className="modal-bg" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={`modal${className ? ' ' + className : ''}`} ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" style={width ? { width } : undefined} onKeyDown={onKeyDown}>
+      <div className={`modal modal-${size}${className ? ' ' + className : ''}`} ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" onKeyDown={onKeyDown}>
         <div className="modal-h">
           <h3 id="modal-title">{title}</h3>
           <button type="button" className="modal-close" aria-label="Đóng hộp thoại" onClick={onClose}>✕</button>

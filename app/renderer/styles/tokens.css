@@ -276,6 +276,10 @@
   --control-h-sm:28px;
   --control-h-compact:32px;
   --control-h:36px;
+  /* Chiều cao tối thiểu của badge `.tag`/`.pill`. Trước đây badge ăn theo
+     dãn dòng của phần tử cha nên cao 25px trong bảng, 27px ngoài bảng, và
+     các bản tự dựng ra 20/22/25/26px. */
+  --badge-h:24px;
   --control-padding-x:var(--space-3);
   --control-radius:var(--radius-sm);
   --button-padding-x:var(--space-3-5);
@@ -334,12 +338,20 @@
   --table-head-tracking-sm:var(--table-head-tracking);
 
   --modal-padding:var(--space-5);
+  /* Bốn cỡ modal; độ rộng thực = min(cỡ, cửa sổ − 32px). */
+  --modal-w-sm:440px;
+  --modal-w-md:600px;
+  --modal-w-lg:800px;
+  --modal-w-xl:1120px;
   /* Khoảng cách nhãn → ô nhập. Là NGUỒN DUY NHẤT: chỉ `margin-bottom` của
      nhãn mang giá trị này; khối `.field` bao quanh không dùng `gap` chen
      giữa. Trước 2026-09-24 có nơi 4px (margin nhãn), nơi 6px (gap khối),
      nơi 10px (gap + margin cộng dồn), nơi 20px (gap lưới + margin). */
   --field-label-gap:var(--space-1-5);
-  --form-row-gap:var(--space-3);
+  /* Khoảng cách GIỮA hai field, cả dọc lẫn ngang. Khối cha tạo bằng `gap`
+     (lưới/flex); nhãn trong `.field` không mang margin-top. Trước
+     2026-09-24 lẫn 8/10/12/14/16/20px và cộng dồn margin-top 8px của nhãn. */
+  --field-gap:var(--space-4);
   --toolbar-gap:var(--space-2);
   --page-header-gap:var(--space-6);
 

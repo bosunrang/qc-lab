@@ -28,7 +28,7 @@
 
 .settings-unit-fields{
   display:grid;
-  gap:var(--gap-content);
+  gap:var(--field-gap);
   margin:16px 16px 0;
 }
 
@@ -38,7 +38,7 @@
 .settings-logo-fields{
   display:grid;
   align-content:start;
-  gap:12px;
+  gap:var(--field-gap);
 }
 
 .settings-unit-fields label,
@@ -74,7 +74,7 @@
   /* Tiêu đề panel đã có khoảng hở dưới; chỉ thêm lề ngang để form Logo
      thẳng hàng theo trục dọc với form Thông tin đơn vị bên cạnh. */
   margin:16px 16px 0;
-  gap:16px;
+  gap:var(--field-gap);
 }
 
 .brand-preview{
@@ -129,7 +129,7 @@
 .lis-gateway-body{display:grid;gap:var(--gap-control);margin:var(--panel-content-gap) 16px 0}
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
    chỉ còn nửa bề rộng trang — giữ đúng lý do hệ thống ghi tại chỗ. */
-.lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--gap-content)}
+.lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--field-gap)}
 .lis-gateway-grid label{margin-top:0}
 .lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:var(--control-h);padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .lis-gateway-toggle input{flex:none}
@@ -140,8 +140,8 @@
 
 
 .firebase-sync-panel{overflow:hidden}
-.firebase-body{display:grid;gap:var(--gap-content);margin:var(--panel-content-gap) 16px 0}
-.firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-content)}
+.firebase-body{display:grid;gap:var(--field-gap);margin:var(--panel-content-gap) 16px 0}
+.firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap)}
 .firebase-auth-grid > div:last-child{grid-column:1 / -1}
 .firebase-auth-grid label,.firebase-body > .field > label{margin-top:0}
 /* Ô dán cấu hình vẫn cao để đọc dễ, nhưng dùng đúng cỡ/chữ/line-height của

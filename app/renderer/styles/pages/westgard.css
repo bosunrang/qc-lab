@@ -2,7 +2,7 @@
    Clinical Precision. */
 
 .wg-test-picker{
-  display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:var(--space-3); align-items:end; margin:var(--panel-content-gap) var(--panel-padding) 0; max-width:760px;
+  display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:var(--field-gap); align-items:end; margin:var(--panel-content-gap) var(--panel-padding) 0; max-width:760px;
 }
 .wg-test-picker label{
   margin-top:0;
@@ -29,7 +29,7 @@
    thuật toán bố cục bảng và các chip bị dồn về mép trái của cột. */
 .wg-table th.wg-verdict-head,.wg-table td.wg-verdict-cell{text-align:center;vertical-align:middle;}
 .wg-table td.wg-verdict-cell{display:table-cell;}
-.wg-table .wg-verdict-cell>.tag{display:table;width:max-content;margin:0 auto;}
+.wg-table .wg-verdict-cell>.tag{display:flex;width:max-content;margin:0 auto;}
 .wg-table .wg-verdict-cell>.tag+.tag{margin-top:var(--space-1);}
 .wg-support-rule{display:inline-flex;align-items:center;gap:var(--space-1);white-space:nowrap;}
 .wg-rule-chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1-5) var(--space-0-5);}

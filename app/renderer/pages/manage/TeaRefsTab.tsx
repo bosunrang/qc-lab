@@ -130,7 +130,7 @@ export function TeaRefsTab() {
         </tbody>
       </table> : <EmptyState title="Không tìm thấy xét nghiệm">Thử tìm lại theo tên, đơn vị hoặc nhóm xét nghiệm.</EmptyState>}
       </div>
-      {adding && <Modal title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} className="rcfg-modal"
+      {adding && <Modal title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} size="lg" className="rcfg-modal"
         footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Hủy</button><button className="btn teal" type="submit" form="tea-add-form">Thêm xét nghiệm</button></>}>
         <form id="tea-add-form" onSubmit={async (event) => {
           event.preventDefault();
@@ -167,7 +167,7 @@ export function TeaRefsTab() {
           <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
       </Modal>}
-      {editing && <Modal title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hóa' : 'Sửa hồ sơ TEa chuẩn hóa'} onClose={() => { setEditing(null); setPrefill(null); }} className="tea-lab-profile-modal" footer={<>
+      {editing && <Modal title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hóa' : 'Sửa hồ sơ TEa chuẩn hóa'} onClose={() => { setEditing(null); setPrefill(null); }} size="md" className="tea-lab-profile-modal" footer={<>
           {current && current.lab != null ? <button type="button" className="btn danger" onClick={() => removeLabProfile(current.id, current.name)}>Xóa TEa chuẩn hóa</button> : null}
           <button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button>
           <button className="btn teal" type="submit" form="tearef-form">{editing === 'new' ? 'Thêm hồ sơ TEa' : 'Lưu thay đổi'}</button>

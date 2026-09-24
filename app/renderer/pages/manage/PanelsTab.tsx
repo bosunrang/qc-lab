@@ -97,7 +97,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
             </tbody>
           </table>}
         {editing && (
-          <Modal title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} className="rcfg-modal"
+          <Modal title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="panel-form">{editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
             <form id="panel-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}

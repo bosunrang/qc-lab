@@ -38,7 +38,7 @@
 }
 
 .user-create-fields{
-  display:grid; grid-template-columns:1fr; gap:var(--gap-content); padding:var(--panel-content-gap) 16px 16px;
+  display:grid; grid-template-columns:1fr; gap:var(--field-gap); padding:var(--panel-content-gap) 16px 16px;
 }
 
 .user-create-fields label{

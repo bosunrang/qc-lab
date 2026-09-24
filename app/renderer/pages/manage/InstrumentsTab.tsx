@@ -65,14 +65,14 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
                   <td>{i.serial || <span className="cell-missing">Chưa khai</span>}</td>
                   <td className="num">{testCountOf(i.id)}</td>
                   <td className="num">{panelCountOf(i.id)}</td>
-                  <td><span className={`badge instrument-status ${i.active ? 'ok' : 'neutral'}`}>{i.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span></td>
+                  <td><span className={`tag instrument-status ${i.active ? 'ok' : 'none'}`}>{i.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span></td>
                   <td><div className="manage-actions"><RowActionButton kind="edit" label={`Sửa máy ${i.name}`} onClick={() => { setErr(null); setEditing(i); }} /><RowActionButton kind="delete" label={`Xóa máy ${i.name}`} onClick={() => remove(i)} /></div></td>
                 </tr>
               ))}
             </tbody>
           </table>}
         {editing && (
-          <Modal title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} className="rcfg-modal"
+          <Modal title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="instrument-form">{editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
             <form id="instrument-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}

@@ -275,9 +275,9 @@ test('EN10: ô nhắc chạy lại mở cho MỌI mức của lần chạy bị 
   assert.match(page, /\$\{excluded \? ' run-excluded' : ''\}/);
   assert.match(page, /title=\{excluded \|\| undefined\}/);
   const css = readFileSync(new URL('../renderer/styles/pages/entry.css', import.meta.url), 'utf8');
-  assert.match(css, /\.qc-value-chip\.run-excluded\{border-style:dashed;/);
+  assert.match(css, /\.qc-value-cell\.run-excluded\{border-style:dashed;/);
   // Nét đổi, MÀU không đổi: chip cảnh báo vẫn giữ viền cảnh báo của nó.
-  assert.match(css, /\.qc-value-chip\.warn\.run-excluded\{border-color:var\(--warning-border\);\}/);
+  assert.match(css, /\.qc-value-cell\.warn\.run-excluded\{border-color:var\(--warning-border\);\}/);
 });
 
 test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại và nói rõ đã bỏ bao nhiêu', () => {

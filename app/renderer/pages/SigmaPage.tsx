@@ -683,7 +683,7 @@ export function SigmaPage() {
                       <td className="num">{lv.mu?.U != null ? <>{lv.mu.U.toFixed(4)}{!lv.mu.complete && <small className="hint"> · tạm tính</small>}</> : '—'}</td>
                       <td className="num">{lv.mu?.complete && lv.mu.absoluteU != null ? `${lv.mu.absoluteU.toFixed(4)}${test?.unit ? ` ${test.unit}` : ''}` : '—'}</td>
                       <td className="num">{lv.mu?.teaRatio != null ? <b className={lv.mu.withinTea ? 'sg-mu-within' : 'sg-mu-over'}>{(lv.mu.teaRatio * 100).toFixed(0)}%</b> : '—'}</td>
-                      <td>{!lv.mu ? <span className="hint">Chưa có CV IQC</span> : !lv.mu.complete ? <span className="badge warn">Chưa đủ</span> : lv.mu.withinTea === false ? <span className="badge rej">U vượt TEa</span> : <span className="badge ok">Đủ thành phần</span>}</td>
+                      <td>{!lv.mu ? <span className="hint">Chưa có CV IQC</span> : !lv.mu.complete ? <span className="tag warn">Chưa đủ</span> : lv.mu.withinTea === false ? <span className="tag rej">U vượt TEa</span> : <span className="tag ok">Đủ thành phần</span>}</td>
                       <td>{lv.mu?.missing?.length ? lv.mu.missing.join(', ') : <span className="hint">Đủ thành phần</span>}</td>
                       <td>{writable && <button type="button" className="btn ghost sm" onClick={() => setMuModal({ period: displayPeriod, level: lv })}>{lv.mu ? 'Sửa MU' : 'Nhập MU'}</button>}</td>
                     </tr>
@@ -785,7 +785,7 @@ function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
     if (!result.ok) setError(result.error?.message || 'Không thể thêm kỳ Sigma.');
   }
 
-  return <Modal title="Thêm kỳ Sigma" onClose={onClose} className="sg-add-period-modal"
+  return <Modal title="Thêm kỳ Sigma" onClose={onClose} size="sm"
     footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Thêm kỳ</button></>}>
     <div className="sg-add-period-form">
       <p className="hint">Chọn trực tiếp kỳ cần nhập, kể cả kỳ trước đó. Kỳ đã tồn tại sẽ không bị ghi đè.</p>
@@ -833,7 +833,7 @@ function BiasModal({ initialRounds, onClose, onSubmit }: {
   }
 
   return (
-    <Modal title="Tính Bias% từ EQA/EQC" onClose={onClose} className="sg-eqa-modal"
+    <Modal title="Tính Bias% từ EQA/EQC" onClose={onClose} size="md"
       footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Áp dụng Bias%</button></>}>
       <div className="sg-eqa-table-wrap">
         <table className="sg-eqa-table">
@@ -887,13 +887,13 @@ function CohortModal({ period, cohorts, onClose, onSubmit }: {
     const result = await onSubmit(selected, true);
     if (!result.ok) await infoDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC', type: 'warn' });
   }
-  return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} className="sg-cohort-modal"
+  return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} size="xl"
     footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</button></>}>
     <div className="sg-cohort-table-wrap"><table className="sg-cohort-table"><thead><tr><th className="sg-cohort-level">Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th className="num">n</th><th className="num">CV</th><th>Trạng thái</th></tr></thead><tbody>
       {period.levels.flatMap((level) => {
         const rows = byLevel.get(level.level) || [];
         if (!rows.length) return <tr key={level.level}><td>Mức {level.level}</td><td colSpan={5} className="hint">Chưa có điểm IQC hợp lệ theo lô trong kỳ này.</td></tr>;
-        return rows.map((cohort, index) => <tr key={`${level.level}:${cohort.lot}:${cohort.start}`}><td className="sg-cohort-level">{index === 0 ? `Mức ${level.level}` : ''}</td><td><label><input type="radio" name={`cohort-${level.level}`} checked={choices[level.level] === cohort.lot} onChange={() => setChoices((old) => ({ ...old, [level.level]: cohort.lot }))} /> Lô {cohort.lot || '—'}</label></td><td>{vnDate(cohort.start)}–{vnDate(cohort.end)}</td><td className="num">{cohort.n}</td><td className="num">{cohort.cv != null ? `${cohort.cv.toFixed(2)}%` : '—'}</td><td><span className={`badge ${cohortStatusTone(cohort.status)}`}>{cohortStatusLabel(cohort.status)}</span>{cohort.issues.length ? <div className="sg-cohort-issue">{cohort.issues.join(' · ')}</div> : null}</td></tr>);
+        return rows.map((cohort, index) => <tr key={`${level.level}:${cohort.lot}:${cohort.start}`}><td className="sg-cohort-level">{index === 0 ? `Mức ${level.level}` : ''}</td><td><label><input type="radio" name={`cohort-${level.level}`} checked={choices[level.level] === cohort.lot} onChange={() => setChoices((old) => ({ ...old, [level.level]: cohort.lot }))} /> Lô {cohort.lot || '—'}</label></td><td>{vnDate(cohort.start)}–{vnDate(cohort.end)}</td><td className="num">{cohort.n}</td><td className="num">{cohort.cv != null ? `${cohort.cv.toFixed(2)}%` : '—'}</td><td><span className={`tag ${cohortStatusTone(cohort.status)}`}>{cohortStatusLabel(cohort.status)}</span>{cohort.issues.length ? <div className="sg-cohort-issue">{cohort.issues.join(' · ')}</div> : null}</td></tr>);
       })}
     </tbody></table></div>
   </Modal>;
@@ -915,17 +915,17 @@ function MuModal({ level, onClose, onSubmit }: {
   }
 
   return (
-    <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} className="sg-eqa-modal sg-mu-modal"
+    <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} size="lg" className="sg-mu-modal"
       footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Áp dụng ngân sách MU</button></>}>
       {err && <p className="field-error">{err}</p>}
       <table className="sg-mu-detail-table">
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>
         <tbody>
-          <tr><td>u(Rw) — từ CV%</td><td>{level.cv != null ? level.cv.toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>
-          <tr><td>Bias quan sát (RMS các vòng EQA)</td><td>{level.biasEqa != null ? Math.abs(level.biasEqa).toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>
-          <tr><td>u(Cref)% — giá trị gán EQA/CRM</td><td>{preview?.uCref != null ? preview.uCref.toFixed(3) : <span className="badge warn">Chưa đánh giá / không áp dụng</span>}</td></tr>
-          <tr><td>u(bias)% = √(bias² + u(Cref)²)</td><td>{preview?.uBias != null ? preview.uBias.toFixed(3) : <span className="badge warn">Chưa có / không áp dụng</span>}</td></tr>
-          <tr><td>u(cal)%</td><td>{preview?.uCal != null ? preview.uCal.toFixed(3) : <span className="badge warn">Chưa đánh giá</span>}</td></tr>
+          <tr><td>u(Rw) — từ CV%</td><td>{level.cv != null ? level.cv.toFixed(3) : <span className="tag warn">Chưa có</span>}</td></tr>
+          <tr><td>Bias quan sát (RMS các vòng EQA)</td><td>{level.biasEqa != null ? Math.abs(level.biasEqa).toFixed(3) : <span className="tag warn">Chưa có</span>}</td></tr>
+          <tr><td>u(Cref)% — giá trị gán EQA/CRM</td><td>{preview?.uCref != null ? preview.uCref.toFixed(3) : <span className="tag warn">Chưa đánh giá / không áp dụng</span>}</td></tr>
+          <tr><td>u(bias)% = √(bias² + u(Cref)²)</td><td>{preview?.uBias != null ? preview.uBias.toFixed(3) : <span className="tag warn">Chưa có / không áp dụng</span>}</td></tr>
+          <tr><td>u(cal)%</td><td>{preview?.uCal != null ? preview.uCal.toFixed(3) : <span className="tag warn">Chưa đánh giá</span>}</td></tr>
         </tbody>
       </table>
       <label className="sg-mu-bias-toggle">

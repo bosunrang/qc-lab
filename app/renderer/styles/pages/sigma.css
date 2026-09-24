@@ -23,7 +23,7 @@
 .sg-setup-heading + .hint{margin:var(--panel-content-gap) 16px 0;}
 /* Hàng nhận diện chỉ đọc: xét nghiệm được chọn từ danh mục QC, sau đó hiện
    ngay đơn vị và máy tương ứng để không phải lặp thêm một ô tên xét nghiệm. */
-.sg-setup-heading + .sg-control-row{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:12px;align-items:end;margin:var(--panel-content-gap) 16px 0;}
+.sg-setup-heading + .sg-control-row{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);align-items:end;margin:var(--panel-content-gap) 16px 0;}
 .sg-setup-heading + .sg-control-row label{margin-top:0;}
 .sg-setup-heading + .sg-control-row>.sg-test-picker{grid-column:1;max-width:none;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-unit-field{grid-column:2;min-width:0;}
@@ -61,7 +61,7 @@
 .sg-level-row{min-height:96px;border-top:1px solid var(--surface-divider);background:var(--panel);}.sg-level-row:hover{background:var(--surface-subtle);}.sg-level-row>div{min-width:0;padding:12px var(--table-cell-px-compact);}.sg-level-row>div:not(:first-child){border-left:1px solid var(--surface-divider);}
 .sg-level-identity,.sg-level-cell{display:grid;align-content:center;justify-items:center;gap:var(--space-2xs);text-align:center;}.sg-level-identity b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-level-identity span,.sg-level-source,.sg-level-sigma span{color:var(--muted);font-size:var(--text-xs);line-height:var(--leading-heading);}
 .sg-level-input-row{display:flex;align-items:center;justify-content:center;gap:var(--space-sm);min-width:0;}.sg-level-input-row input.sg-number{box-sizing:border-box;flex:0 1 92px;min-width:74px;height:var(--control-h);min-height:var(--control-h);padding:0 var(--space-sm);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font-size:var(--text-base);font-weight:var(--weight-normal);text-align:center;appearance:textfield;-moz-appearance:textfield;}.sg-level-input-row .btn{height:var(--control-h);min-height:var(--control-h);}.sg-level-input-row input.sg-number::-webkit-inner-spin-button,.sg-level-input-row input.sg-number::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}.sg-level-input-row input.sg-number::placeholder{color:var(--muted);opacity:.72;}
-.sg-level-source{display:flex;align-items:center;justify-content:center;gap:var(--space-2xs);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.sg-level-source .badge{flex:none;}
+.sg-level-source{display:flex;align-items:center;justify-content:center;gap:var(--space-2xs);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.sg-level-source .tag{flex:none;}
 .sg-level-sigma b{font-size:var(--text-lg);font-weight:var(--weight-bold);line-height:var(--leading-heading);font-variant-numeric:tabular-nums;}
 
 .sg-collapse-panel{padding:0;overflow:hidden;}
@@ -108,7 +108,7 @@
 .sg-chart-empty-copy{min-width:0;}.sg-chart-empty-kicker{display:block;margin-bottom:2px;color:var(--muted);font-size:var(--text-xs);font-weight:var(--weight-bold);text-transform:uppercase;letter-spacing:.04em;}.sg-chart-empty-copy>b{display:block;color:var(--ink);font-size:var(--text-base);line-height:var(--leading-snug);}.sg-chart-empty-copy>p{margin:4px 0 0;color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);}.sg-chart-empty-steps{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}.sg-chart-empty-steps span{padding:2px 6px;border:1px solid var(--accent-border-soft);border-radius:var(--radius-pill);background:var(--surface-elevated-translucent);color:var(--text-subtle);font-size:var(--text-xs);font-weight:700;}
 .sg-chart-tooltip{position:absolute;z-index:3;min-width:190px;max-width:244px;padding:8px 10px;border-radius:var(--radius-md);background:var(--surface-inverse);color:var(--on-accent);box-shadow:var(--shadow-tooltip);font-size:var(--text-sm);line-height:var(--leading-snug);pointer-events:none;transform:translate(10px,-100%);}
 .sg-chart-tooltip b{display:block;margin-bottom:2px;font-weight:var(--weight-bold);}.sg-chart-tooltip .muted{color:var(--text-on-dark-muted);}
-.sg-cohort-modal{width:900px;}
+
 .sg-no-level-panel{padding:0 0 16px;}.sg-no-level-panel .sg-control-row{padding:14px 16px 0;}.sg-no-level-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px;}.sg-no-level-alert .btn{flex:none;}
 .sg-historical-level-note{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:var(--panel-content-gap) 16px 0;}.sg-historical-level-note .btn{flex:none;}
 .sg-cohort-table th:nth-child(1),.sg-cohort-table td:nth-child(1){width:12%;}.sg-cohort-table th:nth-child(2),.sg-cohort-table td:nth-child(2){width:18%;}.sg-cohort-table th:nth-child(3),.sg-cohort-table td:nth-child(3){width:26%;white-space:nowrap;}.sg-cohort-table th:nth-child(4),.sg-cohort-table td:nth-child(4){width:7%;}.sg-cohort-table th:nth-child(5),.sg-cohort-table td:nth-child(5){width:10%;}.sg-cohort-table th:nth-child(6),.sg-cohort-table td:nth-child(6){width:27%;}
@@ -116,8 +116,8 @@
 .sg-cohort-table label{display:inline-flex;align-items:center;gap:4px;margin:0;font-weight:700;}
 .sg-cohort-issue{margin-top:2px;color:var(--warning-ink);font-size:var(--text-xs);line-height:var(--leading-heading);}
 
-.sg-eqa-modal{width:520px;}
-.sg-add-period-modal{width:400px;}.sg-add-period-form{display:grid;gap:var(--space-md);}.sg-add-period-form .hint{margin:0;line-height:var(--leading-body);}.sg-add-period-picker{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);}.sg-add-period-picker label{display:grid;gap:var(--space-2xs);margin:0;color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-add-period-picker select{width:100%;height:var(--control-h);min-height:var(--control-h);}
+
+.sg-add-period-form{display:grid;gap:var(--space-md);}.sg-add-period-form .hint{margin:0;line-height:var(--leading-body);}.sg-add-period-picker{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);}.sg-add-period-picker label{display:grid;gap:var(--space-2xs);margin:0;color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-add-period-picker select{width:100%;height:var(--control-h);min-height:var(--control-h);}
 .sg-eqa-table-wrap{overflow-x:auto;}
 .sg-eqa-table{width:100%;min-width:468px;margin:0 0 10px;border:1px solid var(--surface-border);border-radius:var(--table-radius);border-collapse:separate;border-spacing:0;overflow:hidden;table-layout:fixed;font:var(--table-body-size) var(--sans);}
 /* Đây là bảng NHẬP LIỆU chính của modal, nên giữ header chuẩn 13px. Cột thao
@@ -151,9 +151,9 @@
 .sg-eqa-summary.is-empty{box-sizing:border-box;display:flex;width:fit-content;max-width:100%;min-height:var(--control-h-compact);margin-top:10px;padding:4px 10px;border-left:3px solid var(--warning-accent);border-radius:var(--radius-md);background:var(--warning-bg);color:var(--warning-ink);font-size:var(--text-sm);line-height:var(--leading-body);}
 .sg-eqa-summary.is-empty .sg-eqa-empty{color:var(--warning-ink);font-weight:var(--weight-normal);}
 .sg-eqa-warning{align-self:center;color:var(--warning-ink);font-size:var(--text-xs);font-weight:700;}
-.sg-mu-modal{width:860px;}
+
 /* Thiết lập phân tích dùng lưới ba cột để hiển thị xét nghiệm, đơn vị và máy. */
-.sg-setup-fields{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:12px;row-gap:var(--panel-content-gap);margin:var(--panel-content-gap) 16px 0;}
+.sg-setup-fields{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);row-gap:var(--field-gap);margin:var(--panel-content-gap) 16px 0;}
 .sg-setup-fields > div{min-width:0;}
 .sg-setup-fields label{margin-top:0;}
 /* “Thiết lập phân tích” là cấu hình gọn: mọi control phải cùng nhịp 36px.
@@ -167,7 +167,7 @@
 .sg-setup-fields .sg-tea-input input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
 /* Nguồn EFLM cần bốn trường rõ ràng. Ở bề rộng hẹp, lưới chuyển thành hai
    cột trước khi nhãn hoặc ô ngày bị ép nhỏ và gãy dòng. */
-.sg-eflm-box{display:grid;grid-template-columns:minmax(280px,1.7fr) minmax(144px,.8fr) minmax(168px,1fr);gap:var(--space-md);margin:var(--panel-content-gap) 16px 0;padding:var(--space-md);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
+.sg-eflm-box{display:grid;grid-template-columns:minmax(280px,1.7fr) minmax(144px,.8fr) minmax(168px,1fr);gap:var(--field-gap);margin:var(--panel-content-gap) 16px 0;padding:var(--space-md);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
 .sg-eflm-field{min-width:0;}
 .sg-eflm-field label{display:block;margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* EFLM là phần cấu hình gọn, nên mọi control trong khối dùng cùng nhịp 36px

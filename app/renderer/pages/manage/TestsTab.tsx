@@ -288,7 +288,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
           </table>}
 
         {editing && (
-          <Modal title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} className="rcfg-modal rcfg-assay-modal"
+          <Modal title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal rcfg-assay-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form">{editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
             <form id="test-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}
@@ -363,7 +363,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                             <b>{instrument.name}</b>
                             <small>{instrument.section || 'Chưa gán khu vực'}{instrument.model ? ` · ${instrument.model}` : ''}</small>
                           </span>
-                          {assigned && <span className="assay-machine-lock">Đã gán</span>}
+                          {assigned && <span className="tag ok">Đã gán</span>}
                         </label>;
                       })}
                       {!instruments.length && <p className="empty-state">Chưa có máy xét nghiệm. Hãy thêm máy trước khi tạo xét nghiệm.</p>}
