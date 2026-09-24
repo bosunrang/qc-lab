@@ -268,8 +268,8 @@
      LỚP 3 — TOKEN COMPONENT.
      ═══════════════════════════════════════════════════════════════════ */
   /* Control có sáu mật độ có chủ đích: nút cực gọn 28, hàng dữ liệu 30,
-     toolbar 32, ô bảng gọn 34, select/tìm nhanh/ô dữ liệu/vùng Cấu hình/ô ngày 36 và form chuẩn 40.
-     Không đặt số mới tại trang. */
+     toolbar 32, ô bảng gọn 34, và control chuẩn (form, select, dữ liệu,
+     cấu hình, ô ngày) 36. Không đặt số mới tại trang. */
   --control-h-row:30px;
   --control-h-compact:32px;
   --control-h-table:34px;
@@ -279,7 +279,7 @@
   --control-h-config:36px;
   --control-h-action:36px;
   --control-h-date:36px;
-  --control-h:40px;
+  --control-h:36px;
   --control-h-sm:28px;
   --control-padding-x:var(--space-3);
   --control-radius:var(--radius-sm);

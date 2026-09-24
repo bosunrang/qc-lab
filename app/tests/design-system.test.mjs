@@ -182,7 +182,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h-data\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
     'CV/Bias trong hàng dữ liệu Sigma dùng control 36px, cân với bảng đọc');
   assert.match(sigma, /\.sg-level-input-row \.btn\{height:var\(--control-h-data\);min-height:var\(--control-h-data\);\}/,
-    'nút cạnh ô CV/Bias cùng dùng 36px, không giữ control 40px trong hàng dữ liệu');
+    'nút cạnh ô CV/Bias cùng dùng token hàng dữ liệu 36px');
   assert.match(sigma, /\.sg-period-history-list\{[^}]*grid-auto-rows:58px[^}]*max-height:244px[^}]*overflow-y:auto/,
     'lịch sử kỳ hiển thị tối đa bốn mục rồi cuộn nội bộ, không kéo dài panel');
   assert.doesNotMatch(readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8'), /Ngân sách MU/,
@@ -317,13 +317,13 @@ test('Nhập QC không rò kiểu dáng sang Sigma và không giữ dữ liệu 
 test('mật độ control dùng token component, không viết lại số chuẩn tại trang', () => {
   assert.deepEqual(
     ['sm', 'row', 'compact', 'table', 'select', 'search', 'data', 'config', 'date', ''].map((k) => TOKEN[`--control-h${k ? `-${k}` : ''}`]),
-    ['28px', '30px', '32px', '34px', '36px', '36px', '36px', '36px', '36px', '40px'],
+    ['28px', '30px', '32px', '34px', '36px', '36px', '36px', '36px', '36px', '36px'],
   );
   const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
   assert.match(app, /select\{height:var\(--control-h-select\);min-height:var\(--control-h-select\);\}/,
-    'select chuẩn toàn app dùng 36px, tách khỏi input form 40px');
+    'select chuẩn toàn app dùng token riêng 36px');
   assert.match(app, /input\[type="search"\][^{]*\{height:var\(--control-h-search\);min-height:var\(--control-h-search\);\}/,
-    'ô tìm nhanh toàn app dùng 36px, tách khỏi input nhập liệu 40px');
+    'ô tìm nhanh toàn app dùng token riêng 36px');
   assert.match(app, /input\[type="date"\][^{]*\{height:var\(--control-h-date\);min-height:var\(--control-h-date\);\}/,
     'ô ngày gốc toàn app dùng 36px');
   assert.match(app, /\.datebox input\.date-text\{[^}]*height:var\(--control-h-date\)[^}]*min-height:var\(--control-h-date\)/,
@@ -331,7 +331,7 @@ test('mật độ control dùng token component, không viết lại số chuẩ
   for (const name of ['audit.css', 'entry.css', 'manage.css', 'reagent.css']) {
     const css = readFileSync(join(STYLE_DIR, 'pages', name), 'utf8');
     assert.doesNotMatch(css, /(?:datebox|date-text)[^{]*\{[^}]*height:var\(--control-h(?:;|\))/,
-      `${name} không được đè DatePicker về chiều cao form 40px`);
+      `${name} không được đè DatePicker về token chiều cao form chung`);
   }
   const common = /(?<![-\w])(?:min-)?height\s*:\s*(?:28|30|32|34|36|40)px/g;
   const raw = PAGE_CSS.flatMap((file) => [...readFileSync(file, 'utf8')

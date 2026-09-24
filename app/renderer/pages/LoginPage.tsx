@@ -37,12 +37,18 @@ export function LoginPage() {
       <div className="auth-overlay">
         <div className="auth-card">
           <AuthBrand brand={brand} />
-          <p>Chưa có tài khoản nào trong hệ thống — tạo tài khoản quản trị đầu tiên để bắt đầu.</p>
-          <div className="field"><label>Tên đăng nhập</label><input value={username} autoFocus onChange={(e) => { clearError(); setUsername(e.target.value); }} /></div>
-          <div className="field"><label>Họ tên</label><input value={name} onChange={(e) => { clearError(); setName(e.target.value); }} /></div>
-          <div className="field"><label>Mật khẩu (≥8 ký tự)</label><input type="password" value={password} onChange={(e) => { clearError(); setPassword(e.target.value); }} /></div>
-          {error && <div className="auth-err">{error}</div>}
-          <div className="auth-actions"><button className="btn teal" onClick={() => bootstrapAdmin(username, name, password)}>Tạo tài khoản quản trị</button></div>
+          <div className="auth-setup">
+            <span className="auth-kicker">Thiết lập ban đầu</span>
+            <p>Chưa có tài khoản nào trong hệ thống. Tạo tài khoản quản trị đầu tiên để bắt đầu.</p>
+          </div>
+          <form className="auth-form" onSubmit={(event) => { event.preventDefault(); bootstrapAdmin(username, name, password); }}>
+            <div className="field auth-field"><label htmlFor="bootstrap-username">Tên đăng nhập</label><input id="bootstrap-username" value={username} autoFocus onChange={(e) => { clearError(); setUsername(e.target.value); }} /></div>
+            <div className="field auth-field"><label htmlFor="bootstrap-name">Họ tên</label><input id="bootstrap-name" value={name} onChange={(e) => { clearError(); setName(e.target.value); }} /></div>
+            <div className="field auth-field"><label htmlFor="bootstrap-password">Mật khẩu <span>(tối thiểu 8 ký tự)</span></label><input id="bootstrap-password" type="password" value={password} onChange={(e) => { clearError(); setPassword(e.target.value); }} /></div>
+            {error && <div className="auth-err" role="alert">{error}</div>}
+            <div className="auth-actions"><button className="btn teal" type="submit">Tạo tài khoản quản trị</button></div>
+          </form>
+          <div className="auth-hint">Phiên bản {import.meta.env.VITE_APP_VERSION}</div>
         </div>
       </div>
     );
@@ -52,19 +58,21 @@ export function LoginPage() {
     <div className="auth-overlay">
       <div className="auth-card">
         <AuthBrand brand={brand} />
-        <div className="field"><label>Tên đăng nhập</label><input value={username} autoFocus onChange={(e) => { clearError(); setUsername(e.target.value); }} /></div>
-        <div className="field">
-          <label>Mật khẩu</label>
+        <form className="auth-form" onSubmit={(event) => { event.preventDefault(); login(username, password); }}>
+          <div className="field auth-field"><label htmlFor="login-username">Tên đăng nhập</label><input id="login-username" value={username} autoFocus onChange={(e) => { clearError(); setUsername(e.target.value); }} /></div>
+          <div className="field auth-field">
+            <label htmlFor="login-password">Mật khẩu</label>
           <input type="password" value={password}
+            id="login-password"
             onChange={(e) => { clearError(); setPassword(e.target.value); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') login(username, password); }} />
-        </div>
-        {error && <div className="auth-err">{error}</div>}
-        <div className="auth-actions"><button className="btn teal" onClick={() => login(username, password)}>Đăng nhập</button></div>
+          />
+          </div>
+          {error && <div className="auth-err" role="alert">{error}</div>}
+          <div className="auth-actions"><button className="btn teal" type="submit">Đăng nhập</button></div>
+        </form>
         <div className="auth-hint">Phiên bản {import.meta.env.VITE_APP_VERSION}</div>
       </div>
     </div>
   );
 }
-
 
