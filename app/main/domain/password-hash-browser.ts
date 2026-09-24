@@ -96,6 +96,13 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqualBytes(expected, actual);
 }
 
+/** Cùng chữ ký với bản main process (vite alias thay module này vào chỗ
+ * `password-hash`). Trình duyệt không có thread pool cho PBKDF2 nên vẫn tính
+ * đồng bộ bên trong; chỉ bọc Promise để `auth.login()` dùng chung một đường. */
+export async function verifyPasswordAsync(password: string, stored: string): Promise<boolean> {
+  return verifyPassword(password, stored);
+}
+
 export function isPbkdf2Hash(value: string): boolean {
   return /^pbkdf2\$\d+\$[0-9a-f]+\$[0-9a-f]+$/.test(String(value || ''));
 }

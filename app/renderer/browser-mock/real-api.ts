@@ -137,7 +137,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
       return result;
     },
     login: async (input) => {
-      const result = auth.login(input);
+      const result = await auth.login(input);
       if (result.ok) sessionActor = toActor(result.data);
       rememberSession();
       preview.persist();

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import type { Actor, IpcResult } from '../ipc/shared';
 import { LanSessionStore } from './session-store';
+import { DEFAULT_LOGIN_THROTTLE, LoginThrottle, type LoginThrottleOptions } from './login-throttle';
 
 type LoginResult<T> = IpcResult<T>;
 export interface LanServerDeps<User> {
@@ -18,6 +19,11 @@ export interface LanServerDeps<User> {
 const JSON_LIMIT = 1024 * 1024;
 function cookies(req: IncomingMessage): Record<string, string> {
   return Object.fromEntries((req.headers.cookie || '').split(';').map((part) => part.trim().split('=', 2)).filter(([key]) => key));
+}
+/** Địa chỉ máy trạm để đếm lượt đăng nhập. Khi nghe dual-stack (`::`), cùng
+ * một máy IPv4 hiện dạng `::ffff:192.168.1.5`; gộp về một khoá. */
+function remoteAddress(req: IncomingMessage): string {
+  return String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
 }
 async function body(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = []; let bytes = 0;
@@ -36,7 +42,10 @@ export class LanHttpServer<User> {
   private server: Server | null = null;
   private readonly eventClients = new Set<ServerResponse>();
   readonly sessions = new LanSessionStore();
-  constructor(private readonly deps: LanServerDeps<User>) {}
+  readonly loginThrottle: LoginThrottle;
+  constructor(private readonly deps: LanServerDeps<User>, throttle: LoginThrottleOptions = DEFAULT_LOGIN_THROTTLE) {
+    this.loginThrottle = new LoginThrottle(throttle);
+  }
 
   async start(port = 3200, host = '0.0.0.0'): Promise<number> {
     if (this.server) throw new Error('Máy chủ LAN đang chạy.');
@@ -74,8 +83,17 @@ export class LanHttpServer<User> {
         res.write(': connected\n\n'); this.eventClients.add(res); req.once('close', () => this.eventClients.delete(res)); return;
       }
       if (req.method === 'POST' && url.pathname === '/api/auth/login') {
-        const result = await this.deps.login(await body(req));
+        const input = await body(req);
+        const username = String((input as { data?: { username?: unknown } })?.data?.username ?? '');
+        const gate = this.loginThrottle.begin(remoteAddress(req), username);
+        if ('retryAfterMs' in gate) {
+          const minutes = Math.ceil(gate.retryAfterMs / 60000);
+          res.setHeader('retry-after', String(Math.ceil(gate.retryAfterMs / 1000)));
+          return send(res, 429, { ok: false, error: { code: 'too-many-attempts', message: `Đăng nhập sai quá nhiều lần. Thử lại sau ${minutes} phút.` } });
+        }
+        const result = await this.deps.login(input);
         if (!result.ok) return send(res, 401, result);
+        gate.attempt.succeed();
         const session = this.sessions.create(this.deps.actorOf(result.data));
         res.setHeader('set-cookie', `qclab_session=${session.token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800`);
         return send(res, 200, { ok: true, data: result.data });

@@ -25,11 +25,11 @@ const bootAgain = auth.bootstrapAdmin({ data: { username: 'admin2', name: 'X', p
 assert.equal(bootAgain.ok, false);
 assert.equal(bootAgain.error.code, 'already-bootstrapped');
 
-const badLogin = auth.login({ data: { username: 'admin', password: 'sai-mat-khau' } });
+const badLogin = await auth.login({ data: { username: 'admin', password: 'sai-mat-khau' } });
 assert.equal(badLogin.ok, false);
 assert.equal(badLogin.error.code, 'invalid-credentials');
 
-const login = auth.login({ data: { username: 'admin', password: 'admin12345' } });
+const login = await auth.login({ data: { username: 'admin', password: 'admin12345' } });
 assert.equal(login.ok, true);
 const adminActor = { userId: login.data.id, username: login.data.username, name: login.data.name, role: login.data.role, clientId: 'test-client' };
 
@@ -72,7 +72,7 @@ assert.equal(demoteOk.ok, true, 'con admin thu 2 active thi duoc ha quyen admin 
 
 const reset = auth.resetPassword({ id: created.data.id, data: { newPassword: 'mat-khau-moi-123' } }, secondAdminActor);
 assert.equal(reset.ok, true);
-const loginAfterReset = auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-123' } });
+const loginAfterReset = await auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-123' } });
 assert.equal(loginAfterReset.ok, true);
 assert.equal(loginAfterReset.data.mustChangePassword, true);
 
@@ -83,13 +83,13 @@ assert.equal(wrongOld.error.code, 'wrong-password');
 
 const changeOwn = auth.changeOwnPassword({ data: { oldPassword: 'mat-khau-moi-123', newPassword: 'mat-khau-moi-456' } }, kts1Actor);
 assert.equal(changeOwn.ok, true);
-const loginAfterOwnChange = auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-456' } });
+const loginAfterOwnChange = await auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-456' } });
 assert.equal(loginAfterOwnChange.ok, true);
 assert.equal(loginAfterOwnChange.data.mustChangePassword, false);
 
 const lockKts1 = auth.updateUser({ id: created.data.id, data: { name: 'Nguyen Van A', role: 'technician', active: false } }, secondAdminActor);
 assert.equal(lockKts1.ok, true);
-const lockedLogin = auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-456' } });
+const lockedLogin = await auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-456' } });
 assert.equal(lockedLogin.ok, false);
 assert.equal(lockedLogin.error.code, 'inactive');
 

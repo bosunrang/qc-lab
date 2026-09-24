@@ -6,7 +6,7 @@
 // module này chỉ lo xác thực + CRUD tài khoản.
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
-import { hashPassword, verifyPassword } from '../domain/password-hash';
+import { hashPassword, verifyPassword, verifyPasswordAsync } from '../domain/password-hash';
 import {
   validateUserCreate, validateUserUpdate, validateNewPassword, validateLoginInput, validateSetAvatar,
   type UserCreateInput, type UserUpdateInput, type LoginInput,
@@ -94,12 +94,19 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: toPublicUser(row) };
   }
 
-  function login(input: { data: LoginInput }): IpcResult<PublicUser> {
+  /** Bất đồng bộ vì đây là cổng KHÔNG cần đăng nhập, mở cả qua LAN: mỗi lần
+   * thử phải băm 600.000 vòng, chạy đồng bộ thì vài yêu cầu dồn dập đủ làm đơ
+   * main process. Chỉ phần băm là chờ; đọc và ghi SQLite vẫn đồng bộ. */
+  async function login(input: { data: LoginInput }): Promise<IpcResult<PublicUser>> {
     const result = validateLoginInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, password } = result.data;
+    const stored = db.prepare('SELECT pass_hash FROM users WHERE username=?').get(username) as { pass_hash: string } | undefined;
+    const passwordOk = !!stored && await verifyPasswordAsync(password, stored.pass_hash);
+    // Đọc lại SAU khi chờ băm: trong lúc đó admin có thể vừa khoá tài khoản
+    // hoặc đổi mật khẩu, nên kết luận phải dựa trên hàng hiện tại.
     const row = db.prepare('SELECT * FROM users WHERE username=?').get(username) as UserRow | undefined;
-    if (!row || !verifyPassword(password, row.pass_hash)) {
+    if (!row || !passwordOk || row.pass_hash !== stored?.pass_hash) {
       return { ok: false, error: { code: 'invalid-credentials', message: 'Sai tên đăng nhập hoặc mật khẩu.' } };
     }
     if (!row.active) return { ok: false, error: { code: 'inactive', message: 'Tài khoản đã bị khoá.' } };

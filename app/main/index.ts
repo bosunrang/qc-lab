@@ -39,9 +39,13 @@ function showLanAddresses(port: number): void {
     type: 'info',
     title: 'Địa chỉ truy cập',
     message: 'Nhân viên mở trình duyệt và gõ một trong các địa chỉ sau:',
-    detail: addresses.length
+    detail: (addresses.length
       ? addresses.join('\n')
-      : `Không tìm thấy địa chỉ IPv4 trong mạng nội bộ. Kiểm tra kết nối mạng của máy chủ rồi thử lại.\n\nCổng cố định: ${port}`,
+      : `Không tìm thấy địa chỉ IPv4 trong mạng nội bộ. Kiểm tra kết nối mạng của máy chủ rồi thử lại.\n\nCổng cố định: ${port}`)
+      // Máy chủ LAN chạy HTTP thường: mật khẩu và phiên đăng nhập đi qua mạng
+      // không mã hoá. Nói rõ ngay tại chỗ người quản trị phát địa chỉ cho máy trạm.
+      + '\n\nLưu ý bảo mật: kết nối này KHÔNG mã hoá (HTTP). Chỉ dùng trong mạng nội bộ tin cậy của phòng xét nghiệm, '
+      + `không dùng qua Wi-Fi khách hay Wi-Fi công cộng, và không mở cổng ${port} ra Internet.`,
     buttons: ['Đóng'],
   });
 }
@@ -126,11 +130,21 @@ async function createWindow(): Promise<void> {
     let result: unknown;
     let failure: unknown;
     lanCalls = lanCalls.then(async () => {
+      // Mọi handler lấy `requireActor()` ngay trong phần ĐỒNG BỘ của lời gọi,
+      // nên actor LAN chỉ được đặt đúng trong phần đó. Giữ nó qua `await` thì
+      // handler bất đồng bộ (LIS, Firebase…) để hở một khoảng mà thao tác
+      // desktop gọi `requireActor()` sẽ chạy dưới danh tính người dùng LAN,
+      // và lúc khôi phục có thể ghi đè phiên desktop vừa đăng nhập.
       const previous = sessionActor;
+      let pending: unknown;
       sessionActor = actor;
-      try { result = await handler({} as never, ...args); }
+      try { pending = handler({} as never, ...args); }
       catch (error) { failure = error; }
       finally { sessionActor = previous; }
+      if (!failure) {
+        try { result = await pending; }
+        catch (error) { failure = error; }
+      }
     });
     await lanCalls;
     if (failure) throw failure;
@@ -141,8 +155,8 @@ async function createWindow(): Promise<void> {
   // Đọc lại từ DB thay vì dựng từ sessionActor — xem ghi chú getUser().
   ipcMain.handle('auth:currentUser', () => (sessionActor ? auth.getUser(sessionActor.userId) : null));
   ipcMain.handle('auth:bootstrapAdmin', (_event, input) => auth.bootstrapAdmin(input));
-  ipcMain.handle('auth:login', (_event, input) => {
-    const result = auth.login(input);
+  ipcMain.handle('auth:login', async (_event, input) => {
+    const result = await auth.login(input);
     if (result.ok) sessionActor = toActor(result.data);
     return result;
   });
