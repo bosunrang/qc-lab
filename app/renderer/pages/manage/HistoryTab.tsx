@@ -165,7 +165,7 @@ export function HistoryTab() {
         <div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo xét nghiệm hoặc máy..." /></div>
       </div>
       <div className="panel target-matrix-panel">
-      {!tests.length ? <EmptyHistory title="Chưa có xét nghiệm" message="Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD." /> : <>
+      {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD.</EmptyState> : <>
         <div className="target-selector history-selector">
           <div><label>Xét nghiệm / Máy</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {
             const q = query.trim().toLowerCase();
@@ -196,7 +196,7 @@ export function HistoryTab() {
                 </tr>
               ))}</tbody>
             </table>
-          ) : <EmptyHistory title="Chưa có dữ liệu lịch sử" message="Thiết lập Mean/SD cho xét nghiệm để bắt đầu theo dõi thay đổi." />}
+          ) : <EmptyState title="Chưa có dữ liệu lịch sử">Thiết lập Mean/SD cho xét nghiệm để bắt đầu theo dõi thay đổi.</EmptyState>}
         </div>
       </>}
       {detail && (() => {
@@ -228,7 +228,7 @@ export function HistoryTab() {
                   );
                 })}</tbody>
               </table>
-            ) : <div className="empty"><div className="empty-title">Chưa có mốc Mean/SD</div><div>Không tìm thấy lịch sử Mean/SD cho lô này.</div></div>}
+            ) : <EmptyState title="Chưa có mốc Mean/SD">Không tìm thấy lịch sử Mean/SD cho lô này.</EmptyState>}
             <h4 className="flow-panel space-after-section">Điểm QC đã nhập ({detailPoints.length})</h4>
             {detailPoints.length ? (
               <table className="history-detail-table hist-points-table">
@@ -255,17 +255,13 @@ export function HistoryTab() {
                   );
                 })}</tbody>
               </table>
-            ) : <div className="empty"><div className="empty-title">Chưa có điểm QC</div><div>Không có điểm QC nào khớp với lô/mức này.</div></div>}
+            ) : <EmptyState title="Chưa có điểm QC">Không có điểm QC nào khớp với lô/mức này.</EmptyState>}
           </Modal>
         );
       })()}
       </div>
     </>
   );
-}
-
-function EmptyHistory({ title, message }: { title: string; message: string }) {
-  return <EmptyState title={title}>{message}</EmptyState>;
 }
 
 

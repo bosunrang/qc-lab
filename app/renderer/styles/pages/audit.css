@@ -24,7 +24,7 @@
   margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--title-panel-weight);
 }
 .audit-log-head > input[type="search"]{
-  width:min(320px,42vw); min-height:var(--control-h-search); height:var(--control-h-search);
+  width:min(320px,42vw); min-height:var(--control-h); height:var(--control-h);
 }
 .audit-filterbar{
   display:flex;align-items:flex-end;flex-wrap:wrap;gap:var(--space-2-5);margin:var(--panel-content-gap) var(--space-4) var(--space-2-5);
@@ -56,9 +56,6 @@
 .audit-table-wrap .audit-table{
   width:100%; max-width:100%; min-width:0;
 }
-.audit-log-panel > .empty{
-  margin:0 var(--space-4) var(--space-4);
-}
 .audit-table th, .audit-table td{
   text-align:left;
 }
@@ -86,7 +83,7 @@
 .audit-table td:nth-child(4){overflow-wrap:anywhere;}
 .audit-table td:nth-child(3) .pill{max-width:100%;white-space:normal;}
 
-.audit-filterbar .audit-date{width:170px;height:var(--control-h-date);}
-.audit-filterbar .audit-date .date-text{max-width:none;min-width:0;height:var(--control-h-date);flex:1;}
+.audit-filterbar .audit-date{width:170px;height:var(--control-h);}
+.audit-filterbar .audit-date .date-text{max-width:none;min-width:0;height:var(--control-h);flex:1;}
 
 

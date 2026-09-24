@@ -75,14 +75,14 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-sheet td:first-child,.qc-sheet th:first-child{position:sticky;left:0;z-index:12;background:inherit;box-shadow:none;font-weight:var(--weight-bold);color:var(--text-button);white-space:nowrap;text-align:center;}
 .qc-sheet td:first-child b{margin-top:2px;color:var(--tealink);font-size:var(--text-2xs);font-weight:var(--weight-bold);}
 .qc-sheet td:last-child,.qc-sheet th:last-child{border-right:none;}
-.qc-sheet tbody tr{height:52px;}
+.qc-sheet tbody tr{height:var(--table-row-h-input);}
 .qc-sheet tbody tr{background:var(--panel);}
 .qc-sheet tbody tr:hover{background:var(--surface-subtle);}
 .qc-sheet tbody tr.today{background:var(--accent-surface-tint);}
 .qc-sheet tbody tr.today td{border-top:1px solid var(--accent-border-soft);border-bottom:1px solid var(--accent-border-soft);}
 .qc-sheet tbody tr.missing:not(.today) td:first-child{box-shadow:inset 4px 0 0 var(--warning-accent);}
 
-.qc-value-chip{display:inline-flex;align-items:center;justify-content:center;width:75px;height:var(--control-h-row);padding:0 6px;border-radius:var(--radius-md);border:1px solid var(--surface-border);background:var(--surface);color:var(--text-strong);font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;box-sizing:border-box;min-width:68px;font-size:var(--text-base);box-shadow:var(--control-inset-highlight);line-height:var(--leading-none);text-align:center;}
+.qc-value-chip{display:inline-flex;align-items:center;justify-content:center;width:75px;height:var(--control-h-compact);padding:0 6px;border-radius:var(--radius-md);border:1px solid var(--surface-border);background:var(--surface);color:var(--text-strong);font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;box-sizing:border-box;min-width:68px;font-size:var(--text-base);box-shadow:var(--control-inset-highlight);line-height:var(--leading-none);text-align:center;}
 .qc-value-chip.warn{border-color:var(--warning-border);background:var(--warning-bg);color:var(--warning-ink);}
 .qc-value-chip.rej{border-color:var(--danger-border);background:var(--danger-bg);color:var(--danger-ink);}
 .qc-run-slot{padding:0;display:grid;justify-items:center;gap:2px;}
@@ -103,7 +103,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .prev-lot-slot small{color:var(--text-faint)}
 .qc-old-lot-toggle{margin-left:auto;white-space:nowrap}
 .qc-previous-card{border-color:var(--border);background:var(--surface)}
-.qc-sheet input.qc-inline-input{box-sizing:border-box;width:75px;min-width:75px;max-width:75px;height:var(--control-h-row);min-height:var(--control-h-row);padding:0 8px;line-height:var(--control-h-sm);border:1px dashed var(--border-subtle);border-radius:var(--radius-md);background:var(--panel);box-shadow:none;color:var(--muted);font-size:var(--text-base);font-weight:700;text-align:center;font-variant-numeric:tabular-nums;}
+.qc-sheet input.qc-inline-input{box-sizing:border-box;width:75px;min-width:75px;max-width:75px;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 8px;line-height:var(--control-h-sm);border:1px dashed var(--border-subtle);border-radius:var(--radius-md);background:var(--panel);box-shadow:none;color:var(--muted);font-size:var(--text-base);font-weight:700;text-align:center;font-variant-numeric:tabular-nums;}
 .qc-inline-input:hover,.qc-inline-input:focus:not(:focus-visible){border-color:var(--accent-border-strong);background:var(--panel);box-shadow:none;}
 .qc-inline-input:focus:not(:focus-visible){border-color:var(--accent-border);border-style:solid;}
 .qc-staff-cell{min-width:96px;white-space:nowrap;}
@@ -171,7 +171,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 /* ---- "Điểm trong khoảng xem" (panel gấp lại) ---- */
 .entry-secondary-panel{padding:0;overflow:hidden;}
-.entry-secondary-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;padding:10px 16px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);color:var(--card-head-ink);}
+.entry-secondary-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:var(--panel-header-min-height);padding:10px 16px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);color:var(--card-head-ink);}
 .entry-secondary-summary>span{font-size:var(--title-panel);font-weight:var(--section-heading-weight);}
 .entry-secondary-summary>small{flex:1;color:var(--muted);font-size:var(--text-sm);font-weight:700;text-align:right;}
 /* Mức cho dải kiểm soát là lựa chọn RIÊNG: đặt ở góc phải tiêu đề để không
@@ -228,9 +228,10 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-card tbody tr.qc-point-rej:hover td{background:var(--danger-bg);}
 .qc-table-card tbody tr.qc-point-warn td{background:var(--warning-bg);border-bottom-color:var(--warning-border);}
 .qc-table-card tbody tr.qc-point-warn:hover td{background:var(--warning-bg);}
-.qc-table-empty{min-height:92px;margin:14px;padding:20px 16px;display:grid;place-items:center;box-sizing:border-box;border-radius:0;border:none;background:transparent;}
+/* Chỉ chỉnh khoảng cách quanh EmptyState trong thẻ bảng; kiểu dáng thuộc component. */
+.qc-table-empty{margin:var(--space-3-5);}
 .qc-row-actions{text-align:center;white-space:nowrap;}
-.qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:30px;height:var(--control-h-row);min-height:var(--control-h-row);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:.15s ease;}
+.qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:.15s ease;}
 .qc-row-void svg{width:15px;height:15px;}
 .qc-row-void:hover{border-color:var(--danger-accent);background:var(--danger-bg);}
 /* Đây là mô tả phạm vi dữ liệu, dài và cần đọc như nội dung; không phải nhãn
@@ -260,8 +261,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 .lj-date-field { display: grid; grid-template-columns: 54px 164px; gap: 8px; align-items: center; margin: 0; }
 .lj-date-field .hint { display: flex; align-items: center; justify-content: flex-end; height: var(--control-h); white-space: nowrap; line-height:var(--leading-none); }
-.lj-date-field .datebox { width: 164px; height: var(--control-h-date); }
-.lj-date-field .datebox input.date-text { height: var(--control-h-date); padding-top: 0; padding-bottom: 0; }
+.lj-date-field .datebox { width: 164px; height: var(--control-h); }
+.lj-date-field .datebox input.date-text { height: var(--control-h); padding-top: 0; padding-bottom: 0; }
 
 .qc-month-picker select, .qc-current-month, .qc-today-jump { height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0 10px; font-size: var(--text-sm); }
 .qc-today-jump { white-space: nowrap; min-width: 104px; }
@@ -299,7 +300,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-staff-sep { margin: 0 2px; color: var(--text-faint); font-weight:var(--weight-bold); }
 
 
-.qc-note-input{width:100%;min-width:128px;min-height:var(--control-h-table);resize:vertical;padding:6px 8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font-size:var(--text-sm);line-height:var(--leading-snug);box-shadow:none;}
+.qc-note-input{width:100%;min-width:128px;min-height:var(--control-h);resize:vertical;padding:6px 8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font-size:var(--text-sm);line-height:var(--leading-snug);box-shadow:none;}
 .qc-note-input::placeholder{color:var(--text-placeholder);}
 .qc-note-input:focus:not(:focus-visible){border-color:var(--accent-border);}
 /* Header mức QC vẫn có tooltip khi rê/Tab, nhưng không gạch chân như liên kết. */

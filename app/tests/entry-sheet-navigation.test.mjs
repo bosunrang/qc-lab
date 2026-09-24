@@ -87,7 +87,7 @@ const cell = (date, column, opts = {}) => ({
 // ---- Chọn ô để focus lại sau khi vẽ: ưu tiên ô CÒN TRỐNG
 {
   const filled = cell('2026-09-01', 1);
-  const empty = cell('2026-09-01', 1, { classes: ['empty'] });
+  const empty = cell('2026-09-01', 1, { classes: ['is-empty'] });
   assert.equal(pickSheetFocusCandidate([filled, empty]), empty, 'ưu tiên ô còn trống dù nó đứng sau');
   assert.equal(pickSheetFocusCandidate([filled]), filled, 'không có ô trống thì lấy ô đầu');
   assert.equal(pickSheetFocusCandidate([]), null, 'không có ứng viên nào');

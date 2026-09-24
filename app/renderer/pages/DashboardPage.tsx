@@ -8,6 +8,7 @@ import { useDashboardStore, type OverdueAction } from '../store/dashboard-store'
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useSettingsStore } from '../store/settings-store';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import {
   buildDashboardViewModel, normalizeDashboardSearch, levelTargetOk, dashboardTestRank,
   type DashboardStatus, type DashboardTestItem, type DashboardAlertItem,
@@ -160,7 +161,7 @@ function TestsPanel({ model }: { model: Model }) {
       .sort((a, b) => dashboardTestRank(a) - dashboardTestRank(b) || a.testName.localeCompare(b.testName, 'vi'));
   }, [model.tests, query, status]);
   if (!model.tests.length) {
-    return <div className="panel"><div className="empty-state analysis-empty-state"><b>Chưa có xét nghiệm đang vận hành</b><span>Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.</span>{admin && <Link className="btn teal" to="/manage" state={{ tab: 'targets' }}>Cấu hình Mean/SD</Link>}</div></div>;
+    return <div className="panel"><EmptyState title="Chưa có xét nghiệm đang vận hành" action={admin && <Link className="btn teal" to="/manage" state={{ tab: 'targets' }}>Cấu hình Mean/SD</Link>}>Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.</EmptyState></div>;
   }
   return <div className="panel"><div className="dash-test-toolbar"><h2 className="panel-title">Danh sách xét nghiệm</h2></div><div className="dash-test-filterbar">
     <div className="dash-test-tabs">{STATUS_TABS.map(([key, label]) => { const count = key === 'all' ? model.tests.length : model.tests.filter(test => key === 'missing' ? test.missingToday : test.status === key).length; return <button type="button" key={key} className={status === key ? 'on' : ''} onClick={() => setStatus(key)}>{label}<b>{count}</b></button>; })}</div>

@@ -21,7 +21,7 @@ aside{background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px 12px 1
 .brand-mark{color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-weight:var(--weight-bold);position:relative;flex:0 0 var(--control-h);width:var(--control-h);height:var(--control-h);border-radius:var(--radius-lg);background:linear-gradient(145deg,var(--accent),var(--accent-active));box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 24%,transparent);overflow:hidden;}
 .brand-mark img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;}
 
-.nav-toggle{margin-left:auto;flex:none;width:30px;height:var(--control-h-row);display:flex;align-items:center;justify-content:center;background:var(--sidebar-toggle-surface);border:1px solid var(--sidebar-toggle-border);border-radius:var(--radius-md);color:var(--sidebar-active-icon);cursor:pointer;padding:0;transition:.18s ease;}
+.nav-toggle{margin-left:auto;flex:none;width:var(--control-h-compact);height:var(--control-h-compact);display:flex;align-items:center;justify-content:center;background:var(--sidebar-toggle-surface);border:1px solid var(--sidebar-toggle-border);border-radius:var(--radius-md);color:var(--sidebar-active-icon);cursor:pointer;padding:0;transition:.18s ease;}
 .nav-toggle:hover{background:var(--sidebar-toggle-surface-hover);}
 .nav-toggle svg{width:16px;height:16px;}
 .app-shell.nav-collapsed .brand-row{justify-content:center;}
@@ -74,7 +74,7 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 .head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 
 .top-user{display:flex;align-items:center;gap:10px;border:1px solid var(--surface-divider);padding:6px 8px;border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-panel);flex:0 1 auto;min-width:0;}
-.top-user .avatar{width:34px;height:var(--control-h-table);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--teal-deep);display:flex;align-items:center;justify-content:center;font-size:var(--text-sm);font-weight:var(--weight-bold);overflow:hidden;flex-shrink:0;cursor:pointer;}
+.top-user .avatar{width:var(--control-h);height:var(--control-h);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--teal-deep);display:flex;align-items:center;justify-content:center;font-size:var(--text-sm);font-weight:var(--weight-bold);overflow:hidden;flex-shrink:0;cursor:pointer;}
 .top-user .avatar img{width:100%;height:100%;object-fit:cover;display:block;}
 
 .avatar-modal-preview{display:flex;justify-content:center;margin-bottom:var(--panel-content-gap);}
@@ -95,7 +95,7 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 .panel-head h2{font-size:var(--title-panel);font-weight:var(--section-heading-weight);line-height:var(--line-heading);color:var(--card-head-ink);letter-spacing:0;text-transform:none;}
 
 /* Nút thao tác gọn trên hàng dữ liệu. */
-.row-action{box-sizing:border-box;width:30px;height:var(--control-h-row);padding:0;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--panel);color:var(--muted);display:grid;place-items:center;flex:0 0 30px;cursor:pointer;transition:background .16s,border-color .16s,color .16s;}
+.row-action{box-sizing:border-box;width:var(--control-h-compact);height:var(--control-h-compact);padding:0;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--panel);color:var(--muted);display:grid;place-items:center;flex:0 0 30px;cursor:pointer;transition:background .16s,border-color .16s,color .16s;}
 .row-action svg{width:14px;height:14px;}
 .row-action:hover{background:var(--accent-surface);color:var(--accent);}
 .row-action.is-danger{border-color:var(--danger-border);color:var(--danger-accent);}
@@ -129,10 +129,10 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 input:not([type="checkbox"]):not([type="radio"]),select,textarea,td,.refrow,.mrow,.shift-item b{font-size:var(--text-base);}
 td{color:var(--text-body);font-size:var(--table-body-size);}
 input:not([type="checkbox"]):not([type="radio"]),select{width:100%;padding:0 var(--control-padding-x);border:1px solid var(--border);border-radius:var(--control-radius);background:var(--panel);box-shadow:0 1px 2px var(--shadow-ink-faint);color:var(--text-input);font-weight:var(--weight-normal);transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}
-input:not([type="checkbox"]):not([type="radio"]){height:var(--control-height);min-height:var(--control-height);}
-input[type="search"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h-search);min-height:var(--control-h-search);}
-input[type="date"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h-date);min-height:var(--control-h-date);}
-select{height:var(--control-h-select);min-height:var(--control-h-select);}
+input:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
+input[type="search"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
+input[type="date"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
+select{height:var(--control-h);min-height:var(--control-h);}
 textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:var(--control-h);border:1px solid var(--border);border-radius:var(--control-radius);background:var(--panel);box-shadow:0 1px 2px var(--shadow-ink-faint);color:var(--text-input);font-weight:var(--weight-normal);transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}
 /* Vòng chỉ dẫn khi lấy nét dùng chung toàn hệ thống. Nơi cần điều chỉnh chỉ
    đổi `outline-offset`; không tắt vòng chỉ dẫn hoặc vẽ lại bằng `box-shadow`. */
@@ -200,7 +200,8 @@ th{height:var(--table-header-height);background:var(--table-head-bg);color:var(-
 /* Hàng dữ liệu luôn trắng. Không dùng sọc zebra: với bảng
    labo dài, các chip Đạt/Cảnh báo và đường kẻ hàng đã là tín hiệu quét đủ
    mạnh; sọc xám chỉ làm mặt bảng nặng hơn. */
-tbody tr{min-height:var(--table-row-h);background:var(--panel);transition:background .14s ease;}
+/* `height` trên hàng bảng là chiều cao tối thiểu; `min-height` bị trình duyệt bỏ qua với <tr>. */
+tbody tr{height:var(--table-row-h);background:var(--panel);transition:background .14s ease;}
 tbody tr:hover{background:var(--accent-surface-tint);}
 tbody tr:last-child td{border-bottom:none;}
 td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700;}
@@ -220,7 +221,7 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
    để nội dung bắt đầu đúng theo gutter của modal. */
 .modal-b>form>label:first-child,.modal-b>form>:first-child>label:first-child,.modal-b>form>:first-child>div>label:first-child{margin-top:0;}
 .modal-f{display:flex;justify-content:flex-end;gap:var(--space-sm);padding:var(--space-lg) var(--modal-inline-padding);border-top:1px solid var(--line);}
-.modal-close{display:inline-flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--surface-border);border-radius:var(--radius-md);width:30px;height:var(--control-h-row);font-size:var(--text-md);line-height:var(--leading-none);cursor:pointer;color:var(--muted);transition:background .15s ease,border-color .15s ease,color .15s ease;}
+.modal-close{display:inline-flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--surface-border);border-radius:var(--radius-md);width:var(--control-h-compact);height:var(--control-h-compact);font-size:var(--text-md);line-height:var(--leading-none);cursor:pointer;color:var(--muted);transition:background .15s ease,border-color .15s ease,color .15s ease;}
 .modal-close:hover{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-ink);}
 
 .confirm-modal{position:relative;width:min(440px,calc(100vw - 32px));border:1px solid var(--surface-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-dialog);animation:dialog-enter .16s ease-out;}
@@ -250,17 +251,21 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 @media(prefers-reduced-motion:reduce){.confirm-modal{animation:none;}}
 
 .empty-state{color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);text-align:center;}
-/* Trạng thái rỗng cấp trang dùng chung cho các màn phân tích/nhập QC. Panel
-   bên ngoài đã có viền và nền trắng, nên không dựng thêm hộp `.empty` xám. */
-.analysis-empty-state{display:grid;justify-items:center;gap:8px;min-height:126px;padding:24px;background:var(--panel);text-align:center;}
-.analysis-empty-state>b{color:var(--ink);font-weight:700;}
-.analysis-empty-state>.btn{text-decoration:none;}
-.empty{text-align:center;border:1px solid var(--surface-border);border-radius:var(--radius-md);padding:36px 20px;background:var(--surface-card-soft);color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);}
+/* Thông báo trống — component `EmptyState` (components/EmptyState.tsx) là cách
+   DUY NHẤT để dựng. Nằm thẳng trên bề mặt của khối chứa nên không có viền
+   hay nền riêng: panel ngoài đã có viền và nền trắng, thêm một hộp xám bên
+   trong sẽ đọc thành hai lớp viền. CSS trang chỉ được chỉnh bố cục quanh nó
+   (margin, lưới), không đè viền/nền/màu chữ — design-system.test.mjs chặn. */
+.empty-notice{box-sizing:border-box;display:grid;justify-items:center;align-content:center;gap:var(--space-2);text-align:center;color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
+.empty-notice-page{min-height:128px;padding:var(--space-6) var(--space-5);}
+.empty-notice-compact{padding:var(--space-4);}
+.empty-notice-title{color:var(--text-primary);font-weight:var(--weight-bold);}
+.empty-notice-text{max-width:640px;}
+.empty-notice-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-2);}
+.empty-notice-actions .btn{text-decoration:none;}
 
 td.acts{display:flex;gap:6px;align-items:center;}
 button.x{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:var(--control-h-compact);background:transparent;border:none;color:var(--red);cursor:pointer;font-size:var(--text-sm);padding:0;}
-.empty .empty-title{font-weight:700;color:var(--ink);margin-bottom:4px;}
-.empty .empty-actions{margin-top:var(--space-lg);display:flex;gap:var(--space-sm);justify-content:center;flex-wrap:wrap;}
 /* Chuẩn chữ phụ toàn hệ thống: ghi chú, mô tả hàng và metadata đều dùng
    caption 11.5px/nét 500/màu muted. Những trạng thái cảnh báo hoặc lỗi có
    rule riêng để ghi đè màu, còn tiêu đề trang/modal giữ cấp chữ cao hơn. */
@@ -286,7 +291,7 @@ td .hint{margin-top:2px;color:var(--muted);}
 .datebox:has(:focus:not(:focus-visible)){border-color:var(--accent-border)}
 /* Không đặt `min-height:0`: ô văn bản dùng chuẩn điều khiển 36px của app. */
 /* Canh giữa chuỗi ngày `dd/mm/yyyy` để cân bằng với nút lịch bên phải. */
-.datebox input.date-text{max-width:128px;height:var(--control-h-date);min-height:var(--control-h-date);padding-right:10px;border:none;border-radius:0;background:transparent;text-align:center;}
+.datebox input.date-text{max-width:128px;height:var(--control-h);min-height:var(--control-h);padding-right:10px;border:none;border-radius:0;background:transparent;text-align:center;}
 /* Ô nhập ngày không tự vẽ chỉ dẫn khi lấy nét vì `.datebox` ở dưới đảm nhiệm,
    tránh hai vòng chỉ dẫn chồng lên nhau. */
 .datebox input.date-text:focus-visible{outline:none;}
@@ -297,7 +302,7 @@ td .hint{margin-top:2px;color:var(--muted);}
    input/select khác cùng hàng `.grid2`, thay vì giữ bề rộng cố định hẹp của
    `.datebox` (đúng hệ thống CŨNG hẹp mặc định, nhưng người dùng chỉ rõ muốn
    đồng bộ bề rộng trong modal CRUD). */
-.field>.datebox{width:100%;min-height:var(--control-h-date);}
+.field>.datebox{width:100%;min-height:var(--control-h);}
 .field>.datebox input.date-text{max-width:none;flex:1;}
 /* Viền trái phân tách nút lịch khỏi phần nhập ngày; khung ngoài chịu trách
    nhiệm bo góc nên nút bên trong giữ hình khối gọn, rõ ràng. */
@@ -320,12 +325,12 @@ td .hint{margin-top:2px;color:var(--muted);}
 .vn-date-head{display:grid;grid-template-columns:32px 1fr 32px;align-items:center;gap:6px;margin-bottom:6px}
 .vn-date-head b{text-align:center;font-size:var(--text-sm);color:var(--ink)}
 .vn-date-head button,.vn-date-foot button,.vn-date-grid button,.vn-month-grid button,.vn-year-row button{font-family:var(--sans);border:1px solid transparent;background:var(--panel);color:var(--ink);border-radius:var(--radius-sm);cursor:pointer}
-.vn-date-head button{height:var(--control-h-row);font-size:var(--text-lg);line-height:var(--leading-none);color:var(--muted)}
+.vn-date-head button{height:var(--control-h-compact);font-size:var(--text-lg);line-height:var(--leading-none);color:var(--muted)}
 .vn-date-head button:hover,.vn-date-foot button:hover,.vn-date-grid button:hover,.vn-month-grid button:hover,.vn-year-row button:hover{background:var(--surface-subtle);color:var(--teal)}
 .vn-date-head .vn-date-title{font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--ink);line-height:var(--leading-display)}
 .vn-date-days,.vn-date-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
 .vn-date-days span{text-align:center;font-size:var(--text-2xs);font-weight:var(--weight-bold);color:var(--muted);padding:4px 0}
-.vn-date-grid button{height:var(--control-h-row);font-size:var(--text-sm);font-weight:700}
+.vn-date-grid button{height:var(--control-h-compact);font-size:var(--text-sm);font-weight:700}
 .vn-date-grid button.blank{visibility:hidden;pointer-events:none}
 .vn-date-grid button.today{border-color:var(--accent-border);color:var(--teal)}
 .vn-date-grid button.selected,.vn-month-grid button.selected{background:var(--teal);color:var(--on-accent)}
@@ -349,7 +354,7 @@ td .hint{margin-top:2px;color:var(--muted);}
    do padding quyết định (29px). Riêng thanh công cụ biểu đồ ở trang Nhập
    QC dùng chiều cao control dữ liệu chuẩn (36px). */
 .dayseg button{background:var(--panel);border:none;border-right:1px solid var(--line);padding:6px 14px;cursor:pointer;font-size:var(--text-sm);font-family:var(--sans);color:var(--muted);}
-.lj-toolbar .dayseg{align-self:center;height:var(--control-h-data);}
+.lj-toolbar .dayseg{align-self:center;height:var(--control-h);}
 .lj-toolbar .dayseg button{display:flex;align-items:center;align-self:stretch;justify-content:center;height:auto;min-height:0;padding-top:0;padding-bottom:0;white-space:nowrap;}
 .dayseg button:last-child{border-right:none;}
 .dayseg button.on{background:var(--surface-inverse-soft);color:var(--on-accent);}

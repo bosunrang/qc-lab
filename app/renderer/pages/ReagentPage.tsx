@@ -14,6 +14,7 @@ import { useManageStore } from '../store/manage-store';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
 import { RowActionButton } from '../components/RowActionButton';
@@ -242,7 +243,7 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
 
   return (
     <Modal title={`Chọn nhanh ${label}`} onClose={onClose}>
-      {!items.length && <div className="empty">Chưa có {label} trong danh sách.</div>}
+      {!items.length && <EmptyState size="compact">Chưa có {label} trong danh sách.</EmptyState>}
       {items.map((name, i) => (
         <div className="mrow" key={name}>
           <span><b>{name}</b></span>
@@ -280,7 +281,7 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
               {canDelete && comparisons.length > 1 && <RowActionButton kind="delete" label={`Xóa ${comparison.reagent}`} onClick={() => onRemove(comparison.id)} />}
             </span>
           </div>
-        )) : <div className="empty rc-picker-empty">Không có phép so sánh phù hợp.</div>}
+        )) : <EmptyState size="compact">Không có phép so sánh phù hợp.</EmptyState>}
       </div>
     </Modal>
   );
@@ -318,7 +319,7 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
           <div className="refcat">{section}</div>
           {items.map((item) => <button className="refrow" key={item.key} onClick={() => create(item.name, item.unit)}>{item.name}<span className="meta">{item.unit || 'Chưa có đơn vị'}</span></button>)}
         </div>
-      )) : <div className="empty rc-picker-empty">Không tìm thấy trong danh mục TEa.</div>}
+      )) : <EmptyState size="compact">Không tìm thấy trong danh mục TEa.</EmptyState>}
     </Modal>
   );
 }

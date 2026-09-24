@@ -267,20 +267,15 @@
   /* ═══════════════════════════════════════════════════════════════════
      LỚP 3 — TOKEN COMPONENT.
      ═══════════════════════════════════════════════════════════════════ */
-  /* Control có sáu mật độ có chủ đích: nút cực gọn 28, hàng dữ liệu 30,
-     toolbar 32, ô bảng gọn 34, và control chuẩn (form, select, dữ liệu,
-     cấu hình, ô ngày) 36. Không đặt số mới tại trang. */
-  --control-h-row:30px;
-  --control-h-compact:32px;
-  --control-h-table:34px;
-  --control-h-select:36px;
-  --control-h-search:36px;
-  --control-h-data:36px;
-  --control-h-config:36px;
-  --control-h-action:36px;
-  --control-h-date:36px;
-  --control-h:36px;
+  /* Chiều cao control — BA BẬC, đặt tên theo cỡ chứ không theo nơi dùng:
+       sm      28  nút phụ rất gọn trong ô bảng, badge thao tác;
+       compact 32  nút icon vuông, ô nhập giá trị trong hàng dữ liệu, toolbar;
+       (chuẩn) 36  input, select, tìm nhanh, ô ngày, nút thường.
+     Trước 2026-09-24 có 11 tên (row 30, table 34 và bảy tên cùng bằng 36)
+     nên không ai biết nên chọn tên nào. Không đặt số mới tại trang. */
   --control-h-sm:28px;
+  --control-h-compact:32px;
+  --control-h:36px;
   --control-padding-x:var(--space-3);
   --control-radius:var(--radius-sm);
   --button-padding-x:var(--space-3-5);
@@ -312,8 +307,17 @@
   --title-overline-weight:var(--weight-semibold);
   --title-overline-tracking:.06em;
 
+  /* Hàng bảng — BA BẬC, tính theo control nằm trong hàng:
+       compact 36  bảng gọn trong panel, đi với header gọn 30;
+       (chuẩn) 44  bảng danh sách, đi với header 40;
+       input   52  hàng có ô nhập chuẩn: control 36 + 8px đệm mỗi bên
+                   (bảng Nhập QC, bảng EQA của Sigma, hàng nhập So sánh hoá chất).
+     `height` trên hàng/ô bảng là chiều cao TỐI THIỂU; nội dung nhiều dòng
+     vẫn tự giãn. */
   --table-header-h:40px;
+  --table-row-h-compact:36px;
   --table-row-h:44px;
+  --table-row-h-input:calc(var(--control-h) + var(--space-4));
   --table-radius:var(--radius-md);
   --table-cell-px:var(--space-3);
   --table-cell-py:var(--space-2-5);
@@ -419,8 +423,7 @@
   --sidebar-group-text:var(--dark-text-group);
   --sidebar-link-text:var(--dark-text-link);
 
-  --control-height:var(--control-h);
-  --button-height:var(--control-h-action);
+  --button-height:var(--control-h);
   --button-inline-padding:var(--button-padding-x);
   --sans:var(--font-sans);
   --mono:var(--font-mono);

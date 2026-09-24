@@ -50,9 +50,9 @@ export function sheetNavigationTarget(
 }
 
 /** Trong nhóm ô cùng ngày+mức (có thể còn ô cũ chưa kịp gỡ giữa 2 lượt vẽ),
- * ưu tiên ô còn trống (`.empty`). */
+ * ưu tiên ô còn trống (`.is-empty`). */
 export function pickSheetFocusCandidate(candidates: readonly HTMLInputElement[]): HTMLInputElement | null {
-  return candidates.find((el) => el.classList.contains('empty')) || candidates[0] || null;
+  return candidates.find((el) => el.classList.contains('is-empty')) || candidates[0] || null;
 }
 
 /** Ô đang gõ hiện tại → tính Ô KẾ TIẾP theo phím, rồi CHỜ 1 tick (để React

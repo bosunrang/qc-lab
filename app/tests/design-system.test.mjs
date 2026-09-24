@@ -170,7 +170,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
 
   // Bảng danh sách Cấu hình, ma trận mục tiêu và OPSpecs là bảng lớn: 13px/40px.
   assert.match(manage, /\.rcfg-list>table thead th\{[^}]*font-size:var\(--table-head-size\)/);
-  assert.match(manage, /\.config-shell input[^}]*height:var\(--control-h-config\)[^}]*min-height:var\(--control-h-config\)/,
+  assert.match(manage, /\.config-shell input[^}]*height:var\(--control-h\)[^}]*min-height:var\(--control-h\)/,
     'toàn bộ control trong Cấu hình dùng mật độ 36px, không kéo theo modal');
   assert.match(manage, /\.target-head\{[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
   assert.match(sigma, /\.sg-opspec-table th\{[^}]*height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
@@ -179,9 +179,9 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
     'workspace kỳ dùng header dữ liệu chuẩn 40px/13px');
   assert.match(sigma, /\.sg-period-history-item\.is-selected\{[^}]*border-color:var\(--accent-border\)[^}]*border-left:3px solid var\(--teal\)[^}]*background:var\(--accent-surface\)[^}]*color:var\(--text-accent\);\}/,
     'kỳ đang chọn dùng vạch active teal 3px cùng viền và nền accent chung');
-  assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h-data\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
+  assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
     'CV/Bias trong hàng dữ liệu Sigma dùng control 36px, cân với bảng đọc');
-  assert.match(sigma, /\.sg-level-input-row \.btn\{height:var\(--control-h-data\);min-height:var\(--control-h-data\);\}/,
+  assert.match(sigma, /\.sg-level-input-row \.btn\{height:var\(--control-h\);min-height:var\(--control-h\);\}/,
     'nút cạnh ô CV/Bias cùng dùng token hàng dữ liệu 36px');
   assert.match(sigma, /\.sg-period-history-list\{[^}]*grid-auto-rows:58px[^}]*max-height:244px[^}]*overflow-y:auto/,
     'lịch sử kỳ hiển thị tối đa bốn mục rồi cuộn nội bộ, không kéo dài panel');
@@ -315,23 +315,27 @@ test('Nhập QC không rò kiểu dáng sang Sigma và không giữ dữ liệu 
 });
 
 test('mật độ control dùng token component, không viết lại số chuẩn tại trang', () => {
+  // Ba bậc, tên theo cỡ. Bảy tên cũ cùng bằng 36px và hai bậc lẻ 30/34 đã bị
+  // gom; không khai lại tên theo nơi dùng.
+  const controlTokens = Object.keys(TOKEN).filter((k) => /^--control-h(?:-|$)/.test(k)).sort();
+  assert.deepEqual(controlTokens, ['--control-h', '--control-h-compact', '--control-h-sm']);
   assert.deepEqual(
-    ['sm', 'row', 'compact', 'table', 'select', 'search', 'data', 'config', 'date', ''].map((k) => TOKEN[`--control-h${k ? `-${k}` : ''}`]),
-    ['28px', '30px', '32px', '34px', '36px', '36px', '36px', '36px', '36px', '36px'],
+    ['sm', 'compact', ''].map((k) => TOKEN[`--control-h${k ? `-${k}` : ''}`]),
+    ['28px', '32px', '36px'],
   );
   const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
-  assert.match(app, /select\{height:var\(--control-h-select\);min-height:var\(--control-h-select\);\}/,
+  assert.match(app, /select\{height:var\(--control-h\);min-height:var\(--control-h\);\}/,
     'select chuẩn toàn app dùng token riêng 36px');
-  assert.match(app, /input\[type="search"\][^{]*\{height:var\(--control-h-search\);min-height:var\(--control-h-search\);\}/,
+  assert.match(app, /input\[type="search"\][^{]*\{height:var\(--control-h\);min-height:var\(--control-h\);\}/,
     'ô tìm nhanh toàn app dùng token riêng 36px');
-  assert.match(app, /input\[type="date"\][^{]*\{height:var\(--control-h-date\);min-height:var\(--control-h-date\);\}/,
+  assert.match(app, /input\[type="date"\][^{]*\{height:var\(--control-h\);min-height:var\(--control-h\);\}/,
     'ô ngày gốc toàn app dùng 36px');
-  assert.match(app, /\.datebox input\.date-text\{[^}]*height:var\(--control-h-date\)[^}]*min-height:var\(--control-h-date\)/,
+  assert.match(app, /\.datebox input\.date-text\{[^}]*height:var\(--control-h\)[^}]*min-height:var\(--control-h\)/,
     'DatePicker dùng chung cao 36px');
   for (const name of ['audit.css', 'entry.css', 'manage.css', 'reagent.css']) {
     const css = readFileSync(join(STYLE_DIR, 'pages', name), 'utf8');
-    assert.doesNotMatch(css, /(?:datebox|date-text)[^{]*\{[^}]*height:var\(--control-h(?:;|\))/,
-      `${name} không được đè DatePicker về token chiều cao form chung`);
+    assert.doesNotMatch(css, /(?:datebox|date-text)[^{]*\{[^}]*height:var\(--control-h-(?:sm|compact)\)/,
+      `${name} không được thu DatePicker xuống bậc control nhỏ hơn chuẩn 36px`);
   }
   const common = /(?<![-\w])(?:min-)?height\s*:\s*(?:28|30|32|34|36|40)px/g;
   const raw = PAGE_CSS.flatMap((file) => [...readFileSync(file, 'utf8')
@@ -549,3 +553,105 @@ test('CSS trang không còn giá trị thô nào', () => {
 });
 
 
+
+// Thông báo trống từng có ít nhất bốn kiểu tự dựng (`.empty` có viền + nền
+// xám, `.analysis-empty-state`, `.wg-empty-message`, `.action-*-empty`), và gần
+// như trang nào cũng phải viết thêm CSS để gỡ viền/nền của `.empty`. Mỗi kiểu
+// đều dùng token hợp lệ nên các luật token ở trên không bắt được; trang Báo
+// cáo vì thế lọt ra một hộp xám lồng trong panel trắng. Luật này khoá ở mức
+// component: chỉ `EmptyState` được dựng thông báo trống.
+test('thông báo trống chỉ dựng qua EmptyState, CSS trang không đè viền/nền', () => {
+  const RENDERER = join(ROOT, 'renderer');
+  const COMPONENT = join(RENDERER, 'components', 'EmptyState.tsx');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const RETIRED = new Set(['empty', 'empty-title', 'empty-actions', 'analysis-empty-state', 'wg-empty-message']);
+  const markup = [];
+  for (const file of tsxFiles(RENDERER)) {
+    if (file === COMPONENT) continue;
+    const source = readFileSync(file, 'utf8');
+    for (const m of source.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{'([^']*)'\})/g)) {
+      for (const name of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+        if (RETIRED.has(name) || name.startsWith('empty-notice')) markup.push(`${relative(ROOT, file)}: className "${name}"`);
+      }
+    }
+  }
+  assert.deepEqual(markup, [], 'dùng <EmptyState> (components/EmptyState.tsx), không tự dựng khối thông báo trống');
+
+  const styles = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = m[1].trim();
+      if (/\.(?:empty|empty-title|empty-actions|analysis-empty-state|wg-empty-message)(?![\w-])/.test(selector)) {
+        styles.push(`${relative(ROOT, file)}: ${selector} (lớp đã bỏ)`);
+      }
+      // Chỉ app.css định nghĩa kiểu dáng; trang khác chỉ được chỉnh bố cục.
+      if (file.endsWith('app.css') || !/empty-notice/.test(selector)) continue;
+      const visual = m[2].match(/(?:^|;)\s*(border[\w-]*|background[\w-]*|color|font[\w-]*|box-shadow)\s*:/g);
+      if (visual) styles.push(`${relative(ROOT, file)}: ${selector} đè ${visual.map((v) => v.replace(/[;:\s]/g, '')).join(', ')}`);
+    }
+  }
+  assert.deepEqual(styles, [], 'CSS trang không được dựng lại hay đè viền/nền/chữ của thông báo trống');
+
+  const component = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const base = component.match(/\.empty-notice\{([^}]*)\}/)?.[1] || '';
+  assert.doesNotMatch(base, /(?:^|;)\s*(?:border|background)[\w-]*\s*:/, 'thông báo trống nằm thẳng trên bề mặt khối chứa, không có viền hay nền riêng');
+});
+
+// Chiều cao control và hàng bảng đi theo hai thang ba bậc. Trước 2026-09-24
+// không luật nào kiểm `height`, nên CSS trang tự đặt 22/26/38/46/48/50/52/54px
+// cho nút, hàng và đầu thẻ, và `tbody tr{min-height}` toàn cục không có tác
+// dụng (trình duyệt bỏ qua min-height trên <tr>) mà không ai biết.
+test('chiều cao control và hàng bảng nằm trên thang, không tự đặt số', () => {
+  assert.equal(flat('--table-row-h-compact'), '36px');
+  assert.equal(flat('--table-row-h'), '44px');
+  assert.equal(TOKEN['--table-row-h-input'], 'calc(var(--control-h) + var(--space-4))',
+    'hàng có ô nhập = control chuẩn + 8px đệm mỗi bên');
+
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(app, /(?:^|\})\s*tbody tr\{height:var\(--table-row-h\);/,
+    'hàng chuẩn đặt bằng `height` (tối thiểu với <tr>), không phải `min-height`');
+
+  const rules = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) rules.push({ file, selector: m[1].trim().replace(/\s+/g, ' '), body: m[2] });
+  }
+
+  // Header gọn phải đi với hàng gọn, không ghép header 30px với hàng 44px.
+  const unpaired = [];
+  for (const { selector, body } of rules) {
+    if (!/height:var\(--table-header-h-sm\)/.test(body)) continue;
+    const table = selector.match(/^(.+?) th$/)?.[1];
+    if (table && !rules.some((r) => r.selector === `${table} tbody tr` && /height:var\(--table-row-h-compact\)/.test(r.body))) unpaired.push(table);
+  }
+  assert.deepEqual(unpaired, [], 'bảng dùng header gọn phải khai `tbody tr{height:var(--table-row-h-compact)}`');
+
+  // Khoảng 20–56px là cỡ của control, hàng và đầu thẻ: phải dùng token. Ngoại
+  // lệ chỉ dành cho thứ không phải control — icon, logo, badge/pill — và phải
+  // ghi lý do tại đây.
+  const EXEMPT = {
+    '.dash-test-filterbar button b': 'badge đếm số trong tab lọc',
+    '.settings-admin-icon': 'icon SVG',
+    '.action-chip': 'pill trạng thái',
+    '.rc-pending-icon svg': 'icon SVG',
+    '.qc-staff': 'badge viết tắt người nhập',
+    '.dash-level-pill': 'pill mức QC',
+    '.sg-chart-empty-icon svg': 'icon SVG',
+    '.confirm-modal-icon': 'icon cảnh báo của hộp xác nhận',
+    '.sg-chart-empty-icon': 'khung icon minh hoạ',
+    '.auth-head .brand-mark': 'logo đơn vị ở màn đăng nhập',
+  };
+  const raw = [];
+  for (const { file, selector, body } of rules) {
+    if (EXEMPT[selector]) continue;
+    for (const d of body.matchAll(/(?:^|;)\s*((?:min-|max-)?height)\s*:\s*(\d+)px/g)) {
+      const px = Number(d[2]);
+      if (px >= 20 && px <= 56) raw.push(`${relative(ROOT, file)}: ${selector} ${d[1]}:${px}px`);
+    }
+  }
+  assert.deepEqual(raw, [], 'dùng --control-h-sm/-compact/--control-h, --table-row-h-compact/--table-row-h/-input hoặc --panel-header-min-height');
+});

@@ -16,6 +16,7 @@ import { reauthDialog, infoDialog, confirmDialog } from '../state/dialog-store';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import type { NceRecord, ReportPointRow, TestSummary } from '../../shared/qc-api';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -293,13 +294,10 @@ export function ReportPage() {
           </div>
         </div>
       ) : (
-        <div className="panel">
-          <div className="empty">
-            <div className="empty-title">Chưa có xét nghiệm đang vận hành</div>
-            <div>Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.</div>
-            {admin ? <div className="empty-actions"><Link className="btn teal" to="/manage">Cấu hình Mean/SD</Link></div> : null}
-          </div>
-        </div>
+        <div className="panel"><EmptyState
+          title="Chưa có xét nghiệm đang vận hành"
+          action={admin && <Link className="btn teal" to="/manage" state={{ tab: 'targets' }}>Cấu hình Mean/SD</Link>}
+        >Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.</EmptyState></div>
       )}
 
       <div className="panel">

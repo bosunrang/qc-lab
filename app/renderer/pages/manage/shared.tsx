@@ -41,10 +41,7 @@ export function lotStatus(lot: { depleted?: 0 | 1; exp?: string }, toLotNo?: str
  * ≤760px), không phải lưới riêng từng modal. */
 export function FieldRow({ children }: { children: ReactNode }) { return <div className="grid2">{children}</div>; }
 
-/** Trạng thái trống dùng cho các thẻ Cấu hình chung. Mỗi thẻ chỉ truyền nội
- * dung nghiệp vụ; cấu trúc DOM và style căn giữa được giữ đồng nhất. */
-export function EmptyState({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="empty"><div className="empty-title">{title}</div><div>{children}</div></div>;
-}
+/** Các thẻ Cấu hình chung dùng đúng component thông báo trống của toàn app. */
+export { EmptyState } from '../../components/EmptyState';
 
 

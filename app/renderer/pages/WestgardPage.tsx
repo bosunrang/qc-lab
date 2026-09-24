@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { QcChart, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { infoDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
@@ -330,11 +331,10 @@ export function WestgardPage() {
   if (!summaries.length && !archivedGroups.length) {
     return <>
       <PageHeader title="Phân tích Westgard" subtitle="Đối chiếu luật theo mức QC, lô và lần chạy" />
-      <div className="panel"><div className="empty-state analysis-empty-state">
-        <b>Chưa có xét nghiệm nào để phân tích Westgard</b>
-        <span>{admin ? 'Hãy thêm xét nghiệm trong Cấu hình chung để bắt đầu phân tích.' : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.'}</span>
-        {admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests' } })}>Mở Cấu hình chung</button>}
-      </div></div>
+      <div className="panel"><EmptyState
+        title="Chưa có xét nghiệm nào để phân tích Westgard"
+        action={admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests' } })}>Mở Cấu hình chung</button>}
+      >{admin ? 'Hãy thêm xét nghiệm trong Cấu hình chung để bắt đầu phân tích.' : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.'}</EmptyState></div>
     </>;
   }
 
@@ -451,11 +451,10 @@ export function WestgardPage() {
       {/* CUSUM vẫn tính riêng từng mức (không quy đổi chung một trục như LJ)
           và chỉ hiện khi xét nghiệm đã bật CUSUM. */}
       {view === 'current' && testId && analysisReady && chartMode === 'cusum' && !cusumOn && (
-        <div className="panel"><div className="empty">
-          <div className="empty-title">Chưa bật CUSUM cho xét nghiệm này</div>
-          <div>Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.</div>
-          {writable && <div className="empty-actions"><button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests', editTestId: testId } })}>Mở cấu hình xét nghiệm</button></div>}
-        </div></div>
+        <div className="panel"><EmptyState
+          title="Chưa bật CUSUM cho xét nghiệm này"
+          action={writable && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests', editTestId: testId } })}>Mở cấu hình xét nghiệm</button>}
+        >Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.</EmptyState></div>
       )}
       {view === 'current' && testId && chartMode === 'cusum' && cusumOn && levels.length >= 2 && cusumView === 'summary' && (
         <div className="panel wg-multi-panel">
@@ -488,7 +487,7 @@ export function WestgardPage() {
           <div className="panel wg-level-panel" key={l.level}>
             <h3><div className="wg-level-title"><span>Mức {l.level}</span><span className="wg-lot-name is-current">Lô {lotLabelFor(l.level)}</span></div></h3>
             {!pointCount ? (
-              <div className="wg-empty-message"><b>Chưa có dữ liệu</b><span>LOT đang dùng chưa có điểm QC.</span></div>
+              <EmptyState title="Chưa có dữ liệu">LOT đang dùng chưa có điểm QC.</EmptyState>
             ) : (
               <>
                 <div className="hint wg-panel-intro">Đường CUSUM+ (teal)/CUSUM− (xanh tím) cộng dồn độ lệch z-score; đường xám nét đứt là trung bình động 5 điểm để tham khảo xu hướng. Vượt vạch đỏ đứt ±h là dấu hiệu trôi/shift kéo dài.</div>
@@ -538,11 +537,10 @@ export function WestgardPage() {
               </div>
             </h3>
             {!pointCount ? (
-              <div className="wg-empty-message">
-                <b>Chưa có dữ liệu</b>
-                <span>LOT đang dùng chưa có điểm QC. Bạn có thể {prevBlocks.length ? 'chọn LOT cũ hoặc nhập điểm mới' : 'nhập điểm mới'}.</span>
-                <div className="empty-actions"><button className="btn teal" onClick={() => navigate('/entry', { state: { testId } })}>Nhập QC</button></div>
-              </div>
+              <EmptyState
+                title="Chưa có dữ liệu"
+                action={<button className="btn teal" onClick={() => navigate('/entry', { state: { testId } })}>Nhập QC</button>}
+              >LOT đang dùng chưa có điểm QC. Bạn có thể {prevBlocks.length ? 'chọn LOT cũ hoặc nhập điểm mới' : 'nhập điểm mới'}.</EmptyState>
             ) : (
               <>
                 {analysis?.evaluationNote && <div className="alert warn wg-target-warning">{analysis.evaluationNote}</div>}
@@ -585,7 +583,7 @@ export function WestgardPage() {
       )}
 
       {view === 'archived' && archivedGroupId && !archivedTestsLoading && !archivedTestId && !archivedTests.length && (
-        <div className="panel"><div className="empty"><div className="empty-title">Không tìm thấy xét nghiệm nào</div><div>Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD lịch sử hợp lệ.</div></div></div>
+        <div className="panel"><EmptyState title="Không tìm thấy xét nghiệm nào">Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD lịch sử hợp lệ.</EmptyState></div>
       )}
 
       {view === 'archived' && archivedTestId && archivedBlocksLoading && (
@@ -593,7 +591,7 @@ export function WestgardPage() {
       )}
 
       {view === 'archived' && archivedTestId && !archivedBlocksLoading && !archivedBlocks.length && (
-        <div className="panel"><div className="empty"><div className="empty-title">Chưa có dữ liệu phân tích</div><div>Không có lô nào của nhóm này có Mean/SD lịch sử hợp lệ cho xét nghiệm đã chọn.</div></div></div>
+        <div className="panel"><EmptyState title="Chưa có dữ liệu phân tích">Không có lô nào của nhóm này có Mean/SD lịch sử hợp lệ cho xét nghiệm đã chọn.</EmptyState></div>
       )}
 
       {view === 'archived' && archivedTestId && archivedBlocks.length >= 2 && (
@@ -612,7 +610,7 @@ export function WestgardPage() {
             <div className="wg-level-meta"><span className="tag rej">{archivedStatusLabel}</span><span>Mean {b.mean.toFixed(archivedDecimals)}</span><span>SD {b.sd.toFixed(archivedDecimals)}</span><span>{b.analysis.points.length} điểm</span></div>
           </h3>
           {!b.analysis.points.length ? (
-            <div className="wg-empty-message"><b>Chưa có dữ liệu</b><span>Không tìm thấy điểm QC nào cho lô này.</span></div>
+            <EmptyState title="Chưa có dữ liệu">Không tìm thấy điểm QC nào cho lô này.</EmptyState>
           ) : (
             <>
               <div className="chart-scroll">

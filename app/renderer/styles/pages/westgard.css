@@ -75,6 +75,7 @@
   padding:var(--table-cell-py) var(--table-cell-px-compact); font-size:var(--table-body-size); vertical-align:top;
 }
 .wg-guide th{font-size:var(--table-head-size-sm);letter-spacing:var(--table-head-tracking-sm);height:var(--table-header-h-sm);}
+.wg-guide tbody tr{height:var(--table-row-h-compact);}
 .wg-guide td:first-child{
   font-weight:var(--weight-bold); white-space:nowrap;
 }
@@ -162,11 +163,6 @@
    Công thức width cũ trừ thêm 32px lần nữa nên lề phải bị rộng hơn lề trái.
    Mỗi thẻ mức dùng cùng một khung 14px, bảng lấp đầy chính xác phần trong. */
 .wg-level-panel > .chart-scroll{box-sizing:border-box;padding:var(--panel-padding);}
-/* Trạng thái lô lịch sử chưa có điểm chỉ là thông tin trong thẻ, không dựng
-   thêm một hộp có viền lồng bên trong thẻ mức. */
-.wg-empty-message{display:grid;gap:var(--space-1);padding:var(--space-6) var(--panel-padding);text-align:center;color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
-.wg-empty-message b{color:var(--text-primary);font-weight:var(--weight-bold);}
-.wg-empty-message .empty-actions{margin-top:var(--space-lg);display:flex;justify-content:center;}
 
 /* Hai chế độ biểu đồ là một section độc lập sau phần hướng dẫn. Không dịch
    chuyển bằng transform vì offset làm tab đè lên viền của <details>. */

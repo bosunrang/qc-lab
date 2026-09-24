@@ -47,11 +47,11 @@ test('xuất Sigma phân biệt báo cáo kỳ, bảng dữ liệu thô và so s
 test('trạng thái trống Sigma dùng thông báo hệ thống và cho phép thêm kỳ khi có quyền', () => {
   const page = source('../renderer/pages/SigmaPage.tsx');
 
-  assert.match(page, /className="empty sg-period-empty"/);
+  assert.match(page, /<EmptyState\s+title=\{operationalLevels\.length > 0 \? 'Chưa có kỳ đánh giá'/);
   assert.match(page, /Chưa có kỳ đánh giá/);
   assert.match(page, /Cần cấu hình ít nhất một mức QC đang vận hành trước khi thêm kỳ đánh giá/);
   assert.match(page, /Thêm kỳ đánh giá để ghi nhận CV IQC, Bias EQA\/EQC và theo dõi Sigma/);
-  assert.match(page, /className="empty-actions">\s*<button className="btn teal" onClick=\{\(\) => setAddPeriodOpen\(true\)\}>\+ Thêm kỳ<\/button>/);
+  assert.match(page, /action=\{writable && operationalLevels\.length > 0 && <button className="btn teal" onClick=\{\(\) => setAddPeriodOpen\(true\)\}>\+ Thêm kỳ<\/button>\}/);
 });
 
 

@@ -13,6 +13,7 @@ import { Modal } from '../components/Modal';
 import { CalcIcon, DownloadIcon, PrintIcon } from '../components/BtnIcons';
 import { RowActionButton } from '../components/RowActionButton';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import { DateField } from '../components/DateField';
 import { SigmaTrendChart, SigmaMdcChart } from '../components/SigmaCharts';
 import { printHtmlToPdf } from '../lib/export';
@@ -431,10 +432,10 @@ export function SigmaPage() {
   if (!sigmaTests.length) {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
-      <div className="panel"><div className="empty-state analysis-empty-state">
-        <b>Chưa có xét nghiệm trong danh mục QC</b>
-        <span>Hãy khai báo xét nghiệm trong Cấu hình chung trước khi đánh giá Six Sigma.</span>
-      </div></div>
+      <div className="panel"><EmptyState
+        title="Chưa có xét nghiệm nào để đánh giá Six Sigma"
+        action={admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests' } })}>Mở Cấu hình chung</button>}
+      >{admin ? 'Hãy thêm xét nghiệm trong Cấu hình chung để bắt đầu đánh giá.' : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.'}</EmptyState></div>
     </>;
   }
 
@@ -615,18 +616,15 @@ export function SigmaPage() {
                 {admin && <RowActionButton kind="delete" label={`Xóa kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => removePeriodRow(displayPeriod)} />}
               </div>
             </section>
-          </div> : <div className="empty sg-period-empty">
-            <div className="empty-title">{operationalLevels.length > 0 ? 'Chưa có kỳ đánh giá' : 'Chưa có mức QC đang vận hành'}</div>
-            <div>{operationalLevels.length === 0
-              ? 'Cần cấu hình ít nhất một mức QC đang vận hành trước khi thêm kỳ đánh giá.'
-              : writable
-                ? 'Thêm kỳ đánh giá để ghi nhận CV IQC, Bias EQA/EQC và theo dõi Sigma.'
-                : 'Liên hệ người có quyền ghi để thêm kỳ đánh giá.'}
-            </div>
-            {writable && operationalLevels.length > 0 && <div className="empty-actions">
-              <button className="btn teal" onClick={() => setAddPeriodOpen(true)}>+ Thêm kỳ</button>
-            </div>}
-          </div>}
+          </div> : <EmptyState
+            title={operationalLevels.length > 0 ? 'Chưa có kỳ đánh giá' : 'Chưa có mức QC đang vận hành'}
+            action={writable && operationalLevels.length > 0 && <button className="btn teal" onClick={() => setAddPeriodOpen(true)}>+ Thêm kỳ</button>}
+          >{operationalLevels.length === 0
+            ? 'Cần cấu hình ít nhất một mức QC đang vận hành trước khi thêm kỳ đánh giá.'
+            : writable
+              ? 'Thêm kỳ đánh giá để ghi nhận CV IQC, Bias EQA/EQC và theo dõi Sigma.'
+              : 'Liên hệ người có quyền ghi để thêm kỳ đánh giá.'}
+          </EmptyState>}
           {periods.length > 0 && (
             <div className="sg-data-foot">
               <button className="btn teal" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" onClick={exportAllPeriods}><DownloadIcon />Xuất Excel</button>

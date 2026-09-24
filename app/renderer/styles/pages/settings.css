@@ -144,10 +144,10 @@
    chỉ còn nửa bề rộng trang — giữ đúng lý do hệ thống ghi tại chỗ. */
 .lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--gap-content)}
 .lis-gateway-grid label{margin-top:0}
-.lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
+.lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:var(--control-h);padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .lis-gateway-toggle input{flex:none}
 .lis-gateway-panel .alert{margin:0}
-.lis-gateway-status{width:100%;min-height:var(--control-h-row);align-items:center;border:1px solid var(--surface-border);border-left-width:1px;background:var(--surface-card-soft);color:var(--muted);font-weight:var(--weight-semibold)}
+.lis-gateway-status{width:100%;min-height:var(--control-h-compact);align-items:center;border:1px solid var(--surface-border);border-left-width:1px;background:var(--surface-card-soft);color:var(--muted);font-weight:var(--weight-semibold)}
 .lis-gateway-status.ok{border-color:var(--success-border);border-left-color:var(--success-border)}
 .lis-gateway-status.rej{border-color:var(--danger-border);border-left-color:var(--danger-border)}
 

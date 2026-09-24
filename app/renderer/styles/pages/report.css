@@ -10,8 +10,8 @@
 .report-template-fields{display:grid;grid-template-columns:minmax(220px,320px) minmax(160px,220px) max-content;align-items:end;gap:var(--space-3);margin-top:var(--space-4);}
 /* Thẻ này là thanh cấu hình gọn như bộ lọc/báo cáo: ô nhập đi cùng nút hành
    động 36px, không dùng chiều cao form đầy đủ 40px của màn Cài đặt. */
-.report-template-fields input:not([type="checkbox"]):not([type="radio"]){height:var(--control-h-action);min-height:var(--control-h-action);}
-.report-template-action{display:flex;align-items:end;min-height:var(--control-h-action);}
+.report-template-fields input:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
+.report-template-action{display:flex;align-items:end;min-height:var(--control-h);}
 
 .report-filter-grid.grid4{
   grid-template-columns:minmax(180px,.9fr) minmax(300px,1.35fr) minmax(176px,.7fr) minmax(176px,.7fr);

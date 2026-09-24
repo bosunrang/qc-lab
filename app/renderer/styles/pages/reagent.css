@@ -27,7 +27,7 @@
 }
 
 .rc-toolbar-selcol label { margin: 0 0 var(--field-label-gap); }
-.rc-toolbar-selcol select { width: 100%; max-width: none; height: var(--control-h-select); font-weight: 500; }
+.rc-toolbar-selcol select { width: 100%; max-width: none; height: var(--control-h); font-weight: 500; }
 .rc-toolbar-primary { flex: 0 0 auto; align-self: flex-end; }
 .rc-toolbar-primary > div, .rc-toolbar-secondary { display: flex; flex-wrap: wrap; gap: 8px; }
 .rc-toolbar-secondary { align-self: flex-end; margin-left: auto; }
@@ -50,7 +50,7 @@
 .rc-pair-wrap { overflow-x: auto; overflow-y: hidden; background: var(--panel); }
 .rc-pair-head, .rc-pair-row { display: grid; grid-template-columns: 44px minmax(100px, 1.25fr) minmax(100px, 1.25fr) minmax(78px, .7fr) minmax(108px, .85fr) 30px; gap: 8px; align-items: center; min-width: 600px; }
 .rc-pair-head { min-height: var(--table-header-h-sm); padding: var(--table-cell-py-compact) var(--table-cell-px-compact); background: var(--table-head-bg); border-bottom: 1px solid var(--table-head-border); color: var(--table-head-ink); font-size: var(--table-head-size-sm); letter-spacing: var(--table-head-tracking-sm); font-weight: var(--table-head-weight); line-height:var(--leading-snug); text-align: center; }
-.rc-pair-row { min-height: 52px; padding: 8px 12px; border-bottom: 1px solid var(--line2); background: var(--panel); }
+.rc-pair-row { min-height: var(--table-row-h-input); padding: 8px 12px; border-bottom: 1px solid var(--line2); background: var(--panel); }
 .rc-pair-row:last-child { border-bottom: 0; }
 .rc-pair-row:hover { background: var(--surface-subtle); }
 .rc-pair-panel > .rc-pair-hint{margin:8px var(--panel-content-gap) var(--panel-content-gap);}
@@ -60,7 +60,7 @@
    ngầm tới Westgard/Sigma hay các trang khác. */
 .rc-toolbar-panel{padding:0;}
 .rc-toolbar-panel>.rc-toolbar{margin-top:var(--panel-content-gap);margin-bottom:var(--panel-content-gap);}
-.rc-idx{width:34px;height:var(--control-h-table);margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
+.rc-idx{width:var(--control-h);height:var(--control-h);margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .rc-calc{text-align:center;color:var(--teal);font-variant-numeric:tabular-nums;font-size:var(--table-body-size);font-weight:var(--weight-bold);letter-spacing:0;}
 .rc-calc.neg{color:var(--text-warning);}
 .rc-coverage-cell,.rc-info-panel .rc-coverage-cell{grid-column:1 / -1;}
@@ -70,9 +70,9 @@
 .rc-info-panel>.rc-info-grid{margin:0;grid-template-columns:1fr 1fr;}
 .rc-info-panel .rc-field label{margin:0 0 var(--field-label-gap);}
 .rc-field input,.rc-info-panel .rc-field>input,.rc-info-panel .rc-quick-field input{height:var(--control-h);}
-.rc-field .datebox{height:var(--control-h-date);}
-.rc-info-panel .rc-date-field .datebox{display:grid;grid-template-columns:minmax(0,1fr) 36px;width:100%;max-width:none;height:var(--control-h-date);}
-.rc-info-panel .rc-date-field .datebox input.date-text{max-width:none;height:var(--control-h-date);min-width:0;border:0;border-radius:0;background:transparent;box-shadow:none;}
+.rc-field .datebox{height:var(--control-h);}
+.rc-info-panel .rc-date-field .datebox{display:grid;grid-template-columns:minmax(0,1fr) 36px;width:100%;max-width:none;height:var(--control-h);}
+.rc-info-panel .rc-date-field .datebox input.date-text{max-width:none;height:var(--control-h);min-width:0;border:0;border-radius:0;background:transparent;box-shadow:none;}
 .rc-info-panel .rc-date-field .datebox input.date-text:focus{border:0;box-shadow:none;}
 .rc-info-panel .rc-date-field .datebox .datepick{width:36px;min-width:36px;border-left:1px solid var(--line);background:var(--surface-subtle);}
 .rc-info-panel .rc-quick-field{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:8px;align-items:center;}
@@ -111,7 +111,7 @@
 .rc-stat-value.bad{color:var(--danger-ink);}
 .rc-stat-sub{margin-top:6px;color:var(--muted);font-size:var(--text-sm);font-weight:500;line-height:var(--leading-body);}
 
-.rc-crit-item{display:grid;gap:16px;align-items:start;padding:12px 16px 12px var(--panel-content-gap);border-bottom:1px solid var(--line2);grid-template-columns:112px minmax(0,1fr);column-gap:8px;min-height:48px;background:var(--panel);}
+.rc-crit-item{display:grid;gap:16px;align-items:start;padding:12px 16px 12px var(--panel-content-gap);border-bottom:1px solid var(--line2);grid-template-columns:112px minmax(0,1fr);column-gap:8px;min-height:var(--table-row-h);background:var(--panel);}
 .rc-crit-panel>.rc-criteria-content{margin:var(--panel-content-gap);padding:0;border:1px solid var(--surface-border);border-radius:var(--radius-md);overflow:hidden;}
 .rc-crit-panel>.rc-verdict-wrap{margin:0;padding:0 var(--panel-content-gap) var(--panel-content-gap);}
 .rc-crit-item:first-child{padding-top:12px;}
@@ -165,11 +165,10 @@
 .mrow .acts{display:flex;gap:6px;align-items:center;}
 /* Danh sách chọn nhanh là vùng thao tác trong modal, không phải hàng bảng:
    nút xóa cùng mật độ 36px với nút Chọn bên cạnh. */
-.mrow .btn.sm,.mrow .row-action{height:var(--control-h-action);min-height:var(--control-h-action);}
-.mrow .row-action{width:var(--control-h-action);flex-basis:var(--control-h-action);}
+.mrow .btn.sm,.mrow .row-action{height:var(--control-h);min-height:var(--control-h);}
+.mrow .row-action{width:var(--control-h);flex-basis:var(--control-h);}
 .mrow b{color:var(--ink);font-size:var(--text-base);font-weight:700;}
 .rc-picker-list{max-height:360px;overflow:auto;}
-.rc-picker-empty{padding:16px;}
 .refcat{margin:14px 0 6px;color:var(--muted);font-size:var(--text-2xs);font-weight:var(--weight-bold);letter-spacing:.07em;text-transform:uppercase;}
 .rc-tea-category:first-of-type .refcat{margin-top:0;}
 .refrow{display:block;width:100%;margin-bottom:6px;padding:10px 12px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font-family:var(--sans);text-align:left;cursor:pointer;}
@@ -179,7 +178,7 @@
 /* Hàng thêm nhanh là một control ghép: ô nhập và nút phải cùng 36px.
    `.btn.sm` mặc định 32px làm nút "Thêm" thấp hơn ô nhập 40px. */
 .rc-quick-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px;}
-.rc-quick-add input:not([type="checkbox"]):not([type="radio"]),.rc-quick-add .btn{height:var(--control-h-action);min-height:var(--control-h-action);}
+.rc-quick-add input:not([type="checkbox"]):not([type="radio"]),.rc-quick-add .btn{height:var(--control-h);min-height:var(--control-h);}
 
 .rc-icon-btn{display:grid;place-items:center;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);color:var(--teal);cursor:pointer;}
 .rc-icon-btn:hover{border-color:var(--teal);background:var(--panel2);}

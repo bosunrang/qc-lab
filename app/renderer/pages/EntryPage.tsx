@@ -11,6 +11,7 @@ import { QcChart, type QcChartPoint } from '../components/QcChart';
 import { Modal } from '../components/Modal';
 import { DateField } from '../components/DateField';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import { confirmDialog, reauthDialog } from '../state/dialog-store';
 import { extremeQcPointDeviation, voidNceChoice, type VoidKind } from '../../main/domain/entry-validation';
 import type { QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
@@ -551,11 +552,10 @@ export function EntryPage() {
       <PageHeader title="Nhập QC" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
       {emptyState ? (
         <div className="panel">
-          <div className="empty-state analysis-empty-state">
-            <b>{emptyState.title}</b>
-            <span>{emptyState.message}</span>
-            {admin && <Link className="btn teal" to="/manage" state={{ tab: emptyState.tab }}>{emptyState.linkLabel}</Link>}
-          </div>
+          <EmptyState
+            title={emptyState.title}
+            action={admin && <Link className="btn teal" to="/manage" state={{ tab: emptyState.tab }}>{emptyState.linkLabel}</Link>}
+          >{emptyState.message}</EmptyState>
         </div>
       ) : (
       <div className={`entrygrid${treeCollapsed ? ' tree-collapsed' : ''}`}>
@@ -903,7 +903,7 @@ export function EntryPage() {
                                 ))}
                               </tbody>
                             </table>
-                          ) : <div className="empty qc-table-empty">Chưa có điểm nào trong mức này.</div>}
+                          ) : <EmptyState className="qc-table-empty">Chưa có điểm nào trong mức này.</EmptyState>}
                         </div>
                       );
                     })}
@@ -960,7 +960,7 @@ export function EntryPage() {
                         </div>
                       )}
                     </>
-                  ) : <div className="empty qc-table-empty">{rangeError || 'Đang kiểm tra điều kiện dải kiểm soát…'}</div>}
+                  ) : <EmptyState className="qc-table-empty">{rangeError || 'Đang kiểm tra điều kiện dải kiểm soát…'}</EmptyState>}
                 </div>
               </section>
             </>
@@ -1067,7 +1067,7 @@ function RunSlot({ date, level, columnKey, columnOrder, onCommit }: {
   const [val, setVal] = useState('');
   return (
     <div className="qc-run-slot">
-      <input className="qc-inline-input empty" type="text" inputMode="decimal" placeholder="--" value={val}
+      <input className="qc-inline-input is-empty" type="text" inputMode="decimal" placeholder="--" value={val}
         data-focus-date={date} data-focus-level={level} data-focus-column={columnKey} data-focus-column-order={columnOrder}
         onChange={(e) => setVal(e.target.value)}
         onBlur={async () => { const n = Number(val); if (val.trim() !== '' && !Number.isNaN(n) && await onCommit(n)) setVal(''); }}

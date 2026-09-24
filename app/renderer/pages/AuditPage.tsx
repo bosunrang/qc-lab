@@ -7,6 +7,7 @@ import { Modal } from '../components/Modal';
 import { DateField } from '../components/DateField';
 import { confirmDialog, reauthDialog, infoDialog } from '../state/dialog-store';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import { roleLabel } from '../lib/permissions';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../../main/domain/audit-format';
 
@@ -88,7 +89,7 @@ export function AuditPage() {
         </div>
       </div>
 
-      <div className="panel audit-log-panel">
+      <div className="panel">
         <div className="audit-log-head">
           <h2 className="panel-title">Hoạt động gần đây</h2>
           <input type="search" aria-label="Tìm trong nhật ký hoạt động" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo nội dung…" />
@@ -123,7 +124,7 @@ export function AuditPage() {
             </table>
           </div>
         ) : (
-          <div className="empty"><div className="empty-title">Không có dữ liệu phù hợp</div><div>Thử xoá bộ lọc hoặc chọn khoảng ngày khác.</div></div>
+          <EmptyState title="Không có dữ liệu phù hợp">Thử xoá bộ lọc hoặc chọn khoảng ngày khác.</EmptyState>
         )}
 
         {result.resultTo > 0 && (

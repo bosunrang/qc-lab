@@ -122,7 +122,7 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
   assert.match(page, /Phiên bản/);
   assert.match(page, /saveTemplate\(\{ formCode, version: formVersion \}\)/);
   const reportCss = readFileSync(new URL('../renderer/styles/pages/report.css', import.meta.url), 'utf8');
-  assert.match(reportCss, /\.report-template-fields input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)\{height:var\(--control-h-action\);min-height:var\(--control-h-action\);\}/);
+  assert.match(reportCss, /\.report-template-fields input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)\{height:var\(--control-h\);min-height:var\(--control-h\);\}/);
 }
 
 console.log('app report-handlers end-to-end tests passed');

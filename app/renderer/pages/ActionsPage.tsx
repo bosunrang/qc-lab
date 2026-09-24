@@ -8,6 +8,7 @@ import { Modal } from '../components/Modal';
 import { DateField } from '../components/DateField';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite } from '../lib/permissions';
 import type { NceRecord, NceDetail, QcPointView } from '../../shared/qc-api';
@@ -168,14 +169,13 @@ export function ActionsPage() {
           <div><h2 className="panel-title">Lập hồ sơ sự không phù hợp (NCE)</h2><p>Lưu tiến độ điều tra, bằng chứng rerun và quyết định khép vòng trong cùng một hồ sơ.</p></div>
           <button type="button" className="btn ghost sm" onClick={() => setShowGuide(true)}>Quy trình 8 bước</button>
         </div>
-        {form ? <NceProtocolForm prefill={form.prefill} record={form.record} onClose={() => setForm(null)} /> : <div className="empty action-form-empty">
-          <div className="empty-title">{issueCount ? 'Chọn một sự cố để lập hồ sơ' : 'Không có vi phạm nào cần lập hồ sơ'}</div>
-          <div className="action-empty-copy">{issueCount
-            ? `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`
-            : 'Hồ sơ NCE thường bắt đầu từ một vi phạm QC. Khi không có vi phạm nào, chỉ mở hồ sơ khi thực sự cần ghi nhận sự không phù hợp khác.'}
-          </div>
-          {writable && <div className="empty-actions"><button type="button" className="btn ghost" onClick={() => setForm({ prefill: null, record: null })}>Lập hồ sơ từ nguồn khác</button></div>}
-        </div>}
+        {form ? <NceProtocolForm prefill={form.prefill} record={form.record} onClose={() => setForm(null)} /> : <EmptyState
+          title={issueCount ? 'Chọn một sự cố để lập hồ sơ' : 'Không có vi phạm nào cần lập hồ sơ'}
+          action={writable && <button type="button" className="btn ghost" onClick={() => setForm({ prefill: null, record: null })}>Lập hồ sơ từ nguồn khác</button>}
+        >{issueCount
+          ? `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`
+          : 'Hồ sơ NCE thường bắt đầu từ một vi phạm QC. Khi không có vi phạm nào, chỉ mở hồ sơ khi thực sự cần ghi nhận sự không phù hợp khác.'}
+        </EmptyState>}
       </div>
 
       <ActionLogPanel
@@ -281,10 +281,7 @@ function ActionLogPanel({
           </table></div>
         </>
       ) : (
-        <div className="empty action-log-empty">
-          <div className="empty-title">Chưa có nhật ký</div>
-          <div>Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.</div>
-        </div>
+        <EmptyState title="Chưa có nhật ký">Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.</EmptyState>
       )}
     </div>
   );
