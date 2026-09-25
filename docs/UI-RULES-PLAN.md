@@ -46,7 +46,7 @@ Người dùng tự kiểm tra giao diện; không dùng bản xem trước tron
 
 - Nhánh `refactor/ui-rules-remaining` chưa push, chưa merge vào `main`;
   `main` vẫn đi trước `origin/main`.
-- Nhánh đã merge có thể xoá: `fix/lan-login-security`,
+- Nhánh đã merge có thể xoá:
   `refactor/ui-empty-state-heights`, `refactor/ui-field-badge-modal`.
 - LAN vẫn chạy HTTP thường: cần quyết định có dùng HTTPS (chứng chỉ tự ký
   hoặc CA nội bộ) hay không.
