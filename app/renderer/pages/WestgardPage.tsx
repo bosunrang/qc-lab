@@ -444,9 +444,9 @@ export function WestgardPage() {
         )}
       </div>
 
-      {view === 'current' && !testId && <div className="panel"><p className="empty-state">Chọn 1 xét nghiệm ở panel phía trên.</p></div>}
+      {view === 'current' && !testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở panel phía trên.</EmptyState></div>}
 
-      {view === 'current' && testId && !analysisReady && <div className="panel"><p className="empty-state">{analysisError || 'Đang tải phân tích…'}{analysisError && <button className="btn ghost sm" onClick={() => loadAnalysis(testId, levelNums)}>Thử lại</button>}</p></div>}
+      {view === 'current' && testId && !analysisReady && <div className="panel"><EmptyState action={analysisError ? <button className="btn ghost sm" onClick={() => loadAnalysis(testId, levelNums)}>Thử lại</button> : undefined}>{analysisError || 'Đang tải phân tích…'}</EmptyState></div>}
 
       {/* CUSUM vẫn tính riêng từng mức (không quy đổi chung một trục như LJ)
           và chỉ hiện khi xét nghiệm đã bật CUSUM. */}
@@ -579,7 +579,7 @@ export function WestgardPage() {
       })}
 
       {view === 'archived' && archivedGroupId && archivedTestsLoading && (
-        <div className="panel"><p className="empty-state">Đang nạp xét nghiệm và dữ liệu lịch sử của nhóm lô...</p></div>
+        <div className="panel"><EmptyState>Đang nạp xét nghiệm và dữ liệu lịch sử của nhóm lô…</EmptyState></div>
       )}
 
       {view === 'archived' && archivedGroupId && !archivedTestsLoading && !archivedTestId && !archivedTests.length && (
@@ -587,7 +587,7 @@ export function WestgardPage() {
       )}
 
       {view === 'archived' && archivedTestId && archivedBlocksLoading && (
-        <div className="panel"><p className="empty-state">Đang đánh giá Westgard cho dữ liệu lịch sử...</p></div>
+        <div className="panel"><EmptyState>Đang đánh giá Westgard cho dữ liệu lịch sử…</EmptyState></div>
       )}
 
       {view === 'archived' && archivedTestId && !archivedBlocksLoading && !archivedBlocks.length && (

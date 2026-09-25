@@ -569,7 +569,12 @@ test('thông báo trống chỉ dựng qua EmptyState, CSS trang không đè vi�
     const path = join(dir, entry.name);
     return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
   });
-  const RETIRED = new Set(['empty', 'empty-title', 'empty-actions', 'analysis-empty-state', 'wg-empty-message']);
+  // `empty-state` từng vừa là dòng "Chưa có." giữa nội dung vừa là thông báo
+  // trống của cả panel (17 chỗ). Nay khối trống dùng EmptyState, còn chữ
+  // "chưa có giá trị" nằm giữa nội dung dùng `.hint-inline`. Các placeholder
+  // có icon của Sigma/So sánh hoá chất dùng EmptyState với prop `icon`.
+  const RETIRED = new Set(['empty', 'empty-title', 'empty-actions', 'empty-state', 'analysis-empty-state', 'wg-empty-message',
+    'sg-chart-empty-icon', 'rc-pending-evaluation', 'rc-pending-icon', 'rc-empty-panel-state', 'rc-chart-empty-state', 'rc-stats-empty']);
   const markup = [];
   for (const file of tsxFiles(RENDERER)) {
     if (file === COMPONENT) continue;
@@ -587,7 +592,7 @@ test('thông báo trống chỉ dựng qua EmptyState, CSS trang không đè vi�
     const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const m of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const selector = m[1].trim();
-      if (/\.(?:empty|empty-title|empty-actions|analysis-empty-state|wg-empty-message)(?![\w-])/.test(selector)) {
+      if ([...RETIRED].some((name) => new RegExp(`\\.${name}(?![\\w-])`).test(selector))) {
         styles.push(`${relative(ROOT, file)}: ${selector} (lớp đã bỏ)`);
       }
       // Chỉ app.css định nghĩa kiểu dáng; trang khác chỉ được chỉnh bố cục.
@@ -636,12 +641,7 @@ test('chiều cao control và hàng bảng nằm trên thang, không tự đặt
   // lệ chỉ dành cho thứ không phải control — icon, logo, badge/pill — và phải
   // ghi lý do tại đây.
   const EXEMPT = {
-    '.dash-test-filterbar button b': 'badge đếm số trong tab lọc',
-    '.settings-admin-icon': 'icon SVG',
-    '.rc-pending-icon svg': 'icon SVG',
-    '.sg-chart-empty-icon svg': 'icon SVG',
     '.confirm-modal-icon': 'icon cảnh báo của hộp xác nhận',
-    '.sg-chart-empty-icon': 'khung icon minh hoạ',
     '.auth-head .brand-mark': 'logo đơn vị ở màn đăng nhập',
   };
   const raw = [];

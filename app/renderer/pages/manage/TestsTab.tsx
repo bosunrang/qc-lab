@@ -366,7 +366,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                           {assigned && <span className="tag ok">Đã gán</span>}
                         </label>;
                       })}
-                      {!instruments.length && <p className="empty-state">Chưa có máy xét nghiệm. Hãy thêm máy trước khi tạo xét nghiệm.</p>}
+                      {!instruments.length && <EmptyState size="compact">Chưa có máy xét nghiệm. Hãy thêm máy trước khi tạo xét nghiệm.</EmptyState>}
                     </div>
                   </div>
                 </section>

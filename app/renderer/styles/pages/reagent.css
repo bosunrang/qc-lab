@@ -102,8 +102,6 @@
 
 .rc-stat-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap-panel);margin-bottom:var(--gap-panel);}
 .rc-stats-panel>.rc-stats-content{padding:var(--panel-content-gap);margin:0;}
-.rc-empty-panel-state{box-sizing:border-box;min-height:92px;padding:20px var(--panel-content-gap);}
-.rc-stats-empty{display:grid;place-items:center;color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);text-align:center;}
 .rc-stat-card{padding:12px 14px;min-height:98px;display:flex;flex-direction:column;justify-content:center;background:var(--panel);border:1px solid var(--surface-border);box-shadow:var(--surface-shadow);overflow:hidden;border-radius:var(--radius-md);min-width:0;}
 .rc-stat-label{font-size:var(--text-xs);font-weight:var(--weight-bold);letter-spacing:0;text-transform:none;}
 .rc-stat-value{margin-top:8px;color:var(--teal);font-family:var(--sans);font-size:var(--text-2xl);line-height:var(--leading-none);font-weight:var(--weight-bold);letter-spacing:0;font-variant-numeric:tabular-nums;}
@@ -136,9 +134,6 @@
 .rc-chart-svg{font-family:var(--sans);shape-rendering:geometricPrecision;text-rendering:geometricPrecision;}
 .rc-chart-svg .rc-chart-tick{font-size:var(--text-xs);font-weight:var(--weight-semibold);}
 .rc-chart-svg .rc-chart-axis-label{font-size:var(--text-xs);font-weight:var(--weight-semibold);}
-.rc-chart-empty-state{display:grid;place-content:center;justify-items:center;gap:4px;color:var(--muted);text-align:center;}
-.rc-chart-empty-state b{color:var(--ink);font-size:var(--text-base);font-weight:var(--weight-bold);}
-.rc-chart-empty-state span{max-width:310px;font-size:var(--text-sm);line-height:var(--leading-body);}
 .rc-chart-legend{display:flex;flex-wrap:wrap;gap:var(--space-3-5);margin:0;padding:8px var(--panel-content-gap) var(--panel-content-gap);color:var(--muted);font-size:var(--text-xs);}
 .rc-chart-legend i{display:inline-block;width:16px;height:3px;margin-right:4px;border-radius:var(--radius-pill);vertical-align:middle;}
 .rc-chart-legend .reg{background:var(--teal);}
@@ -180,27 +175,5 @@
 .rc-icon-btn:hover{border-color:var(--teal);background:var(--panel2);}
 .rc-icon-btn:disabled{opacity:.55;cursor:not-allowed;}
 .rc-icon-btn svg{width:var(--icon);height:var(--icon);stroke-width:1.9;}
-.rc-pending-evaluation{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  color:var(--muted);
-}
-.rc-pending-icon{
-  display:grid;
-  place-items:center;
-  flex:0 0 var(--control-h);
-  width:var(--control-h);
-  height:var(--control-h);
-  border:1px solid var(--accent-border-soft);
-  border-radius:50%;
-  background:var(--accent-surface);
-  color:var(--teal);
-}
-.rc-pending-icon svg{width:var(--icon-lg);height:var(--icon-lg);}
-.rc-pending-copy{display:grid;gap:2px;min-width:0;}
-.rc-pending-kicker{color:var(--muted);font-size:var(--text-xs);font-weight:var(--weight-bold);letter-spacing:.04em;text-transform:uppercase;}
-.rc-pending-copy b{color:var(--ink);font-size:var(--text-base);font-weight:var(--weight-bold);line-height:var(--leading-snug);}
-.rc-pending-copy>span:last-child{color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);}
 
 

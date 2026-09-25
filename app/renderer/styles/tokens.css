@@ -91,9 +91,8 @@
   --ink-filter-count:#4f6874;
 
   /* Màu chuyên dụng cho biểu tượng phân tích, tách khỏi màu giao diện. */
-  --indigo-300:#cad1e5;  /* viền ô biểu tượng MDC ở Sigma */
-  --indigo-600:#5c6eaa;  /* nét biểu tượng MDC ở Sigma */
-  --ink-icon:#4e7884;    /* nét biểu tượng trong ô trống biểu đồ Sigma */
+  --indigo-300:#cad1e5;  /* viền vòng icon tông info của EmptyState */
+  --indigo-600:#5c6eaa;  /* nét icon tông info của EmptyState */
 
   /* Bề mặt tối của sidebar là hệ màu độc lập với vùng nội dung. */
   --dark-text:#d3dee4;
@@ -183,7 +182,6 @@
   --shadow-menu:0 14px 32px rgba(18,32,43,.2);
   --shadow-tooltip:0 12px 28px rgba(20,33,43,.22);
   --shadow-tooltip-compact:0 8px 22px rgba(17,43,51,.22);
-  --shadow-icon-tight:0 2px 7px rgba(20,36,46,.06);
   --shadow-control-hover:0 2px 8px rgba(21,104,105,.08);
   /* Bóng của control, nút và khung chrome. Trước 2026-09-25 các giá trị này
      viết tay ngay trong app.css; ba bóng "0 1px 2px" (ô nhập .055, thẻ người
@@ -236,7 +234,6 @@
   --danger-text:var(--red-600);      --danger-surface:var(--red-100);
   --danger-border:var(--red-300);    --danger-accent:var(--red-500);
   --danger-border-soft:var(--red-200);
-  --icon-ink-muted:var(--ink-icon);
   --icon-ink-alt:var(--indigo-600);
   --icon-border-alt:var(--indigo-300);
   --neutral-text:var(--gray-600);    --neutral-surface:var(--gray-100);
@@ -291,6 +288,8 @@
   /* Bộ đếm trong tab (`.count`) và số thứ tự bước (`.step-number`). */
   --count-h:20px;
   --step-number-size:var(--control-h-sm);
+  /* Vòng tròn chứa icon của `EmptyState` có icon. */
+  --empty-icon-size:48px;
   /* Cỡ icon SVG — đặt theo khung chứa. Trước 2026-09-25 có 10/14/15/16/17/
      21/23/27px, cùng vai trò mà nơi 14 nơi 15 (nút xoá hàng 32px).
        xs 10  mũi tên mở rộng trong ô vuông 16px của cây;

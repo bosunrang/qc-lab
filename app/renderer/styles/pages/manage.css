@@ -147,7 +147,6 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-table th:nth-child(7),.assay-table td:nth-child(7){width:86px;}
 .assay-table td:last-child .manage-actions{flex-wrap:nowrap;}
 
-.config-shell-main .empty-state{text-align:center;padding:var(--space-lg);color:var(--muted);}
 
 
 /* Nhịp form chuẩn của Cấu hình chung: 12px giữa CÁC HÀNG field, 4px giữa
@@ -476,7 +475,6 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-machine-copy b,.assay-machine-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .assay-machine-copy b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .assay-machine-copy small{color:var(--muted);font-size:var(--text-xs);font-weight:400;}
-.assay-machine-picker>.empty-state{grid-column:1/-1;margin:0;padding:16px;}
 /* Ô chọn nằm TRONG ô bảng — dùng ở 2 chỗ: cột "Máy xét nghiệm" của thẻ Danh
    mục xét nghiệm (đổi máy thì cả dòng đổi theo), và cột "Xét nghiệm trong
    panel" của thẻ Panel QC (gộp danh sách dài lại thành một dòng để đọc). */
@@ -523,7 +521,8 @@ main:has(.config-shell){padding-bottom:16px;}
 .panel-test-picker span{display:grid;gap:2px;}
 .panel-test-picker b{font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--ink);}
 .panel-test-picker small{font-size:var(--text-xs);font-weight:400;color:var(--muted);}
-.panel-test-picker .empty-state{margin:0;padding:var(--space-section);}
+/* Thông báo trống trong lưới nhiều cột phải chiếm trọn hàng. */
+.lot-level-picker>.empty-notice,.panel-test-picker>.empty-notice{grid-column:1/-1;}
 .rcfg-modal .panel-test-picker+.field{margin-top:var(--space-panel);}
 .panel-active{margin:0;}
 

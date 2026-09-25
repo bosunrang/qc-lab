@@ -471,10 +471,10 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
       {record.parent_nce_id && <p className="action-detail-muted">Vòng tiếp theo của hồ sơ {record.parent_nce_id}.</p>}
 
       <SectionTitle n={2} title="Điều tra" />
-      <p>{detail.investigation || <span className="empty-state">Chưa ghi nhận.</span>}</p>
+      <p>{detail.investigation || <span className="hint-inline">Chưa ghi nhận.</span>}</p>
 
       <SectionTitle n={3} title="Nguyên nhân" />
-      <p>{detail.causeCategory ? `${detail.causeCategory} — ` : ''}{detail.causeDescription || <span className="empty-state">Chưa ghi nhận.</span>}</p>
+      <p>{detail.causeCategory ? `${detail.causeCategory} — ` : ''}{detail.causeDescription || <span className="hint-inline">Chưa ghi nhận.</span>}</p>
 
       <SectionTitle n={4} title="Khắc phục" />
       <p>{detail.correction}</p>
@@ -495,7 +495,7 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
           <div className="field"><label>Ghi chú</label><input value={rerunNote} onChange={(e) => setRerunNote(e.target.value)} /></div>
           <div className="field"><label>&nbsp;</label><button className="btn ghost sm" disabled={!rerunPointId} onClick={() => guard(() => store.setRerunEvidence(record.id, rerunPointId, rerunNote))}>Gắn bằng chứng</button></div>
         </div>
-      ) : <p className="empty-state">Chưa có.</p>}
+      ) : <p className="hint-inline">Chưa có.</p>}
 
       <SectionTitle n={6} title="Release-to-service" />
       {detail.releaseDecision ? (
@@ -508,7 +508,7 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
           <div className="field"><label>Căn cứ</label><input value={releaseNote} onChange={(e) => setReleaseNote(e.target.value)} /></div>
           <div className="field"><label>&nbsp;</label><button className="btn ghost sm" onClick={() => guard(() => store.setReleaseDecision(record.id, releaseDecision, releaseNote))}>Lưu quyết định</button></div>
         </div>
-      ) : <p className="empty-state">Chưa có.</p>}
+      ) : <p className="hint-inline">Chưa có.</p>}
 
       <SectionTitle n={7} title="Hiệu lực" />
       {!record.action_completed_date && canReview && (

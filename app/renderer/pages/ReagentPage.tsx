@@ -93,9 +93,9 @@ function StatsPanel({ result }: { result: ReagentComparisonResult | null }) {
     <div className="panel rc-stats-panel">
       <h2 className="panel-title">Kết quả thống kê</h2>
       {!result ? (
-        <div className="rc-empty-panel-state rc-stats-empty">
+        <EmptyState>
           Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để xem thống kê mô tả; khuyến nghị ≥20 cặp cho sàng lọc phần mềm.
-        </div>
+        </EmptyState>
       ) : (
         <div className="rc-stats-content">
           <div className="rc-stat-kpis">
@@ -158,20 +158,10 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
   if (!result) return (
     <div className="panel rc-crit-panel">
       <h2 className="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2>
-      <div className="rc-empty-panel-state rc-pending-evaluation">
-        <div className="rc-pending-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 10v5" />
-            <path d="M12 7h.01" />
-          </svg>
-        </div>
-        <div className="rc-pending-copy">
-          <span className="rc-pending-kicker">Đánh giá</span>
-          <b>Chưa đủ dữ liệu để kết luận</b>
-          <span>Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để xem các tiêu chí; cần ≥20 cặp, xác nhận bao phủ khoảng đo/điểm quyết định và %Bias trong giới hạn SOP để đạt sàng lọc phần mềm.</span>
-        </div>
-      </div>
+      <EmptyState kicker="Đánh giá" title="Chưa đủ dữ liệu để kết luận"
+        icon={<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 10v5" /><path d="M12 7h.01" /></svg>}>
+        Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để xem các tiêu chí; cần ≥20 cặp, xác nhận bao phủ khoảng đo/điểm quyết định và %Bias trong giới hạn SOP để đạt sàng lọc phần mềm.
+      </EmptyState>
     </div>
   );
   // 6 tiêu chí, đúng thứ tự + câu chữ hệ thống. `decision` = tiêu chí QUYẾT
@@ -349,7 +339,7 @@ export function ReagentPage() {
     return (
       <div>
         <PageHeader title="So sánh 2 lô hóa chất" subtitle="Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP" />
-        <div className="panel"><p className="empty-state">Chưa có phép so sánh nào. Tạo mới để bắt đầu.</p></div>
+        <div className="panel"><EmptyState>Chưa có phép so sánh nào. Tạo mới để bắt đầu.</EmptyState></div>
       </div>
     );
   }
@@ -532,10 +522,7 @@ export function ReagentPage() {
       <div className="panel rc-chart-panel">
         <h2 className="panel-title">Biểu đồ</h2>
         {!result ? (
-          <div className="rc-empty-panel-state rc-chart-empty-state">
-            <b>Chưa có biểu đồ</b>
-            <span>Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để vẽ biểu đồ.</span>
-          </div>
+          <EmptyState title="Chưa có biểu đồ">Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để vẽ biểu đồ.</EmptyState>
         ) : (
           <div className="rc-charts">
             <div className="rc-chart-box">

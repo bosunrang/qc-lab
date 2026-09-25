@@ -286,7 +286,9 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 .info-modal .confirm-modal-actions{padding:14px 20px 16px;}
 @keyframes dialog-enter{from{opacity:0;transform:translateY(8px) scale(.985);}to{opacity:1;transform:translateY(0) scale(1);}}
 
-.empty-state{color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);text-align:center;}
+/* Chữ "chưa có giá trị" nằm giữa nội dung (ô chi tiết hồ sơ, sau nhãn). Không phải
+   thông báo trống của cả khối — khối trống dùng `EmptyState`. */
+.hint-inline{color:var(--text-tertiary);}
 /* Thông báo trống — component `EmptyState` (components/EmptyState.tsx) là cách
    DUY NHẤT để dựng. Nằm thẳng trên bề mặt của khối chứa nên không có viền
    hay nền riêng: panel ngoài đã có viền và nền trắng, thêm một hộp xám bên
@@ -299,6 +301,14 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 .empty-notice-text{max-width:640px;}
 .empty-notice-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-2);}
 .empty-notice-actions .btn{text-decoration:none;}
+/* Biến thể có icon: ngang, chữ canh trái; vòng tròn 48px chứa icon --icon-lg. */
+.empty-notice-media{display:flex;align-items:center;justify-content:center;gap:var(--space-3-5);text-align:left;}
+.empty-notice-icon{display:grid;place-items:center;flex:0 0 var(--empty-icon-size);width:var(--empty-icon-size);height:var(--empty-icon-size);border:1px solid var(--accent-border-soft);border-radius:var(--radius-full);background:var(--accent-surface);color:var(--accent);}
+.empty-notice-icon svg{width:var(--icon-lg);height:var(--icon-lg);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.empty-notice-media.tone-info .empty-notice-icon{border-color:var(--icon-border-alt);background:var(--info-surface);color:var(--icon-ink-alt);}
+.empty-notice-body{display:grid;gap:var(--space-0-5);min-width:0;}
+.empty-notice-media .empty-notice-actions{justify-content:flex-start;}
+.empty-notice-kicker{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-bold);letter-spacing:var(--title-overline-tracking);text-transform:uppercase;}
 
 td.acts{display:flex;gap:6px;align-items:center;}
 button.x{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:var(--control-h-compact);background:transparent;border:none;color:var(--red);cursor:pointer;font-size:var(--text-sm);padding:0;}

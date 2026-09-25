@@ -292,7 +292,7 @@ export function LotsTab() {
                   })}
                 </div>;
               })}
-              {!lots.length && <div className="empty-state">Chưa có lô QC để tạo nhóm.</div>}
+              {!lots.length && <EmptyState size="compact">Chưa có lô QC để tạo nhóm.</EmptyState>}
             </div>
             <div className="field"><label>Tên nhóm lô</label><input name="name" placeholder="Tự động: 1102/1103" defaultValue={editingGroup !== 'new' ? editingGroup.name : ''} autoFocus /></div>
           </form>

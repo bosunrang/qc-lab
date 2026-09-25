@@ -5,6 +5,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { infoDialog, confirmDialog, reauthDialog } from '../state/dialog-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
 import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
 
 const LOGO_SIZE = 96;
@@ -110,7 +111,7 @@ export function SettingsPage() {
     }
   }, [profile, seeded]);
 
-  if (!profile) return <div className="panel"><p className="empty-state">Đang tải…</p></div>;
+  if (!profile) return <div className="panel"><EmptyState>Đang tải…</EmptyState></div>;
 
   const showError = (message: string) => infoDialog(message, { type: 'warn' });
 
@@ -411,7 +412,7 @@ export function SettingsPage() {
         >
           <h4>Sẵn sàng nhận ({lisQueue.pending.length})</h4>
           {lisQueue.pending.length === 0
-            ? <p className="empty-state">Không có kết quả nào chờ nhận.</p>
+            ? <EmptyState size="compact">Không có kết quả nào chờ nhận.</EmptyState>
             : (
               <table>
                 <thead><tr><th>Xét nghiệm</th><th>Mức</th><th>Lô</th><th>Giá trị</th><th></th></tr></thead>
@@ -430,7 +431,7 @@ export function SettingsPage() {
             )}
           <h4 style={{ marginTop: 'var(--space-md)' }}>Chưa khớp cấu hình ({lisQueue.unresolved.length})</h4>
           {lisQueue.unresolved.length === 0
-            ? <p className="empty-state">Không có bản ghi nào chưa khớp.</p>
+            ? <EmptyState size="compact">Không có bản ghi nào chưa khớp.</EmptyState>
             : (
               <table>
                 <thead><tr><th>Máy/Mã xét nghiệm</th><th>Lý do</th><th></th></tr></thead>

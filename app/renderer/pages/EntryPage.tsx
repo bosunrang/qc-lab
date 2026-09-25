@@ -620,7 +620,7 @@ export function EntryPage() {
         </div>
 
         <div className="entry-main" key={testId}>
-          {!testId && <div className="panel"><p className="empty-state">Chọn 1 xét nghiệm ở danh mục bên trái.</p></div>}
+          {!testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở danh mục bên trái.</EmptyState></div>}
           {testId && (
             <>
               <div className="panel qc-sheet-panel">

@@ -2,6 +2,7 @@
 // cục hoặc innerHTML; dữ liệu là SigmaPeriodView từ IPC/SQLite.
 import { useMemo, useState } from 'react';
 import { mdcRatios } from '../lib/sigma-workflow';
+import { EmptyState } from './EmptyState';
 import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 
 const LEVEL_COLORS = ['#0e4d4a', '#7a4f9a', '#c47d12'];
@@ -26,20 +27,17 @@ function periodTitle(period: string): string { return `Kỳ ${period.slice(5)}/$
 
 function EmptyChart({ kind }: { kind: 'trend' | 'mdc' }) {
   const trend = kind === 'trend';
-  return <div className="sg-chart-empty" role="status">
-    <div className={`sg-chart-empty-icon ${trend ? 'trend' : 'mdc'}`} aria-hidden="true">
+  return <div role="status">
+    <EmptyState className="sg-chart-empty" tone={trend ? 'accent' : 'info'} kicker="Chờ dữ liệu đánh giá"
+      title={trend ? 'Chưa có kỳ Sigma đủ điều kiện để vẽ xu hướng' : 'Chưa đủ dữ liệu để xác định vị trí MDC'}
+      icon={trend
+        ? <svg viewBox="0 0 28 28"><path d="M4 21.5h20M5.5 18l5-5 4 3 7-8" /><circle cx="5.5" cy="18" r="1.3" /><circle cx="10.5" cy="13" r="1.3" /><circle cx="14.5" cy="16" r="1.3" /><circle cx="21.5" cy="8" r="1.3" /></svg>
+        : <svg viewBox="0 0 28 28"><path d="M4 22V5m0 17h20M6 6l15 14M9 6l12 11M13 6l8 7" /><circle cx="14" cy="14" r="2.2" /></svg>}>
       {trend
-        ? <svg viewBox="0 0 28 28" fill="none"><path d="M4 21.5h20M5.5 18l5-5 4 3 7-8" /><circle cx="5.5" cy="18" r="1.3" /><circle cx="10.5" cy="13" r="1.3" /><circle cx="14.5" cy="16" r="1.3" /><circle cx="21.5" cy="8" r="1.3" /></svg>
-        : <svg viewBox="0 0 28 28" fill="none"><path d="M4 22V5m0 17h20M6 6l15 14M9 6l12 11M13 6l8 7" /><circle cx="14" cy="14" r="2.2" /></svg>}
-    </div>
-    <div className="sg-chart-empty-copy">
-      <span className="sg-chart-empty-kicker">Chờ dữ liệu đánh giá</span>
-      <b>{trend ? 'Chưa có kỳ Sigma đủ điều kiện để vẽ xu hướng' : 'Chưa đủ dữ liệu để xác định vị trí MDC'}</b>
-      <p>{trend
         ? 'Nhập CV IQC và Bias EQA/EQC cho cùng một mức QC trong mục “Số liệu theo kỳ”.'
-        : 'MDC cần TEa, CV IQC và Bias EQA/EQC đầy đủ trong cùng một kỳ và mức QC.'}</p>
+        : 'MDC cần TEa, CV IQC và Bias EQA/EQC đầy đủ trong cùng một kỳ và mức QC.'}
       <div className="sg-chart-empty-steps"><span className="pill">1. Nhập CV IQC</span><span className="pill">2. Nhập Bias EQA/EQC</span></div>
-    </div>
+    </EmptyState>
   </div>;
 }
 
