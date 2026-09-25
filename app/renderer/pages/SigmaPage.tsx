@@ -24,12 +24,7 @@ import { confirmDialog, infoDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaEqaRound, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 import { resolveSigmaTea, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
 import { governingSigmaLevel, sigmaDesignEligible, parseEqaDraft } from '../lib/sigma-workflow';
-import { uncertaintyBudget } from '../../main/domain/sigma-metrics';
-
-function rmsOf(values: number[]): number {
-  if (!values.length) return 0;
-  return values.length === 1 ? values[0] : Math.sqrt(values.reduce((s, v) => s + v * v, 0) / values.length);
-}
+import { eqaRoundBias, eqaRoundsStats, sigmaImprovement, uncertaintyBudget } from '../../main/domain/sigma-metrics';
 
 /** Dải năm cho bộ lọc và hộp thêm kỳ: năm nay ± 5. */
 const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
@@ -105,9 +100,9 @@ function designRunText(design: { n: number; r: number; alternatives: { n: number
   return [one(design.n, design.r), ...alts].join(' hoặc ');
 }
 
-/** Thẻ khuyến nghị cải thiện chỉ hiện khi Sigma tính được và < 4. Phân nhóm
- * nguyên nhân theo tỉ lệ `|bias| / (|bias| + 1.65·cv)`: >0,6 do Bias,
- * <0,4 do CV, còn lại do cả hai. */
+/** Thẻ khuyến nghị cải thiện chỉ hiện khi Sigma tính được và < 4. Mục tiêu CV/
+ * Bias và nhóm nguyên nhân (Quality Goal Index) do `sigmaImprovement()` của
+ * main tính; thẻ này chỉ trình bày. */
 const BIAS_ACTS = [
   'Hiệu chuẩn lại; kiểm tra lô/hạn dùng của calibrator.',
   'Kiểm tra giá trị đích EQA (nhóm peer cùng phương pháp/máy).',
@@ -127,21 +122,19 @@ function ImprovementCard({ level, result, tea }: { level: number; result: SigmaL
   const cv = Number(result.cv ?? 0);
   const bias = Math.abs(Number(result.biasEqa ?? 0));
   const fail = sigma < 3;
-  const cvNeed = (teaN - bias) / 4;
-  const biasNeed = teaN - 4 * cv;
-  const share = bias + 1.65 * cv === 0 ? 0 : bias / (bias + 1.65 * cv);
-  const driver = share > 0.6 ? 'độ chệch (bias) lớn' : share < 0.4 ? 'độ chụm (CV) lớn' : 'cả độ chệch lẫn độ chụm';
-  const acts = share > 0.6 ? BIAS_ACTS : share < 0.4 ? CV_ACTS : [BIAS_ACTS[0], CV_ACTS[0], BIAS_ACTS[1], CV_ACTS[1]];
+  const plan = sigmaImprovement(teaN, bias, cv);
+  const driver = plan.driver === 'inaccuracy' ? 'độ chệch (bias) lớn' : plan.driver === 'imprecision' ? 'độ chụm (CV) lớn' : 'cả độ chệch lẫn độ chụm';
+  const acts = plan.driver === 'inaccuracy' ? BIAS_ACTS : plan.driver === 'imprecision' ? CV_ACTS : [BIAS_ACTS[0], CV_ACTS[0], BIAS_ACTS[1], CV_ACTS[1]];
   const parts: string[] = [];
-  if (cvNeed > 0) parts.push(`giảm CV ≤ ${cvNeed.toFixed(2)}% (hiện ${cv.toFixed(2)}%)`);
-  if (biasNeed > 0) parts.push(`giảm |Bias| ≤ ${biasNeed.toFixed(2)}% (hiện ${bias.toFixed(2)}%)`);
+  if (plan.cvTarget > 0) parts.push(`giảm CV ≤ ${plan.cvTarget.toFixed(2)}% (hiện ${cv.toFixed(2)}%)`);
+  if (plan.biasTarget > 0) parts.push(`giảm |Bias| ≤ ${plan.biasTarget.toFixed(2)}% (hiện ${bias.toFixed(2)}%)`);
   const zone = sigmaZone(sigma);
   return (
     <div className="alert sg-improvement-card" style={{ ['--sg-color' as never]: zone.c }}>
       <b>Khuyến nghị cải thiện — Mức {level}</b>
       {!sigmaDesignEligible(result) && <div className="sg-improvement-target">Ước tính tham khảo — dữ liệu IQC chưa đủ điều kiện hoặc chưa được xác nhận rà soát.</div>}
       <div className="sg-improvement-lead">
-        {fail ? 'Phương pháp chưa đạt năng lực — cần khắc phục trước khi tin cậy kết quả.' : 'Hiệu năng cận biên — nên cải thiện để vượt 4σ.'} Nguyên nhân chủ yếu do {driver}.
+        {fail ? 'Phương pháp chưa đạt năng lực — cần khắc phục trước khi tin cậy kết quả.' : 'Hiệu năng cận biên — nên cải thiện để vượt 4σ.'} Nguyên nhân chủ yếu do {driver}{plan.qgi != null ? ` (QGI ${plan.qgi.toFixed(2)})` : ''}.
       </div>
       <div className="sg-improvement-target">{parts.length ? `Để đạt ≥ 4σ: ${parts.join(' hoặc ')}.` : 'Độ chệch đã vượt mức cho phép — phải giảm bias trước.'}</div>
       <ul className="sg-improvement-list">
@@ -815,10 +808,11 @@ function BiasModal({ initialRounds, onClose, onSubmit }: {
     ? initialRounds.map((round) => ({ lab: round.lab != null ? String(round.lab) : '', target: round.target != null ? String(round.target) : '' }))
     : [{ lab: '', target: '' }, { lab: '', target: '' }, { lab: '', target: '' }]);
   const { parsedRounds, hasIncompleteRound } = parseEqaDraft(rounds);
-  const biases = parsedRounds.map((round) => (round.lab - round.target) / Math.abs(round.target) * 100);
-  const rms = rmsOf(biases);
-  const mean = biases.length ? biases.reduce((s, v) => s + v, 0) / biases.length : 0;
-  const mixedSigns = biases.some((v) => v > 0) && biases.some((v) => v < 0);
+  // Xem trước dùng đúng công thức main dùng khi lưu (RMS các vòng, giữ dấu khi chỉ 1 vòng).
+  const eqa = eqaRoundsStats(parsedRounds.map((round) => eqaRoundBias(round.lab, round.target)));
+  const rms = eqa?.rms ?? 0;
+  const mean = eqa?.mean ?? 0;
+  const mixedSigns = eqa?.mixedSigns ?? false;
 
   async function submit() {
     if (hasIncompleteRound) {

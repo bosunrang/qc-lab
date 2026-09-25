@@ -4,7 +4,11 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { qcRunKey, compareQcRunKey } from '../main/domain/sort-order.ts';
-import { displayedWestgardBlocks, observedStats, statText, westgardExportRows, escapeHtml } from '../renderer/lib/westgard-view.ts';
+import { createRequire } from 'node:module';
+import { displayedWestgardBlocks, statText, westgardExportRows, escapeHtml } from '../renderer/lib/westgard-view.ts';
+// Công thức thống kê nằm ở main (observed-stats); trang Westgard lọc điểm `accepted` trước khi gọi.
+const { observedStats: statsOf } = createRequire(import.meta.url)('../../app-dist/main/domain/observed-stats.js');
+const observedStats = (points) => statsOf(points.filter((point) => point.accepted));
 
 test('WG10/14: displayed historical lot is also exported with targets, run and evidence', () => {
   const point = { id: 'old', date: '2026-09-01', runId: 'run2', val: 107, z: 3.5, targetMean: 100, targetSd: 2, verdict: 'rej', runRejected: true, accepted: false, rules: ['1-3s'], supportRules: ['2-2s'], cusumSignal: null };

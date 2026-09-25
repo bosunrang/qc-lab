@@ -8,6 +8,7 @@ import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, t
 import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
+import { observedStats } from '../domain/observed-stats';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
@@ -155,15 +156,12 @@ export function createWestgardHandlers(db: Db) {
         const last = points.at(-1);
         // CV mẫu của các run được chấp nhận; n < 2 chưa đủ tính SD mẫu.
         const accepted = acceptedIdsOf(points, byPoint);
-        const vals = points.filter(p => accepted.has(p.id)).map(p => p.val);
-        const n = vals.length;
-        const obsMean = n ? vals.reduce((a, b) => a + b, 0) / n : 0;
-        const obsSd = n > 1 ? Math.sqrt(vals.reduce((a, b) => a + (b - obsMean) ** 2, 0) / (n - 1)) : 0;
+        const observed = observedStats(points.filter(p => accepted.has(p.id)));
         return {
           level: lv.level, mean: lv.mean, sd: lv.sd, qcLotId: lv.qc_lot_id, lot: lv.lot_no, exp: lv.exp,
           worstVerdict, latestVerdict, latestRules,
           pointCount: points.length, todayPointCount: points.filter(p => p.date === today).length,
-          cv: n >= 2 && obsMean !== 0 ? obsSd / Math.abs(obsMean) * 100 : null,
+          cv: observed.cv,
           latest: last ? { id: last.id, date: last.date, runId: last.run_id, val: last.val } : null,
         };
       });

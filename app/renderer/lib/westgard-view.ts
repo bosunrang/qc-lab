@@ -12,14 +12,6 @@ export function displayedWestgardBlocks(
   });
 }
 
-export function observedStats(points: readonly { val: number; accepted: boolean; date?: string }[]) {
-  const accepted = points.filter(point => point.accepted && Number.isFinite(point.val));
-  const n = accepted.length, days = new Set(accepted.map(point => point.date).filter(Boolean)).size;
-  const mean = n ? accepted.reduce((sum, point) => sum + point.val, 0) / n : null;
-  const sd = n >= 2 && mean != null ? Math.sqrt(accepted.reduce((sum, point) => sum + (point.val - mean) ** 2, 0) / (n - 1)) : null;
-  return { n, days, mean, sd, cv: sd != null && mean ? sd / Math.abs(mean) * 100 : null, provisional: n < 20 || days < 10 };
-}
-
 export function statText(value: number | null | undefined, decimals = 2): string {
   if (value == null || !Number.isFinite(value)) return '—';
   const digits = Math.max(2, Math.min(6, decimals));

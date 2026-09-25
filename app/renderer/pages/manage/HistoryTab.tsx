@@ -4,6 +4,8 @@ import { Modal } from '../../components/Modal';
 import type { HistoryQcPointView, Test, TestLevel, QcLot } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from './shared';
+import { observedStats } from '../../../main/domain/observed-stats';
+import { pointTarget } from '../../../main/domain/westgard-engine';
 
 type HistoryEntry = {
   at?: string; mean: number | null; sd: number | null; qcLotId: string | null;
@@ -27,18 +29,12 @@ type HistoryRow = {
   key: string;
 };
 
-/** Mean/sample-SD/CV của một mảng giá trị — CÙNG công thức đã dùng ở panel
- * "Điểm trong khoảng xem" của trang Nhập QC (`EntryPage.tsx`: mean thường,
- * SD mẫu n-1, CV=SD/Mean×100%). Trả `null` khi rỗng (không có điểm nào —
- * hiện "—" thay vì 0, tránh hiểu nhầm "SD bằng 0"); `sd`/`cv` riêng trả
- * `null` khi n=1 (không tính được SD từ 1 điểm). */
+/** Mean/SD mẫu/CV của một mảng giá trị — công thức chung ở
+ * `main/domain/observed-stats.ts`. Trả `null` khi rỗng (hiện "—" thay vì 0,
+ * tránh hiểu nhầm "SD bằng 0"). */
 function statsOf(values: number[]): { mean: number; sd: number | null; cv: number | null } | null {
-  const n = values.length;
-  if (!n) return null;
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  const sd = n > 1 ? Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : null;
-  const cv = sd != null && mean ? (sd / mean) * 100 : null;
-  return { mean, sd, cv };
+  const stats = observedStats(values.map((val) => ({ val })));
+  return stats.mean == null ? null : { mean: stats.mean, sd: stats.sd, cv: stats.cv };
 }
 
 function parseHistory(json: string): HistoryEntry[] {
@@ -234,9 +230,13 @@ export function HistoryTab() {
               <table className="history-detail-table hist-points-table">
                 <thead><tr><th>Ngày</th><th>Lần chạy</th><th className="num">Giá trị</th><th className="num">Z</th><th className="num">Mean lúc nhập</th><th className="num">SD lúc nhập</th><th>Phân loại Z-score</th><th>Người thực hiện</th></tr></thead>
                 <tbody>{detailPoints.slice().sort((a, b) => a.date.localeCompare(b.date) || String(a.run_id).localeCompare(String(b.run_id), 'vi', { numeric: true })).map((point) => {
-                  const mean = point.qc_mean ?? detail.mean;
-                  const sd = point.qc_sd && point.qc_sd > 0 ? point.qc_sd : detail.sd;
-                  const z = mean != null && sd ? (point.val - mean) / sd : NaN;
+                  // Cùng quy tắc với kết luận Westgard: Mean/SD chốt lúc nhập chỉ
+                  // dùng khi có đủ cả cặp. Trước đây lấy `qc_mean` và `qc_sd`
+                  // độc lập, nên cùng một điểm có thể ra Z khác trang Nhập QC.
+                  const target = pointTarget({ val: point.val, qcMean: point.qc_mean, qcSd: point.qc_sd }, detail.mean, detail.sd);
+                  const z = target.z;
+                  const mean = target.key ? target.mean : null;
+                  const sd = target.key ? target.sd : null;
                   const abs = Math.abs(z);
                   // Nhãn đọc nhanh theo dải Z, không phải verdict Westgard
                   // (chuỗi/luật liên mức chỉ có ở trang Phân tích Westgard).

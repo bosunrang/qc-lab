@@ -1,6 +1,6 @@
 import type { Db } from '../db/sqlite-like';
 import type { Test } from '../../shared/qc-api';
-import { sigmaMetric, uncertaintyBudget, eqaRoundsStats, sigmaQualityDesign, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
+import { sigmaMetric, uncertaintyBudget, eqaRoundBias, eqaRoundsStats, sigmaQualityDesign, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
 import { buildSigmaCohorts, type SigmaCohort, type SigmaCohortPoint } from '../domain/sigma-cohort';
 import { countOperationalLevels } from '../db/operational-levels';
 import { resolveTea, type SigmaTeaSourceCore, type TeaRefCore } from '../domain/sigma-tea-core';
@@ -58,7 +58,7 @@ function normalizeEqaRounds(raw: unknown): { ok: true; rounds: SigmaEqaRound[] }
       const lab = row.lab == null || String(row.lab).trim() === '' ? NaN : finiteNumber(row.lab, NaN);
       const target = row.target == null || String(row.target).trim() === '' ? NaN : finiteNumber(row.target, NaN);
       if (Number.isFinite(lab) && Number.isFinite(target) && target !== 0) {
-        rounds.push({ lab, target, bias: (lab - target) / Math.abs(target) * 100 });
+        rounds.push({ lab, target, bias: eqaRoundBias(lab, target) });
         continue;
       }
       return { ok: false };

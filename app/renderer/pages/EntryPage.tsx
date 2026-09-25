@@ -5,6 +5,8 @@ import { useWestgardStore } from '../store/westgard-store';
 import { useEntryStore } from '../store/entry-store';
 import { useAuthStore } from '../store/auth-store';
 import { initialsFromName } from '../../main/domain/name-initials';
+import { observedStats } from '../../main/domain/observed-stats';
+import { pointZ } from '../../main/domain/westgard-engine';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { QcChart, type QcChartPoint } from '../components/QcChart';
@@ -296,17 +298,14 @@ export function EntryPage() {
 
   /** z-score của một điểm: `+0.40s` / `-1.20s` (có dấu, hậu tố 's').
    *
-   * Ưu tiên Mean/SD đã CHỐT lúc nhập (`qc_mean`/`qc_sd`) đúng thứ tự mà
-   * `pointTarget()` ở domain dùng, rồi mới tới Mean/SD đang gán của mức. Lấy
-   * thẳng Mean/SD hiện hành thì sau một lần đổi dải, cùng một điểm hiện
-   * "Z = +3,80s · Đạt" — Z nói theo dải mới còn kết luận vẫn theo dải cũ.
-   * `HistoryTab` đã đọc đúng cặp cột này từ đầu. */
+   * Dùng `pointZ()` của main — ĐÚNG quy tắc Westgard dùng khi kết luận: Mean/SD
+   * đã CHỐT lúc nhập (`qc_mean`/`qc_sd`, phải đủ cả cặp) rồi mới tới Mean/SD
+   * đang gán của mức. Lấy thẳng Mean/SD hiện hành thì sau một lần đổi dải,
+   * cùng một điểm hiện "Z = +3,80s · Đạt" — Z nói theo dải mới còn kết luận
+   * vẫn theo dải cũ. */
   function zText(point: QcPointView, level: { mean: number | null; sd: number | null }): string {
-    const hasSnapshot = point.qc_mean != null && point.qc_sd != null && point.qc_sd > 0;
-    const mean = hasSnapshot ? (point.qc_mean as number) : Number(level.mean);
-    const sd = hasSnapshot ? (point.qc_sd as number) : Number(level.sd);
-    if (!Number.isFinite(mean) || !Number.isFinite(sd) || sd <= 0) return '—';
-    const z = (point.val - mean) / sd;
+    const z = pointZ({ val: point.val, qcMean: point.qc_mean, qcSd: point.qc_sd }, level.mean, level.sd);
+    if (!Number.isFinite(z)) return '—';
     return `${z >= 0 ? '+' : ''}${z.toFixed(2)}s`;
   }
 
@@ -333,16 +332,6 @@ export function EntryPage() {
     return inLjWindow((pointsByLevel[level] || []).filter((p) => !p.voided && ids.has(p.id)));
   }
 
-  /** Thống kê QUAN SÁT ĐƯỢC của các điểm còn hiệu lực (SD mẫu, n-1) — dùng
-   * cho panel "Thống kê toàn bộ", khác Mean/SD ĐÍCH đang gán cho mức. */
-  function observedStats(points: QcPointView[]): { n: number; mean: number; sd: number; cv: number } {
-    const vals = points.filter((p) => !p.voided).map((p) => p.val);
-    const n = vals.length;
-    if (!n) return { n: 0, mean: 0, sd: 0, cv: 0 };
-    const mean = vals.reduce((a, b) => a + b, 0) / n;
-    const sd = n > 1 ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
-    return { n, mean, sd, cv: mean ? (sd / Math.abs(mean)) * 100 : 0 };
-  }
 
   async function saveDayNote(date: string, note: string) {
     const result = await setDayNote(testId, date, note);
@@ -829,12 +818,12 @@ export function EntryPage() {
                         </div>
                         <div className="lj-qc-strip">
                           {(() => {
-                            const st = observedStats(acceptedPoints);
+                            const st = observedStats(acceptedPoints.filter((p) => !p.voided));
                             return (
                               <>
-                                <div className="lj-qc-stat"><span className="k">Mean thực</span><span className="v">{st.n ? st.mean.toFixed(decimals) : '—'}</span></div>
-                                <div className="lj-qc-stat"><span className="k">SD thực</span><span className="v">{st.n > 1 ? st.sd.toFixed(4) : '—'}</span></div>
-                                <div className="lj-qc-stat"><span className="k">CV thực</span><span className="v">{st.n > 1 && st.mean ? st.cv.toFixed(2) + '%' : '—'}</span></div>
+                                <div className="lj-qc-stat"><span className="k">Mean thực</span><span className="v">{st.mean != null ? st.mean.toFixed(decimals) : '—'}</span></div>
+                                <div className="lj-qc-stat"><span className="k">SD thực</span><span className="v">{st.sd != null ? st.sd.toFixed(4) : '—'}</span></div>
+                                <div className="lj-qc-stat"><span className="k">CV thực</span><span className="v">{st.cv != null ? st.cv.toFixed(2) + '%' : '—'}</span></div>
                                 <div className="lj-qc-stat control"><span className="k">Mean mục tiêu</span><span className="v">{column.mean != null ? valText(column.mean) : '—'}</span></div>
                                 <div className="lj-qc-stat control"><span className="k">SD mục tiêu</span><span className="v">{column.sd != null ? column.sd.toFixed(4) : '—'}</span></div>
                               </>
@@ -875,19 +864,15 @@ export function EntryPage() {
                       const recorded = all.filter((p) => !p.voided && (!ljTo || p.date <= ljTo));
                       const cumulative = recorded.filter((p) => p.accepted !== false);
                       const excluded = recorded.length - cumulative.length;
-                      const vals = cumulative.map((p) => p.val);
-                      const n = vals.length;
-                      const mean = n ? vals.reduce((a, b) => a + b, 0) / n : 0;
-                      const sd = n > 1 ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
-                      const cv = mean ? (sd / Math.abs(mean)) * 100 : 0;
+                      const { n, mean, sd, cv } = observedStats(cumulative);
                       return (
                         <div className={`qc-table-card${column.parallel ? ' qc-parallel-card' : ''}${column.previous ? ' qc-previous-card' : ''}`} key={column.key}>
                           <h4><span>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="hint qc-table-count">{active.length} điểm trong khoảng</span></span></h4>
                           <div className="qc-cumulative">
                             <div><span>N dùng thống kê</span><b>{n}</b></div>
-                            <div><span>Mean tích lũy</span><b>{n ? mean.toFixed(decimals) : '—'}</b></div>
-                            <div><span>SD tích lũy</span><b>{n > 1 ? sd.toFixed(4) : '—'}</b></div>
-                            <div><span>CV tích lũy</span><b>{n && mean ? cv.toFixed(2) + '%' : '—'}</b></div>
+                            <div><span>Mean tích lũy</span><b>{mean != null ? mean.toFixed(decimals) : '—'}</b></div>
+                            <div><span>SD tích lũy</span><b>{sd != null ? sd.toFixed(4) : '—'}</b></div>
+                            <div><span>CV tích lũy</span><b>{cv != null ? cv.toFixed(2) + '%' : '—'}</b></div>
                           </div>
                           <div className="hint qc-cumulative-source">Tổng ghi nhận {recorded.length}{excluded ? ` · ${excluded} điểm thuộc lần chạy bị loại, không vào thống kê` : ''}</div>
                           {active.length ? (

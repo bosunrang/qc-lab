@@ -90,6 +90,41 @@ export function sigmaMetric(tea: unknown, bias: unknown, cv: unknown): SigmaMetr
   return { tea: teaN, bias: biasN, cv: cvN, sigma, dpmo, yieldPercent: 100 - dpmo / 1e4 };
 }
 
+export type SigmaErrorDriver = 'imprecision' | 'inaccuracy' | 'both';
+export interface SigmaImprovement {
+  /** CV cần đạt để Sigma chạm `targetSigma` khi giữ nguyên Bias: (TEa − |Bias|) / σ. */
+  cvTarget: number;
+  /** |Bias| cần đạt khi giữ nguyên CV: TEa − σ · CV. Âm nghĩa là chỉ giảm Bias là không đủ. */
+  biasTarget: number;
+  /** Quality Goal Index = |Bias| / (1,5 · CV); null khi CV không dương. */
+  qgi: number | null;
+  driver: SigmaErrorDriver;
+}
+
+/** Gợi ý cải thiện cho mức có Sigma thấp. Phân nhóm nguyên nhân theo Quality
+ * Goal Index của Parry (bài trên Westgard QC, "Quality Goal Index: Its Use in
+ * Benchmarking and Improving Sigma Quality Performance"): QGI < 0,8 do độ chụm
+ * (CV), 0,8–1,2 do cả hai, > 1,2 do độ chệch (Bias).
+ *
+ * Trước 2026-09-25 phép tính này chỉ nằm ở renderer (SigmaPage), không có
+ * test, và dùng tỉ lệ |Bias| / (|Bias| + 1,65 · CV) với ngưỡng 0,6/0,4 — tương
+ * đương QGI khoảng 0,73 và 1,65, lệch ngưỡng đã công bố. */
+export function sigmaImprovement(tea: number, bias: number, cv: number, targetSigma = 4): SigmaImprovement {
+  const absBias = Math.abs(bias);
+  const qgi = cv > 0 ? absBias / (1.5 * cv) : null;
+  // Dung sai nhỏ cho sai số dấu phẩy động: 1,2 / 1,5 tính ra 0,7999… nhưng
+  // theo bảng công bố, QGI bằng đúng 0,8 hoặc 1,2 thuộc nhóm "cả hai".
+  const EPS = 1e-9;
+  const driver: SigmaErrorDriver = qgi == null ? 'both' : qgi < 0.8 - EPS ? 'imprecision' : qgi > 1.2 + EPS ? 'inaccuracy' : 'both';
+  return { cvTarget: (tea - absBias) / targetSigma, biasTarget: tea - targetSigma * cv, qgi, driver };
+}
+
+/** Bias% của một vòng EQA/EQC: (KQ PXN − giá trị đích) / |giá trị đích| × 100.
+ * Dùng chung cho lúc lưu (main) và phần xem trước trong hộp nhập (renderer). */
+export function eqaRoundBias(lab: number, target: number): number {
+  return (lab - target) / Math.abs(target) * 100;
+}
+
 export interface EqaRoundsStats { rms: number; mean: number; n: number; biasSem: number | null; mixedSigns: boolean }
 
 /** Bias% từ nhiều vòng EQA/EQC — Sigma dùng RMS (root-mean-square) của các

@@ -14,7 +14,8 @@ import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { infoDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
 import { vnDate as formatVnDate } from '../lib/format';
-import { displayedWestgardBlocks, observedStats, statText, westgardExportRows, WESTGARD_EXPORT_HEADERS, escapeHtml } from '../lib/westgard-view';
+import { observedStats } from '../../main/domain/observed-stats';
+import { displayedWestgardBlocks, statText, westgardExportRows, WESTGARD_EXPORT_HEADERS, escapeHtml } from '../lib/westgard-view';
 import type { ArchivedBlock } from '../../shared/qc-api';
 
 const VERDICT_LABEL: Record<string, string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
@@ -523,7 +524,8 @@ export function WestgardPage() {
         const pointCount = analysis?.points.length || 0;
         const meanText = statText(block.mean, currentSummary?.decimalPlaces);
         const sdText = statText(block.sd, currentSummary?.decimalPlaces);
-        const observed = observedStats(analysis?.points || []);
+        // Chỉ điểm main đã chấp nhận mới vào thống kê quan sát.
+        const observed = observedStats((analysis?.points || []).filter((point) => point.accepted));
         return (
           <div className={`panel${prevBlock ? ' wg-level-panel wg-prev-lot' : ''}`} key={l.level}>
             <h3>
