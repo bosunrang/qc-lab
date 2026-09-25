@@ -54,6 +54,15 @@ A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một ngu�
     ngắn vẫn lọt (hiện vô hại vì hàm tự từ chối khi đã có người dùng).
 - Hàng đợi LAN (`lanCalls`) chờ cả phần `await` của handler: một lệnh LIS hay
   Firebase chậm làm mọi máy trạm đứng theo.
+- Gốc của hàng đợi này: danh tính nằm trong biến toàn cục `sessionActor`
+  (`main/index.ts`), mỗi lời gọi LAN tráo tạm biến này sang actor của máy trạm
+  rồi trả lại. Trong khi đó các hàm handler đã nhận `actor` làm tham số
+  (`auth.createUser(input, requireActor())`); chỉ lớp đăng ký trong
+  `index.ts` là đọc biến toàn cục.
+- Cửa sổ chính không có `will-navigate` hay `setWindowOpenHandler`: một liên
+  kết trong dữ liệu có thể điều hướng cửa sổ app sang trang ngoài.
+  `sandbox` chỉ dựa vào mặc định của Electron, không khai tường minh (cửa sổ
+  in PDF ở `export-handlers.ts` thì có khai).
 
 **Việc cần làm:**
 
@@ -64,14 +73,23 @@ A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một ngu�
    theo đuôi tên. Mặc định `lan: false` cho kênh mới.
 3. Kênh đăng nhập/đăng xuất, backup, in PDF, xuất Excel qua hộp thoại, khởi tạo
    quản trị: `lan: false`.
-4. Hàng đợi LAN chỉ tuần tự hoá phần đồng bộ (đổi actor); phần `await` chạy
-   ngoài hàng đợi.
+4. Truyền actor theo từng lời gọi thay cho biến toàn cục: bảng kênh đăng ký
+   handler dạng `(actor, ...args) => …`; nhánh desktop truyền actor của phiên
+   đăng nhập, nhánh LAN truyền actor của request. Bỏ việc tráo `sessionActor`
+   và bỏ hàng đợi `lanCalls`: không còn khoảng hở danh tính qua `await`, lệnh
+   chậm của một máy trạm không chặn máy khác. `sessionActor` chỉ còn là phiên
+   của máy chính, do `login`/`logout` desktop đặt.
 5. Bọc lỗi một chỗ khi đăng ký handler: exception (kể cả `requireActor()`)
    thành `{ ok: false, error }` thay vì ném qua IPC.
+6. Chặn điều hướng ở cửa sổ chính: `will-navigate` chỉ cho phép URL của app;
+   `setWindowOpenHandler` từ chối mọi cửa sổ mới (liên kết ngoài, nếu cần,
+   mở bằng `shell.openExternal` sau khi kiểm `https:`). Khai `sandbox: true`
+   tường minh trong `webPreferences`.
 
 **Test:** mỗi kênh trong preload có trong bảng; LAN gọi `login`, `htmlToPdf`,
 `bootstrapAdmin` bị từ chối; một handler bất đồng bộ chậm không chặn handler
-khác của LAN.
+khác của LAN; hai lời gọi LAN của hai actor chạy xen nhau, mỗi lời gọi ghi
+nhật ký đúng actor của mình và phiên desktop không đổi.
 
 **Quyết định còn chờ:** có chuyển LAN sang HTTPS không. Mạng bệnh viện dùng
 chung nên nên làm; cách đề xuất là chứng chỉ tự ký do app tạo, cho phép nạp
