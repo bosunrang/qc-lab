@@ -176,11 +176,12 @@ function LoadingView({ subtitle }: { subtitle: string }) {
 }
 
 export function DashboardPage() {
-  const { testSummaries, overdueActions, lots, loading, load } = useDashboardStore();
+  const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore();
   const { profile, load: loadProfile } = useSettingsStore();
   useEffect(() => { load(); loadProfile(); }, [load, loadProfile]);
   useStoreInvalidation(['qc_points', 'tests', 'actions', 'activity', 'qc_lots'], undefined, load);
   const subtitle = (profile?.name || 'Khoa Xét nghiệm') + (profile?.dept ? ` · ${profile.dept}` : '');
+  if (error) return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="panel"><EmptyState title="Không tải được Tổng quan" action={<button type="button" className="btn teal" onClick={() => { void load(); }}>Thử lại</button>}>Dữ liệu đã lưu không bị ảnh hưởng. Nội dung lỗi: {error}</EmptyState></div></>;
   if (loading) return <LoadingView subtitle={subtitle} />;
   const today = todayIso(), model = buildDashboardViewModel(testSummaries, lots, overdueActions, today);
   // `safePercent` của hệ thống — kẹp 0..100 trước khi vẽ thanh tiến độ.

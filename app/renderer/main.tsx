@@ -2,6 +2,8 @@ import { createRoot } from 'react-dom/client';
 import { AppRouter } from './router';
 import { installBrowserMockIfNeeded } from './browser-mock/install';
 import { createLanHttpApi } from './lan/http-api';
+import { PageErrorBoundary } from './components/ErrorBoundary';
+import { installUnhandledErrorReporting } from './lib/unhandled-errors';
 
 // Chỉ cài khi không chạy trong Electron thật, ví dụ `vite dev` mở qua
 // localhost. Ở Electron, hàm này trả `false` ngay lập tức (không nạp WASM,
@@ -17,7 +19,10 @@ async function start(): Promise<void> {
   const installed = lan ? false : await installBrowserMockIfNeeded();
   if (!rootEl) return;
   if (installed) rootEl.textContent = '';
-  createRoot(rootEl).render(<AppRouter />);
+  installUnhandledErrorReporting();
+  // Lớp chặn ngoài cùng cho lỗi ở màn hình đăng nhập hoặc khung app; lỗi của
+  // từng trang đã có lớp riêng trong `AppShell`.
+  createRoot(rootEl).render(<PageErrorBoundary><AppRouter /></PageErrorBoundary>);
 }
 
 // Chỉ hiện khi thật sự phải chờ nạp WASM (chế độ xem trước); trong Electron
