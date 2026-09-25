@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type WebContents } from 'electron';
 import { networkInterfaces } from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { openDatabase } from './db/open-database';
 import { type Actor, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier } from './ipc/shared';
 import { createBusinessOperations, createLanInvoker, registerIpcOperations, sessionContext } from './ipc/operations';
@@ -21,11 +22,36 @@ import { createLisHandlers } from './ipc/lis-handlers';
 import { createFirebaseHandlers } from './ipc/firebase-handlers';
 import { lanAddresses } from './lan/addresses';
 import { LanHttpServer } from './lan/http-server';
+import { classifyNavigation } from './window-guard';
 
 const LAN_PORT = 3200;
 let tray: Tray | null = null;
 let quitting = false;
 let mainWindow: BrowserWindow | null = null;
+const DEV_SERVER_URL = process.env.APP_V2_DEV_SERVER_URL;
+const INDEX_HTML = path.join(__dirname, '..', 'renderer', 'index.html');
+/** URL trang chính — mốc để quyết định điều hướng, xem `window-guard.ts`. */
+const APP_ENTRY_URL = DEV_SERVER_URL || pathToFileURL(INDEX_HTML).href;
+const CHILD_WINDOW_PREFERENCES = { sandbox: true, contextIsolation: true, nodeIntegration: false };
+
+/** Áp cho MỌI webContents (cửa sổ chính, cửa sổ hướng dẫn, cửa sổ in PDF):
+ * chỉ hiển thị trang của app; liên kết `https:` ra ngoài mở bằng trình duyệt
+ * hệ thống. */
+function guardNavigation(contents: WebContents): void {
+  contents.on('will-navigate', (event, url) => {
+    const decision = classifyNavigation(url, APP_ENTRY_URL);
+    if (decision === 'app') return;
+    event.preventDefault();
+    if (decision === 'external') void shell.openExternal(url);
+  });
+  contents.setWindowOpenHandler(({ url }) => {
+    const decision = classifyNavigation(url, APP_ENTRY_URL);
+    // Trang của app mở ở cửa sổ con (vd hướng dẫn Firebase ở trang Cài đặt).
+    if (decision === 'app') return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: CHILD_WINDOW_PREFERENCES } };
+    if (decision === 'external') void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+}
 
 function showMainWindow(): void {
   const win = mainWindow;
@@ -104,6 +130,7 @@ async function createWindow(): Promise<void> {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -165,9 +192,8 @@ async function createWindow(): Promise<void> {
   });
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
 
-  const devServerUrl = process.env.APP_V2_DEV_SERVER_URL;
-  if (devServerUrl) win.loadURL(devServerUrl);
-  else win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  if (DEV_SERVER_URL) win.loadURL(DEV_SERVER_URL);
+  else win.loadFile(INDEX_HTML);
 }
 
 // Một lần bấm icon thứ hai không được tạo thêm server LAN. Cổng 3200 là cố
@@ -176,6 +202,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', showMainWindow);
+  app.on('web-contents-created', (_event, contents) => guardNavigation(contents));
   app.whenReady().then(createWindow).catch((error) => {
     dialog.showErrorBox('Không khởi động được QC Lab', error instanceof Error ? error.message : 'Không thể khởi động máy chủ LAN.');
     app.quit();
