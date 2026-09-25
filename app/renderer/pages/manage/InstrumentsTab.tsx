@@ -17,8 +17,9 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
   function openNew() { setErr(null); setEditing('new'); }
   useEffect(() => {
     if (createRequest <= 0) return;
-    openNew(); onCreateRequestHandled?.();
-  }, [createRequest]);
+    // Viết thẳng thay vì gọi openNew() để effect chỉ phụ thuộc state setter ổn định.
+    setErr(null); setEditing('new'); onCreateRequestHandled?.();
+  }, [createRequest, onCreateRequestHandled]);
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
     const data = {

@@ -99,7 +99,7 @@ export function SettingsPage() {
     tick();
     const timer = setInterval(tick, LIS_POLL_MS);
     return () => { alive = false; clearInterval(timer); };
-  }, [lisEnabled]);
+  }, [lisEnabled, pullLisQueue]);
 
   // Nạp giá trị đã lưu vào form đúng 1 lần khi profile về — sau đó form là
   // của người dùng gõ, không bị ghi đè lại mỗi khi store re-render.

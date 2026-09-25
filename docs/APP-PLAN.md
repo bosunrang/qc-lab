@@ -61,6 +61,7 @@ Với thay đổi mã nguồn, chạy đầy đủ:
 ```powershell
 npm test
 npm run typecheck
+npm run lint
 npm run build
 ```
 

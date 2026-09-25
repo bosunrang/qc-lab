@@ -15,6 +15,7 @@ npm run dev
 npm start
 npm test
 npm run typecheck
+npm run lint
 npm run build
 npm run dist
 ```
@@ -33,7 +34,10 @@ dùng `node:sqlite` và không kèm tài nguyên WASM.
 - Mỗi handler ghi dữ liệu phải lần lượt kiểm tra quyền, kiểm tra dữ liệu thuần,
   transaction, `writeAudit()` và `notifyChanged()`.
 - Không xoá cứng điểm QC; dùng quy trình huỷ điểm hiện có.
-- Chạy `npm test`, `npm run typecheck` và `npm run build` khi sửa mã nguồn.
+- Chạy `npm test`, `npm run typecheck`, `npm run lint` và `npm run build` khi
+  sửa mã nguồn. Gói `typescript` là bí danh của `@typescript/typescript6` chỉ
+  để typescript-eslint dùng; trình biên dịch `tsc` là TypeScript 7 từ
+  `@typescript/native` (xem `eslint.config.mjs`).
 - `docs/WESTGARD-REVIEW-*.md` và `docs/SIGMA-REVIEW-*.md` lưu các đợt rà soát
   nghiệp vụ cùng quyết định đã chốt. Đọc tài liệu phù hợp trước khi sửa logic
   Westgard hoặc Six Sigma. Các tệp `*-probes-*.cjs` ghi lại trạng thái trước khi

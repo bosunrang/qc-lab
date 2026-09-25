@@ -9,6 +9,10 @@ const path = require('node:path');
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const ROOT = path.join(__dirname, '..');
 const TESTS = path.join(ROOT, 'tests');
+// Trình biên dịch là TypeScript 7 (gói `@typescript/native`). Gói `typescript`
+// được trỏ sang `@typescript/typescript6` chỉ để typescript-eslint có API
+// TypeScript 6 — xem package.json và eslint.config.mjs.
+const TSC = path.join(REPO_ROOT, 'node_modules', '@typescript', 'native', 'bin', 'tsc');
 const files = fs.readdirSync(TESTS).filter(name => name.endsWith('.test.mjs')).sort();
 
 if (!files.length) {
@@ -21,13 +25,13 @@ if (!files.length) {
 // import thẳng .ts qua ESM. Build trước khi chạy test, giống quy ước
 // tsconfig.worker.json của repo gốc.
 const build = spawnSync(process.execPath, [
-  path.join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
+  TSC,
   '-p', path.join(REPO_ROOT, 'tsconfig.app-main.json'),
 ], { cwd: REPO_ROOT, stdio: 'inherit' });
 if (build.status !== 0) { console.error('Build app main process thất bại — dừng, không chạy test.'); process.exit(1); }
 
 const buildMock = spawnSync(process.execPath, [
-  path.join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
+  TSC,
   '-p', path.join(REPO_ROOT, 'tsconfig.app-mock.json'),
 ], { cwd: REPO_ROOT, stdio: 'inherit' });
 if (buildMock.status !== 0) { console.error('Build bản giả lập trình duyệt thất bại — dừng, không chạy test.'); process.exit(1); }

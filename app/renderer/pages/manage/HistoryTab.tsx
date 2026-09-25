@@ -102,7 +102,7 @@ export function HistoryTab() {
       if (alive) setPoints(useManageStore.getState().historyPointsByTestId[testId] || []);
     })();
     return () => { alive = false; };
-  }, [testId]);
+  }, [testId, loadHistoryPoints]);
 
   const groupLabel = (lotId: string | null | undefined) => {
     if (!lotId) return 'Chưa thuộc nhóm';

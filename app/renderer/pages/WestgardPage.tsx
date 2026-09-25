@@ -1,6 +1,6 @@
 // Phân tích Westgard theo xét nghiệm và từng mức QC, gồm cấu hình luật,
 // hướng dẫn, biểu đồ Levey-Jennings/CUSUM và lịch sử nhóm lô.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
@@ -68,9 +68,12 @@ export function WestgardPage() {
     setTestId(summaries[0].testId);
   }, [summaries, testId]);
   const currentSummary = summaries.find((s) => s.testId === testId);
-  const levels = (levelsByTestId[testId] || []).filter(level => currentSummary?.levels.some(active => active.level === level.level));
-  const analysisByLevel = analysisTestId === testId ? loadedAnalysis : {};
-  const previousLotBlocks = analysisTestId === testId ? loadedPrevious : [];
+  // Ghi nhớ các mảng/đối tượng dẫn xuất: chúng là phụ thuộc của useMemo dựng
+  // dữ liệu biểu đồ bên dưới. Tạo mới mỗi lần render thì biểu đồ bị dựng lại
+  // ở mọi lần render (ESLint exhaustive-deps phát hiện).
+  const levels = useMemo(() => (levelsByTestId[testId] || []).filter(level => currentSummary?.levels.some(active => active.level === level.level)), [levelsByTestId, testId, currentSummary]);
+  const analysisByLevel = useMemo(() => (analysisTestId === testId ? loadedAnalysis : {}), [analysisTestId, testId, loadedAnalysis]);
+  const previousLotBlocks = useMemo(() => (analysisTestId === testId ? loadedPrevious : []), [analysisTestId, testId, loadedPrevious]);
   const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError;
   /** Nhãn cho điểm tự nó đạt nhưng cả lần chạy bị loại. Nêu rõ MỨC nguồn để
    * không bị hiểu nhầm là chính điểm đang xem sai.
@@ -240,11 +243,11 @@ export function WestgardPage() {
     if (view === 'archived' && archivedGroupId) setArchivedRefresh((revision) => revision + 1);
   });
 
-  const lotLabelFor = (level: number) => {
+  const lotLabelFor = useCallback((level: number) => {
     const lv = levels.find((l) => l.level === level);
     const lot = lv?.qc_lot_id ? lots.find((l) => l.id === lv.qc_lot_id) : null;
     return lot?.lot_no || '—';
-  };
+  }, [levels, lots]);
   const navigate = useNavigate();
   // Vẫn là MỘT biểu đồ tổng hợp hai mức: dữ liệu quy đổi về Z-score chung,
   // chỉ đồng bộ kích thước/co giãn với biểu đồ ở trang Nhập QC.
@@ -266,7 +269,7 @@ export function WestgardPage() {
         level: l.level, lot: b.lotNo, label: `M${l.level}·cũ ${b.lotNo}`, points: b.analysis.points,
       }))];
     }),
-    [levels, lots, analysisByLevel, prevOpen, previousLotBlocks, testId],
+    [levels, lotLabelFor, analysisByLevel, prevOpen, previousLotBlocks, testId],
   );
   // Đếm số đường chứ không đếm số mức — một xét nghiệm một mức đang
   // mở lô cũ cũng có 2 đường để so sánh.

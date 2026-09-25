@@ -19,7 +19,6 @@ export function useStoreInvalidation(tables: string[], testId: string | undefine
       if (testId && payload.testIds.length && !payload.testIds.includes(testId)) return;
       onChangeRef.current();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tablesKey, testId]);
 }
 

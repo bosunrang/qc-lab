@@ -291,9 +291,10 @@ export function SigmaPage() {
   const selectedPeriod = periods.find((period) => period.id === selectedPeriodId);
   const displayPeriod = selectedPeriod && filteredPeriods.some((period) => period.id === selectedPeriod.id)
     ? selectedPeriod : filteredPeriods[filteredPeriods.length - 1] || selectedPeriod || latestPeriod;
+  const displayPeriodId = displayPeriod?.id;
   useEffect(() => {
-    if (displayPeriod && selectedPeriodId !== displayPeriod.id) setSelectedPeriodId(displayPeriod.id);
-  }, [displayPeriod?.id, selectedPeriodId]);
+    if (displayPeriodId && selectedPeriodId !== displayPeriodId) setSelectedPeriodId(displayPeriodId);
+  }, [displayPeriodId, selectedPeriodId]);
   const hasChartData = periods.some((period) => period.levels.some((level) => Number.isFinite(level.sigma?.sigma)));
   // Thiết kế QC chung phải lấy mức IQC hợp lệ có Sigma thấp nhất: đó là mức
   // chi phối nguy cơ. Không lấy CV nhập tay hay cohort chưa đủ 30 điểm.
