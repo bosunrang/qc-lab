@@ -158,8 +158,7 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
   if (!result) return (
     <div className="panel rc-crit-panel">
       <h2 className="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2>
-      <EmptyState kicker="Đánh giá" title="Chưa đủ dữ liệu để kết luận"
-        icon={<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 10v5" /><path d="M12 7h.01" /></svg>}>
+      <EmptyState title="Chưa đủ dữ liệu để kết luận">
         Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để xem các tiêu chí; cần ≥20 cặp, xác nhận bao phủ khoảng đo/điểm quyết định và %Bias trong giới hạn SOP để đạt sàng lọc phần mềm.
       </EmptyState>
     </div>

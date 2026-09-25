@@ -99,8 +99,6 @@
 .sg-svg-chart{position:relative;width:100%;margin:4px auto 0;}
 .sg-svg-chart svg{display:block;width:100%;height:auto;max-height:285px;font-family:var(--sans);}
 .sg-mdc-point{cursor:pointer;}
-.sg-chart-empty{min-height:164px;}
-.sg-chart-empty-steps{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .sg-chart-tooltip{position:absolute;z-index:var(--z-float);min-width:190px;max-width:244px;padding:8px 10px;border-radius:var(--radius-md);background:var(--surface-inverse);color:var(--on-accent);box-shadow:var(--shadow-tooltip);font-size:var(--text-sm);line-height:var(--leading-snug);pointer-events:none;transform:translate(10px,-100%);}
 .sg-chart-tooltip b{display:block;margin-bottom:2px;font-weight:var(--weight-bold);}.sg-chart-tooltip .muted{color:var(--text-on-dark-muted);}
 

@@ -28,15 +28,10 @@ function periodTitle(period: string): string { return `Kỳ ${period.slice(5)}/$
 function EmptyChart({ kind }: { kind: 'trend' | 'mdc' }) {
   const trend = kind === 'trend';
   return <div role="status">
-    <EmptyState className="sg-chart-empty" tone={trend ? 'accent' : 'info'} kicker="Chờ dữ liệu đánh giá"
-      title={trend ? 'Chưa có kỳ Sigma đủ điều kiện để vẽ xu hướng' : 'Chưa đủ dữ liệu để xác định vị trí MDC'}
-      icon={trend
-        ? <svg viewBox="0 0 28 28"><path d="M4 21.5h20M5.5 18l5-5 4 3 7-8" /><circle cx="5.5" cy="18" r="1.3" /><circle cx="10.5" cy="13" r="1.3" /><circle cx="14.5" cy="16" r="1.3" /><circle cx="21.5" cy="8" r="1.3" /></svg>
-        : <svg viewBox="0 0 28 28"><path d="M4 22V5m0 17h20M6 6l15 14M9 6l12 11M13 6l8 7" /><circle cx="14" cy="14" r="2.2" /></svg>}>
+    <EmptyState title={trend ? 'Chưa có kỳ Sigma đủ điều kiện để vẽ xu hướng' : 'Chưa đủ dữ liệu để xác định vị trí MDC'}>
       {trend
         ? 'Nhập CV IQC và Bias EQA/EQC cho cùng một mức QC trong mục “Số liệu theo kỳ”.'
         : 'MDC cần TEa, CV IQC và Bias EQA/EQC đầy đủ trong cùng một kỳ và mức QC.'}
-      <div className="sg-chart-empty-steps"><span className="pill">1. Nhập CV IQC</span><span className="pill">2. Nhập Bias EQA/EQC</span></div>
     </EmptyState>
   </div>;
 }

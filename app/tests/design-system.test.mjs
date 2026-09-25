@@ -578,10 +578,10 @@ test('thông báo trống chỉ dựng qua EmptyState, CSS trang không đè vi�
   });
   // `empty-state` từng vừa là dòng "Chưa có." giữa nội dung vừa là thông báo
   // trống của cả panel (17 chỗ). Nay khối trống dùng EmptyState, còn chữ
-  // "chưa có giá trị" nằm giữa nội dung dùng `.hint-inline`. Các placeholder
-  // có icon của Sigma/So sánh hoá chất dùng EmptyState với prop `icon`.
+  // "chưa có giá trị" nằm giữa nội dung dùng `.hint-inline`. Placeholder có
+  // icon trong vòng tròn của Sigma/So sánh hoá chất cũng về kiểu chung.
   const RETIRED = new Set(['empty', 'empty-title', 'empty-actions', 'empty-state', 'analysis-empty-state', 'wg-empty-message',
-    'sg-chart-empty-icon', 'rc-pending-evaluation', 'rc-pending-icon', 'rc-empty-panel-state', 'rc-chart-empty-state', 'rc-stats-empty']);
+    'sg-chart-empty', 'sg-chart-empty-icon', 'sg-chart-empty-steps', 'rc-pending-evaluation', 'rc-pending-icon', 'rc-empty-panel-state', 'rc-chart-empty-state', 'rc-stats-empty']);
   const markup = [];
   for (const file of tsxFiles(RENDERER)) {
     if (file === COMPONENT) continue;
@@ -613,6 +613,9 @@ test('thông báo trống chỉ dựng qua EmptyState, CSS trang không đè vi�
   const component = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const base = component.match(/\.empty-notice\{([^}]*)\}/)?.[1] || '';
   assert.doesNotMatch(base, /(?:^|;)\s*(?:border|background)[\w-]*\s*:/, 'thông báo trống nằm thẳng trên bề mặt khối chứa, không có viền hay nền riêng');
+  // Một hình thức duy nhất: tiêu đề + lời giải thích + hành động, không icon.
+  const emptyStateSrc = readFileSync(COMPONENT, 'utf8');
+  assert.doesNotMatch(emptyStateSrc, /\bicon\?:|\bkicker\?:|\btone\?:/, 'EmptyState không có biến thể icon/kicker/tone');
 });
 
 // Chiều cao control và hàng bảng đi theo hai thang ba bậc. Trước 2026-09-24
