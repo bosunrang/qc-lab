@@ -86,7 +86,8 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
   assert.equal(handlers.size, 125);
 
-  await assert.rejects(async () => handlers.get('nce:create')({}, NCE_INPUT), /Chưa đăng nhập/);
+  const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
+  assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
   session.set(tech);
   const saved = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.equal(saved.ok, true);
@@ -229,8 +230,34 @@ test('phục hồi backup chỉ dùng tệp main vừa kiểm tra, không nhận
 test('bản xem trước gắn cùng bảng nghiệp vụ, đọc phiên tại thời điểm gọi', async () => {
   const { business, session } = setup();
   const api = bindOperations(business, sessionContext(() => session.get()));
-  await assert.rejects(api.listUsers(), /Chưa đăng nhập/);
+  assert.equal((await api.listUsers()).error.code, 'unauthenticated');
+  await assert.rejects(api.getLisSettings(), /Chưa đăng nhập/, 'hàm đọc vẫn ném lỗi như trước');
   session.set(tech);
   const saved = await api.createNce(NCE_INPUT);
   assert.equal(saved.ok, true);
+});
+
+test('exception của thao tác trả IpcResult thành { ok: false }; thao tác đọc vẫn ném', async () => {
+  const boom = () => { throw new Error('SQLITE_BUSY: database is locked'); };
+  const table = {
+    createNce: { channel: 'nce:create', lan: true, run: boom },
+    listTests: { channel: 'config:listTests', lan: true, run: boom },
+  };
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const handlers = new Map();
+    registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, [table], sessionContext(() => tech));
+    const lan = createLanInvoker([table]);
+    const api = bindOperations(table, sessionContext(() => tech));
+    const expected = { ok: false, error: { code: 'internal-error', message: 'SQLITE_BUSY: database is locked' } };
+    assert.deepEqual(await handlers.get('nce:create')({}, NCE_INPUT), expected, 'IPC');
+    assert.deepEqual(await lan('createNce', [NCE_INPUT], tech), expected, 'LAN');
+    assert.deepEqual(await api.createNce(NCE_INPUT), expected, 'bản xem trước');
+    await assert.rejects(handlers.get('config:listTests')({}), /SQLITE_BUSY/);
+    await assert.rejects(lan('listTests', [], tech), /SQLITE_BUSY/);
+    await assert.rejects(api.listTests(), /SQLITE_BUSY/);
+  } finally {
+    console.error = quiet;
+  }
 });

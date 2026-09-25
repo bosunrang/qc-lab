@@ -23,6 +23,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | Lỗi nhỏ | Mã NCE không trùng; token LIS và thao tác bỏ kết quả LIS có kiểm quyền; cây Nhập QC cập nhật ngay |
 | Công cụ | ESLint + luật React hooks trong CI |
 | A.1–A.4 (nhánh `refactor/ipc-channels`) | Bảng thao tác một nguồn `main/ipc/operations.ts` + `desktop-operations.ts`; IPC, RPC của LAN và bản xem trước sinh từ bảng; LAN chỉ gọi dòng `lan: true`; actor truyền theo từng lời gọi, bỏ `lanCalls`; test ở `tests/ipc-operations.test.mjs` |
+| A.5 (nhánh `refactor/ipc-error-boundary`) | Exception của thao tác trả `IpcResult` thành `{ ok: false }` (`unauthenticated` / `internal-error`) ở IPC, LAN và bản xem trước; thao tác đọc vẫn ném, danh sách do trình biên dịch kiểm theo `QcApi` |
 
 ## Thứ tự đề xuất
 

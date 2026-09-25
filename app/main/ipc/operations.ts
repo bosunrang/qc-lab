@@ -79,16 +79,65 @@ export interface BusinessHandlers {
   lis: ReturnType<typeof createLisHandlers>;
 }
 
+/** Lỗi gọi thao tác cần đăng nhập khi chưa có phiên. Có mã riêng để bọc
+ * thành `IpcResult` với `code: 'unauthenticated'`. */
+export class NotSignedInError extends Error {
+  readonly code = 'unauthenticated';
+  constructor() { super('Chưa đăng nhập.'); }
+}
+
 /** Ngữ cảnh đọc danh tính từ một phiên đang giữ trong bộ nhớ (máy chính,
  * bản xem trước). Đọc lại mỗi lần gọi `actor()`, không chụp lúc tạo. */
 export function sessionContext(current: () => Actor | null): CallContext {
   return {
     actor() {
       const actor = current();
-      if (!actor) throw new Error('Chưa đăng nhập.');
+      if (!actor) throw new NotSignedInError();
       return actor;
     },
   };
+}
+
+// ── Bọc lỗi một chỗ ──────────────────────────────────────────────────────
+// Thao tác trả `IpcResult`: exception (chưa đăng nhập, lỗi SQLite, lỗi lập
+// trình) thành `{ ok: false, error }`, để form hiện lỗi thay vì một promise
+// bị từ chối mà renderer không bắt. Thao tác đọc trả thẳng dữ liệu (mảng,
+// object) thì GIỮ việc ném lỗi: trả một object lỗi vào chỗ renderer chờ mảng
+// sẽ làm vỡ `.map` ở nơi khác, khó lần hơn.
+
+type DataApiName = { [K in ApiName]: Result<K> extends { ok: boolean } ? never : K }[ApiName];
+const DATA_API_NAMES = [
+  'hasAnyUsers', 'currentUser', 'listInstruments', 'listTests', 'listTestLevels', 'listPlannedTargets',
+  'listActivity', 'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
+  'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
+  'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
+  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNceRecords',
+  'listReagentComparisons', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'backupStatus', 'getLisSettings',
+] as const satisfies readonly DataApiName[];
+// Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
+// mà danh sách trên chưa ghi.
+type MissingDataApi = Exclude<DataApiName, (typeof DATA_API_NAMES)[number]>;
+const dataApiListIsComplete: [MissingDataApi] extends [never] ? true : MissingDataApi = true;
+void dataApiListIsComplete;
+const DATA_APIS: ReadonlySet<string> = new Set(DATA_API_NAMES);
+
+/** Chuyển exception thành `IpcResult` lỗi. Lỗi ngoài dự kiến ghi ra console
+ * của main để lần được, vì renderer chỉ thấy câu thông báo. */
+export function errorResult(error: unknown): { ok: false; error: { code: string; message: string } } {
+  if (error instanceof NotSignedInError) return { ok: false, error: { code: error.code, message: error.message } };
+  console.error(error);
+  const message = error instanceof Error && error.message ? error.message : 'Đã xảy ra lỗi không xác định.';
+  return { ok: false, error: { code: 'internal-error', message } };
+}
+
+async function invokeOperation(name: string, operation: AnyOperation, ctx: CallContext, args: unknown[]): Promise<unknown> {
+  if (DATA_APIS.has(name)) return operation.run(ctx, ...args);
+  try {
+    return await operation.run(ctx, ...args);
+  } catch (error) {
+    return errorResult(error);
+  }
 }
 
 /** Các thao tác nghiệp vụ chỉ gọi handler của `main/ipc`, giống nhau ở mọi
@@ -239,7 +288,7 @@ export function registerIpcOperations(
   for (const [name, operation] of entriesOf(tables)) {
     if (seen.has(operation.channel)) throw new Error(`Kênh IPC bị khai hai lần: ${operation.channel} (${name}).`);
     seen.add(operation.channel);
-    ipc.handle(operation.channel, (_event, ...args) => operation.run(ctx, ...args));
+    ipc.handle(operation.channel, (_event, ...args) => invokeOperation(name, operation, ctx, args));
   }
 }
 
@@ -258,7 +307,7 @@ export function createLanInvoker(tables: object[]): (method: string, args: unkno
   return async (method, args, actor) => {
     const operation = allowed.get(method);
     if (!operation) return LAN_UNKNOWN_OPERATION;
-    return operation.run({ actor: () => actor }, ...args);
+    return invokeOperation(method, operation, { actor: () => actor }, args);
   };
 }
 
@@ -267,5 +316,5 @@ export function createLanInvoker(tables: object[]): (method: string, args: unkno
 export type BoundOperations<N extends ApiName> = { [K in N]: (...args: Args<K>) => Promise<Result<K>> };
 export function bindOperations<N extends ApiName>(table: OperationTable<N>, ctx: CallContext): BoundOperations<N> {
   return Object.fromEntries(entriesOf([table]).map(([name, operation]) =>
-    [name, async (...args: unknown[]) => operation.run(ctx, ...args)])) as unknown as BoundOperations<N>;
+    [name, (...args: unknown[]) => invokeOperation(name, operation, ctx, args)])) as unknown as BoundOperations<N>;
 }
