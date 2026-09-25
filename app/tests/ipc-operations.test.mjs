@@ -103,7 +103,7 @@ test('LAN chỉ mở danh sách cho phép tường minh', () => {
   assert.deepEqual(closed, [
     'bootstrapAdmin', 'chooseBackupFile', 'connectFirebase', 'currentUser', 'disconnectFirebase',
     'exportBackup', 'exportTableXlsx', 'importBackup', 'listActivity', 'login', 'logout',
-    'printHtmlToPdf', 'syncFirebase',
+    'printHtmlToPdf', 'resetOperationalData', 'syncFirebase',
   ]);
 });
 
@@ -114,7 +114,7 @@ test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và t�
   for (const method of [
     'login', 'logout', 'currentUser', 'bootstrapAdmin', 'auth:bootstrapAdmin', 'auth:login',
     'htmlToPdf', 'printHtmlToPdf', 'print:htmlToPdf', 'export', 'exportBackup', 'backup:export',
-    'chooseFile', 'import', 'listActivity', 'config:listTests', 'constructor', '__proto__', 'toString', '',
+    'chooseFile', 'import', 'listActivity', 'resetOperationalData', 'backup:resetAll', 'config:listTests', 'constructor', '__proto__', 'toString', '',
   ]) {
     const result = await lan(method, [{ data: { username: 'admin', password: 'admin12345' } }], viewer);
     assert.equal(result?.error?.code, 'unknown-operation', `LAN phải chặn "${method}"`);

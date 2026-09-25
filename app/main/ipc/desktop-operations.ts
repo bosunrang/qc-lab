@@ -129,6 +129,8 @@ export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): 
       },
     },
     backupStatus: { channel: 'backup:status', lan: true, run: () => backup.backupStatus() },
-    resetOperationalData: { channel: 'backup:resetAll', lan: true, run: (ctx) => backup.resetOperationalData(ctx.actor()) },
+    // Xoá dữ liệu vận hành của cả phòng: chỉ làm trên máy chính, máy trạm LAN
+    // dùng để nhập dữ liệu (người dùng chốt 2026-09-25).
+    resetOperationalData: { channel: 'backup:resetAll', lan: false, run: (ctx) => backup.resetOperationalData(ctx.actor()) },
   };
 }

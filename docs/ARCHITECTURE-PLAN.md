@@ -99,8 +99,8 @@ A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một ngu�
   `approveNce`, `cancelNce`, 2 hàm mẫu báo cáo — cùng `backupStatus`. Các hàm
   này đều kiểm quyền theo actor. Ngược lại `listActivity`, `login`, `logout`,
   `currentUser` không còn gọi được qua `/api/rpc`.
-- `resetOperationalData` vẫn mở qua LAN như trước (chỉ admin, có bản an
-  toàn). Cần chốt: có nên chỉ cho làm trên máy chính không.
+- `resetOperationalData` chỉ làm trên máy chính (`lan: false`, người dùng
+  chốt 2026-09-25: máy trạm dùng để nhập dữ liệu).
 - Máy trạm vẫn chưa xuất Excel/in PDF được (như trước); nên dùng
   `browser-export.ts` như bản xem trước.
 
@@ -238,4 +238,3 @@ tách (tách thuần, không đổi hành vi).
 | LAN có chuyển sang HTTPS | Có, sau giai đoạn A; chứng chỉ tự ký + tuỳ chọn CA nội bộ |
 | Chu kỳ đẩy Firebase | 15 phút và khi đóng app |
 | Bật/tắt luật Westgard chung cần quyền gì | Tra SOP; nếu là cấu hình chung của phòng thì nên là admin |
-| Khởi tạo lại dữ liệu từ máy trạm LAN | Chỉ cho làm trên máy chính (`lan: false`) |
