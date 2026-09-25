@@ -10,6 +10,8 @@
 .wg-rules{
   margin:var(--space-3) var(--panel-padding) 0;
 }
+/* Trước đây đặt inline bằng token --type-body đã bị xoá nên không có tác dụng. */
+.wg-rules>b{font-size:var(--title-sub);}
 /* Header đã có `margin-bottom: var(--panel-content-gap)`. Tab chọn vùng
    xem bắt đầu ngay sau nhịp đó; cộng thêm margin-top ở JSX sẽ làm khoảng
    cách từ đường viền header tới tab bị gấp đôi. */

@@ -355,7 +355,13 @@ test('mật độ control dùng token component, không viết lại số chuẩ
 test('mọi var() trong CSS đều có định nghĩa và không tham chiếu vòng', () => {
   const RUNTIME = new Set(['--sg-color']); // đặt inline từ SigmaPage.tsx
   const missing = new Set();
-  for (const file of ALL) {
+  // Cả style inline trong TSX: `var(--type-body)` ở Westgard từng trỏ vào
+  // token đã xoá mà không test nào thấy, vì luật này chỉ đọc CSS.
+  const codeFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? codeFiles(path) : /\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+  for (const file of [...ALL, ...codeFiles(join(ROOT, 'renderer'))]) {
     for (const m of readFileSync(file, 'utf8').matchAll(/var\((--[a-z0-9-]+)/g)) {
       if (!(m[1] in TOKEN) && !RUNTIME.has(m[1])) missing.add(`${relative(ROOT, file)}: ${m[1]}`);
     }

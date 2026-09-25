@@ -380,7 +380,7 @@ export function WestgardPage() {
             {testId && (
               <>
                 <div className="wg-rules">
-                  <b style={{ fontSize: 'var(--type-body)' }}>Cấu hình chung của luật</b>
+                  <b>Cấu hình chung của luật</b>
                   <div className="flow-note">
                     {ruleSettings.map((r) => (
                       <span className="wg-rule-item" key={r.id}>
