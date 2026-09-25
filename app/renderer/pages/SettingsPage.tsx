@@ -420,7 +420,7 @@ export function SettingsPage() {
                   {lisQueue.pending.map((r) => (
                     <tr key={r.id}>
                       <td>{r.resolved.displayName}</td><td>{r.resolved.level}</td><td>{r.resolved.lot}</td><td>{r.message.value}</td>
-                      <td style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                      <td style={{ display: 'flex', gap: 'var(--space-1-5)' }}>
                         <button className="btn teal sm" onClick={() => importLisRecord(r)}>Nhận</button>
                         <button className="btn ghost sm" onClick={() => rejectLisRecord(r.message.messageId)}>Bỏ</button>
                       </td>
@@ -429,7 +429,7 @@ export function SettingsPage() {
                 </tbody>
               </table>
             )}
-          <h4 style={{ marginTop: 'var(--space-md)' }}>Chưa khớp cấu hình ({lisQueue.unresolved.length})</h4>
+          <h4 style={{ marginTop: 'var(--space-2-5)' }}>Chưa khớp cấu hình ({lisQueue.unresolved.length})</h4>
           {lisQueue.unresolved.length === 0
             ? <EmptyState size="compact">Không có bản ghi nào chưa khớp.</EmptyState>
             : (

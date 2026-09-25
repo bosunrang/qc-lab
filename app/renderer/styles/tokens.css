@@ -3,11 +3,14 @@
    đủ tinh gọn và hiện đại cho một ứng dụng desktop dùng hằng ngày.
    Tài liệu đầy đủ: docs/DESIGN-SYSTEM.md.
 
-   File này có 4 lớp, đọc từ trên xuống:
-     1. Primitive  — dải màu, thang chữ, lưới khoảng cách. KHÔNG dùng ở CSS trang.
-     2. Vai trò    — surface/border/text/accent/trạng thái. ĐÂY là thứ được dùng.
+   File này có 3 lớp, đọc từ trên xuống:
+     1. Primitive  — dải màu, thang chữ, lưới khoảng cách. Màu thô KHÔNG dùng ở
+                     CSS trang; các thang (--text-*, --weight-*, --leading-*,
+                     --space-*, --radius-*) thì dùng trực tiếp.
+     2. Vai trò    — surface/border/text/accent/trạng thái. ĐÂY là màu được dùng.
      3. Component  — kích thước dùng chung của control/panel/bảng/modal.
-     4. Bí danh    — cầu tạm cho CSS chưa chuyển; đích đến là xoá sạch lớp này.
+   Lớp 4 "bí danh tạm" (91 tên, 820 chỗ dùng) đã xoá ngày 2026-09-25; không
+   thêm tên đồng nghĩa cho một token đã có.
 
    Ba quy tắc không thương lượng:
      · Không viết hex trực tiếp ngoài Lớp 1.
@@ -74,14 +77,9 @@
   /* Màu chữ vai trò: tối ưu độ rõ trên bốn bề mặt sáng của ứng dụng. */
   --ink-strong:#173740;
   --ink-body:#344b55;
-  --ink-subtle:#536a76;
   --ink-faint:#70818a;
   --ink-button:#263f49;
-  --ink-button-muted:#405762;
   --ink-accent:#0b5f66;
-  --ink-success:#08695f;
-  --ink-info:#2b5e7f;
-  --ink-warning:#7a4508;
   --ink-disabled:#6f818a;
   --ink-placeholder:#70818a;
   --ink-readonly:#4a626e;
@@ -93,7 +91,6 @@
   /* Bề mặt tối của sidebar là hệ màu độc lập với vùng nội dung. */
   --dark-text:#d3dee4;
   --dark-text-muted:#9fb2bc;
-  --dark-text-soft:#aac0c9;
   --dark-text-group:#92a8b3;
   --dark-text-link:#c9d7de;
   --dark-icon:#8ea5b0;
@@ -149,7 +146,6 @@
   --radius-xs:8px; --radius-sm:8px; --radius-md:8px; --radius-lg:8px; --radius-full:999px;
 
   --font-sans:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --font-mono:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 
   /* ═══════════════════════════════════════════════════════════════════
      LỚP 2 — VAI TRÒ NGỮ NGHĨA. Đây là thứ CSS trang được phép dùng.
@@ -191,27 +187,22 @@
   --shadow-page-head:0 4px 18px var(--shadow-ink-faint);
   --shadow-brand:0 8px 20px color-mix(in srgb,var(--accent) 24%,transparent);
   --control-inset-highlight:inset 0 1px 0 rgba(255,255,255,.92);
-  --surface-elevated-translucent:rgba(255,255,255,.68);
 
   --text-primary:var(--gray-900);
   --text-secondary:var(--ink-body);
   --text-tertiary:var(--gray-600);
   --text-disabled:var(--ink-disabled);
-  --text-inverse:var(--white);
-  --text-link:var(--ink-accent);
 
   --accent:var(--teal-500);
   --accent-hover:var(--teal-600);
   --accent-active:var(--teal-700);
   --accent-text:var(--teal-700);
   --accent-surface:var(--teal-100);
-  --accent-surface-strong:var(--teal-100);
   --accent-border:var(--teal-300);
   --accent-border-soft:var(--teal-200);
   --accent-border-strong:var(--teal-400);
   --accent-border-hover:var(--teal-450);
   --accent-surface-tint:var(--teal-50);
-  --accent-surface-selected:rgba(12,111,120,.10);
   --accent-control-surface:rgba(11,116,125,.12);
   --accent-control-surface-hover:rgba(11,116,125,.22);
   --accent-control-border:rgba(11,116,125,.35);
@@ -247,7 +238,6 @@
   --sidebar-toggle-surface-hover:rgba(47,179,166,.24);
   --sidebar-toggle-border:rgba(47,179,166,.35);
   --sidebar-status-surface:rgba(255,255,255,.035);
-  --sidebar-status-border:rgba(126,149,165,.18);
   --sidebar-group-divider:linear-gradient(90deg,rgba(126,149,165,.26),rgba(126,149,165,0));
   --sidebar-expanded-width:clamp(208px,17vw,258px);
   --sidebar-collapsed-width:78px;
@@ -262,6 +252,21 @@
   /* Âm đúng bằng độ dày vòng: vòng teal nằm đè lên viền control thay vì
      bao thêm một lớp bên ngoài. Không đổi kích thước và không tạo hai viền. */
   --focus-ring-offset:-1px;
+
+  /* Màu chữ theo vai trò hẹp — trước 2026-09-25 nằm ở lớp bí danh tạm. */
+  --text-strong:var(--ink-strong);
+  --text-faint:var(--ink-faint);
+  --text-button:var(--ink-button);
+  --text-readonly:var(--ink-readonly);
+  --text-placeholder:var(--ink-placeholder);
+  --text-archived:var(--ink-archived);
+  --text-on-dark-muted:var(--dark-on-light);
+  --text-accent:var(--ink-accent);
+  --filter-text:var(--ink-filter);
+  --filter-active-text:var(--ink-filter-active);
+  --filter-count-text:var(--ink-filter-count);
+  --sidebar-group-text:var(--dark-text-group);
+  --sidebar-link-text:var(--dark-text-link);
 
   /* ═══════════════════════════════════════════════════════════════════
      LỚP 3 — TOKEN COMPONENT.
@@ -300,7 +305,6 @@
   --button-font-size:var(--text-base);
   --button-font-weight:var(--weight-semibold);
 
-  --panel-radius:var(--radius-lg);
   --panel-padding:var(--space-5);
   --panel-content-gap:var(--space-4);
   --panel-header-h:48px;
@@ -350,6 +354,9 @@
   --table-header-h-sm:30px;
   --table-head-size-sm:var(--table-head-size);
   --table-head-tracking-sm:var(--table-head-tracking);
+  --table-head-bg:var(--thead-bg);
+  --table-head-ink:var(--text-tertiary);
+  --table-head-border:var(--thead-line);
 
   --modal-padding:var(--space-5);
   /* Bốn cỡ modal; độ rộng thực = min(cỡ, cửa sổ − 32px). */
@@ -405,110 +412,6 @@
   --z-dialog:110;
   --z-tooltip:120;
   --z-picker:130;
-
-  /* ═══════════════════════════════════════════════════════════════════
-     LỚP 4 — BÍ DANH TẠM cho CSS chưa chuyển. Mỗi trang chuyển xong thì xoá
-     dần bí danh tương ứng. Không thêm tên mới vào đây.
-     ═══════════════════════════════════════════════════════════════════ */
-  --bg:var(--surface-page);
-  --panel:var(--surface);
-  --panel2:var(--surface-sunken);
-  --ink:var(--text-primary);
-  --muted:var(--text-tertiary);
-  --line:var(--border-subtle);
-  --line2:var(--border-subtle);
-  --line-strong:var(--border);
-  --teal:var(--accent);
-  --teal-deep:var(--accent-active);
-  --tealink:var(--accent-text);
-  --amber:var(--warning-text);
-  --red:var(--danger-text);
-
-  --section-head-bg:var(--surface-section-header);
-  --section-head-border:var(--border-subtle);
-  --section-head-ink:var(--text-primary);
-  --section-heading-weight:var(--weight-semibold);
-  --card-head-border:var(--border-subtle);
-  --card-head-ink:var(--text-primary);
-  --card-head-active:var(--accent-surface-tint);
-  --panel-header-min-height:var(--panel-header-h);
-  --subpanel-header-min-height:var(--subpanel-header-h);
-  --panel-inline-padding:var(--panel-padding);
-  --modal-inline-padding:var(--modal-padding);
-  --surface-shadow:var(--panel-shadow);
-  --surface-card-soft:var(--surface-subtle);
-  --surface-soft:var(--surface-subtle);
-  --surface-neutral:var(--surface-sunken);
-
-  --table-head-bg:var(--thead-bg);
-  --table-head-ink:var(--ink-subtle);
-  --table-head-border:var(--thead-line);
-  --table-head-letter-spacing:var(--table-head-tracking);
-  --table-header-height:var(--table-header-h);
-  --table-cell-block-padding:var(--table-cell-py);
-  --table-cell-inline-padding:var(--table-cell-px);
-
-  --text-strong:var(--ink-strong);
-  --text-body:var(--ink-body);
-  --text-input:var(--text-primary);
-  --text-subtle:var(--ink-subtle);
-  --text-faint:var(--ink-faint);
-  --text-button:var(--ink-button);
-  --text-button-muted:var(--ink-button-muted);
-  --text-readonly:var(--ink-readonly);
-  --text-pill:var(--text-tertiary);
-  --text-placeholder:var(--ink-placeholder);
-  --text-archived:var(--ink-archived);
-  --text-on-dark-muted:var(--dark-on-light);
-  --text-accent:var(--ink-accent);
-  --text-success:var(--ink-success);
-  --text-info:var(--ink-info);
-  --text-warning:var(--ink-warning);
-  --text-danger:var(--danger-text);
-  --filter-text:var(--ink-filter);
-  --filter-active-text:var(--ink-filter-active);
-  --filter-count-text:var(--ink-filter-count);
-
-  --neutral-ink:var(--neutral-text);
-  --neutral-bg:var(--neutral-surface);
-  --success-ink:var(--success-text);
-  --success-bg:var(--success-surface);
-  --info-ink:var(--info-text);
-  --info-bg:var(--info-surface);
-  --warning-ink:var(--warning-text);
-  --warning-bg:var(--warning-surface);
-  --danger-ink:var(--danger-text);
-  --danger-bg:var(--danger-surface);
-
-  --sidebar-active-icon:var(--sidebar-active-accent);
-  --sidebar-cloud-text:var(--dark-text-soft);
-  --sidebar-group-text:var(--dark-text-group);
-  --sidebar-link-text:var(--dark-text-link);
-
-  --button-height:var(--control-h);
-  --button-inline-padding:var(--button-padding-x);
-  --sans:var(--font-sans);
-  --mono:var(--font-mono);
-
-  --gap-control:var(--space-2);
-  --gap-content:var(--space-4);
-  --gap-panel:var(--space-5);
-  --gap-group:var(--space-6);
-  --space-2xs:var(--space-1);
-  --space-xs:var(--space-1-5);
-  --space-sm:var(--space-2);
-  --space-md:var(--space-2-5);
-  --space-lg:var(--space-3);
-  --space-section:var(--space-4);
-  --space-panel:var(--space-4);
-  --space-xl:var(--space-5);
-  --space-modal:var(--space-5);
-  --radius-pill:var(--radius-full);
-
-  --line-display:var(--leading-display);
-  --line-heading:var(--leading-heading);
-  --line-compact:var(--leading-snug);
-  --line-body:var(--leading-body);
 }
 
 *,*::before,*::after{box-sizing:border-box;}
@@ -522,17 +425,17 @@
    cố ý ẩn scrollbar vẫn có selector riêng ghi đè. */
 *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);}
 *::-webkit-scrollbar{width:var(--scrollbar-size);height:var(--scrollbar-size);}
-*::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:var(--radius-pill);}
-*::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid var(--scrollbar-track);border-radius:var(--radius-pill);background-clip:padding-box;}
+*::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:var(--radius-full);}
+*::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid var(--scrollbar-track);border-radius:var(--radius-full);background-clip:padding-box;}
 *::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover);}
 *::-webkit-scrollbar-button{display:none;width:0;height:0;}
 html,body,#root{height:100%;}
-body{margin:0;font-family:var(--sans);font-size:var(--text-base);color:var(--ink);background:var(--bg);}
+body{margin:0;font-family:var(--font-sans);font-size:var(--text-base);color:var(--text-primary);background:var(--surface-page);}
 h1,h2,h3,h4,p{margin:0;}
 /* Không dùng `font:inherit` cho form control: thuộc tính này làm ô nhập
    thừa hưởng cả font-weight của khối cha, nên input trong toolbar có thể
    bị in đậm ngoài ý muốn. Component tự khai báo cỡ và độ đậm chữ. */
 /* Chỉ đặt font-family. `color:inherit` cũng bị bỏ để checkbox/radio không
    vô tình thừa hưởng màu chữ phụ của khối cha. */
-button,input,select,textarea{font-family:var(--sans);}
+button,input,select,textarea{font-family:var(--font-sans);}
 table{border-collapse:collapse;width:100%;}

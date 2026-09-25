@@ -22,7 +22,7 @@
 }
 
 .user-create-card{
-  background:var(--panel); border:1px solid var(--surface-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-control);
+  background:var(--surface); border:1px solid var(--surface-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-control);
 }
 
 .user-table-wrap{
@@ -34,7 +34,7 @@
 }
 
 .user-create-card-title{
-  margin:0; padding:10px 16px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg); color:var(--section-head-ink); font-size:var(--title-panel); font-weight:var(--section-heading-weight); letter-spacing:0; text-transform:none;
+  margin:0; padding:10px 16px; border-bottom:1px solid var(--border-subtle); background:var(--surface-section-header); color:var(--text-primary); font-size:var(--title-panel); font-weight:var(--weight-semibold); letter-spacing:0; text-transform:none;
 }
 
 .user-create-fields{
@@ -58,7 +58,7 @@
 }
 
 .user-perm-grid label{
-  display:flex; align-items:center; gap:8px; min-height:var(--control-h); margin:0; padding:8px 10px; border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface-card-soft); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-bold); cursor:pointer; box-shadow:none;
+  display:flex; align-items:center; gap:8px; min-height:var(--control-h); margin:0; padding:8px 10px; border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface-subtle); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-bold); cursor:pointer; box-shadow:none;
 }
 
 .user-perm-grid label.disabled{
@@ -66,7 +66,7 @@
 }
 
 .user-perm-grid input[type="checkbox"]{
-  appearance:auto; -webkit-appearance:checkbox; box-sizing:border-box; width:17px; min-width:17px; max-width:17px; height:17px; min-height:0; flex:0 0 17px; margin:0; padding:0; border:1px solid var(--border); border-radius:var(--radius-xs); background:var(--panel); box-shadow:none; accent-color:var(--teal);
+  appearance:auto; -webkit-appearance:checkbox; box-sizing:border-box; width:17px; min-width:17px; max-width:17px; height:17px; min-height:0; flex:0 0 17px; margin:0; padding:0; border:1px solid var(--border); border-radius:var(--radius-xs); background:var(--surface); box-shadow:none; accent-color:var(--accent);
 }
 
 

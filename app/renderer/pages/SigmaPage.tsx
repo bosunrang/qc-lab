@@ -847,7 +847,7 @@ function BiasModal({ initialRounds, onClose, onSubmit }: {
                   <td className="sg-eqa-index">{i + 1}</td>
                   <td><input type="number" step="any" value={v.lab} onChange={(e) => setRounds((r) => r.map((x, j) => (j === i ? { ...x, lab: e.target.value } : x)))} /></td>
                   <td><input type="number" step="any" value={v.target} onChange={(e) => setRounds((r) => r.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))} /></td>
-                  <td className="sg-eqa-bias" style={{ color: bias != null ? (Math.abs(bias) > 10 ? 'var(--red)' : 'var(--teal)') : undefined }}>{bias != null ? `${bias.toFixed(2)}%` : '—'}</td>
+                  <td className="sg-eqa-bias" style={{ color: bias != null ? (Math.abs(bias) > 10 ? 'var(--danger-text)' : 'var(--accent)') : undefined }}>{bias != null ? `${bias.toFixed(2)}%` : '—'}</td>
                   <td><RowActionButton kind="delete" label={`Xóa vòng EQA ${i + 1}`} className="sg-eqa-del" onClick={() => setRounds((r) => r.filter((_, j) => j !== i))} disabled={rounds.length <= 1} /></td>
                 </tr>
               );

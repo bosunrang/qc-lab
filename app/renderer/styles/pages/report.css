@@ -4,9 +4,9 @@
   padding:var(--space-1) var(--panel-padding) var(--panel-padding);
 }
 
-.report-template-panel{margin-bottom:var(--gap-panel);}
+.report-template-panel{margin-bottom:var(--space-5);}
 .report-template-body{padding:var(--space-1) var(--panel-padding) var(--panel-padding);}
-.report-template-body>.hint{display:block;margin:0;color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body);}
+.report-template-body>.hint{display:block;margin:0;color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
 .report-template-fields{display:grid;grid-template-columns:minmax(220px,320px) minmax(160px,220px) max-content;align-items:end;gap:var(--field-gap);margin-top:var(--space-4);}
 /* Thẻ này là thanh cấu hình gọn như bộ lọc/báo cáo: ô nhập đi cùng nút hành
    động 36px, không dùng chiều cao form đầy đủ 40px của màn Cài đặt. */
@@ -86,13 +86,13 @@
 }
 
 .report-nce-option b{
-  color:var(--ink);
+  color:var(--text-primary);
   font-size:var(--text-base);
   font-weight:var(--weight-semibold);
 }
 
 .report-nce-option small{
-  color:var(--muted);
+  color:var(--text-tertiary);
   font-size:var(--text-xs);
   font-weight:var(--weight-medium);
 }
@@ -139,7 +139,7 @@
   justify-content:space-between;
   gap:var(--space-3);
   padding:var(--space-2-5) var(--space-3-5);
-  background:var(--panel);
+  background:var(--surface);
   font-size:var(--text-sm);
 }
 

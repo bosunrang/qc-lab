@@ -14,14 +14,14 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Khi zoom hoặc ở laptop hẹp, phải lộ scrollbar ngang để thẻ cuối (TEa)
    không thành nội dung bị che không có đường tới. Kiểu scrollbar chung ở
    tokens.css giữ thanh này gọn như các bảng dữ liệu. */
-.config-shell-tabs{flex:0 0 auto;min-width:0;margin:0;padding:4px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-control);overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
+.config-shell-tabs{flex:0 0 auto;min-width:0;margin:0;padding:4px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-control);overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
 .config-shell-tabs-scroll{display:flex;align-items:stretch;gap:4px;min-width:max-content;}
-.config-shell-tabs button{display:flex;align-items:center;gap:6px;min-height:var(--control-h);padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-subtle);cursor:pointer;font-family:var(--sans);text-align:left;}
+.config-shell-tabs button{display:flex;align-items:center;gap:6px;min-height:var(--control-h);padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-tertiary);cursor:pointer;font-family:var(--font-sans);text-align:left;}
 .config-shell-tabs button>b{font-size:var(--text-sm);font-weight:var(--weight-bold);white-space:nowrap;}
-.config-shell-tabs button:hover{color:var(--text-body);background:var(--surface-subtle);}
+.config-shell-tabs button:hover{color:var(--text-secondary);background:var(--surface-subtle);}
 /* Cùng kiểu nhấn với mục “Cấu hình chung” ở sidebar: đường viền trái 2px
    nằm trong chính thẻ active, thay vì vệt shadow 3px tách rời và thô hơn. */
-.config-shell-tabs button.on{padding-left:12px;border-left:2px solid var(--teal);background:var(--accent-surface);color:var(--text-accent);}
+.config-shell-tabs button.on{padding-left:12px;border-left:2px solid var(--accent);background:var(--accent-surface);color:var(--text-accent);}
 /* Cột flex, KHÔNG tự cuộn: thanh công cụ và các khối giới thiệu là item cố
    định, chỉ khối bảng mới là vùng cuộn. Bản trước để chính `.config-shell-main`
    cuộn nên mọi thứ phía trên bảng (tiêu đề thẻ, ô tìm kiếm, 3 thẻ nguồn TEa)
@@ -49,16 +49,16 @@ main:has(.config-shell){padding-bottom:16px;}
        không sọc xen kẽ; nút thao tác dạng icon hiện thường trực.
    Muốn đổi diện mạo cả trang thì sửa Ở ĐÂY, đừng thêm ngoại lệ cho một thẻ —
    đó đúng là thứ đã tạo ra tình trạng 8 thẻ 8 kiểu trước đợt này. */
-.rcfg-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3) 16px;min-height:0;margin:0;padding:20px 0 var(--panel-content-gap);background:transparent;border-bottom:0;box-shadow:none;color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--section-heading-weight);letter-spacing:0;text-transform:none;}
+.rcfg-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3) 16px;min-height:0;margin:0;padding:20px 0 var(--panel-content-gap);background:transparent;border-bottom:0;box-shadow:none;color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);letter-spacing:0;text-transform:none;}
 .config-shell-main > .rcfg-toolbar{align-items:center;}
-.rcfg-toolbar h2{margin:0;font-size:var(--title-panel);font-weight:var(--section-heading-weight);line-height:var(--line-heading);letter-spacing:-.01em;color:var(--ink);}
+.rcfg-toolbar h2{margin:0;font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);letter-spacing:-.01em;color:var(--text-primary);}
 .rcfg-toolbar p{margin:2px 0 0;max-width:520px;color:var(--text-faint);font-size:var(--text-sm);font-weight:500;}
 .rcfg-toolbar>div:first-child{flex:1 1 320px;min-width:min(100%,260px);}
 .rcfg-tools{display:flex;align-items:center;gap:8px;flex:1 1 300px;min-width:0;justify-content:flex-end;flex-wrap:wrap;}
 /* Ô tìm kiếm và nút chính cùng cao 36px, nền trắng: header không còn dải xám
    nên ô nền xám cũ (`--surface-subtle`) sẽ thành mảng màu duy nhất trôi nổi
    trên nền trang. */
-.rcfg-tools input{height:var(--control-h);min-height:var(--control-h);width:auto;flex:1 1 220px;max-width:320px;border-color:var(--border-subtle);background:var(--panel);box-shadow:none;}
+.rcfg-tools input{height:var(--control-h);min-height:var(--control-h);width:auto;flex:1 1 220px;max-width:320px;border-color:var(--border-subtle);background:var(--surface);box-shadow:none;}
 .rcfg-toolbar .btn.teal{min-height:var(--control-h);padding-inline:14px;border-radius:var(--radius-sm);box-shadow:none;}
 
 /* Nhịp bảng kiểu LIMS (điểm (3) của khối chuẩn ở trên): đầu bảng 40px chữ
@@ -68,8 +68,8 @@ main:has(.config-shell){padding-bottom:16px;}
    thật; bảng Mean/SD là LƯỚI (`.target-head`/`.target-row`) nên có khối
    riêng bên dưới, giá trị bám sát các con số ở đây. */
 .config-shell-main .rcfg-list>table{border:0;border-radius:0;}
-.config-shell-main .rcfg-list>table thead th{height:var(--table-header-height);padding-block:0;background:var(--table-head-bg);border-bottom-color:var(--table-head-border);color:var(--table-head-ink);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-letter-spacing);}
-.config-shell-main .rcfg-list>table tbody tr{background:var(--panel);}
+.config-shell-main .rcfg-list>table thead th{height:var(--table-header-h);padding-block:0;background:var(--table-head-bg);border-bottom-color:var(--table-head-border);color:var(--table-head-ink);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-tracking);}
+.config-shell-main .rcfg-list>table tbody tr{background:var(--surface);}
 .config-shell-main .rcfg-list>table tbody tr:hover{background:var(--surface-subtle);}
 /* 44px là SÀN, không phải khuôn. `height` trên ô bảng được trình duyệt hiểu
    là chiều cao tối thiểu, nên hàng một dòng chữ đúng 44px, còn hàng có ô hai
@@ -99,7 +99,7 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Trạng thái là nhãn có nền rất nhạt: đủ nổi để quét nhanh theo hàng, nhưng
    không lấn át dữ liệu. Mục đã ngừng dùng nhãn trung tính, không báo động. */
 .config-shell-main .instrument-status{min-width:108px;justify-content:center;}
-.config-shell-main .cell-missing{color:var(--warning-ink);}
+.config-shell-main .cell-missing{color:var(--warning-text);}
 /* Nút thao tác HIỆN THƯỜNG TRỰC (chốt 2026-09-13). Bản trước cho cụm icon
    `opacity:0` và chỉ hiện khi rê chuột/Tab tới — bảng lúc nghỉ sạch hơn,
    nhưng cột thao tác thành một mảng trống và không còn dấu hiệu nào cho biết
@@ -173,10 +173,10 @@ main:has(.config-shell){padding-bottom:16px;}
 
 .rcfg-group-modal .modal-b{max-height:72vh;overflow:auto;}
 .rcfg-group-modal .lot-level-col label{min-height:62px;}
-.rcfg-modal input[type=checkbox],.config-shell input[type=checkbox]{accent-color:var(--teal);}
+.rcfg-modal input[type=checkbox],.config-shell input[type=checkbox]{accent-color:var(--accent);}
 .rcfg-modal .field-row{gap:var(--field-gap);}
-.rcfg-check{display:flex;align-items:center;gap:var(--gap-control);margin:0;color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
-.rcfg-check input{accent-color:var(--teal);}
+.rcfg-check{display:flex;align-items:center;gap:var(--space-2);margin:0;color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-bold);}
+.rcfg-check input{accent-color:var(--accent);}
 .instrument-active{margin:0;}
 
 /* Tám thẻ cấu hình dùng chung một khung list: bảng tràn hết panel (không lồng
@@ -235,12 +235,12 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Thẻ con Lô QC có tiêu đề riêng cao bằng token panel nằm trên bảng: nó dính
    trước, bảng dính ngay dưới nó. */
 .lot-config-grid > .panel > .rcfg-panel-h{position:sticky;top:0;z-index:var(--z-sticky-head);}
-.lot-config-grid > .panel > table thead th{top:var(--panel-header-min-height);}
+.lot-config-grid > .panel > table thead th{top:var(--panel-header-h);}
 .config-shell-main > .rcfg-list:has(> table){
   padding:0;
   border-radius:var(--table-radius);
   border-color:var(--border-subtle);
-  background:var(--panel);
+  background:var(--surface);
   box-shadow:none;
 }
 .config-shell-main > .rcfg-list:not(:has(table)):not(:has(> .empty-notice)){padding-bottom:16px;}
@@ -251,8 +251,8 @@ main:has(.config-shell){padding-bottom:16px;}
    duy nhất còn có tiêu đề bên trong khối trắng. Nền trắng + một đường kẻ
    mảnh: dải xám ở đây sẽ nằm ngay trên hàng tiêu đề cột của bảng (cũng xám
    nhạt) thành hai dải xám dính nhau. */
-.rcfg-panel-h{display:flex;align-items:center;justify-content:space-between;gap:var(--gap-content);min-height:var(--panel-header-min-height);margin:0;padding:var(--space-sm) var(--space-panel);border-bottom:1px solid var(--table-head-border);background:var(--panel);}
-.rcfg-panel-h h3{margin:0;color:var(--card-head-ink);font-size:var(--title-panel);font-weight:var(--section-heading-weight);}
+.rcfg-panel-h{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--panel-header-h);margin:0;padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--table-head-border);background:var(--surface);}
+.rcfg-panel-h h3{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);}
 .rcfg-list>table{width:100%;min-width:0;table-layout:fixed;}
 .rcfg-list th,.rcfg-list td{vertical-align:middle;text-align:center;}
 .rcfg-list th:first-child,.rcfg-list td:first-child{text-align:left;}
@@ -270,21 +270,21 @@ main:has(.config-shell){padding-bottom:16px;}
 .lot-table th:nth-child(4),.lot-table td:nth-child(4){width:26%;}
 .lot-table th:nth-child(5),.lot-table td:nth-child(5){width:10%;}
 .lot-table th:nth-child(6),.lot-table td:nth-child(6){width:86px;}
-.lot-row-actions{display:flex;justify-content:center;gap:var(--gap-control);}
+.lot-row-actions{display:flex;justify-content:center;gap:var(--space-2);}
 .lot-row-actions .btn{min-width:42px;padding-inline:10px;}
-.lot-group-list{display:grid;gap:var(--gap-content);padding:var(--space-section);}
-.lot-list-pagination{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-2) var(--space-section);border-top:1px solid var(--surface-divider);background:var(--panel);}
+.lot-group-list{display:grid;gap:var(--space-4);padding:var(--space-4);}
+.lot-list-pagination{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-2) var(--space-4);border-top:1px solid var(--surface-divider);background:var(--surface);}
 .lot-list-pagination .hint{font-variant-numeric:tabular-nums;}
 .lot-page-controls{display:flex;align-items:center;gap:var(--space-1);}
 .lot-page-button{flex:0 0 var(--control-h-compact);width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border-radius:var(--radius-md);font-size:var(--text-lg);line-height:var(--leading-none);}
 .lot-page-controls b{min-width:var(--control-h-compact);color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;text-align:center;}
-.lot-group-card{border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
-.lot-group-card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--gap-content);padding:var(--gap-content);border-bottom:1px solid var(--line);background:var(--surface-subtle);}
+.lot-group-card{border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
+.lot-group-card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);padding:var(--space-4);border-bottom:1px solid var(--border-subtle);background:var(--surface-subtle);}
 .lot-group-card-h>div{display:grid;gap:2px;min-width:0;}
 .lot-group-card-h b{font-size:var(--text-sm);font-weight:var(--weight-bold);}
-.lot-group-card-h small{color:var(--muted);font-size:var(--text-xs);line-height:var(--leading-snug);}
-.lot-group-chipline{display:flex;flex-wrap:wrap;gap:var(--gap-control);padding:var(--gap-content);}
-.lot-group-actions{display:flex;justify-content:flex-end;gap:var(--gap-control);padding:0 var(--gap-content) var(--gap-content);}
+.lot-group-card-h small{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-snug);}
+.lot-group-chipline{display:flex;flex-wrap:wrap;gap:var(--space-2);padding:var(--space-4);}
+.lot-group-actions{display:flex;justify-content:flex-end;gap:var(--space-2);padding:0 var(--space-4) var(--space-4);}
 .lot-group-actions .btn.sm{box-sizing:border-box;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:2px 8px;}
 .lot-group-actions .row-action{width:var(--control-h-compact);height:var(--control-h-compact);flex-basis:var(--control-h-compact);}
 
@@ -305,13 +305,13 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Dải chọn Panel/nhóm lô/xét nghiệm là hàng đầu tiên BÊN TRONG khối trắng —
    cùng vai trò với ô tìm kiếm ở header của các thẻ khác, nên cũng nền trắng,
    chỉ một đường kẻ ngăn với bảng bên dưới. */
-.target-selector{display:grid;gap:var(--field-gap);padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--panel);align-items:end;}
+.target-selector{display:grid;gap:var(--field-gap);padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--surface);align-items:end;}
 .target-selector select,.target-selector input{height:var(--control-h);}
 .target-selector.history-selector{grid-template-columns:minmax(240px,320px);}
 .target-matrix-panel .target-selector:not(.history-selector){grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));}
 .target-selector.field{max-width:none;}
 .target-selector .field{margin:0;}
-.target-matrix-panel .target-selector.target-config-selector{display:flex;flex-wrap:wrap;justify-content:flex-start;margin:0;padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--panel);align-items:end;}
+.target-matrix-panel .target-selector.target-config-selector{display:flex;flex-wrap:wrap;justify-content:flex-start;margin:0;padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--surface);align-items:end;}
 .target-config-panel-field{flex:0 1 380px;min-width:240px;}
 .target-config-group-field{flex:0 1 320px;min-width:240px;}
 .target-config-selector .field{margin:0;}
@@ -322,26 +322,26 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Lưới Mean/SD nằm TRONG khối trắng `.target-matrix-panel`, nên tự nó không
    mang viền/bo góc/lề nữa — điểm (2) của khối chuẩn (một bề mặt trắng, không
    lồng khung trong khung). */
-.target-table{display:block;margin:0;max-width:100%;max-height:none;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;padding-bottom:0;border:0;border-radius:0;background:var(--panel);contain:paint;}
+.target-table{display:block;margin:0;max-width:100%;max-height:none;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;padding-bottom:0;border:0;border-radius:0;background:var(--surface);contain:paint;}
 .target-head,.target-row{display:grid;grid-template-columns:54px minmax(280px,1.7fr) repeat(4,minmax(145px,1fr)) minmax(130px,.8fr);column-gap:10px;align-items:center;}
 /* Mean/SD là lưới, không dùng thẻ <table>, nhưng hàng cột phải theo đúng
    hệ màu header bảng chung để không thành một ngoại lệ thị giác. */
-.target-head{position:sticky;top:0;z-index:var(--z-sticky);min-height:var(--table-header-height);padding:0 10px;font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);font-weight:var(--table-head-weight);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);}
+.target-head{position:sticky;top:0;z-index:var(--z-sticky);min-height:var(--table-header-h);padding:0 10px;font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);font-weight:var(--table-head-weight);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);}
 
 .target-head>span,.target-row>span{display:flex;align-items:center;justify-content:center;text-align:center;}
 .target-row{min-height:var(--table-row-h);padding:4px 10px;border-bottom:1px solid var(--border-subtle);}
 .target-row:last-child{border-bottom:0;}
 .target-row:hover{background:var(--surface-subtle);}
 .target-head>*,.target-row>*{min-width:0;}
-.target-row input[type=number]{min-width:0;width:116px;max-width:100%;height:var(--control-h);margin:0;justify-self:center;background:var(--panel);color:var(--ink);text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield;}
+.target-row input[type=number]{min-width:0;width:116px;max-width:100%;height:var(--control-h);margin:0;justify-self:center;background:var(--surface);color:var(--text-primary);text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield;}
 .target-row input[type=number]::-webkit-inner-spin-button,
 .target-row input[type=number]::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
 .target-row input:disabled{border-color:var(--border-subtle);background:var(--surface-subtle);color:var(--text-disabled);}
 .target-table select,.target-table input{max-width:100%;}
-.target-level-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 14px;border:0;border-bottom:1px solid var(--table-head-border);border-radius:0;background:transparent;}.target-level-toolbar>div:first-child{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-body);font-size:var(--text-sm);}
+.target-level-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 14px;border:0;border-bottom:1px solid var(--table-head-border);border-radius:0;background:transparent;}.target-level-toolbar>div:first-child{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-secondary);font-size:var(--text-sm);}
 
 .target-level-toolbar .dayseg{flex:0 0 auto;}
-.target-level-toolbar>div:first-child b{font-size:var(--text-base);}.target-level-toolbar .target-level-lot{overflow:hidden;color:var(--teal);font-size:var(--text-base);font-weight:700;text-overflow:ellipsis;white-space:nowrap;}
+.target-level-toolbar>div:first-child b{font-size:var(--text-base);}.target-level-toolbar .target-level-lot{overflow:hidden;color:var(--accent);font-size:var(--text-base);font-weight:700;text-overflow:ellipsis;white-space:nowrap;}
 .target-summary{display:flex;flex:1 1 390px;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:0;}
 .target-summary .tag{gap:var(--space-1);}
 .target-summary b{font-size:var(--text-sm);}
@@ -363,7 +363,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .lot-trans-row2{display:flex;gap:var(--field-gap);margin-top:0;}
 .lot-trans-row2>div{flex:0 0 auto;width:200px;}
 .lot-trans-row3 .field,.lot-trans-row2 .field{margin:0;}
-.lot-trans-modal .lot-trans-row2+.field{margin-top:var(--space-panel);}
+.lot-trans-modal .lot-trans-row2+.field{margin-top:var(--space-4);}
 /* Dòng nhắc chọn Panel/lô dùng `.hint.flow-section` dùng chung như hệ thống. */
 
 .history-selector .field{margin:0;}
@@ -393,16 +393,16 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-source-card {
   min-width: 0;
   padding: 10px 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 .tea-source-card > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tea-source-card b { font-size: var(--text-sm); }
-.tea-source-card p { margin: 4px 0; color: var(--muted); font-size: var(--text-sm); line-height:var(--leading-snug); }
-.tea-source-card a { color: var(--tealink); font-size: var(--text-sm); font-weight:var(--weight-bold); text-decoration: none; }
-.tea-source-card.retired { background: var(--warning-bg); border-color: var(--warning-border); }
-.tea-source-card.retired b { color: var(--warning-ink); }
+.tea-source-card p { margin: 4px 0; color: var(--text-tertiary); font-size: var(--text-sm); line-height:var(--leading-snug); }
+.tea-source-card a { color: var(--accent-text); font-size: var(--text-sm); font-weight:var(--weight-bold); text-decoration: none; }
+.tea-source-card.retired { background: var(--warning-surface); border-color: var(--warning-border); }
+.tea-source-card.retired b { color: var(--warning-text); }
 .tea-ref-table { width: 100%; min-width: 920px; table-layout: fixed; margin: 0; border: 0; }
 .tea-ref-table th, .tea-ref-table td { text-align: center; vertical-align: middle; }
 .tea-ref-table th:nth-child(1), .tea-ref-table td:nth-child(1) { width: 26%; text-align: left; }
@@ -414,116 +414,116 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-ref-table input.tea-ref-value::-webkit-inner-spin-button,
 .tea-ref-table input.tea-ref-value::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
 .tea-ref-table input.tea-ref-value:hover:not(:disabled),
-.tea-ref-table input.tea-ref-value:focus:not(:focus-visible){border-color:var(--accent-border);background:var(--panel);}
+.tea-ref-table input.tea-ref-value:focus:not(:focus-visible){border-color:var(--accent-border);background:var(--surface);}
 .tea-lab-cell{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;white-space:nowrap;}
-.tea-lab-cell>b{font-size:var(--text-sm);color:var(--ink);}
+.tea-lab-cell>b{font-size:var(--text-sm);color:var(--text-primary);}
 .tea-lab-cell .btn{min-height:var(--control-h-sm);padding:2px 8px;}
 .tea-ref-status { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
 .tea-ref-status .btn { min-height: var(--control-h-sm); padding: 4px 8px; }
-.tea-form-section { margin-bottom: var(--gap-content); padding-bottom: var(--gap-content); border-bottom: 1px solid var(--line); }
+.tea-form-section { margin-bottom: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .tea-form-section-last { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
-.tea-form-section > b { display: block; margin-bottom: var(--gap-content); color: var(--card-head-ink); font-size: var(--text-base); }
+.tea-form-section > b { display: block; margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--text-base); }
 .tea-form-primary { display: grid; grid-template-columns: minmax(160px,1fr) 72px 88px minmax(185px,1.15fr); gap: var(--field-gap); }
 .tea-form-primary .field, .tea-form-dates .field, .tea-form-people .field { margin: 0; }
 .tea-form-section > .field + .field { margin-top: var(--field-gap); }
-.tea-form-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-content); }
-.tea-form-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--field-gap); margin-top: var(--gap-content); }
+.tea-form-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.tea-form-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--field-gap); margin-top: var(--space-4); }
 
 /* Biểu mẫu xét nghiệm giữ cùng mật độ và thứ bậc thông tin với giao diện cũ. */
 
 .assay-setup-layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:12px;align-items:stretch;}
-.assay-config-card{min-width:0;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
-.assay-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--panel-header-min-height);padding:8px 12px;border-bottom:1px solid var(--line);background:var(--section-head-bg);box-sizing:border-box;}
+.assay-config-card{min-width:0;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
+.assay-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--panel-header-h);padding:8px 12px;border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);box-sizing:border-box;}
 .assay-card-head>span{display:grid;min-width:0;gap:2px;}
-.assay-card-head b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
-.assay-card-head small,.assay-advanced summary small{color:var(--muted);font-size:var(--text-xs);font-weight:500;line-height:var(--leading-snug);}
+.assay-card-head b{color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-bold);}
+.assay-card-head small,.assay-advanced summary small{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:500;line-height:var(--leading-snug);}
 .assay-card-body{padding:10px 12px 12px;}
 .assay-settings-column{min-width:0;}
 .assay-main-grid,.assay-detail-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(96px,1fr);gap:var(--field-gap);align-items:end;}
-.assay-detail-grid{margin-top:var(--gap-content);}
+.assay-detail-grid{margin-top:var(--space-4);}
 .assay-main-grid>div,.assay-detail-grid>div{min-width:0;}
 .assay-main-grid .field,.assay-detail-grid .field{margin:0;min-width:0;}
 .assay-name-picker{position:relative;}
-.assay-name-options{position:absolute;z-index:var(--z-float);top:calc(100% + 4px);left:0;right:0;max-height:260px;overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-menu);}
-.assay-name-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:var(--control-h);padding:8px 10px;border:0;border-bottom:1px solid var(--line2);background:var(--panel);color:var(--ink);font-family:var(--sans);font-size:var(--text-sm);text-align:left;cursor:pointer;}
+.assay-name-options{position:absolute;z-index:var(--z-float);top:calc(100% + 4px);left:0;right:0;max-height:260px;overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-menu);}
+.assay-name-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:var(--control-h);padding:8px 10px;border:0;border-bottom:1px solid var(--border-subtle);background:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);text-align:left;cursor:pointer;}
 .assay-name-options button:last-child{border-bottom:0;}
 .assay-name-options button:hover,.assay-name-options button:focus-visible{background:var(--surface-subtle);}
 .assay-name-options span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.assay-name-options small{flex:none;color:var(--muted);font-size:var(--text-xs);white-space:nowrap;}
-.assay-name-options p{margin:0;padding:10px 10px;color:var(--muted);font-size:var(--text-sm);}
-.assay-machine-section{display:flex;min-height:0;flex-direction:column;background:var(--panel);}
+.assay-name-options small{flex:none;color:var(--text-tertiary);font-size:var(--text-xs);white-space:nowrap;}
+.assay-name-options p{margin:0;padding:10px 10px;color:var(--text-tertiary);font-size:var(--text-sm);}
+.assay-machine-section{display:flex;min-height:0;flex-direction:column;background:var(--surface);}
 .assay-machine-head-actions{display:flex;flex:none;align-items:center;gap:6px;}
-.assay-add-machine{min-height:var(--control-h-sm);padding:0 8px;border:1px solid var(--accent-border-strong);border-radius:var(--radius-sm);background:var(--panel);color:var(--teal);font-family:var(--sans);font-size:var(--text-xs);font-weight:var(--weight-bold);white-space:nowrap;cursor:pointer;}
-.assay-add-machine:hover{background:var(--accent-surface);border-color:var(--teal);}
+.assay-add-machine{min-height:var(--control-h-sm);padding:0 8px;border:1px solid var(--accent-border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--accent);font-family:var(--font-sans);font-size:var(--text-xs);font-weight:var(--weight-bold);white-space:nowrap;cursor:pointer;}
+.assay-add-machine:hover{background:var(--accent-surface);border-color:var(--accent);}
 .assay-machine-body{display:flex;min-height:0;flex:1;flex-direction:column;}
 .assay-machine-picker{display:grid;grid-template-columns:1fr;align-content:start;gap:6px;min-height:0;flex:1;overflow:auto;padding-right:2px;}
-.assay-machine-picker label{display:grid;grid-template-columns:17px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;min-height:var(--table-row-h);margin:0;padding:6px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);cursor:pointer;transition:border-color var(--motion-fast) ease,background var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
+.assay-machine-picker label{display:grid;grid-template-columns:17px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;min-height:var(--table-row-h);margin:0;padding:6px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);cursor:pointer;transition:border-color var(--motion-fast) ease,background var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
 .assay-machine-picker label:hover{border-color:var(--accent-border-hover);box-shadow:var(--shadow-control-hover);}
 .assay-machine-picker label:has(input:checked){border-color:var(--accent-border-hover);background:var(--accent-surface);box-shadow:none;}
 .assay-machine-picker label.assigned{cursor:default;}
 .assay-machine-picker input[type=checkbox]{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;}
 .assay-machine-check{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--surface);color:transparent;font-size:var(--text-2xs);font-weight:var(--weight-bold);box-sizing:border-box;transition:background var(--motion-fast) ease,border-color var(--motion-fast) ease,color var(--motion-fast) ease;}
-.assay-machine-picker label:has(input:checked) .assay-machine-check{border-color:var(--teal);background:var(--teal);color:var(--on-accent);}
+.assay-machine-picker label:has(input:checked) .assay-machine-check{border-color:var(--accent);background:var(--accent);color:var(--on-accent);}
 .assay-machine-copy{display:grid;min-width:0;gap:2px;}
 .assay-machine-copy b,.assay-machine-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.assay-machine-copy b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
-.assay-machine-copy small{color:var(--muted);font-size:var(--text-xs);font-weight:400;}
+.assay-machine-copy b{color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-bold);}
+.assay-machine-copy small{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:400;}
 /* Ô chọn nằm TRONG ô bảng — dùng ở 2 chỗ: cột "Máy xét nghiệm" của thẻ Danh
    mục xét nghiệm (đổi máy thì cả dòng đổi theo), và cột "Xét nghiệm trong
    panel" của thẻ Panel QC (gộp danh sách dài lại thành một dòng để đọc). */
 .assay-machine-select,
-.panel-test-select{width:100%;max-width:280px;height:var(--control-h);padding:0 28px 0 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background-color:var(--panel);color:var(--ink);font-family:var(--sans);font-size:var(--text-sm);font-weight:400;text-align:left;cursor:pointer;}
+.panel-test-select{width:100%;max-width:280px;height:var(--control-h);padding:0 28px 0 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background-color:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;text-align:left;cursor:pointer;}
 .assay-machine-select:hover,
 .panel-test-select:hover{border-color:var(--accent-border-strong);}
 .assay-machine-select:focus:not(:focus-visible),
 .panel-test-select:focus:not(:focus-visible){border-color:var(--accent-border);}
-.assay-advanced{margin-top:var(--gap-content);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
-.assay-advanced summary{display:flex;align-items:center;justify-content:space-between;gap:var(--gap-content);min-height:var(--panel-header-min-height);padding:8px var(--space-lg);background:var(--section-head-bg);cursor:pointer;list-style:none;box-sizing:border-box;}
+.assay-advanced{margin-top:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
+.assay-advanced summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--panel-header-h);padding:8px var(--space-3);background:var(--surface-section-header);cursor:pointer;list-style:none;box-sizing:border-box;}
 .assay-advanced summary::-webkit-details-marker{display:none;}
 .assay-advanced summary>span:first-child{display:grid;gap:2px;}
 .assay-advanced summary b{font-size:var(--text-base);}
-.assay-advanced summary>span:last-child{width:16px;color:var(--teal);font-size:0;text-align:center;}
+.assay-advanced summary>span:last-child{width:16px;color:var(--accent);font-size:0;text-align:center;}
 .assay-advanced summary>span:last-child::before{content:'+';font-size:var(--text-md);}
 .assay-advanced[open] summary>span:last-child::before{content:'−';}
-.assay-advanced-body{padding:var(--gap-content) var(--space-lg) var(--space-lg);border-top:1px solid var(--line);background:var(--panel);}
-.assay-rule-head,.assay-rule-row{display:grid;grid-template-columns:70px minmax(0,1fr) minmax(0,1.3fr);gap:var(--gap-content);align-items:center;}
-.assay-rule-head{padding:0 0 var(--gap-control);color:var(--muted);font-size:var(--text-xs);font-weight:var(--weight-bold);}
-.assay-rule-grid{display:grid;gap:var(--gap-control);}
+.assay-advanced-body{padding:var(--space-4) var(--space-3) var(--space-3);border-top:1px solid var(--border-subtle);background:var(--surface);}
+.assay-rule-head,.assay-rule-row{display:grid;grid-template-columns:70px minmax(0,1fr) minmax(0,1.3fr);gap:var(--space-4);align-items:center;}
+.assay-rule-head{padding:0 0 var(--space-2);color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-bold);}
+.assay-rule-grid{display:grid;gap:var(--space-2);}
 .assay-rule-row b{font-size:var(--text-sm);}
-.assay-cusum-grid{display:grid;grid-template-columns:repeat(2,minmax(0,200px));gap:var(--field-gap);justify-content:start;margin-top:var(--gap-content);}
+.assay-cusum-grid{display:grid;grid-template-columns:repeat(2,minmax(0,200px));gap:var(--field-gap);justify-content:start;margin-top:var(--space-4);}
 .assay-cusum-grid .field{margin:0;}
-.assay-closed{margin-top:var(--space-panel);}
+.assay-closed{margin-top:var(--space-4);}
 
 /* Popup Panel QC: cùng cấu trúc picker/card của giao diện cũ. */
 .panel-qc-main-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap);}
 .panel-qc-main-grid .field{margin:0;}
-.panel-test-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--card-head-ink);}
+.panel-test-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);}
 /* Thiếu `grid-template-columns` — hệ thống (`professional-config.css`'s
    `.group-lot-picker,.lot-level-picker{grid-template-columns:repeat(auto-fit,
    minmax(min(180px,100%),1fr));}`) xếp checkbox NHIỀU CỘT theo hàng ngang;
    app chỉ có base `display:grid` không khai cột nên mặc định 1 cột, xếp
    dọc từng dòng — đúng lỗi người dùng chỉ ra qua ảnh chụp. */
 .panel-test-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:6px;max-height:280px;overflow:auto;padding:0;border:0;border-radius:0;background:transparent;}
-.panel-test-picker label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--panel);cursor:pointer;}
+.panel-test-picker label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;}
 .panel-test-picker label:hover{border-color:var(--accent-border-strong);}
 .panel-test-picker label:has(input:checked){border-color:var(--accent-border-hover);background:var(--accent-surface);}
 .panel-test-picker input{display:grid;flex:0 0 17px;place-content:center;width:17px;height:17px;margin:0;border:1px solid var(--border);border-radius:var(--radius-xs);appearance:none;-webkit-appearance:none;background:var(--surface);box-sizing:border-box;cursor:pointer;}
 .panel-test-picker input::after{width:8px;height:4px;border:solid var(--surface);border-width:0 0 2px 2px;content:"";opacity:0;transform:rotate(-45deg);}
-.panel-test-picker input:checked{border-color:var(--teal);background:var(--teal);}
+.panel-test-picker input:checked{border-color:var(--accent);background:var(--accent);}
 .panel-test-picker input:checked::after{opacity:1;}
 .panel-test-picker span{display:grid;gap:2px;}
-.panel-test-picker b{font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--ink);}
-.panel-test-picker small{font-size:var(--text-xs);font-weight:400;color:var(--muted);}
+.panel-test-picker b{font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);}
+.panel-test-picker small{font-size:var(--text-xs);font-weight:400;color:var(--text-tertiary);}
 /* Thông báo trống trong lưới nhiều cột phải chiếm trọn hàng. */
 .lot-level-picker>.empty-notice,.panel-test-picker>.empty-notice{grid-column:1/-1;}
-.rcfg-modal .panel-test-picker+.field{margin-top:var(--space-panel);}
+.rcfg-modal .panel-test-picker+.field{margin-top:var(--space-4);}
 .panel-active{margin:0;}
 
 /* Popup lô QC và nhóm lô QC: chia trường/lô đúng hai modal của hệ thống. */
 /* Popup lô QC nhỏ hơn modal cấu hình chung vì chỉ có các trường một lô.
    Các hàng `grid2` nhận nhịp 12px từ `#lot-form`, không mang margin cục bộ. */
 
-.lot-group-picker-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--card-head-ink);}
+.lot-group-picker-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);}
 .lot-level-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:300px;overflow:auto;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
 /* hệ thống chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/`levels-3plus`
    trên chính modal), không phải auto-fit. */
@@ -532,13 +532,13 @@ main:has(.config-shell){padding-bottom:16px;}
 .rcfg-group-modal.levels-3plus .lot-level-picker{grid-template-columns:repeat(3,minmax(0,1fr));}
 .lot-level-col{display:grid;align-content:start;gap:6px;min-width:0;}
 
-.lot-level-title{letter-spacing:var(--title-overline-tracking);padding:2px 2px;color:var(--text-subtle);font-size:var(--text-2xs);font-weight:var(--weight-bold);text-transform:none;letter-spacing:0;}
-.lot-level-col label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--panel);cursor:pointer;}
+.lot-level-title{letter-spacing:var(--title-overline-tracking);padding:2px 2px;color:var(--text-tertiary);font-size:var(--text-2xs);font-weight:var(--weight-bold);text-transform:none;letter-spacing:0;}
+.lot-level-col label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;}
 .lot-level-col label:hover{border-color:var(--accent-border-strong);}
-.lot-level-col input{width:17px;height:17px;accent-color:var(--teal);}
+.lot-level-col input{width:17px;height:17px;accent-color:var(--accent);}
 .lot-level-col span{display:grid;gap:2px;}
-.lot-level-col b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
-.lot-level-col small{color:var(--muted);font-size:var(--text-xs);}
+.lot-level-col b{color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-bold);}
+.lot-level-col small{color:var(--text-tertiary);font-size:var(--text-xs);}
 .lot-opt-depleted{opacity:.62;}
 /* Bộ chọn lô và tên nhóm là hai hàng liên tiếp của cùng form; `row-gap` 12px
    trên #lot-group-form đã đủ nhịp. Không cộng thêm khoảng cách panel ở đây. */
@@ -553,7 +553,7 @@ main:has(.config-shell){padding-bottom:16px;}
   .rcfg-tools input{ max-width:none; }
 }
 
-.lot-config-left,.lot-config-right{border:1px solid var(--surface-border);background:var(--panel);overflow:hidden;min-width:0;max-width:100%;border-radius:var(--radius-lg);box-shadow:none;contain:paint;}
+.lot-config-left,.lot-config-right{border:1px solid var(--surface-border);background:var(--surface);overflow:hidden;min-width:0;max-width:100%;border-radius:var(--radius-lg);box-shadow:none;contain:paint;}
 .lot-config-left:has(> .lot-table){padding:0;}
 .lot-config-left > .lot-table{margin:0;border:0;border-radius:0;border-collapse:collapse;border-spacing:0;width:100%;min-width:0;table-layout:fixed;background:transparent;}
 /* Dùng cùng 3 tầng nền của cụm Mean/SD: mặt thẻ trắng, phần điều khiển và
@@ -561,13 +561,13 @@ main:has(.config-shell){padding-bottom:16px;}
    đặc, đồng thời thân bảng không còn sọc nền xen kẽ. */
 .lot-config-grid > :is(.lot-config-left,.lot-config-right) > .rcfg-panel-h,
 .lot-config-left > .lot-table thead th{background:var(--table-head-bg);color:var(--table-head-ink);border-bottom-color:var(--table-head-border);}
-.lot-config-left > .lot-table tbody tr{background:var(--panel);}
+.lot-config-left > .lot-table tbody tr{background:var(--surface);}
 .transition-list{overflow-x:auto;}
 /* Thông báo trống (EmptyState) đã nằm thẳng trên nền panel; panel chỉ bỏ
    đệm đáy để khối không bị dư khoảng trống bên dưới. */
 .config-shell-main > .target-matrix-panel:has(> .empty-notice),
 .config-shell-main > .target-matrix-panel:has(> .rcfg-list > .empty-notice){padding-bottom:0;}
-button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--danger-ink);}
+button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--danger-text);}
 
 
 
@@ -577,27 +577,27 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
    cấu hình khác. */
 .lot-trans-target-head-row{display:flex;align-items:center;gap:10px;margin:16px 0 10px;}
 .lot-trans-target-head-row label{margin:0;}
-.lot-trans-target-head-row input.lot-trans-target-search{flex:0 0 220px;width:220px;max-width:45%;height:var(--control-h-compact);min-height:0;margin-left:auto;padding:0 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);font-size:var(--text-sm);background:var(--panel);}
+.lot-trans-target-head-row input.lot-trans-target-search{flex:0 0 220px;width:220px;max-width:45%;height:var(--control-h-compact);min-height:0;margin-left:auto;padding:0 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);font-size:var(--text-sm);background:var(--surface);}
 .lot-trans-target-table .target-head,.lot-trans-target-table .target-row{grid-template-columns:32px 210px repeat(4,minmax(108px,1fr)) minmax(84px,.75fr);column-gap:12px;width:100%;padding-left:12px;padding-right:12px;}
 .target-table.lot-trans-target-table{max-height:min(320px,calc(100vh - 430px));margin:0;border:1px solid var(--table-head-border);border-radius:var(--table-radius);}
 .lot-trans-target-table .target-head{min-height:var(--table-header-h);}
 .lot-trans-target-table .target-head>span{font-size:var(--table-head-size-sm);letter-spacing:var(--table-head-tracking-sm);line-height:var(--leading-heading);white-space:normal;}
 .lot-trans-target-table .target-row input[type=number]{width:104px;max-width:100%;justify-self:center;}
 .lot-assay-check{display:flex;align-items:center;justify-content:center;margin:0;}
-.lot-assay-check input{width:18px;height:18px;accent-color:var(--teal);}
+.lot-assay-check input{width:18px;height:18px;accent-color:var(--accent);}
 .lot-assay-name{display:grid;min-width:0;}
 .lot-assay-name b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.lot-group-card-h b,.lot-assay-name b,.group-lot-picker b,.lot-level-col b{color:var(--ink);font-weight:var(--weight-bold);}
-.lot-assay-name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:var(--text-xs);}
+.lot-group-card-h b,.lot-assay-name b,.group-lot-picker b,.lot-level-col b{color:var(--text-primary);font-weight:var(--weight-bold);}
+.lot-assay-name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-tertiary);font-size:var(--text-xs);}
 .target-row,.target-row .lot-assay-name b{font-size:var(--text-sm);}
 .target-row .lot-assay-name small{font-size:var(--text-xs);}
 .target-head>span:first-child,.target-row>.lot-assay-check{justify-content:center;}
 .target-head>span:nth-child(2),.target-row>.lot-assay-name{justify-content:flex-start;padding-left:12px;text-align:left;}
-.target-actions{justify-content:flex-end;margin-top:0;padding:12px 14px;border-top:0;background:var(--panel);}
+.target-actions{justify-content:flex-end;margin-top:0;padding:12px 14px;border-top:0;background:var(--surface);}
 .target-matrix-panel .target-table{margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0;margin-bottom:14px;}
 
 
-.history-detail-table thead th{height:var(--table-header-h);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);font-size:var(--table-head-size);text-transform:none;letter-spacing:var(--table-head-letter-spacing);}
+.history-detail-table thead th{height:var(--table-header-h);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);font-size:var(--table-head-size);text-transform:none;letter-spacing:var(--table-head-tracking);}
 .history-detail-table th,.history-detail-table td{text-align:center;vertical-align:middle;padding-left:14px;padding-right:14px;}
 .history-detail-table th:first-child,.history-detail-table td:first-child{text-align:left;}
 .rcfg-history-detail-modal .history-detail-table{width:100%;min-width:0;table-layout:fixed;}
@@ -618,8 +618,8 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
   min-height:var(--control-h);
 }
 .rcfg-modal button.btn{
-  height:var(--button-height);
-  min-height:var(--button-height);
+  height:var(--control-h);
+  min-height:var(--control-h);
 }
 .rcfg-modal select{
   height:var(--control-h);
@@ -636,7 +636,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 }
 
 .history-detail-heading{margin-top:0;margin-bottom:var(--panel-content-gap);}
-.space-after-section{margin-bottom:var(--space-section);}
+.space-after-section{margin-bottom:var(--space-4);}
 /* .hist-meansd-table ("Mean/SD đã dùng") và .hist-points-table ("Điểm QC đã
    nhập") — 2 class riêng cho 2 bảng trong modal "Chi tiết", mỗi bảng khai
    đủ 8 cột, không dùng chung rule nth-child với các bảng khác của trang

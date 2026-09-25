@@ -177,7 +177,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   assert.match(sigma, /\.sg-opspec-table td\{[^}]*height:var\(--table-row-h\)[^}]*vertical-align:middle/);
   assert.match(sigma, /\.sg-level-matrix-head\{[^}]*min-height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/,
     'workspace kỳ dùng header dữ liệu chuẩn 40px/13px');
-  assert.match(sigma, /\.sg-period-history-item\.is-selected\{[^}]*border-color:var\(--accent-border\)[^}]*border-left:3px solid var\(--teal\)[^}]*background:var\(--accent-surface\)[^}]*color:var\(--text-accent\);\}/,
+  assert.match(sigma, /\.sg-period-history-item\.is-selected\{[^}]*border-color:var\(--accent-border\)[^}]*border-left:3px solid var\(--accent\)[^}]*background:var\(--accent-surface\)[^}]*color:var\(--text-accent\);\}/,
     'kỳ đang chọn dùng vạch active teal 3px cùng viền và nền accent chung');
   assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
     'CV/Bias trong hàng dữ liệu Sigma dùng control 36px, cân với bảng đọc');
@@ -203,7 +203,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   );
   assert.match(
     sigma,
-    /\.sg-eqa-summary\.is-empty \.sg-eqa-empty\{color:var\(--warning-ink\);font-weight:var\(--weight-normal\);\}/,
+    /\.sg-eqa-summary\.is-empty \.sg-eqa-empty\{color:var\(--warning-text\);font-weight:var\(--weight-normal\);\}/,
     'nội dung hướng dẫn EQA không được đậm quá mức cần thiết',
   );
   assert.match(reagent, /\.rc-pair-head \{[^}]*min-height:\s*var\(--table-header-h-sm\)[^}]*font-size:\s*var\(--table-head-size-sm\)[^}]*letter-spacing:\s*var\(--table-head-tracking-sm\)/);
@@ -220,7 +220,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   );
   assert.match(
     westgard,
-    /\.wg-chart-control\{margin:var\(--space-section\) var\(--panel-padding\);\}/,
+    /\.wg-chart-control\{margin:var\(--space-4\) var\(--panel-padding\);\}/,
     'vùng đổi biểu đồ Westgard có khoảng thở section ở trên và dưới, cùng gutter panel',
   );
   assert.match(
@@ -532,7 +532,7 @@ test('thanh thông báo info dùng trạng thái xanh dương chung', () => {
   );
   assert.match(
     appCss,
-    /\.alert\.info\{background:var\(--info-bg\);color:var\(--info-ink\);border-left-color:var\(--info-accent\);\}/,
+    /\.alert\.info\{background:var\(--info-surface\);color:var\(--info-text\);border-left-color:var\(--info-accent\);\}/,
     'mọi alert info phải dùng cùng nền, chữ và thanh nhấn xanh dương',
   );
 });
@@ -668,7 +668,7 @@ test('chiều cao control và hàng bảng nằm trên thang, không tự đặt
       if (px >= 20 && px <= 56) raw.push(`${relative(ROOT, file)}: ${selector} ${d[1]}:${px}px`);
     }
   }
-  assert.deepEqual(raw, [], 'dùng --control-h-sm/-compact/--control-h, --table-row-h-compact/--table-row-h/-input hoặc --panel-header-min-height');
+  assert.deepEqual(raw, [], 'dùng --control-h-sm/-compact/--control-h, --table-row-h-compact/--table-row-h/-input hoặc --panel-header-h');
 });
 
 // Khoảng cách nhãn → ô nhập từng đến từ ba nguồn cộng dồn tuỳ trang: margin
@@ -1041,4 +1041,23 @@ test('bộ đếm và số thứ tự bước: hai kiểu dùng chung, một kí
     }
   }
   assert.deepEqual(bad, [], 'dùng .count / .step-number; trang chỉ đổi màu nền của .step-number');
+});
+
+// Lớp 4 "bí danh tạm" của tokens.css từng có 91 tên đồng nghĩa với 820 chỗ
+// dùng, nên cùng một màu có ba bốn cách gọi: --panel là --surface, --muted là
+// --text-tertiary, --teal là --accent, --space-md là --space-2-5. Lớp này đã
+// xoá; 16 tên thực chất là vai trò riêng được chuyển lên lớp 2/3.
+test('không còn lớp bí danh: tên đồng nghĩa cũ không được định nghĩa lại', () => {
+  const RETIRED = `bg panel panel2 ink muted line line2 line-strong teal teal-deep tealink amber red
+    section-head-bg section-head-border section-head-ink section-heading-weight card-head-border card-head-ink
+    card-head-active panel-header-min-height subpanel-header-min-height panel-inline-padding modal-inline-padding
+    surface-shadow surface-card-soft surface-soft surface-neutral table-head-letter-spacing table-header-height
+    table-cell-block-padding table-cell-inline-padding text-body text-input text-subtle text-button-muted text-pill
+    text-success text-info text-warning text-danger neutral-ink neutral-bg success-ink success-bg info-ink info-bg
+    warning-ink warning-bg danger-ink danger-bg sidebar-active-icon sidebar-cloud-text button-height
+    button-inline-padding sans mono gap-control gap-content gap-panel gap-group space-2xs space-xs space-sm space-md
+    space-lg space-section space-panel space-xl space-modal radius-pill line-display line-heading line-compact line-body`
+    .split(/\s+/).filter(Boolean).map((n) => `--${n}`);
+  assert.deepEqual(RETIRED.filter((n) => n in TOKEN), [], 'dùng token vai trò đã có thay vì khai lại tên đồng nghĩa');
+  assert.doesNotMatch(tokensSrc, /LỚP 4/, 'không dựng lại lớp bí danh');
 });
