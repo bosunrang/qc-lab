@@ -900,3 +900,28 @@ test('modal: bốn cỡ qua prop size, trang không tự đặt độ rộng', (
   }
   assert.deepEqual(bad, [], 'độ rộng modal chỉ đặt ở app.css theo 4 cỡ');
 });
+
+// Thứ tự lớp từng có 17 số (1, 2, 3, 4, 5, 8, 12, 20, 21, 24, 40, 41, 90, 900,
+// 1100, 1200, 1400) chọn tuỳ chỗ, nên không ai biết một lớp mới phải đặt bao
+// nhiêu. Luật: đặt theo vai trò bằng `--z-*`; `1` chỉ để nâng trong cùng khối.
+test('z-index: thang theo vai trò, không số thô', () => {
+  const ORDER = ['--z-sticky', '--z-sticky-head', '--z-float', '--z-page-head', '--z-sidebar',
+    '--z-modal', '--z-dialog', '--z-tooltip', '--z-picker'];
+  const values = ORDER.map((k) => Number(flat(k)));
+  for (let i = 0; i < ORDER.length; i += 1) {
+    assert.ok(Number.isInteger(values[i]) && values[i] > (i ? values[i - 1] : 1),
+      `${ORDER[i]} phải là số nguyên lớn hơn lớp đứng trước (thang: ${ORDER.join(' < ')})`);
+  }
+  const zTokens = Object.keys(TOKEN).filter((k) => k.startsWith('--z-')).sort();
+  assert.deepEqual(zTokens, [...ORDER].sort(), 'thêm vai trò mới vào ORDER cùng lý do trong tokens.css');
+
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/z-index\s*:\s*([^;}]+)/g)) {
+      const value = m[1].trim();
+      if (!/^(?:0|1|auto|var\(--z-[a-z-]+\))$/.test(value)) bad.push(`${relative(ROOT, file)}: z-index:${value}`);
+    }
+  }
+  assert.deepEqual(bad, [], 'dùng var(--z-*) theo vai trò; chỉ 0, 1, auto được viết thô');
+});

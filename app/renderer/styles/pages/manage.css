@@ -238,10 +238,10 @@ main:has(.config-shell){padding-bottom:16px;}
    `z-index` phải cao hơn nội dung hàng, nếu không nút/nhãn của hàng đầu tiên
    sẽ vẽ đè lên dải tiêu đề. */
 .config-shell-main .rcfg-list > table{overflow:visible;}
-.config-shell-main .rcfg-list > table thead th{position:sticky;top:0;z-index:3;}
+.config-shell-main .rcfg-list > table thead th{position:sticky;top:0;z-index:var(--z-sticky);}
 /* Thẻ con Lô QC có tiêu đề riêng cao bằng token panel nằm trên bảng: nó dính
    trước, bảng dính ngay dưới nó. */
-.lot-config-grid > .panel > .rcfg-panel-h{position:sticky;top:0;z-index:4;}
+.lot-config-grid > .panel > .rcfg-panel-h{position:sticky;top:0;z-index:var(--z-sticky-head);}
 .lot-config-grid > .panel > table thead th{top:var(--panel-header-min-height);}
 .config-shell-main > .rcfg-list:has(> table){
   padding:0;
@@ -334,7 +334,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .target-head,.target-row{display:grid;grid-template-columns:54px minmax(280px,1.7fr) repeat(4,minmax(145px,1fr)) minmax(130px,.8fr);column-gap:10px;align-items:center;}
 /* Mean/SD là lưới, không dùng thẻ <table>, nhưng hàng cột phải theo đúng
    hệ màu header bảng chung để không thành một ngoại lệ thị giác. */
-.target-head{position:sticky;top:0;z-index:2;min-height:var(--table-header-height);padding:0 10px;font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);font-weight:var(--table-head-weight);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);}
+.target-head{position:sticky;top:0;z-index:var(--z-sticky);min-height:var(--table-header-height);padding:0 10px;font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);font-weight:var(--table-head-weight);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);color:var(--table-head-ink);}
 
 .target-head>span,.target-row>span{display:flex;align-items:center;justify-content:center;text-align:center;}
 .target-row{min-height:var(--table-row-h);padding:4px 10px;border-bottom:1px solid var(--border-subtle);}
@@ -454,7 +454,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-main-grid .field,.assay-detail-grid .field{margin:0;min-width:0;}
 .assay-main-grid .field>label,.assay-detail-grid .field>label,.assay-cusum-grid .field>label{margin-top:0;}
 .assay-name-picker{position:relative;}
-.assay-name-options{position:absolute;z-index:20;top:calc(100% + 4px);left:0;right:0;max-height:260px;overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-menu);}
+.assay-name-options{position:absolute;z-index:var(--z-float);top:calc(100% + 4px);left:0;right:0;max-height:260px;overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-menu);}
 .assay-name-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:var(--control-h);padding:8px 10px;border:0;border-bottom:1px solid var(--line2);background:var(--panel);color:var(--ink);font-family:var(--sans);font-size:var(--text-sm);text-align:left;cursor:pointer;}
 .assay-name-options button:last-child{border-bottom:0;}
 .assay-name-options button:hover,.assay-name-options button:focus-visible{background:var(--surface-subtle);}

@@ -18,7 +18,7 @@
 button.entry-tree-toggle,button.entry-tree-expand{width:28px;height:var(--control-h-sm);min-height:var(--control-h-sm);display:flex;align-items:center;justify-content:center;flex:none;padding:0;border:1px solid var(--accent-control-border);border-radius:var(--radius-md);background:var(--accent-control-surface);color:var(--tealink);cursor:pointer;transition:.18s ease;}
 button.entry-tree-toggle:hover,button.entry-tree-expand:hover{background:var(--accent-control-surface-hover);}
 button.entry-tree-toggle svg,button.entry-tree-expand svg{width:16px;height:16px;}
-button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-index:12;background:var(--panel);border-color:var(--line);color:var(--ink);box-shadow:var(--surface-shadow);}
+button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-index:var(--z-float);background:var(--panel);border-color:var(--line);color:var(--ink);box-shadow:var(--surface-shadow);}
 .entrygrid.tree-collapsed button.entry-tree-expand{display:flex;}
 .entrygrid.tree-collapsed button.entry-tree-expand svg{transform:rotate(180deg);}
 .tree-tools{display:grid;grid-template-columns:1fr;gap:8px;margin:10px 12px 12px;padding:0 0 10px;border-bottom:1px solid var(--surface-divider);}
@@ -44,7 +44,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 /* ---- Bảng nhập QC (worksheet theo lịch tháng) ---- */
 .qc-sheet-panel{border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
-.qc-sheet-heading{background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);color:var(--card-head-ink);display:grid;align-items:center;justify-content:space-between;gap:14px;min-height:64px;padding:10px 16px;position:sticky;top:0;z-index:8;grid-template-columns:minmax(220px,1fr) auto;}
+.qc-sheet-heading{background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);color:var(--card-head-ink);display:grid;align-items:center;justify-content:space-between;gap:14px;min-height:64px;padding:10px 16px;position:sticky;top:0;z-index:var(--z-sticky-head);grid-template-columns:minmax(220px,1fr) auto;}
 .qc-sheet-title{display:flex;gap:2px;min-width:0;align-items:baseline;flex-wrap:wrap;column-gap:8px;row-gap:2px;}
 .qc-sheet-title span{color:var(--text-accent);font-size:var(--title-panel);font-weight:var(--section-heading-weight);}
 .qc-sheet-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--title-panel);color:var(--text-strong);letter-spacing:-.01em;line-height:var(--leading-heading);}
@@ -60,15 +60,15 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-sheet{min-width:1080px;border:none;margin:0;table-layout:auto;border-radius:0;border-collapse:separate;border-spacing:0;overflow:visible;}
 @media(max-width:1280px){ .qc-sheet{ min-width:840px; } }
 @media(max-width:1150px){ .qc-sheet{ min-width:780px; } }
-.qc-sheet thead{position:relative;z-index:20;}
-.qc-sheet thead tr{position:sticky;top:0;z-index:20;}
+.qc-sheet thead{position:relative;z-index:var(--z-sticky-head);}
+.qc-sheet thead tr{position:sticky;top:0;z-index:var(--z-sticky-head);}
 /* Header sticky đã có `border-bottom` 1px từ rule bảng chung. Không thêm
    shadow theo từng ô: nhiều shadow liền nhau làm đáy header thành vệt đậm. */
-.qc-sheet th{position:sticky;top:0;z-index:21;color:var(--table-head-ink);line-height:var(--leading-heading);text-align:center;background:var(--table-head-bg);border-right:1px solid var(--table-head-border);box-shadow:none;}
-.qc-sheet thead th:first-child{z-index:24;background:var(--table-head-bg);color:var(--table-head-ink);font-weight:var(--table-head-weight);line-height:var(--leading-heading);text-transform:none;letter-spacing:var(--table-head-letter-spacing);}
+.qc-sheet th{position:sticky;top:0;z-index:var(--z-sticky);color:var(--table-head-ink);line-height:var(--leading-heading);text-align:center;background:var(--table-head-bg);border-right:1px solid var(--table-head-border);box-shadow:none;}
+.qc-sheet thead th:first-child{z-index:var(--z-sticky-head);background:var(--table-head-bg);color:var(--table-head-ink);font-weight:var(--table-head-weight);line-height:var(--leading-heading);text-transform:none;letter-spacing:var(--table-head-letter-spacing);}
 .qc-sheet td.num{text-align:center;}
 .qc-sheet td{border-right:1px solid var(--border-subtle);text-align:center;vertical-align:middle;padding-top:4px;padding-bottom:4px;color:inherit;}
-.qc-sheet td:first-child,.qc-sheet th:first-child{position:sticky;left:0;z-index:12;background:inherit;box-shadow:none;font-weight:var(--weight-bold);color:var(--text-button);white-space:nowrap;text-align:center;}
+.qc-sheet td:first-child,.qc-sheet th:first-child{position:sticky;left:0;z-index:var(--z-sticky);background:inherit;box-shadow:none;font-weight:var(--weight-bold);color:var(--text-button);white-space:nowrap;text-align:center;}
 .qc-sheet td:first-child b{margin-top:2px;color:var(--tealink);font-size:var(--text-2xs);font-weight:var(--weight-bold);}
 .qc-sheet td:last-child,.qc-sheet th:last-child{border-right:none;}
 .qc-sheet tbody tr{height:var(--table-row-h-input);}
@@ -104,7 +104,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-inline-input:focus:not(:focus-visible){border-color:var(--accent-border);border-style:solid;}
 .qc-staff-cell{min-width:96px;white-space:nowrap;}
 
-.qc-cumulative{border-bottom:1px solid var(--line);position:sticky;left:0;z-index:2;display:grid;grid-template-columns:repeat(4,minmax(105px,1fr));background:var(--surface-subtle);}
+.qc-cumulative{border-bottom:1px solid var(--line);position:sticky;left:0;z-index:var(--z-sticky);display:grid;grid-template-columns:repeat(4,minmax(105px,1fr));background:var(--surface-subtle);}
 .qc-cumulative>div{padding:8px 10px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid var(--border-subtle);text-align:center;}
 .qc-cumulative>div:last-child{border-right:none;}
 .qc-cumulative span{display:block;white-space:nowrap;color:var(--muted);font-size:var(--table-body-size);font-weight:var(--weight-bold);}
@@ -207,7 +207,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    rule dùng chung (đã xảy ra: font-size từng bị đè 14px→13px). */
 /* Header "Mức · Lô" là cấp con của "Điểm trong khoảng xem": dùng cấp
    `title-sub` (14px/600), không dùng lại cấp panel (16px/600). */
-.qc-table-card h4{position:sticky;left:0;z-index:3;display:flex;align-items:center;box-sizing:border-box;width:100%;font-size:var(--title-sub);font-weight:var(--title-sub-weight);}
+.qc-table-card h4{position:sticky;left:0;z-index:var(--z-sticky-head);display:flex;align-items:center;box-sizing:border-box;width:100%;font-size:var(--title-sub);font-weight:var(--title-sub-weight);}
 .qc-table-card h4>span{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
 .qc-table-count{font-weight:700;white-space:nowrap;color:var(--muted);font-size:var(--text-xs);}
 .qc-table-card table{border:none;border-radius:0;table-layout:fixed;width:100%;}
@@ -269,7 +269,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
   position: absolute; top: 0; right: 0; bottom: 0; width: 22px; margin: 0; padding: 0;
   display: flex; align-items: center; justify-content: center; border: none; border-radius: 0;
   background: transparent; color: var(--teal); cursor: pointer; overflow: hidden; white-space: nowrap;
-  box-sizing: border-box; z-index: 2; opacity: 0; pointer-events: none;
+  box-sizing: border-box; z-index: 1; opacity: 0; pointer-events: none;
   transition: opacity .15s ease, width .18s ease, background .18s ease;
 }
 .qc-run-cell:hover .qc-add-run-btn { opacity: 1; pointer-events: auto; background: var(--accent-surface); }
@@ -298,8 +298,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-note-input:focus:not(:focus-visible){border-color:var(--accent-border);}
 /* Header mức QC vẫn có tooltip khi rê/Tab, nhưng không gạch chân như liên kết. */
 .qc-sheet th.qc-level-head{cursor:help;text-decoration:none;}
-.qc-sheet th.qc-level-head::after{content:attr(data-qc-tooltip);position:absolute;left:50%;top:calc(100% + 7px);transform:translateX(-50%) translateY(-3px);z-index:40;min-width:max-content;padding:8px 10px;border:1px solid var(--accent-border-soft);border-radius:var(--radius-md);background:var(--surface-inverse-soft);color:var(--on-accent);box-shadow:var(--shadow-tooltip-compact);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-heading);letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease,transform .12s ease,visibility .12s;}
-.qc-sheet th.qc-level-head:hover, .qc-sheet th.qc-level-head:focus-visible{z-index:41;}
+.qc-sheet th.qc-level-head::after{content:attr(data-qc-tooltip);position:absolute;left:50%;top:calc(100% + 7px);transform:translateX(-50%) translateY(-3px);z-index:1;min-width:max-content;padding:8px 10px;border:1px solid var(--accent-border-soft);border-radius:var(--radius-md);background:var(--surface-inverse-soft);color:var(--on-accent);box-shadow:var(--shadow-tooltip-compact);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-heading);letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease,transform .12s ease,visibility .12s;}
+.qc-sheet th.qc-level-head:hover, .qc-sheet th.qc-level-head:focus-visible{z-index:var(--z-float);}
 .qc-sheet th.qc-level-head:focus-visible{outline-offset:-2px;}
 .qc-sheet th.qc-level-head:hover::after, .qc-sheet th.qc-level-head:focus-visible::after{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);}
 .tree .tn-config .config-name{min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;overflow-wrap:normal;line-height:var(--leading-heading);}

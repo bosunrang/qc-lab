@@ -11,7 +11,7 @@ body{background:var(--bg);color:var(--ink);font-size:var(--text-base);line-heigh
 .app-shell.nav-collapsed{grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}
 
 
-aside{background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px 12px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;min-width:0;max-width:100vw;border-right:1px solid var(--sidebar-border);box-shadow:6px 0 24px var(--shadow-ink-faint);z-index:5;}
+aside{background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px 12px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;min-width:0;max-width:100vw;border-right:1px solid var(--sidebar-border);box-shadow:6px 0 24px var(--shadow-ink-faint);z-index:var(--z-sidebar);}
 .brand-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;position:relative;padding:0 8px;}
 .brand-row:after{content:"";position:absolute;right:8px;bottom:-10px;left:8px;height:1px;background:var(--sidebar-group-divider);}
 .brand{display:flex;align-items:center;color:var(--on-accent);position:relative;gap:12px;font-weight:var(--weight-bold);font-size:var(--text-md);min-width:0;flex:1 1 auto;}
@@ -25,7 +25,7 @@ aside{background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px 12px 1
 .nav-toggle:hover{background:var(--sidebar-toggle-surface-hover);}
 .nav-toggle svg{width:16px;height:16px;}
 .app-shell.nav-collapsed .brand-row{justify-content:center;}
-.app-shell.nav-collapsed .nav-toggle{position:absolute;right:-25px;background:var(--panel);border:1px solid var(--surface-border);color:var(--ink);box-shadow:var(--surface-shadow);z-index:2;}
+.app-shell.nav-collapsed .nav-toggle{position:absolute;right:-25px;background:var(--panel);border:1px solid var(--surface-border);color:var(--ink);box-shadow:var(--surface-shadow);z-index:var(--z-float);}
 .app-shell.nav-collapsed .nav-toggle svg{transform:rotate(180deg);}
 
 .sidebar-footer{position:relative;flex:none;margin-top:auto;padding:var(--space-3) var(--space-1) 0;}.sidebar-footer:before{content:"";position:absolute;top:0;right:var(--space-2);left:var(--space-2);height:1px;background:var(--sidebar-group-divider);}
@@ -63,7 +63,7 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 /* Header trang chuẩn 84px ở desktop: đủ cho tên trang, mô tả và cụm tài
    khoản nhưng không chiếm chiều cao của bảng. `min-height` (thay vì height)
    vẫn cho phép nó nới an toàn nếu một tiêu đề/khối tài khoản phải xuống dòng. */
-.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(12px,1.4vw,20px);position:sticky;top:0;z-index:90;box-sizing:border-box;min-height:88px;margin:0 calc(-1 * clamp(20px,2.4vw,36px)) var(--page-header-gap);padding:12px clamp(20px,2.4vw,36px);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:0 4px 18px var(--shadow-ink-faint);}
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(12px,1.4vw,20px);position:sticky;top:0;z-index:var(--z-page-head);box-sizing:border-box;min-height:88px;margin:0 calc(-1 * clamp(20px,2.4vw,36px)) var(--page-header-gap);padding:12px clamp(20px,2.4vw,36px);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:0 4px 18px var(--shadow-ink-faint);}
 /* Khoảng hở dưới header nằm trên chính `.head` như hệ thống
    (`professional-base.css`: `margin:0 calc(...) 22px`). Bản trước dùng
    `main > .head + *{margin-top:...}` — KHÔNG khớp được, vì mọi trang app
@@ -233,8 +233,8 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 
 
 
-.modal-bg{position:fixed;inset:0;background:var(--surface-overlay);display:flex;align-items:center;justify-content:center;z-index:900;padding:var(--space-xl);backdrop-filter:blur(4px);}
-#dialogRoot .modal-bg,.modal-bg.dialog-layer{z-index:1100;background:var(--surface-overlay);backdrop-filter:blur(6px);}
+.modal-bg{position:fixed;inset:0;background:var(--surface-overlay);display:flex;align-items:center;justify-content:center;z-index:var(--z-modal);padding:var(--space-xl);backdrop-filter:blur(4px);}
+#dialogRoot .modal-bg,.modal-bg.dialog-layer{z-index:var(--z-dialog);background:var(--surface-overlay);backdrop-filter:blur(6px);}
 .modal{background:var(--panel);border:1px solid var(--surface-divider);border-radius:var(--radius-lg);width:min(var(--modal-w-md),calc(100vw - var(--space-8)));max-height:86vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-floating);}
 /* Bốn cỡ modal (xem Modal.tsx). Độ rộng CHỈ đặt ở đây; CSS trang không đặt
    width cho modal — design-system.test.mjs chặn. */
@@ -349,7 +349,7 @@ td .hint{margin-top:2px;color:var(--muted);}
 .datebox input.native-date{display:none;}
 
 
-.vn-date-picker{position:fixed;z-index:1400;width:258px;background:var(--panel);border:1px solid var(--surface-border);border-radius:var(--radius-md);box-shadow:var(--shadow-popover);padding:8px;font-family:var(--sans)}
+.vn-date-picker{position:fixed;z-index:var(--z-picker);width:258px;background:var(--panel);border:1px solid var(--surface-border);border-radius:var(--radius-md);box-shadow:var(--shadow-popover);padding:8px;font-family:var(--sans)}
 .vn-date-head{display:grid;grid-template-columns:32px 1fr 32px;align-items:center;gap:6px;margin-bottom:6px}
 .vn-date-head b{text-align:center;font-size:var(--text-sm);color:var(--ink)}
 .vn-date-head button,.vn-date-foot button,.vn-date-grid button,.vn-month-grid button,.vn-year-row button{font-family:var(--sans);border:1px solid transparent;background:var(--panel);color:var(--ink);border-radius:var(--radius-sm);cursor:pointer}
@@ -390,7 +390,7 @@ td .hint{margin-top:2px;color:var(--muted);}
 .chart-scroll canvas{width:100%;max-width:1320px;min-width:0;margin:0 auto;display:block;height:auto;}
 /* Tooltip điểm QC trên canvas Levey-Jennings — cùng nội dung và tương phản
    với `.qc-tooltip` của hệ thống, nhưng render bởi React thay vì chèn HTML tay. */
-.qc-chart-tooltip{position:fixed;z-index:1200;pointer-events:none;max-width:236px;padding:8px 10px;border-radius:var(--radius-md);background:var(--surface-inverse);color:var(--on-accent);box-shadow:var(--shadow-tooltip);font-size:var(--text-sm);line-height:var(--leading-snug);}
+.qc-chart-tooltip{position:fixed;z-index:var(--z-tooltip);pointer-events:none;max-width:236px;padding:8px 10px;border-radius:var(--radius-md);background:var(--surface-inverse);color:var(--on-accent);box-shadow:var(--shadow-tooltip);font-size:var(--text-sm);line-height:var(--leading-snug);}
 .qc-chart-tooltip b{display:block;margin-bottom:2px;font-weight:var(--weight-bold);}
 .qc-chart-tooltip strong{font-weight:var(--weight-bold);}
 .qc-chart-tooltip .muted{color:var(--text-on-dark-muted);}

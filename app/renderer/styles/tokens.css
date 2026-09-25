@@ -360,6 +360,28 @@
   --scrollbar-thumb:var(--scrollbar-thumb-base);
   --scrollbar-thumb-hover:color-mix(in srgb, var(--scrollbar-thumb-base) 82%, black);
 
+  /* Thứ tự lớp — đặt theo vai trò, thấp → cao. Trước 2026-09-25 có 17 số
+     (1…1400) chọn tuỳ chỗ. Các cặp bắt buộc "phải đè":
+       · cột đầu dính của bảng Nhập QC nằm trên nút "+" trong ô (z-index 1);
+       · thead dính nằm trên cột đầu dính; ô góc nằm trên các ô header khác;
+       · tiêu đề dính của khối (panel Lô QC, tiêu đề bảng) nằm trên thead;
+       · nút nổi ra mép khối, tooltip, danh sách gợi ý nằm trên mọi thứ dính;
+       · sidebar nằm trên header trang: nút thu gọn nhô 25px sang vùng header;
+       · hộp xác nhận (DialogHost) nằm trên modal đang mở;
+       · tooltip biểu đồ (fixed) nằm trên hộp thoại vì biểu đồ có thể ở trong modal;
+       · lịch chọn ngày mở được từ trong hộp thoại nên cao nhất.
+     `z-index:1` thô vẫn được dùng để nâng một phần tử trên anh em trong cùng
+     khối (th dính của bảng chung, vòng focus, nút đóng góc hộp thoại). */
+  --z-sticky:2;
+  --z-sticky-head:3;
+  --z-float:10;
+  --z-page-head:20;
+  --z-sidebar:30;
+  --z-modal:100;
+  --z-dialog:110;
+  --z-tooltip:120;
+  --z-picker:130;
+
   /* ═══════════════════════════════════════════════════════════════════
      LỚP 4 — BÍ DANH TẠM cho CSS chưa chuyển. Mỗi trang chuyển xong thì xoá
      dần bí danh tương ứng. Không thêm tên mới vào đây.
