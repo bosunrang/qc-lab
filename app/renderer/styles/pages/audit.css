@@ -32,9 +32,6 @@
 .audit-filterbar > div{
   min-width:150px;
 }
-.audit-filterbar label{
-  margin-top:0;
-}
 .audit-filterbar > .audit-filter-summary{
   align-self:flex-end;min-width:0;margin-left:auto;color:var(--text-tertiary);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-display);text-align:right;
 }

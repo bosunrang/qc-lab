@@ -232,20 +232,27 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
 
 test('nhãn đứng trên control dùng thang form chung', () => {
   const appCss = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
-  const settings = readFileSync(join(STYLE_DIR, 'pages', 'settings.css'), 'utf8');
   const reagent = readFileSync(join(STYLE_DIR, 'pages', 'reagent.css'), 'utf8');
-  const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
 
   assert.match(appCss, /label\{[^}]*font-size:var\(--text-sm\)[^}]*color:var\(--text-secondary\)[^}]*font-weight:var\(--weight-semibold\);\}/,
     'nhãn field toàn app dùng token 13px/600/màu phụ — 12px làm dấu tiếng Việt chồng lên nhau khó đọc');
-  assert.match(settings, /\.settings-unit-fields label,[\s\S]*?\{\s*margin-top:0;\s*\}/,
-    'Cài đặt chỉ chỉnh nhịp giữa các field, không đổi thang chữ hay khoảng nhãn → ô');
   assert.match(reagent, /\.rc-field label\s*\{\s*display:\s*block;\s*margin:\s*0 0 var\(--field-label-gap\);\s*\}/,
     'nhãn field So sánh hóa chất dùng khoảng cách chuẩn');
   assert.doesNotMatch(reagent, /\.rc-field label,.rc-toolbar-selcol label\{[^}]*font-size/,
     'Reagent không tự nâng nhãn control lên 13px/700');
-  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row label\{margin-top:0;\}/,
-    'nhãn đầu tiên của thẻ Sigma không cộng thêm khoảng hở so với gutter panel');
+  // `.field>label` đã bỏ margin-top ở mọi nơi. Rule trang chỉ để đặt lại
+  // `margin-top:0` cho nhãn là thừa — từng có 9 rule như vậy (Cài đặt, Sigma,
+  // Cấu hình, Người dùng, Westgard, Nhật ký).
+  const redundant = [];
+  for (const file of PAGE_CSS) {
+    if (file.endsWith('app.css')) continue;
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      const onlyLabels = m[1].split(',').every((p) => /^label(?:[.:\[]|$)/.test(p.trim().split(/\s*[>+~]\s*|\s+/).pop() || ''));
+      if (onlyLabels && /^\s*margin-top\s*:\s*0\s*;?\s*$/.test(m[2])) redundant.push(`${relative(ROOT, file)}: ${m[1].trim()}`);
+    }
+  }
+  assert.deepEqual(redundant, [], 'nhãn trong .field đã có margin-top 0; nhãn ngoài .field (checkbox) đặt margin trên lớp của nó');
   assert.doesNotMatch(appCss, /\.auth-card label\{font-size:var\(--text-base\)/,
     'nhãn đăng nhập không được tự tăng lên bằng cỡ control');
 });

@@ -156,10 +156,6 @@ main:has(.config-shell){padding-bottom:16px;}
 :is(#instrument-form,#lot-form,#tea-add-form,#transition-form,#panel-form,#lot-group-form){display:grid;row-gap:var(--field-gap);}
 :is(#instrument-form,#lot-form,#tea-add-form,#transition-form,#panel-form,#lot-group-form)>.field-error{margin:0;}
 :is(#instrument-form,#lot-form,#tea-add-form)>.grid2{column-gap:var(--field-gap);}
-:is(#instrument-form,#lot-form,#tea-add-form)>.grid2 .field>label,
-#transition-form>:is(.lot-trans-row3,.lot-trans-row2) .field>label,
-#panel-form>.panel-qc-main-grid .field>label,
-#lot-group-form>.field>label{margin-top:0;}
 /* Hàng chọn của Panel/lô là thành phần cấp một của form, nên không giữ lại
    margin cục bộ 16px/8px; `row-gap` ở cha là nguồn khoảng cách duy nhất. */
 #panel-form>.panel-test-label,
@@ -310,7 +306,6 @@ main:has(.config-shell){padding-bottom:16px;}
    cùng vai trò với ô tìm kiếm ở header của các thẻ khác, nên cũng nền trắng,
    chỉ một đường kẻ ngăn với bảng bên dưới. */
 .target-selector{display:grid;gap:var(--field-gap);padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--panel);align-items:end;}
-.target-selector label{margin-top:0;}
 .target-selector select,.target-selector input{height:var(--control-h);}
 .target-selector.history-selector{grid-template-columns:minmax(240px,320px);}
 .target-matrix-panel .target-selector:not(.history-selector){grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));}
@@ -430,7 +425,6 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-form-section > b { display: block; margin-bottom: var(--gap-content); color: var(--card-head-ink); font-size: var(--text-base); }
 .tea-form-primary { display: grid; grid-template-columns: minmax(160px,1fr) 72px 88px minmax(185px,1.15fr); gap: var(--field-gap); }
 .tea-form-primary .field, .tea-form-dates .field, .tea-form-people .field { margin: 0; }
-.tea-form-primary .field>label,.tea-form-dates .field>label,.tea-form-people .field>label,.tea-form-section>.field>label{margin-top:0;}
 .tea-form-section > .field + .field { margin-top: var(--field-gap); }
 .tea-form-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-content); }
 .tea-form-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--field-gap); margin-top: var(--gap-content); }
@@ -449,7 +443,6 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-detail-grid{margin-top:var(--gap-content);}
 .assay-main-grid>div,.assay-detail-grid>div{min-width:0;}
 .assay-main-grid .field,.assay-detail-grid .field{margin:0;min-width:0;}
-.assay-main-grid .field>label,.assay-detail-grid .field>label,.assay-cusum-grid .field>label{margin-top:0;}
 .assay-name-picker{position:relative;}
 .assay-name-options{position:absolute;z-index:var(--z-float);top:calc(100% + 4px);left:0;right:0;max-height:260px;overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-menu);}
 .assay-name-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:var(--control-h);padding:8px 10px;border:0;border-bottom:1px solid var(--line2);background:var(--panel);color:var(--ink);font-family:var(--sans);font-size:var(--text-sm);text-align:left;cursor:pointer;}

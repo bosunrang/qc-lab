@@ -41,10 +41,6 @@
   display:grid; grid-template-columns:1fr; gap:var(--field-gap); padding:var(--panel-content-gap) 16px 16px;
 }
 
-.user-create-fields label{
-  margin-top:0;
-}
-
 .user-create-actions .btn{
   min-width:88px;
 }

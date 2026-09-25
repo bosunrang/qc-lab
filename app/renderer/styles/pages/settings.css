@@ -41,12 +41,6 @@
   gap:var(--field-gap);
 }
 
-.settings-unit-fields label,
-.settings-brand-fields label,
-.settings-logo-fields label{
-  margin-top:0;
-}
-
 .settings-profile-grid .settings-unit-fields > div > input:not([type="file"]),
 .settings-brand-fields > div > input:not([type="file"]){
   height:var(--control-h);
@@ -130,8 +124,7 @@
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
    chỉ còn nửa bề rộng trang — giữ đúng lý do hệ thống ghi tại chỗ. */
 .lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--field-gap)}
-.lis-gateway-grid label{margin-top:0}
-.lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:var(--control-h);padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
+.lis-gateway-toggle{display:flex;margin:0;align-items:center;gap:8px;min-height:var(--control-h);padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .lis-gateway-toggle input{flex:none}
 .lis-gateway-panel .alert{margin:0}
 .lis-gateway-status{width:100%;min-height:var(--control-h-compact);align-items:center;border:1px solid var(--surface-border);border-left-width:1px;background:var(--surface-card-soft);color:var(--muted);font-weight:var(--weight-semibold)}
@@ -143,7 +136,6 @@
 .firebase-body{display:grid;gap:var(--field-gap);margin:var(--panel-content-gap) 16px 0}
 .firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap)}
 .firebase-auth-grid > div:last-child{grid-column:1 / -1}
-.firebase-auth-grid label,.firebase-body > .field > label{margin-top:0}
 /* Ô dán cấu hình vẫn cao để đọc dễ, nhưng dùng đúng cỡ/chữ/line-height của
    textarea hệ thống; khối Firebase Rules bên dưới mới là vùng monospace. */
 .firebase-config-input{width:100%;min-height:168px;resize:vertical;font-family:var(--sans);font-size:var(--text-base);line-height:var(--leading-body)}

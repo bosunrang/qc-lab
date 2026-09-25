@@ -24,7 +24,6 @@
 /* Hàng nhận diện chỉ đọc: xét nghiệm được chọn từ danh mục QC, sau đó hiện
    ngay đơn vị và máy tương ứng để không phải lặp thêm một ô tên xét nghiệm. */
 .sg-setup-heading + .sg-control-row{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);align-items:end;margin:var(--panel-content-gap) 16px 0;}
-.sg-setup-heading + .sg-control-row label{margin-top:0;}
 .sg-setup-heading + .sg-control-row>.sg-test-picker{grid-column:1;max-width:none;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-unit-field{grid-column:2;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-instrument-field{grid-column:3;min-width:0;}
@@ -151,7 +150,6 @@
 /* Thiết lập phân tích dùng lưới ba cột để hiển thị xét nghiệm, đơn vị và máy. */
 .sg-setup-fields{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);row-gap:var(--field-gap);margin:var(--panel-content-gap) 16px 0;}
 .sg-setup-fields > div{min-width:0;}
-.sg-setup-fields label{margin-top:0;}
 /* “Thiết lập phân tích” là cấu hình gọn: mọi control phải cùng nhịp 36px.
    Scope riêng để không làm các trường số của modal MU (cũng tái dùng
    `.sg-setup-fields`) mất chiều cao form 40px. */
@@ -165,7 +163,7 @@
    cột trước khi nhãn hoặc ô ngày bị ép nhỏ và gãy dòng. */
 .sg-eflm-box{display:grid;grid-template-columns:minmax(280px,1.7fr) minmax(144px,.8fr) minmax(168px,1fr);gap:var(--field-gap);margin:var(--panel-content-gap) 16px 0;padding:var(--space-md);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
 .sg-eflm-field{min-width:0;}
-.sg-eflm-field label{display:block;margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sg-eflm-field label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* EFLM là phần cấu hình gọn, nên mọi control trong khối dùng cùng nhịp 36px
    của màn cấu hình — input văn bản không được cao hơn select và ô ngày. */
 .sg-eflm-box .sg-eflm-field input:not([type="checkbox"]):not([type="radio"]),.sg-eflm-box .sg-eflm-field select{box-sizing:border-box;width:100%;height:var(--control-h);min-height:var(--control-h);}
