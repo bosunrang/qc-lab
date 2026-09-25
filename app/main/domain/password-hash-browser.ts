@@ -103,6 +103,12 @@ export async function verifyPasswordAsync(password: string, stored: string): Pro
   return verifyPassword(password, stored);
 }
 
+/** Như `verifyPasswordAsync`: tính đồng bộ bên trong, chỉ bọc Promise để các
+ * handler tài khoản dùng chung một đường với bản main process. */
+export async function hashPasswordAsync(password: string): Promise<string> {
+  return hashPassword(password);
+}
+
 export function isPbkdf2Hash(value: string): boolean {
   return /^pbkdf2\$\d+\$[0-9a-f]+\$[0-9a-f]+$/.test(String(value || ''));
 }

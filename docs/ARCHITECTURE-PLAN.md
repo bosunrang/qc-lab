@@ -25,6 +25,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | A.1–A.4 (nhánh `refactor/ipc-channels`) | Bảng thao tác một nguồn `main/ipc/operations.ts` + `desktop-operations.ts`; IPC, RPC của LAN và bản xem trước sinh từ bảng; LAN chỉ gọi dòng `lan: true`; actor truyền theo từng lời gọi, bỏ `lanCalls`; test ở `tests/ipc-operations.test.mjs` |
 | A.5 (nhánh `refactor/ipc-error-boundary`) | Exception của thao tác trả `IpcResult` thành `{ ok: false }` (`unauthenticated` / `internal-error`) ở IPC, LAN và bản xem trước; thao tác đọc vẫn ném, danh sách do trình biên dịch kiểm theo `QcApi` |
 | A.6 (nhánh `refactor/window-hardening`) | `main/window-guard.ts`: mọi webContents chỉ hiện trang của app; `https:` ra ngoài mở bằng trình duyệt hệ thống; còn lại bị chặn. Cửa sổ chính khai `sandbox: true` |
+| E.1 (nhánh `perf/async-password-hash`) | Khởi tạo quản trị, tạo tài khoản, đặt lại, đổi và kiểm mật khẩu băm bất đồng bộ (`hashPasswordAsync`); điều kiện kiểm lại sau khi băm (trùng tên, tài khoản bị xoá, mật khẩu vừa bị đặt lại); test `tests/auth-async.test.mjs` |
 
 ## Thứ tự đề xuất
 

@@ -133,7 +133,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   const api = {
     currentUser: async () => (sessionActor ? auth.getUser(sessionActor.userId) : null),
     bootstrapAdmin: async (input) => {
-      const result = auth.bootstrapAdmin(input);
+      const result = await auth.bootstrapAdmin(input);
       preview.persist();
       return result;
     },

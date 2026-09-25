@@ -42,6 +42,18 @@ function assertAtomic(db, tables, label, write) {
   }
 }
 
+/** Như `assertAtomic` cho handler bất đồng bộ (băm mật khẩu trước khi ghi). */
+async function assertAtomicAsync(db, tables, label, write) {
+  const before = snapshot(db, [...tables, 'activity']);
+  db.exec("CREATE TRIGGER atomic_fail_audit BEFORE INSERT ON activity BEGIN SELECT RAISE(ABORT,'audit-fail'); END");
+  try {
+    await assert.rejects(async () => { const r = await write(); if (r && r.ok === false) throw new Error(`dữ liệu mẫu bị từ chối: ${r.error.code}`); }, /audit-fail/, `${label}: lỗi nhật ký phải làm thao tác thất bại`);
+    assert.equal(snapshot(db, [...tables, 'activity']), before, `${label}: dữ liệu phải được hoàn nguyên`);
+  } finally {
+    db.exec('DROP TRIGGER atomic_fail_audit');
+  }
+}
+
 test('withTransaction: hoàn nguyên khi lỗi, lồng được, giữ lỗi gốc', () => {
   const db = openDatabase(':memory:');
   db.exec('CREATE TABLE t(v)');
@@ -61,15 +73,15 @@ test('withTransaction: hoàn nguyên khi lỗi, lồng được, giữ lỗi g�
   assert.throws(() => withTransaction(db, () => Promise.resolve()), /đồng bộ/);
 });
 
-test('tài khoản: tạo, sửa, đặt lại mật khẩu, xoá đều nguyên tử', () => {
+test('tài khoản: tạo, sửa, đặt lại mật khẩu, xoá đều nguyên tử', async () => {
   const db = openDatabase(':memory:');
   const auth = createAuthHandlers(db);
-  const boot = auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quản trị viên', password: 'mat-khau-dai-1' } });
+  const boot = await auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quản trị viên', password: 'mat-khau-dai-1' } });
   const actor = { ...admin, userId: boot.data.id };
-  const user = auth.createUser({ data: { username: 'ktv1', name: 'Nguyễn Văn A', role: 'technician', password: 'ktv-pass-123' } }, actor).data;
-  assertAtomic(db, ['users'], 'createUser', () => auth.createUser({ data: { username: 'ktv2', name: 'Trần B', role: 'technician', password: 'ktv-pass-123' } }, actor));
+  const user = (await auth.createUser({ data: { username: 'ktv1', name: 'Nguyễn Văn A', role: 'technician', password: 'ktv-pass-123' } }, actor)).data;
+  await assertAtomicAsync(db, ['users'], 'createUser', () => auth.createUser({ data: { username: 'ktv2', name: 'Trần B', role: 'technician', password: 'ktv-pass-123' } }, actor));
   assertAtomic(db, ['users'], 'updateUser', () => auth.updateUser({ id: user.id, data: { name: 'Tên mới', role: 'technician', active: true } }, actor));
-  assertAtomic(db, ['users'], 'resetPassword', () => auth.resetPassword({ id: user.id, data: { newPassword: 'mat-khau-moi-9' } }, actor));
+  await assertAtomicAsync(db, ['users'], 'resetPassword', () => auth.resetPassword({ id: user.id, data: { newPassword: 'mat-khau-moi-9' } }, actor));
   assertAtomic(db, ['users'], 'deleteUser', () => auth.deleteUser({ id: user.id }, actor));
 });
 

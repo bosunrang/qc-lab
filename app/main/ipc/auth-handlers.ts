@@ -6,7 +6,7 @@
 // module này chỉ lo xác thực + CRUD tài khoản.
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
-import { hashPassword, verifyPassword, verifyPasswordAsync } from '../domain/password-hash';
+import { hashPasswordAsync, verifyPasswordAsync } from '../domain/password-hash';
 import {
   validateUserCreate, validateUserUpdate, validateNewPassword, validateLoginInput, validateSetAvatar,
   type UserCreateInput, type UserUpdateInput, type LoginInput,
@@ -80,15 +80,21 @@ export function createAuthHandlers(db: Db) {
 
   /** Chỉ dùng đúng 1 lần khi bảng `users` còn rỗng — tạo tài khoản quản trị
    * đầu tiên mà KHÔNG cần actor có sẵn (chưa ai đăng nhập được vì chưa có
-   * user nào). Actor ghi audit chính là tài khoản vừa tạo. */
-  function bootstrapAdmin(input: { data: UserCreateInput }): IpcResult<PublicUser> {
-    if (hasAnyUsers()) return { ok: false, error: { code: 'already-bootstrapped', message: 'Hệ thống đã có tài khoản, không thể khởi tạo lại.' } };
+   * user nào). Actor ghi audit chính là tài khoản vừa tạo.
+   *
+   * Mọi hàm băm mật khẩu dưới đây đều bất đồng bộ (xem `login`) và băm TRƯỚC
+   * khi mở transaction để transaction ngắn. Trong lúc chờ băm, lời gọi khác
+   * có thể chen vào, nên điều kiện đã kiểm trước đó được kiểm lại sau `await`. */
+  async function bootstrapAdmin(input: { data: UserCreateInput }): Promise<IpcResult<PublicUser>> {
+    const already: IpcResult<never> = { ok: false, error: { code: 'already-bootstrapped', message: 'Hệ thống đã có tài khoản, không thể khởi tạo lại.' } };
+    if (hasAnyUsers()) return already;
     const result = validateUserCreate(input.data, []);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, name, initials, password } = result.data;
     const id = uid();
-    // Băm mật khẩu (600.000 vòng) TRƯỚC khi mở transaction để transaction ngắn.
-    const passHash = hashPassword(password);
+    const passHash = await hashPasswordAsync(password);
+    // Hai lần bấm "Khởi tạo" dồn nhau không được tạo hai tài khoản quản trị.
+    if (hasAnyUsers()) return already;
     const row = withTransaction(db, () => {
       db.prepare('INSERT INTO users(id,username,name,initials,role,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,1,0)')
         .run(id, username, name, initials, 'admin', passHash);
@@ -118,14 +124,17 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: toPublicUser(row) };
   }
 
-  function createUser(input: { data: UserCreateInput }, actor: Actor): IpcResult<PublicUser> {
+  async function createUser(input: { data: UserCreateInput }, actor: Actor): Promise<IpcResult<PublicUser>> {
     if (actor.role !== 'admin') return forbidden();
-    const existingUsernames = (db.prepare('SELECT username FROM users').all() as { username: string }[]).map(r => r.username);
-    const result = validateUserCreate(input.data, existingUsernames);
+    const existingUsernames = () => (db.prepare('SELECT username FROM users').all() as { username: string }[]).map(r => r.username);
+    const result = validateUserCreate(input.data, existingUsernames());
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, name, initials, role, password, pagePerms } = result.data;
     const id = uid();
-    const passHash = hashPassword(password);
+    const passHash = await hashPasswordAsync(password);
+    // Kiểm trùng tên lần nữa: một lần tạo khác cùng tên có thể vừa xong.
+    const recheck = validateUserCreate(input.data, existingUsernames());
+    if (!recheck.ok) return { ok: false, error: { code: recheck.code, message: recheck.message } };
     withTransaction(db, () => {
       db.prepare('INSERT INTO users(id,username,name,initials,role,page_perms_json,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,?,1,1)')
         .run(id, username, name, initials, role, JSON.stringify(pagePerms), passHash);
@@ -177,14 +186,17 @@ export function createAuthHandlers(db: Db) {
   /** Admin đặt lại mật khẩu cho người khác — luôn bật must_change_password
    * để buộc đổi lại ở lần đăng nhập kế tiếp, không âm thầm giữ mật khẩu admin
    * vừa gõ làm mật khẩu lâu dài của người dùng. */
-  function resetPassword(input: { id: unknown; data: { newPassword?: unknown } }, actor: Actor): IpcResult<{ id: string }> {
+  async function resetPassword(input: { id: unknown; data: { newPassword?: unknown } }, actor: Actor): Promise<IpcResult<{ id: string }>> {
     if (actor.role !== 'admin') return forbidden();
     const id = String(input.id || '');
+    const notFound: IpcResult<never> = { ok: false, error: { code: 'not-found', message: 'Không tìm thấy người dùng.' } };
     const existing = db.prepare('SELECT * FROM users WHERE id=?').get(id) as UserRow | undefined;
-    if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy người dùng.' } };
+    if (!existing) return notFound;
     const result = validateNewPassword(input.data?.newPassword);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const passHash = hashPassword(result.data);
+    const passHash = await hashPasswordAsync(result.data);
+    // Tài khoản có thể vừa bị xoá trong lúc băm.
+    if (!db.prepare('SELECT 1 FROM users WHERE id=?').get(id)) return notFound;
     withTransaction(db, () => {
       db.prepare('UPDATE users SET pass_hash=?, must_change_password=1 WHERE id=?').run(passHash, id);
       writeAudit(db, actor, 'Đặt lại mật khẩu', `Đặt lại mật khẩu cho "${existing.username}"`, existing.username);
@@ -194,23 +206,26 @@ export function createAuthHandlers(db: Db) {
   }
 
 
-  function verifyOwnPassword(input: { data: { password?: unknown } }, actor: Actor): IpcResult<{ ok: true }> {
+  async function verifyOwnPassword(input: { data: { password?: unknown } }, actor: Actor): Promise<IpcResult<{ ok: true }>> {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
-    if (!row || !verifyPassword(String(input.data?.password || ''), row.pass_hash)) {
+    if (!row || !await verifyPasswordAsync(String(input.data?.password || ''), row.pass_hash)) {
       return { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu không đúng.' } };
     }
     return { ok: true, data: { ok: true } };
   }
 
-  function changeOwnPassword(input: { data: { oldPassword?: unknown; newPassword?: unknown } }, actor: Actor): IpcResult<{ id: string }> {
+  async function changeOwnPassword(input: { data: { oldPassword?: unknown; newPassword?: unknown } }, actor: Actor): Promise<IpcResult<{ id: string }>> {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
     if (!row) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy tài khoản.' } };
-    if (!verifyPassword(String(input.data?.oldPassword || ''), row.pass_hash)) {
-      return { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu hiện tại không đúng.' } };
-    }
+    const wrong: IpcResult<never> = { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu hiện tại không đúng.' } };
+    if (!await verifyPasswordAsync(String(input.data?.oldPassword || ''), row.pass_hash)) return wrong;
     const result = validateNewPassword(input.data?.newPassword);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const passHash = hashPassword(result.data);
+    const passHash = await hashPasswordAsync(result.data);
+    // Mật khẩu có thể vừa bị admin đặt lại trong lúc băm: mật khẩu cũ vừa
+    // kiểm không còn là mật khẩu hiện hành, không được ghi đè.
+    const current = db.prepare('SELECT pass_hash FROM users WHERE id=?').get(row.id) as { pass_hash: string } | undefined;
+    if (current?.pass_hash !== row.pass_hash) return wrong;
     withTransaction(db, () => {
       db.prepare('UPDATE users SET pass_hash=?, must_change_password=0 WHERE id=?').run(passHash, row.id);
       writeAudit(db, actor, 'Đổi mật khẩu', `Tự đổi mật khẩu`, row.username);

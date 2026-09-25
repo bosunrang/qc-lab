@@ -139,7 +139,7 @@ const resetBackup = createBackupHandlers(resetDb, dir);
 const { createAuthHandlers } = require('../../app-dist/main/ipc/auth-handlers.js');
 const { verifyAuditChain } = require('../../app-dist/main/domain/audit-chain.js');
 const resetAuth = createAuthHandlers(resetDb);
-resetAuth.bootstrapAdmin({ data: { username: 'admin', name: 'Quản trị', password: 'mat-khau-dai-1' } });
+await resetAuth.bootstrapAdmin({ data: { username: 'admin', name: 'Quản trị', password: 'mat-khau-dai-1' } });
 const resetActor = { ...actor, userId: resetAuth.listUsers(actor).data[0].id, username: 'admin' };
 const resetInstrument = resetConfig.saveInstrument({ data: { name: 'Máy sẽ bị xoá' } }, resetActor).data;
 resetConfig.saveTest({ data: { name: 'Test sẽ bị xoá', instrumentId: resetInstrument.id } }, resetActor);

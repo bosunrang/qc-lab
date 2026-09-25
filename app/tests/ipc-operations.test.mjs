@@ -137,7 +137,7 @@ test('thao tác nào handler đòi quyền admin thì không mở qua LAN', asyn
 
 test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và tên thuộc prototype', async () => {
   const { lan, session, printed, auth } = setup();
-  auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri', password: 'admin12345' } });
+  await auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri', password: 'admin12345' } });
   session.set(admin);
   for (const method of [
     'login', 'logout', 'currentUser', 'bootstrapAdmin', 'auth:bootstrapAdmin', 'auth:login',
@@ -186,7 +186,7 @@ test('lời gọi LAN chậm không chặn lời gọi khác, và không lẫn d
 
 test('phiên máy chính: đăng nhập, đăng xuất, và chưa đăng nhập thì bị chặn', async () => {
   const { desktop, business, session, auth, db } = setup();
-  auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri', password: 'admin12345' } });
+  await auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri', password: 'admin12345' } });
   const ctx = sessionContext(() => session.get());
   assert.throws(() => business.listUsers.run(ctx), /Chưa đăng nhập/);
 
