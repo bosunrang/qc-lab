@@ -14,7 +14,7 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Khi zoom hoặc ở laptop hẹp, phải lộ scrollbar ngang để thẻ cuối (TEa)
    không thành nội dung bị che không có đường tới. Kiểu scrollbar chung ở
    tokens.css giữ thanh này gọn như các bảng dữ liệu. */
-.config-shell-tabs{flex:0 0 auto;min-width:0;margin:0;padding:4px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-control-subtle);overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
+.config-shell-tabs{flex:0 0 auto;min-width:0;margin:0;padding:4px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);box-shadow:var(--shadow-control);overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
 .config-shell-tabs-scroll{display:flex;align-items:stretch;gap:4px;min-width:max-content;}
 .config-shell-tabs button{display:flex;align-items:center;gap:6px;min-height:var(--control-h);padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-subtle);cursor:pointer;font-family:var(--sans);text-align:left;}
 .config-shell-tabs button>b{font-size:var(--text-sm);font-weight:var(--weight-bold);white-space:nowrap;}
@@ -418,7 +418,7 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-ref-table th:nth-child(7), .tea-ref-table td:nth-child(7) { width: 19%; }
 /* Ô nhập TEa CLIA%/Ricos% trong bảng dùng chiều cao điều khiển dạng bảng;
    viền chỉ nổi rõ khi hover/focus để giữ mật độ dữ liệu gọn. */
-.tea-ref-table input.tea-ref-value{display:block;box-sizing:border-box;width:min(100%,88px);height:var(--control-h);min-height:var(--control-h);margin:0 auto;padding:4px 8px;border-color:transparent;background:transparent;box-shadow:none;text-align:center;cursor:text;appearance:textfield;-moz-appearance:textfield;transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;}
+.tea-ref-table input.tea-ref-value{display:block;box-sizing:border-box;width:min(100%,88px);height:var(--control-h);min-height:var(--control-h);margin:0 auto;padding:4px 8px;border-color:transparent;background:transparent;box-shadow:none;text-align:center;cursor:text;appearance:textfield;-moz-appearance:textfield;transition:background-color var(--motion-fast) ease,border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
 .tea-ref-table input.tea-ref-value::-webkit-inner-spin-button,
 .tea-ref-table input.tea-ref-value::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
 .tea-ref-table input.tea-ref-value:hover:not(:disabled),
@@ -467,12 +467,12 @@ main:has(.config-shell){padding-bottom:16px;}
 .assay-add-machine:hover{background:var(--accent-surface);border-color:var(--teal);}
 .assay-machine-body{display:flex;min-height:0;flex:1;flex-direction:column;}
 .assay-machine-picker{display:grid;grid-template-columns:1fr;align-content:start;gap:6px;min-height:0;flex:1;overflow:auto;padding-right:2px;}
-.assay-machine-picker label{display:grid;grid-template-columns:17px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;min-height:var(--table-row-h);margin:0;padding:6px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease;}
+.assay-machine-picker label{display:grid;grid-template-columns:17px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;min-height:var(--table-row-h);margin:0;padding:6px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--panel);cursor:pointer;transition:border-color var(--motion-fast) ease,background var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
 .assay-machine-picker label:hover{border-color:var(--accent-border-hover);box-shadow:var(--shadow-control-hover);}
 .assay-machine-picker label:has(input:checked){border-color:var(--accent-border-hover);background:var(--accent-surface);box-shadow:none;}
 .assay-machine-picker label.assigned{cursor:default;}
 .assay-machine-picker input[type=checkbox]{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;}
-.assay-machine-check{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--surface);color:transparent;font-size:var(--text-2xs);font-weight:var(--weight-bold);box-sizing:border-box;transition:background .15s ease,border-color .15s ease,color .15s ease;}
+.assay-machine-check{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--surface);color:transparent;font-size:var(--text-2xs);font-weight:var(--weight-bold);box-sizing:border-box;transition:background var(--motion-fast) ease,border-color var(--motion-fast) ease,color var(--motion-fast) ease;}
 .assay-machine-picker label:has(input:checked) .assay-machine-check{border-color:var(--teal);background:var(--teal);color:var(--on-accent);}
 .assay-machine-copy{display:grid;min-width:0;gap:2px;}
 .assay-machine-copy b,.assay-machine-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

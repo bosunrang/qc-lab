@@ -183,11 +183,19 @@
   --shadow-menu:0 14px 32px rgba(18,32,43,.2);
   --shadow-tooltip:0 12px 28px rgba(20,33,43,.22);
   --shadow-tooltip-compact:0 8px 22px rgba(17,43,51,.22);
-  --shadow-card-subtle:0 1px 2px rgba(20,33,43,.05);
-  --shadow-icon:0 2px 8px rgba(20,36,46,.06);
   --shadow-icon-tight:0 2px 7px rgba(20,36,46,.06);
   --shadow-control-hover:0 2px 8px rgba(21,104,105,.08);
-  --shadow-control-subtle:0 1px 2px rgb(27 57 70 / .035);
+  /* Bóng của control, nút và khung chrome. Trước 2026-09-25 các giá trị này
+     viết tay ngay trong app.css; ba bóng "0 1px 2px" (ô nhập .055, thẻ người
+     dùng .05, thanh tab Cấu hình .035) gộp thành một --shadow-control. */
+  --shadow-control:0 1px 2px var(--shadow-ink-faint);
+  --shadow-button:0 1px 2px var(--shadow-ink-soft);
+  --shadow-button-hover:0 4px 12px color-mix(in srgb,var(--accent) 22%,transparent);
+  --shadow-button-hover-neutral:0 3px 10px var(--shadow-ink-faint);
+  --shadow-button-hover-danger:0 4px 12px color-mix(in srgb,var(--danger-accent) 22%,transparent);
+  --shadow-sidebar:6px 0 24px var(--shadow-ink-faint);
+  --shadow-page-head:0 4px 18px var(--shadow-ink-faint);
+  --shadow-brand:0 8px 20px color-mix(in srgb,var(--accent) 24%,transparent);
   --control-inset-highlight:inset 0 1px 0 rgba(255,255,255,.92);
   --surface-elevated-translucent:rgba(255,255,255,.68);
 
@@ -384,6 +392,16 @@
        · lịch chọn ngày mở được từ trong hộp thoại nên cao nhất.
      `z-index:1` thô vẫn được dùng để nâng một phần tử trên anh em trong cùng
      khối (th dính của bảng chung, vòng focus, nút đóng góc hộp thoại). */
+  /* Thời lượng chuyển động — hai bậc. Trước 2026-09-25 có sáu số
+     .12/.14/.15/.16/.18/.2s cho cùng một việc (đổi màu khi rê chuột).
+       fast 150ms  hover, focus, hiện/ẩn nhỏ (giá trị đang dùng nhiều nhất);
+       (chuẩn) 200ms  mở/thu khối: sidebar, hộp thoại hiện ra.
+     `--motion-loading` là chu kỳ lặp của thanh tải, không phải chuyển cảnh.
+     Người dùng bật "giảm chuyển động" thì cả hai bậc về 0 (khối @media dưới). */
+  --motion-fast:150ms;
+  --motion:200ms;
+  --motion-loading:1.15s;
+
   --z-sticky:2;
   --z-sticky-head:3;
   --z-float:10;
@@ -500,6 +518,10 @@
 }
 
 *,*::before,*::after{box-sizing:border-box;}
+/* Giảm chuyển động: mọi transition/animation đọc thời lượng từ token nên chỉ
+   cần hạ token ở đây. Đặt SAU khối :root chính để bộ đọc token của test
+   không lấy nhầm giá trị 0. */
+@media(prefers-reduced-motion:reduce){:root{--motion-fast:0ms;--motion:0ms;}}
 /* Thanh cuộn dùng chung: mảnh 8px, track xám
    rất nhạt và thumb bo tròn có viền cùng màu track. Áp cho cả trục dọc lẫn
    kéo ngang của mọi vùng cuộn (bảng, biểu đồ, modal, textarea); từng vùng

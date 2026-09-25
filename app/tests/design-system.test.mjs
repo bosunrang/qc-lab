@@ -503,9 +503,11 @@ test('nút nguy hiểm giữ ngữ nghĩa danger khi tương tác', () => {
   );
   assert.match(
     appCss,
-    /\.btn\.danger:hover:not\(:disabled\)\{background:var\(--danger-text\);box-shadow:[^;}]*var\(--danger-accent\)/,
+    /\.btn\.danger:hover:not\(:disabled\)\{background:var\(--danger-text\);box-shadow:var\(--shadow-button-hover-danger\)/,
     'nút danger phải giữ nền và bóng danger khi hover',
   );
+  assert.match(TOKEN['--shadow-button-hover-danger'], /var\(--danger-accent\)/,
+    'bóng hover của nút danger lấy màu danger, không lấy teal');
 });
 
 test('thanh thông báo info dùng trạng thái xanh dương chung', () => {
@@ -964,4 +966,30 @@ test('cỡ icon: năm bậc theo khung chứa, không số thô', () => {
     }
   }
   assert.deepEqual(bad, [], 'đặt cỡ icon bằng var(--icon-xs|sm|md|lg) hoặc var(--icon)');
+});
+
+// Bóng đổ từng viết tay ở 10 chỗ (sidebar, logo, header trang, nút…) và
+// thời lượng chuyển động có sáu số .12/.14/.15/.16/.18/.2s cho cùng việc đổi
+// màu khi rê chuột. Luật: box-shadow là token hoặc `inset` (vạch chỉ báo vẽ
+// bằng bóng trong); thời lượng là --motion-fast/--motion/--motion-loading.
+test('bóng đổ và chuyển động chỉ dùng token', () => {
+  assert.equal(flat('--motion-fast'), '150ms');
+  assert.equal(flat('--motion'), '200ms');
+  assert.match(tokensSrc, /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*:root\s*\{[^}]*--motion-fast:\s*0ms;[^}]*--motion:\s*0ms;/,
+    'giảm chuyển động hạ cả hai bậc về 0');
+
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/(?<![-\w])box-shadow\s*:\s*([^;}]+)/g)) {
+      const layers = m[1].trim().split(/,(?![^(]*\))/).map((l) => l.trim());
+      for (const layer of layers) {
+        if (!/^(?:none|var\(--[a-z0-9-]+\)|inset\s.+)$/.test(layer)) bad.push(`${relative(ROOT, file)}: box-shadow:${layer}`);
+      }
+    }
+    for (const m of source.matchAll(/(?<![-\w])(transition|animation)(?:-duration|-delay)?\s*:\s*([^;}]+)/g)) {
+      for (const t of m[2].matchAll(/(?:^|[\s,])(\d*\.?\d+m?s)(?=[\s,]|$)/g)) bad.push(`${relative(ROOT, file)}: ${m[1]} ${t[1]}`);
+    }
+  }
+  assert.deepEqual(bad, [], 'thêm bóng/thời lượng vào tokens.css theo vai trò, đừng viết tay tại trang');
 });

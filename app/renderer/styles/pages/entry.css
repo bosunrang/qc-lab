@@ -15,7 +15,7 @@
   overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; align-self:start;
 }
 .entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 6px 12px;background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);}
-button.entry-tree-toggle,button.entry-tree-expand{width:28px;height:var(--control-h-sm);min-height:var(--control-h-sm);display:flex;align-items:center;justify-content:center;flex:none;padding:0;border:1px solid var(--accent-control-border);border-radius:var(--radius-md);background:var(--accent-control-surface);color:var(--tealink);cursor:pointer;transition:.18s ease;}
+button.entry-tree-toggle,button.entry-tree-expand{width:28px;height:var(--control-h-sm);min-height:var(--control-h-sm);display:flex;align-items:center;justify-content:center;flex:none;padding:0;border:1px solid var(--accent-control-border);border-radius:var(--radius-md);background:var(--accent-control-surface);color:var(--tealink);cursor:pointer;transition:var(--motion-fast) ease;}
 button.entry-tree-toggle:hover,button.entry-tree-expand:hover{background:var(--accent-control-surface-hover);}
 button.entry-tree-toggle svg,button.entry-tree-expand svg{width:var(--icon);height:var(--icon);}
 button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-index:var(--z-float);background:var(--panel);border-color:var(--line);color:var(--ink);box-shadow:var(--surface-shadow);}
@@ -227,7 +227,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 /* Chỉ chỉnh khoảng cách quanh EmptyState trong thẻ bảng; kiểu dáng thuộc component. */
 .qc-table-empty{margin:var(--space-3-5);}
 .qc-row-actions{text-align:center;white-space:nowrap;}
-.qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:.15s ease;}
+.qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:var(--motion-fast) ease;}
 .qc-row-void svg{width:var(--icon-sm);height:var(--icon-sm);}
 .qc-row-void:hover{border-color:var(--danger-accent);background:var(--danger-bg);}
 /* Đây là mô tả phạm vi dữ liệu, dài và cần đọc như nội dung; không phải nhãn
@@ -270,7 +270,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
   display: flex; align-items: center; justify-content: center; border: none; border-radius: 0;
   background: transparent; color: var(--teal); cursor: pointer; overflow: hidden; white-space: nowrap;
   box-sizing: border-box; z-index: 1; opacity: 0; pointer-events: none;
-  transition: opacity .15s ease, width .18s ease, background .18s ease;
+  transition: opacity var(--motion-fast) ease, width var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 .qc-run-cell:hover .qc-add-run-btn { opacity: 1; pointer-events: auto; background: var(--accent-surface); }
 .qc-add-run-btn:hover { width: 70px; background: var(--accent-surface-tint); }
@@ -278,7 +278,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-add-run-label {
   font-size: var(--text-xs); font-weight: 700; letter-spacing: .01em; margin-left: 0;
   max-width: 0; opacity: 0; white-space: nowrap; overflow: hidden;
-  transition: max-width .15s ease, opacity .15s ease, margin-left .15s ease;
+  transition: max-width var(--motion-fast) ease, opacity var(--motion-fast) ease, margin-left var(--motion-fast) ease;
 }
 .qc-add-run-btn:hover .qc-add-run-label { max-width: 44px; margin-left: 4px; opacity: 1; }
 
@@ -298,7 +298,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-note-input:focus:not(:focus-visible){border-color:var(--accent-border);}
 /* Header mức QC vẫn có tooltip khi rê/Tab, nhưng không gạch chân như liên kết. */
 .qc-sheet th.qc-level-head{cursor:help;text-decoration:none;}
-.qc-sheet th.qc-level-head::after{content:attr(data-qc-tooltip);position:absolute;left:50%;top:calc(100% + 7px);transform:translateX(-50%) translateY(-3px);z-index:1;min-width:max-content;padding:8px 10px;border:1px solid var(--accent-border-soft);border-radius:var(--radius-md);background:var(--surface-inverse-soft);color:var(--on-accent);box-shadow:var(--shadow-tooltip-compact);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-heading);letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease,transform .12s ease,visibility .12s;}
+.qc-sheet th.qc-level-head::after{content:attr(data-qc-tooltip);position:absolute;left:50%;top:calc(100% + 7px);transform:translateX(-50%) translateY(-3px);z-index:1;min-width:max-content;padding:8px 10px;border:1px solid var(--accent-border-soft);border-radius:var(--radius-md);background:var(--surface-inverse-soft);color:var(--on-accent);box-shadow:var(--shadow-tooltip-compact);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-heading);letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity var(--motion-fast) ease,transform var(--motion-fast) ease,visibility var(--motion-fast);}
 .qc-sheet th.qc-level-head:hover, .qc-sheet th.qc-level-head:focus-visible{z-index:var(--z-float);}
 .qc-sheet th.qc-level-head:focus-visible{outline-offset:-2px;}
 .qc-sheet th.qc-level-head:hover::after, .qc-sheet th.qc-level-head:focus-visible::after{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);}
