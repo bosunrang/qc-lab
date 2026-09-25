@@ -288,6 +288,9 @@
      dãn dòng của phần tử cha nên cao 25px trong bảng, 27px ngoài bảng, và
      các bản tự dựng ra 20/22/25/26px. */
   --badge-h:24px;
+  /* Bộ đếm trong tab (`.count`) và số thứ tự bước (`.step-number`). */
+  --count-h:20px;
+  --step-number-size:var(--control-h-sm);
   /* Cỡ icon SVG — đặt theo khung chứa. Trước 2026-09-25 có 10/14/15/16/17/
      21/23/27px, cùng vai trò mà nơi 14 nơi 15 (nút xoá hàng 32px).
        xs 10  mũi tên mở rộng trong ô vuông 16px của cây;

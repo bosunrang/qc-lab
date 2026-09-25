@@ -18,12 +18,10 @@ main:has(.config-shell){padding-bottom:16px;}
 .config-shell-tabs-scroll{display:flex;align-items:stretch;gap:4px;min-width:max-content;}
 .config-shell-tabs button{display:flex;align-items:center;gap:6px;min-height:var(--control-h);padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-subtle);cursor:pointer;font-family:var(--sans);text-align:left;}
 .config-shell-tabs button>b{font-size:var(--text-sm);font-weight:var(--weight-bold);white-space:nowrap;}
-.config-shell-tabs button>small{min-width:20px;padding:2px 6px;border-radius:var(--radius-pill);background:var(--surface-sunken);color:var(--text-subtle);text-align:center;font-size:var(--text-2xs);font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;line-height:var(--leading-none);}
 .config-shell-tabs button:hover{color:var(--text-body);background:var(--surface-subtle);}
 /* Cùng kiểu nhấn với mục “Cấu hình chung” ở sidebar: đường viền trái 2px
    nằm trong chính thẻ active, thay vì vệt shadow 3px tách rời và thô hơn. */
 .config-shell-tabs button.on{padding-left:12px;border-left:2px solid var(--teal);background:var(--accent-surface);color:var(--text-accent);}
-.config-shell-tabs button.on small{background:var(--accent-surface-tint);color:var(--text-success);}
 /* Cột flex, KHÔNG tự cuộn: thanh công cụ và các khối giới thiệu là item cố
    định, chỉ khối bảng mới là vùng cuộn. Bản trước để chính `.config-shell-main`
    cuộn nên mọi thứ phía trên bảng (tiêu đề thẻ, ô tìm kiếm, 3 thẻ nguồn TEa)

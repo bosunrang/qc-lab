@@ -293,7 +293,7 @@ function NceGuideModal({ onClose }: { onClose: () => void }) {
       <div className="action-guide-intro">Thực hiện theo thứ tự để hồ sơ NCE đủ bằng chứng, kiểm soát được nguy cơ và có thể khép vòng độc lập.</div>
       <ol className="action-guide-steps">
         {GUIDE_STEPS.map((step, index) => <li className="action-guide-step" key={step.title}>
-          <span className="action-guide-number">{index + 1}</span>
+          <span className="step-number">{index + 1}</span>
           <div><b>{step.title}</b><p>{step.body}</p><small>{step.note}</small></div>
         </li>)}
       </ol>
@@ -370,7 +370,7 @@ function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | n
   return <div className="action-form-body">
     {error && <div className="alert danger">{error}</div>}
     <div className="action-incident-banner"><b>{record ? `Đang tiếp tục hồ sơ ${record.nce_id}` : 'Đang lập hồ sơ NCE'}</b><div>{tests.find((test) => test.id === testId)?.name || 'Chưa chọn xét nghiệm'} · M{level} · Lô {lot || '—'} · {vnDate(date)}</div></div>
-    <div className="action-form-step-ident"><span>1</span><div><b>Nhận diện và phân công sự cố</b><small>Ghi đúng đối tượng QC, nguồn phát hiện và người phụ trách trước khi điều tra.</small></div></div>
+    <div className="action-form-step-ident"><span className="step-number">1</span><div><b>Nhận diện và phân công sự cố</b><small>Ghi đúng đối tượng QC, nguồn phát hiện và người phụ trách trước khi điều tra.</small></div></div>
     <div className="action-ident-groups">
       <div className="action-ident-group"><div className="action-ident-group-title"><b>Đối tượng QC</b><small>{record ? 'Khóa theo hồ sơ đã mở để bảo toàn bằng chứng' : 'Sự cố có thể gắn vào dòng vi phạm QC hoặc tạo từ nguồn khác'}</small></div>
         <div className="action-form-main">

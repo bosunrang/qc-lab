@@ -993,3 +993,36 @@ test('bóng đổ và chuyển động chỉ dùng token', () => {
   }
   assert.deepEqual(bad, [], 'thêm bóng/thời lượng vào tokens.css theo vai trò, đừng viết tay tại trang');
 });
+
+// Bộ đếm trong tab và số thứ tự bước không phải badge trạng thái nên từng tự
+// dựng ở mỗi trang: bộ đếm Tổng quan 20px/12px, Cấu hình tự co theo chữ
+// 11px, và tab đang chọn đổi màu bộ đếm theo hai cách. Luật: `.count` và
+// `.step-number` dựng ở app.css; trang chỉ được đổi màu nền số thứ tự bước.
+test('bộ đếm và số thứ tự bước: hai kiểu dùng chung, một kích thước', () => {
+  assert.equal(flat('--count-h'), '20px');
+  assert.equal(flat('--step-number-size'), '28px');
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(app, /(?:^|\})\s*\.count\{[^}]*min-width:var\(--count-h\);height:var\(--count-h\)/);
+  assert.match(app, /(?:^|\})\s*\.step-number\{[^}]*width:var\(--step-number-size\);height:var\(--step-number-size\)/);
+
+  const SHAPE = /^(?:(?:min-|max-)?(?:width|height)|padding(?:-[a-z]+)?|font(?:-[a-z]+)?|line-height|border-radius|display)$/;
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      const lasts = m[1].split(',').map((p) => p.trim().split(/\s*[>+~]\s*|\s+/).pop() || '');
+      if (file.endsWith('app.css') && lasts.every((l) => /^\.(?:count|step-number)$/.test(l))) continue;
+      const hit = lasts.find((l) => /\.(?:count|step-number)(?![\w-])/.test(l));
+      if (hit) {
+        for (const d of m[2].matchAll(/(?:^|;)\s*([a-z-]+)\s*:/g)) {
+          if (SHAPE.test(d[1]) || (/count/.test(hit) && /^(?:background|color)$/.test(d[1]))) bad.push(`${relative(ROOT, file)}: ${m[1].trim()} đổi ${d[1]}`);
+        }
+      }
+      // Số thứ tự bước hoặc bộ đếm tự dựng lại: khối tròn cố định cỡ 20/28px.
+      if (/-(?:number|count)(?![\w-])/.test(m[1]) && !/\.(?:count|step-number)(?![\w-])/.test(m[1]) && /border-radius:var\(--radius-(?:full|pill)\)/.test(m[2])) {
+        bad.push(`${relative(ROOT, file)}: ${m[1].trim()} tự dựng bộ đếm/số thứ tự`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], 'dùng .count / .step-number; trang chỉ đổi màu nền của .step-number');
+});

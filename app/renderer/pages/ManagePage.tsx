@@ -74,7 +74,7 @@ export function ManagePage() {
           <div className="config-shell-tabs-scroll">
             {TABS.map((t) => (
               <button key={t.id} type="button" className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
-                <b>{t.label}</b>{counts[t.id] ? <small aria-label={`Có ${counts[t.id]} mục`}>{counts[t.id]}</small> : null}
+                <b>{t.label}</b>{counts[t.id] ? <small className="count" aria-label={`Có ${counts[t.id]} mục`}>{counts[t.id]}</small> : null}
               </button>
             ))}
           </div>

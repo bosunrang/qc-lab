@@ -38,7 +38,7 @@ function EmptyChart({ kind }: { kind: 'trend' | 'mdc' }) {
       <p>{trend
         ? 'Nhập CV IQC và Bias EQA/EQC cho cùng một mức QC trong mục “Số liệu theo kỳ”.'
         : 'MDC cần TEa, CV IQC và Bias EQA/EQC đầy đủ trong cùng một kỳ và mức QC.'}</p>
-      <div className="sg-chart-empty-steps"><span>1. Nhập CV IQC</span><span>2. Nhập Bias EQA/EQC</span></div>
+      <div className="sg-chart-empty-steps"><span className="pill">1. Nhập CV IQC</span><span className="pill">2. Nhập Bias EQA/EQC</span></div>
     </div>
   </div>;
 }
