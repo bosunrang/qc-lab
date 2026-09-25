@@ -27,6 +27,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | A.6 (nhánh `refactor/window-hardening`) | `main/window-guard.ts`: mọi webContents chỉ hiện trang của app; `https:` ra ngoài mở bằng trình duyệt hệ thống; còn lại bị chặn. Cửa sổ chính khai `sandbox: true` |
 | E.1 (nhánh `perf/async-password-hash`) | Khởi tạo quản trị, tạo tài khoản, đặt lại, đổi và kiểm mật khẩu băm bất đồng bộ (`hashPasswordAsync`); điều kiện kiểm lại sau khi băm (trùng tên, tài khoản bị xoá, mật khẩu vừa bị đặt lại); test `tests/auth-async.test.mjs` |
 | E.2 (nhánh `perf/audit-sql-query`) | `audit.query` đếm, lọc ngày, phân trang bằng SQL; tìm chữ so trên vài cột rồi mới nạp đủ cột cho trang. 50.000 dòng: lật trang 351 ms → dưới 1 ms, tìm chữ 4,5 s → 0,6 s. Test đối chiếu với cách cũ trên 546 tổ hợp |
+| Lọc ngày Nhật ký (nhánh `fix/audit-local-date-filter`) | Lọc theo ngày giờ địa phương như bảng hiển thị, không theo ngày UTC (trước đây 00:00–06:59 sáng bị xếp vào hôm trước); ngày không hợp lệ bị bỏ qua |
 
 ## Thứ tự đề xuất
 

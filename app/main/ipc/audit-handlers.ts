@@ -4,6 +4,7 @@ import type { ActivityArchivePreview, ActivityPage } from '../../shared/qc-api';
 import { rowToAuditEntry, setActivityAnchor, type Actor, type IpcResult, writeAudit, requireAdmin, withTransaction } from './shared';
 import { activityPageWindow, activitySearchText, type ActivityLike, type ActivityPageWindow, type ActivitySearchFields } from '../domain/audit-filter';
 import { textKey } from '../domain/text-utils';
+import { localDayStartIso, validLocalDate } from '../domain/local-date';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../domain/audit-format';
 import { roleLabel } from '../domain/page-roles';
 
@@ -57,21 +58,23 @@ export function createAuditHandlers(db: Db) {
    * xem — trước đây mỗi lần lật trang nạp cả bảng (tới 50.000 dòng) rồi lọc
    * bằng JS. Kết quả phải trùng `filterActivity` + `paginateActivity` (test
    * đối chiếu):
-   * - Lọc ngày theo ngày UTC của `ts`. `ts` luôn là ISO UTC do `nowIso()`
+   * - Lọc ngày theo ngày GIỜ ĐỊA PHƯƠNG, đúng ngày bảng hiển thị: ngày chọn
+   *   đổi thành mốc 00:00 địa phương viết dạng ISO UTC rồi so thẳng với `ts`
+   *   (dùng được chỉ mục `idx_activity_ts`). `ts` luôn là ISO UTC do `nowIso()`
    *   ghi trong `insertAudit` (nơi duy nhất ghi bảng này; phục hồi chỉ chép lại
-   *   dòng của chính app, và `ts` nằm trong chuỗi hash), nên
-   *   `substr(ts,1,10)` đúng bằng ngày mà `filterActivity` tính.
+   *   dòng của chính app, và `ts` nằm trong chuỗi hash), nên so chuỗi là so
+   *   thời điểm.
    * - Tìm chữ bỏ dấu và khớp cả giờ hiển thị, SQL không làm được: đọc các cột
    *   cần so khớp của những dòng đã lọc ngày, so bằng `activitySearchText`,
    *   rồi mới nạp đủ cột cho đúng các dòng thuộc trang. */
   function query(input: AuditQueryInput, actor: Actor): IpcResult<ActivityPage> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const text = textKey(String(input.query || ''));
-    const from = String(input.from || ''), to = String(input.to || '');
+    const from = validLocalDate(input.from), to = validLocalDate(input.to);
     const conditions: string[] = [];
     const params: string[] = [];
-    if (from) { conditions.push('substr(ts, 1, 10) >= ?'); params.push(from); }
-    if (to) { conditions.push('substr(ts, 1, 10) <= ?'); params.push(to); }
+    if (from) { conditions.push('ts >= ?'); params.push(localDayStartIso(from)); }
+    if (to) { conditions.push('ts < ?'); params.push(localDayStartIso(to, 1)); }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const page = Number(input.page) || 1, pageSize = Number(input.pageSize) || 25;
 

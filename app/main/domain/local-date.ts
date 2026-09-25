@@ -19,4 +19,22 @@ export function isoLocalDateAfter(days: number, at: Date = new Date()): string {
   return isoLocalDate(shifted);
 }
 
+/** `value` nếu là một ngày có thật dạng `YYYY-MM-DD`, ngược lại chuỗi rỗng
+ * (vd `2026-02-30` không phải ngày có thật). */
+export function validLocalDate(value: unknown): string {
+  const text = String(value ?? '');
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return '';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return isoLocalDate(date) === text ? text : '';
+}
+
+/** Thời điểm 00:00 giờ địa phương của ngày `YYYY-MM-DD` (cộng thêm `addDays`),
+ * viết dạng ISO UTC để so thẳng với cột thời điểm lưu bằng `toISOString()`.
+ * Nhận ngày đã qua `validLocalDate`. */
+export function localDayStartIso(date: string, addDays = 0): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day + addDays).toISOString();
+}
+
 

@@ -6,6 +6,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
+// Lọc ngày theo giờ địa phương: cố định giờ Việt Nam (UTC+7) để ca sát nửa
+// đêm có nghĩa ở mọi máy chạy test. Đặt TRƯỚC khi nạp module (bộ định dạng
+// giờ được dựng lúc nạp).
+process.env.TZ = 'Asia/Ho_Chi_Minh';
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createAuditHandlers } = require('../../app-dist/main/ipc/audit-handlers.js');
@@ -43,7 +47,8 @@ test('kết quả trùng cách lọc cũ trên mọi tổ hợp tìm chữ, kho�
   const db = seed(700);
   const audit = createAuditHandlers(db);
   const queries = ['', 'glucose', 'GLUCOSE MUC 2', 'nguyen van anh', 'Đào', 'ktv', 'quản trị', 'chỉ xem', 'huy diem', '42', '5.0', 'không có dòng nào', '  '];
-  const ranges = [['', ''], ['2026-01-10', ''], ['', '2026-02-01'], ['2026-01-05', '2026-01-20'], ['2026-03-01', '2026-02-01'], ['2027-01-01', '']];
+  const ranges = [['', ''], ['2026-01-10', ''], ['', '2026-02-01'], ['2026-01-05', '2026-01-20'], ['2026-03-01', '2026-02-01'], ['2027-01-01', ''],
+    ['2026-01-07', '2026-01-07'], ['2026-02-30', ''], ['', 'abc'], ['2026-1-5', '2026-01-20']];
   const pages = [[1, 25], [3, 25], [999, 25], [1, 1], [2, 1000], [0, 0], [-4, 10]];
   let checked = 0;
   for (const query of queries) for (const [from, to] of ranges) for (const [page, pageSize] of pages) {
@@ -54,6 +59,24 @@ test('kết quả trùng cách lọc cũ trên mọi tổ hợp tìm chữ, kho�
     checked++;
   }
   assert.ok(checked > 500);
+});
+
+test('lọc ngày theo ngày giờ Việt Nam mà bảng hiển thị, không theo ngày UTC', () => {
+  const db = openDatabase(':memory:');
+  const insert = db.prepare("INSERT INTO activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash) VALUES (?,?,?,'A','a','u','admin','Thêm điểm QC','','','t','','')");
+  insert.run('late', 1, '2026-09-25T16:59:59.999Z'); // 23:59:59 ngày 25/09 giờ Việt Nam
+  insert.run('early', 2, '2026-09-25T17:00:00.000Z'); // 00:00 ngày 26/09
+  insert.run('dawn', 3, '2026-09-25T23:30:00.000Z'); // 06:30 ngày 26/09, ngày UTC vẫn là 25/09
+  const audit = createAuditHandlers(db);
+  const seqs = (from, to) => audit.query({ from, to, page: 1, pageSize: 25 }, admin).data.rows.map((r) => r.seq);
+  assert.equal(formatAuditDateTimeVN('2026-09-25T23:30:00.000Z'), '06:30 26/9/2026', 'bảng hiện 26/09');
+  assert.deepEqual(seqs('2026-09-26', '2026-09-26'), [3, 2]);
+  assert.deepEqual(seqs('2026-09-25', '2026-09-25'), [1]);
+  assert.deepEqual(seqs('', '2026-09-25'), [1]);
+  assert.deepEqual(seqs('2026-09-26', ''), [3, 2]);
+  for (const [from, to] of [['2026-09-26', '2026-09-26'], ['2026-09-25', '2026-09-25']]) {
+    assert.deepEqual(audit.query({ from, to, page: 1, pageSize: 25 }, admin).data, oracle(db, { from, to, page: 1, pageSize: 25 }));
+  }
 });
 
 test('tìm theo giờ hiển thị (giờ Việt Nam) vẫn khớp', () => {

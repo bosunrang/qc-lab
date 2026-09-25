@@ -1,15 +1,19 @@
 import { textKey } from './text-utils';
 import { roleLabel } from './page-roles';
 import { formatAuditDateTimeVN } from './audit-format';
+import { isoLocalDate, validLocalDate } from './local-date';
 
 export interface ActivityLike {
   seq: number; ts: string; user: string; username: string; role: string;
   type: string; detail: string; target: string; prevHash: string; hash: string;
 }
 
+/** Ngày của dòng nhật ký theo GIỜ ĐỊA PHƯƠNG — đúng ngày bảng Nhật ký hiện
+ * (`formatAuditDateTimeVN`). Trước đây lấy ngày UTC, nên thao tác lúc
+ * 00:00–06:59 sáng giờ Việt Nam bị lọc vào ngày hôm trước. */
 function dateKeyOf(activity: ActivityLike): string {
   const date = new Date(activity?.ts);
-  return Number.isFinite(+date) ? date.toISOString().slice(0, 10) : '';
+  return Number.isFinite(+date) ? isoLocalDate(date) : '';
 }
 
 /** Các trường tìm kiếm của một dòng nhật ký — cột cần có để so khớp. */
@@ -27,7 +31,8 @@ export function activitySearchText(activity: ActivitySearchFields): string {
 
 export function filterActivity(items: ActivityLike[], query: string, from: string, to: string): ActivityLike[] {
   const text = textKey(query);
-  const start = String(from || ''), end = String(to || '');
+  // Ngày không hợp lệ thì bỏ mốc đó, cùng cách `audit.query` ở main.
+  const start = validLocalDate(from), end = validLocalDate(to);
   return items.filter(activity => {
     const date = dateKeyOf(activity);
     if (start && (!date || date < start)) return false;
