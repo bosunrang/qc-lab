@@ -46,12 +46,17 @@ test('applySchema dọn dữ liệu cũ về mã chuẩn và chạy lại đư�
     ['a7', '', ''],
   ];
   for (const [id, raw] of rawErrorTypes) insert.run(id, '2026-09-01', `NCE-${id}`, raw);
+  // Mô phỏng CSDL tạo trước bước migration 2: mỗi bước chỉ chạy một lần theo
+  // số phiên bản, nên phải lùi số về 1 thì bước dọn dữ liệu mới chạy.
+  const asVersion1 = () => db.prepare("UPDATE app_meta SET value='1' WHERE key='schemaVersion'").run();
+  asVersion1();
   applySchema(db);
   const read = () => Object.fromEntries((db.prepare('SELECT id,error_type FROM actions').all()).map(r => [r.id, r.error_type]));
   const after = read();
   for (const [id, raw, want] of rawErrorTypes) assert.equal(after[id], want, `${id}: "${raw}" → "${want}"`);
   // Phép ánh xạ SQL phải cho cùng kết quả với `normalizeErrorClass()`.
   for (const [id, raw] of rawErrorTypes) assert.equal(after[id], normalizeErrorClass(raw), `${id}: SQL lệch normalizeErrorClass()`);
+  asVersion1();
   applySchema(db);
   assert.deepEqual(read(), after, 'chạy lại không đổi gì thêm');
 });

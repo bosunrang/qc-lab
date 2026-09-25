@@ -4,8 +4,10 @@
 // WHERE/JOIN/sort thật cần (đặc biệt `qc_points`); giữ cột *_json khi cấu
 // trúc luôn đọc/ghi nguyên khối theo cha, không filter xuyên hàng.
 import type { SqliteLike } from './sqlite-like';
+import { withTransaction } from './transaction';
 
-export const SCHEMA_VERSION = 1;
+/** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -356,84 +358,116 @@ CREATE TABLE IF NOT EXISTS tea_refs (
 );
 `;
 
-/** Mở kết nối và áp schema (idempotent — mọi CREATE TABLE đều IF NOT EXISTS).
- * `CREATE TABLE IF NOT EXISTS` KHÔNG tự thêm cột mới vào bảng đã tồn tại sẵn
- * trên đĩa — mọi cột thêm SAU lần tạo bảng đầu tiên (như `tests.active`,
- * 2026-09-01) cần 1 bước ALTER TABLE idempotent riêng ở đây, kiểm tra qua
- * `PRAGMA table_info` trước khi thêm để chạy lại nhiều lần không lỗi. */
-export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: string) => { all: () => unknown[] } }): void {
+function hasColumn(db: SqliteLike, table: string, column: string): boolean {
+  return (db.prepare(`PRAGMA table_info('${table}')`).all() as { name: string }[]).some((c) => c.name === column);
+}
+function addColumnIfMissing(db: SqliteLike, table: string, column: string, definition: string): void {
+  if (!hasColumn(db, table, column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+}
+
+interface Migration { version: number; name: string; up(db: SqliteLike): void }
+
+/** Các bước nâng schema, theo thứ tự. Mỗi bước chạy trong một transaction và
+ * ghi số phiên bản ngay trong transaction đó, nên hoặc xong trọn bước, hoặc
+ * chưa hề chạy. `CREATE TABLE IF NOT EXISTS` KHÔNG tự thêm cột vào bảng đã có
+ * trên đĩa, nên mọi cột thêm sau phải có một bước ở đây.
+ *
+ * Mỗi bước phải chạy lại được (kiểm tra trước khi ALTER): CSDL tạo trước
+ * 2026-09-25 đều ghi `schemaVersion = 1` dù đã chạy một phần các lệnh ALTER
+ * của bước 2 — hồi đó chúng chạy ở mỗi lần mở mà không tăng số phiên bản.
+ *
+ * Thêm thay đổi schema mới: thêm một bước với `version` kế tiếp và tăng
+ * `SCHEMA_VERSION`. Không sửa bước đã phát hành. */
+const MIGRATIONS: Migration[] = [
+  { version: 1, name: 'Schema gốc', up: () => { /* các bảng tạo bởi SCHEMA_SQL */ } },
+  {
+    version: 2,
+    name: 'Cột bổ sung tháng 9/2026 và chuẩn hoá mã loại sai số',
+    up(db) {
+      addColumnIfMissing(db, 'tests', 'active', 'INTEGER NOT NULL DEFAULT 1');
+      addColumnIfMissing(db, 'tests', 'analyte_id', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'tests', 'eflm_analyte', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'tests', 'eflm_aps', "TEXT NOT NULL DEFAULT 'desirable'");
+      addColumnIfMissing(db, 'tests', 'eflm_lookup_date', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'tests', 'eflm_ref', "TEXT NOT NULL DEFAULT ''");
+      // Không đoán EFLM từ `tea`: cột cũ có thể đã bị nguồn CLIA/Ricos ghi đè.
+      // Giữ nguyên giá trị cũ để truy xuất; yêu cầu xác nhận lại EFLM một lần.
+      addColumnIfMissing(db, 'tests', 'eflm_tea', 'REAL');
+      addColumnIfMissing(db, 'lot_groups', 'archived_lot_ids_json', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'users', 'avatar', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'test_levels', 'mean_sd_effective_from', "TEXT NOT NULL DEFAULT ''");
+      if (!hasColumn(db, 'qc_panel_tests', 'position')) {
+        db.exec('ALTER TABLE qc_panel_tests ADD COLUMN position INTEGER;');
+        // Lấp lại từ `rowid`: handler LUÔN chèn theo đúng thứ tự người dùng
+        // tick (`for (const testId of validTestIds)`), nên thứ tự đó vẫn nằm
+        // nguyên trong DB — chỉ là chưa ai đọc theo nó. Nhờ vậy panel đã tạo
+        // trước bản này lấy lại đúng thứ tự cũ, người dùng không phải tick lại.
+        db.exec(`UPDATE qc_panel_tests SET position = (
+          SELECT COUNT(*) FROM qc_panel_tests older
+          WHERE older.panel_id = qc_panel_tests.panel_id AND older.rowid < qc_panel_tests.rowid
+        );`);
+      }
+      normalizeErrorTypes(db);
+    },
+  },
+];
+
+/** `actions.error_type` chỉ được chứa MÃ `SE`/`RE`/`''`. Ba nguồn ghi từng
+ * dùng ba bộ từ vựng khác nhau — form NCE ghi `SE`, huỷ điểm ghi
+ * "SE — Sai số hệ thống", luồng quản lý dải ghi "Quản lý dải kiểm soát" —
+ * nên `ActionsPage` so `=== 'SE'` hiện NGƯỢC thành "Sai số ngẫu nhiên" cho
+ * hai nguồn sau. Mọi cổng ghi đã chuyển sang `normalizeErrorClass()`; bước
+ * này dọn nốt dữ liệu đã lưu (kể cả dữ liệu vừa phục hồi từ backup cũ).
+ * Phép ánh xạ phải khớp `normalizeErrorClass()`.
+ * KHÔNG dùng `UPPER()`: nó chỉ gấp chữ ASCII nên "số"/"hệ" giữ nguyên và
+ * mẫu so sánh viết hoa sẽ trượt. `LIKE` mặc định của SQLite đã không phân
+ * biệt hoa/thường cho phần ASCII, còn ký tự có dấu thì so khớp nguyên văn. */
+function normalizeErrorTypes(db: SqliteLike): void {
+  db.exec(`UPDATE actions SET error_type = CASE
+    WHEN TRIM(error_type) LIKE 'SE %' OR TRIM(error_type) LIKE '%sai số hệ thống%' THEN 'SE'
+    WHEN TRIM(error_type) LIKE 'RE %' OR TRIM(error_type) LIKE '%sai số ngẫu nhiên%' THEN 'RE'
+    ELSE '' END
+    WHERE error_type NOT IN ('SE', 'RE', '');`);
+}
+
+/** Phiên bản schema đang ghi trong CSDL; 0 khi CSDL còn rỗng. */
+export function readSchemaVersion(db: SqliteLike): number {
+  const row = db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get() as { value: string } | undefined;
+  const version = Number(row?.value ?? 0);
+  return Number.isInteger(version) && version > 0 ? version : 0;
+}
+
+/** Tạo bảng còn thiếu rồi chạy các bước migration chưa chạy. Gọi khi mở CSDL
+ * và ngay sau khi phục hồi dữ liệu (backup/Firebase) để dữ liệu cũ được nâng
+ * cấp mà không phải khởi động lại app. Từ chối CSDL tạo bởi phiên bản mới hơn:
+ * chạy tiếp trên schema mà app không hiểu dễ làm hỏng dữ liệu. */
+export function applySchema(db: SqliteLike): void {
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA_SQL);
-  if (db.prepare) {
-    const cols = db.prepare("PRAGMA table_info('tests')").all() as { name: string }[];
-    if (!cols.some((c) => c.name === 'active')) {
-      db.exec('ALTER TABLE tests ADD COLUMN active INTEGER NOT NULL DEFAULT 1;');
-    }
-    if (!cols.some((c) => c.name === 'analyte_id')) {
-      db.exec("ALTER TABLE tests ADD COLUMN analyte_id TEXT NOT NULL DEFAULT '';");
-    }
-    for (const [name, sql] of [['eflm_analyte', "TEXT NOT NULL DEFAULT ''"], ['eflm_aps', "TEXT NOT NULL DEFAULT 'desirable'"], ['eflm_lookup_date', "TEXT NOT NULL DEFAULT ''"], ['eflm_ref', "TEXT NOT NULL DEFAULT ''"]] as const) {
-      if (!cols.some((c) => c.name === name)) db.exec(`ALTER TABLE tests ADD COLUMN ${name} ${sql};`);
-    }
-    // Không đoán EFLM từ `tea`: cột cũ có thể đã bị nguồn CLIA/Ricos ghi đè.
-    // Giữ nguyên giá trị cũ để truy xuất; yêu cầu xác nhận lại EFLM một lần.
-    if (!cols.some(c => c.name === 'eflm_tea')) db.exec('ALTER TABLE tests ADD COLUMN eflm_tea REAL;');
-    const groupCols = db.prepare("PRAGMA table_info('lot_groups')").all() as { name: string }[];
-    if (!groupCols.some((c) => c.name === 'archived_lot_ids_json')) {
-      db.exec("ALTER TABLE lot_groups ADD COLUMN archived_lot_ids_json TEXT NOT NULL DEFAULT '';");
-    }
-    const userCols = db.prepare("PRAGMA table_info('users')").all() as { name: string }[];
-    if (!userCols.some((c) => c.name === 'avatar')) {
-      db.exec("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';");
-    }
-    const levelCols = db.prepare("PRAGMA table_info('test_levels')").all() as { name: string }[];
-    if (!levelCols.some((c) => c.name === 'mean_sd_effective_from')) {
-      db.exec("ALTER TABLE test_levels ADD COLUMN mean_sd_effective_from TEXT NOT NULL DEFAULT '';");
-    }
-    const panelTestCols = db.prepare("PRAGMA table_info('qc_panel_tests')").all() as { name: string }[];
-    if (!panelTestCols.some((c) => c.name === 'position')) {
-      db.exec('ALTER TABLE qc_panel_tests ADD COLUMN position INTEGER;');
-      // Lấp lại từ `rowid`: handler LUÔN chèn theo đúng thứ tự người dùng
-      // tick (`for (const testId of validTestIds)`), nên thứ tự đó vẫn nằm
-      // nguyên trong DB — chỉ là chưa ai đọc theo nó. Nhờ vậy panel đã tạo
-      // trước bản này lấy lại đúng thứ tự cũ, người dùng không phải tick lại.
-      db.exec(`UPDATE qc_panel_tests SET position = (
-        SELECT COUNT(*) FROM qc_panel_tests older
-        WHERE older.panel_id = qc_panel_tests.panel_id AND older.rowid < qc_panel_tests.rowid
-      );`);
-    }
-    // `actions.error_type` chỉ được chứa MÃ `SE`/`RE`/`''`. Ba nguồn ghi từng
-    // dùng ba bộ từ vựng khác nhau — form NCE ghi `SE`, huỷ điểm ghi
-    // "SE — Sai số hệ thống", luồng quản lý dải ghi "Quản lý dải kiểm soát" —
-    // nên `ActionsPage` so `=== 'SE'` hiện NGƯỢC thành "Sai số ngẫu nhiên" cho
-    // hai nguồn sau. Mọi cổng ghi đã chuyển sang `normalizeErrorClass()`; bước
-    // này dọn nốt dữ liệu đã lưu. Idempotent: dòng đã chuẩn bị `WHERE` loại ra.
-    // Phép ánh xạ phải khớp `normalizeErrorClass()` trong
-    // KHÔNG dùng `UPPER()`: nó chỉ gấp chữ ASCII nên "số"/"hệ" giữ nguyên và
-    // mẫu so sánh viết hoa sẽ trượt. `LIKE` mặc định của SQLite đã không phân
-    // biệt hoa/thường cho phần ASCII, còn ký tự có dấu thì so khớp nguyên văn.
-    db.exec(`UPDATE actions SET error_type = CASE
-      WHEN TRIM(error_type) LIKE 'SE %' OR TRIM(error_type) LIKE '%sai số hệ thống%' THEN 'SE'
-      WHEN TRIM(error_type) LIKE 'RE %' OR TRIM(error_type) LIKE '%sai số ngẫu nhiên%' THEN 'RE'
-      ELSE '' END
-      WHERE error_type NOT IN ('SE', 'RE', '');`);
+  const current = readSchemaVersion(db);
+  if (current > SCHEMA_VERSION) {
+    throw new Error(`Dữ liệu được tạo bởi phiên bản QC Lab mới hơn (schema ${current}, bản này hỗ trợ tới ${SCHEMA_VERSION}). Hãy cập nhật QC Lab.`);
+  }
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= current) continue;
+    withTransaction(db, () => {
+      migration.up(db);
+      db.prepare("INSERT INTO app_meta(key,value) VALUES('schemaVersion',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+        .run(String(migration.version));
+    });
   }
 }
 
-/** Chèn các dòng khởi tạo bắt buộc cho một database CÒN RỖNG: mốc
- * `schemaVersion` trong `app_meta` và dòng `lab` id=1 (hồ sơ phòng xét
- * nghiệm, mọi trang Cài đặt đều đọc/ghi đúng dòng này).
+/** Chèn các dòng khởi tạo bắt buộc: dòng `lab` id=1 (hồ sơ phòng xét nghiệm,
+ * mọi trang Cài đặt đều đọc/ghi đúng dòng này). Còn số phiên bản schema thì
+ * do bước migration trong `applySchema()` ghi.
  *
  * Tách ra khỏi `openDatabase()` (2026-09-09) vì bản xem trước qua trình duyệt
  * mở SQLite bằng sql.js/WASM chứ không qua `node:sqlite`, nên không gọi được
- * `openDatabase()` — mà nếu nó tự chèn lại 2 dòng này thì đó lại đúng là kiểu
- * nhân bản logic mà cả đợt này đang đi gỡ. Idempotent: chỉ chạy khi chưa có
- * mốc `schemaVersion`.
+ * `openDatabase()` — mà nếu nó tự chèn lại dòng này thì đó lại đúng là kiểu
+ * nhân bản logic mà cả đợt này đang đi gỡ. Idempotent.
  */
 export function seedInitialRows(db: SqliteLike): void {
-  const row = db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get() as { value: string } | undefined;
-  if (row) return;
-  db.prepare("INSERT INTO app_meta(key,value) VALUES('schemaVersion',?)").run(String(SCHEMA_VERSION));
   db.prepare('INSERT OR IGNORE INTO lab(id) VALUES (1)').run();
 }
 

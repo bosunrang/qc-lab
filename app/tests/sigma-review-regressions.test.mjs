@@ -153,6 +153,8 @@ test('SG05: EFLM survives source switches; old shared value is never migrated as
   assert.equal(restored.eflm_tea, 10); assert.equal(restored.tea, 10);
   assert.equal(resolveTea(restored, [], [], 'eflm').value, 10);
   db.exec('ALTER TABLE tests DROP COLUMN eflm_tea');
+  // CSDL cũ chưa có cột `eflm_tea` ghi phiên bản schema 1.
+  db.prepare("UPDATE app_meta SET value='1' WHERE key='schemaVersion'").run();
   applySchema(db); applySchema(db);
   const restoredRow = db.prepare('SELECT * FROM tests WHERE id=?').get(assay.id);
   assert.equal(restoredRow.tea, 10); assert.equal(restoredRow.eflm_tea, null);

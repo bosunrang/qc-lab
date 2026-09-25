@@ -8,6 +8,7 @@ import type { ActivityEntry } from '../../shared/qc-api';
 import { uid } from '../domain/text-utils';
 import { auditEntryHash } from '../domain/audit-chain';
 import { canWriteRole, isAdminRole } from '../domain/page-roles';
+import { withTransaction } from '../db/transaction';
 
 export interface Actor { userId: string; username: string; name: string; role: string; clientId: string }
 
@@ -15,32 +16,9 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: { code: s
 
 export function nowIso(): string { return new Date().toISOString(); }
 
-let savepointSeq = 0;
-/** Chạy `work` nguyên tử: lỗi ở bất kỳ bước nào thì mọi thay đổi bên trong bị
- * huỷ, kể cả dòng nhật ký. Dùng SAVEPOINT thay vì BEGIN để lồng được — gọi
- * bên trong một transaction đang mở (hoặc bên trong `writeAudit`) vẫn đúng.
- * ROLLBACK được bọc riêng để lỗi của nó không đè mất lỗi gốc.
- *
- * `work` phải đồng bộ: SQLite ở đây chạy đồng bộ, một `await` giữa chừng sẽ
- * để transaction mở trong khi lệnh khác chen vào. */
-export function withTransaction<T>(db: Db, work: () => T): T {
-  const name = `tx_${++savepointSeq}`;
-  db.exec(`SAVEPOINT ${name}`);
-  try {
-    const result = work();
-    if (result && typeof (result as { then?: unknown }).then === 'function') {
-      throw new Error('withTransaction chỉ nhận hàm đồng bộ.');
-    }
-    db.exec(`RELEASE ${name}`);
-    return result;
-  } catch (error) {
-    try {
-      db.exec(`ROLLBACK TO ${name}`);
-      db.exec(`RELEASE ${name}`);
-    } catch { /* giữ lỗi gốc */ }
-    throw error;
-  }
-}
+// Handler dùng `withTransaction` qua đây; định nghĩa nằm ở tầng db để migration
+// schema cũng dùng được mà không phụ thuộc ngược lên ipc.
+export { withTransaction };
 
 /** Đích nhận `store:changed`. Khai dạng CẤU TRÚC (không `import type
  * { BrowserWindow } from 'electron'`) vì bản xem trước qua trình duyệt chạy

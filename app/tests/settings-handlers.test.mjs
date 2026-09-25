@@ -53,7 +53,7 @@ assert.equal(storage.dbFileBytes, 0);
 assert.equal(storage.path, ':memory:');
 assert.equal(storage.engine, 'SQLite');
 assert.match(storage.sqliteVersion, /^\d+\.\d+/);
-assert.equal(storage.schemaVersion, 1);
+assert.equal(storage.schemaVersion, require('../../app-dist/main/db/schema.js').SCHEMA_VERSION);
 assert.equal(storage.storageMode, 'memory');
 
 console.log('app settings-handlers end-to-end tests passed');

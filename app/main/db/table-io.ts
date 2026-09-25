@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Db } from './sqlite-like';
-import { SCHEMA_VERSION } from './schema';
+import { SCHEMA_VERSION, applySchema } from './schema';
 import { buildBackupEnvelope } from '../domain/backup';
 
 export function listTableNames(db: Db): string[] {
@@ -41,7 +41,11 @@ export function restoreAllTables(db: Db, dataByTable: Record<string, Record<stri
     for (const table of tables) {
       const rows = dataByTable[table];
       if (!rows || !rows.length) continue;
-      const cols = columnsOf(db, table);
+      // Chỉ chèn cột có trong dữ liệu: backup cũ chưa có các cột thêm sau, gán
+      // NULL tường minh sẽ vỡ ràng buộc NOT NULL (ví dụ `users.avatar`), còn bỏ
+      // qua thì cột nhận giá trị mặc định của schema hiện tại.
+      const cols = columnsOf(db, table).filter((c) => c in rows[0]);
+      if (!cols.length) continue;
       const placeholders = cols.map(() => '?').join(',');
       const stmt = db.prepare(`INSERT INTO ${table}(${cols.join(',')}) VALUES (${placeholders})`);
       for (const row of rows) {
@@ -49,11 +53,15 @@ export function restoreAllTables(db: Db, dataByTable: Record<string, Record<stri
         stmt.run(...values);
       }
     }
+    // Dữ liệu phục hồi mang số phiên bản schema của lúc xuất: chạy các bước
+    // migration còn thiếu ngay trong transaction này, để dữ liệu cũ được chuẩn
+    // hoá luôn và một bản không nâng cấp được thì huỷ cả lần phục hồi.
+    applySchema(db);
     const violations = db.prepare('PRAGMA foreign_key_check').all();
     if (violations.length) throw new Error(`Dữ liệu vi phạm ràng buộc khoá ngoại (${violations.length} dòng) — huỷ thao tác.`);
     db.exec('COMMIT');
   } catch (e) {
-    db.exec('ROLLBACK');
+    try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ }
     throw e;
   } finally {
     db.exec('PRAGMA foreign_keys = ON');
