@@ -1,6 +1,12 @@
 // Hợp đồng IPC lộ ra qua preload.ts — dùng chung giữa main và renderer để
 // renderer có type an toàn khi gọi window.qcApi.*
 export interface LisGatewaySettings { enabled: boolean; url: string; token: string }
+/** Kết quả kiểm tra một tệp backup trước khi phục hồi. `legacy` là tệp .json
+ * xuất trước khi đổi sang định dạng SQLite. */
+export interface BackupFileSummary {
+  fileName: string; tables: number; rows: number; points: number;
+  schemaVersion: number; createdAt: string; bytes: number; legacy: boolean;
+}
 export interface LisResolved {
   ok: boolean; code: string; reason?: string;
   qclabTestId?: string; level?: number; lot?: string; displayName?: string;
@@ -647,13 +653,17 @@ export interface QcApi {
   exportTableXlsx(input: { sheetName: string; headers: string[]; rows: (string | number | null)[][] }): Promise<IpcResult<string>>;
 
   printHtmlToPdf(input: { html: string; defaultFileName: string; pageNumbers?: boolean }): Promise<IpcResult<{ path: string }>>;
-  /** Xuất/phục hồi toàn bộ dữ liệu QC Lab. */
-  exportBackup(): Promise<IpcResult<string>>;
-  importBackup(input: { data: { json: string } }): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
-  /** Công cụ kiểm tra và khởi tạo lại dữ liệu vận hành.
-   * `verifyBackup` chỉ đọc tệp; `resetOperationalData` giữ tài khoản và nhật ký. */
-  backupStatus(): Promise<{ lastBackupAt: string | null; lastBackupBytes: number; maxImportBytes: number }>;
-  verifyBackup(input: { data: { json: string } }): Promise<IpcResult<{ tables: number; rows: number; points: number; schemaVersion: number; createdAt: string }>>;
+  /** Xuất toàn bộ dữ liệu ra một tệp backup SQLite. Main mở hộp thoại lưu;
+   * `data` là `null` khi người dùng huỷ hộp thoại. Chỉ chạy trên máy chính. */
+  exportBackup(): Promise<IpcResult<{ path: string; bytes: number; points: number } | null>>;
+  /** Mở hộp thoại chọn tệp backup (.sqlite, hoặc .json cũ) và kiểm tra nó mà
+   * không chạm vào dữ liệu đang dùng. `data` là `null` khi người dùng huỷ. */
+  chooseBackupFile(): Promise<IpcResult<BackupFileSummary | null>>;
+  /** Phục hồi từ tệp vừa kiểm tra ở `chooseBackupFile()`; luôn tạo bản an
+   * toàn của dữ liệu hiện tại trước khi thay thế. */
+  importBackup(): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
+  backupStatus(): Promise<{ lastBackupAt: string | null; lastBackupBytes: number }>;
+  /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. */
   resetOperationalData(): Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
 
   getLisSettings(): Promise<LisGatewaySettings>;

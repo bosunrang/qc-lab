@@ -269,8 +269,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
       return {
         lastBackupAt: at,
         lastBackupBytes: Number.isFinite(bytes) ? bytes : 0,
-        // Giữ đồng bộ với `MAX_IMPORT_BYTES` của backup-handlers.ts (128 MB).
-        maxImportBytes: 128 * 1024 * 1024,
       };
     },
 
@@ -284,8 +282,8 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     exportTableXlsx: exportTableXlsxInBrowser,
     printHtmlToPdf: ({ html }) => printHtmlToPdfInBrowser(html),
     exportBackup: async () => notAvailable(),
+    chooseBackupFile: async () => notAvailable(),
     importBackup: async () => notAvailable(),
-    verifyBackup: async () => notAvailable(),
     resetOperationalData: async () => notAvailable(),
     getLisSettings: async () => lis.getSettings(requireActor()),
     saveLisSettings: async (input) => lis.saveSettings(input, requireActor()),

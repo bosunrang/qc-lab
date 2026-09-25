@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   LabProfile, IpcResult, LisGatewaySettings, LisQueueRecord, FirebaseSettings,
-  FirebaseConnectResult, FirebaseSyncResult, StorageInfo,
+  FirebaseConnectResult, FirebaseSyncResult, StorageInfo, BackupFileSummary,
 } from '../../shared/qc-api';
 
 /** Trang Cài đặt gom 5 nhóm dữ liệu backend độc lập: hồ sơ đơn vị, dung
@@ -17,13 +17,13 @@ import type {
  * RANH GIỚI: store giữ DỮ LIỆU TỪ BACKEND và các thao tác gọi IPC; state của
  * FORM (tên đơn vị đang gõ, mật khẩu Firebase, ô URL LIS…) vẫn thuộc về
  * trang — đó là nháp của người dùng, không phải dữ liệu đã lưu. Hộp thoại
- * xác nhận, tải file Blob, đọc `<input type="file">` cũng ở trang: chúng là
- * UI, không phải dữ liệu.
+ * xác nhận cũng ở trang: chúng là UI, không phải dữ liệu. Hộp thoại chọn tệp
+ * backup do main process mở.
  */
 interface SettingsState {
   profile: LabProfile | null;
   storage: StorageInfo | null;
-  backup: { lastBackupAt: string | null; lastBackupBytes: number; maxImportBytes: number } | null;
+  backup: { lastBackupAt: string | null; lastBackupBytes: number } | null;
   lis: LisGatewaySettings | null;
   lisQueue: { pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null;
   firebase: FirebaseSettings | null;
@@ -35,9 +35,9 @@ interface SettingsState {
   save: (data: { name: string; dept: string; address: string; brandTitle: string; brandSub: string; logoText?: string; logoData?: string; clearLogo?: boolean }) => Promise<IpcResult<LabProfile>>;
 
   loadBackupStatus: () => Promise<void>;
-  exportBackup: () => Promise<IpcResult<string>>;
-  importBackup: (json: string) => Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
-  verifyBackup: (json: string) => Promise<IpcResult<{ tables: number; rows: number; points: number; schemaVersion: number; createdAt: string }>>;
+  exportBackup: () => Promise<IpcResult<{ path: string; bytes: number; points: number } | null>>;
+  chooseBackupFile: () => Promise<IpcResult<BackupFileSummary | null>>;
+  importBackup: () => Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
   resetOperationalData: () => Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
 
   loadLis: () => Promise<void>;
@@ -80,16 +80,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const result = await window.qcApi.exportBackup();
     // Mốc "sao lưu gần nhất" đổi ngay sau khi xuất — nạp lại để lời nhắc sao
     // lưu không còn nói "chưa sao lưu trên máy này".
-    if (result.ok) await get().loadBackupStatus();
+    if (result.ok && result.data) await get().loadBackupStatus();
     return result;
   },
-  importBackup: async (json) => {
-    const result = await window.qcApi.importBackup({ data: { json } });
+  chooseBackupFile: async () => window.qcApi.chooseBackupFile(),
+  importBackup: async () => {
+    const result = await window.qcApi.importBackup();
     // Phục hồi thay gần như MỌI bảng: nạp lại cả hồ sơ đơn vị lẫn dung lượng.
     if (result.ok) await get().loadAll();
     return result;
   },
-  verifyBackup: async (json) => window.qcApi.verifyBackup({ data: { json } }),
   resetOperationalData: async () => {
     const result = await window.qcApi.resetOperationalData();
     if (result.ok) await get().loadAll();

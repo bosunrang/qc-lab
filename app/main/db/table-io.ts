@@ -1,8 +1,6 @@
-import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Db } from './sqlite-like';
-import { SCHEMA_VERSION, applySchema } from './schema';
-import { buildBackupEnvelope } from '../domain/backup';
+import { applySchema } from './schema';
 
 export function listTableNames(db: Db): string[] {
   return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[])
@@ -21,11 +19,18 @@ export function dumpAllTables(db: Db): Record<string, Record<string, unknown>[]>
   return out;
 }
 
+/** Chép nguyên CSDL ra một tệp SQLite mới. `VACUUM INTO` do SQLite tự làm
+ * theo từng trang, không dựng dữ liệu thành chuỗi trong bộ nhớ như bản JSON
+ * cũ (từng phình quá 128 MB ở khoảng 175.000 điểm QC). Không chạy được bên
+ * trong transaction, và tệp đích phải chưa tồn tại. */
+export function vacuumInto(db: Db, filePath: string): void {
+  db.prepare('VACUUM INTO ?').run(filePath);
+}
+
 /** Chốt một bản sao an toàn trước khi thay thế toàn bộ dữ liệu. */
 export function writeSafetySnapshot(db: Db, userDataDir: string, filePrefix: string): string {
-  const envelope = buildBackupEnvelope(dumpAllTables(db), SCHEMA_VERSION, 'app', new Date().toISOString());
-  const path = join(userDataDir, `${filePrefix}-${Date.now()}.json`);
-  writeFileSync(path, JSON.stringify(envelope), 'utf8');
+  const path = join(userDataDir, `${filePrefix}-${Date.now()}.sqlite`);
+  vacuumInto(db, path);
   return path;
 }
 
@@ -68,4 +73,39 @@ export function restoreAllTables(db: Db, dataByTable: Record<string, Record<stri
   }
 }
 
-
+/** Thay thế toàn bộ bảng bằng dữ liệu của một tệp SQLite khác (bản backup đã
+ * kiểm tra). Dữ liệu chép ngay trong SQLite qua ATTACH, không đi qua bộ nhớ
+ * JavaScript. Chỉ chép các bảng và cột có ở CẢ HAI phía: bảng lạ trong tệp
+ * (như `backup_info`) bị bỏ qua; cột mới hơn bản backup nhận giá trị mặc định
+ * của schema hiện tại. */
+export function restoreAllTablesFromFile(db: Db, filePath: string): void {
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.prepare('ATTACH DATABASE ? AS backup_src').run(filePath);
+  try {
+    db.exec('BEGIN');
+    try {
+      const tables = listTableNames(db);
+      const sourceTables = new Set((db.prepare("SELECT name FROM backup_src.sqlite_master WHERE type='table'").all() as { name: string }[]).map((r) => r.name));
+      for (const table of [...tables].reverse()) db.exec(`DELETE FROM main.${table}`);
+      for (const table of tables) {
+        if (!sourceTables.has(table)) continue;
+        const sourceCols = new Set((db.prepare(`PRAGMA backup_src.table_info(${table})`).all() as { name: string }[]).map((r) => r.name));
+        const cols = (db.prepare(`PRAGMA main.table_info(${table})`).all() as { name: string }[]).map((r) => r.name).filter((c) => sourceCols.has(c));
+        if (!cols.length) continue;
+        db.exec(`INSERT INTO main.${table}(${cols.join(',')}) SELECT ${cols.join(',')} FROM backup_src.${table}`);
+      }
+      // Cùng lý do với restoreAllTables(): nâng dữ liệu phục hồi lên schema
+      // hiện tại ngay trong transaction này.
+      applySchema(db);
+      const violations = db.prepare('PRAGMA main.foreign_key_check').all();
+      if (violations.length) throw new Error(`Dữ liệu vi phạm ràng buộc khoá ngoại (${violations.length} dòng) — huỷ thao tác.`);
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ }
+      throw e;
+    }
+  } finally {
+    db.exec('DETACH DATABASE backup_src');
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+}

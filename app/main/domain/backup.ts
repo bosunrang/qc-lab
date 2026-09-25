@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
 
+/** Định dạng JSON cũ: vẫn dùng cho gói đồng bộ Firebase và vẫn phục hồi được
+ * từ tệp .json đã xuất trước 2026-09-25. */
 export const BACKUP_FORMAT = 'qclab-v2-backup';
 export const BACKUP_FORMAT_VERSION = 1;
+/** Định dạng tệp backup hiện tại: một tệp SQLite (tạo bằng `VACUUM INTO`) có
+ * thêm bảng `backup_info` ghi dấu định dạng, phiên bản schema và thời điểm. */
+export const BACKUP_FILE_FORMAT = 'qclab-v2-sqlite-backup';
+export const BACKUP_FILE_FORMAT_VERSION = 1;
 
 export interface BackupEnvelope {
   format: string;

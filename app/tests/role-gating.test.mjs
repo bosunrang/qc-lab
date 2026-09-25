@@ -115,10 +115,12 @@ assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-
 
 // ── 5b) Xuất backup: CHỈ admin — bản backup chứa cả chuỗi mật khẩu PBKDF2
 // của mọi người dùng, không phải dữ liệu ai cũng được tải về.
-const backup = require('../../app-dist/main/ipc/backup-handlers.js').createBackupHandlers(db, ':memory:');
-assertForbidden(backup.exportBackup(viewer), 'viewer exportBackup');
-assertForbidden(backup.exportBackup(tech), 'KTV exportBackup');
-assert.equal(backup.exportBackup(admin).ok, true, 'admin phai xuat duoc backup');
+const backupDir = require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'qclab-role-'));
+const backupFile = require('node:path').join(backupDir, 'backup.sqlite');
+const backup = require('../../app-dist/main/ipc/backup-handlers.js').createBackupHandlers(db, backupDir);
+assertForbidden(backup.exportBackupTo(backupFile, viewer), 'viewer exportBackup');
+assertForbidden(backup.exportBackupTo(backupFile, tech), 'KTV exportBackup');
+assert.equal(backup.exportBackupTo(backupFile, admin).ok, true, 'admin phai xuat duoc backup');
 
 // ── 6) Đọc KHÔNG bị chặn: chỉ-xem vẫn xem được dữ liệu QC ────────────────
 // Cố ý: 6 trang (Tổng quan/Nhập QC/Westgard/Sigma/Hoá chất/Báo cáo) mở cho

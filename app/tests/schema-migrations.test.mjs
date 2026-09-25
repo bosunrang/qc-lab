@@ -66,3 +66,27 @@ test('phục hồi dữ liệu từ phiên bản mới hơn: huỷ cả lần ph
   assert.deepEqual(target.prepare('SELECT name FROM instruments').all().map((r) => r.name), ['Máy hiện có'], 'dữ liệu hiện có giữ nguyên');
   assert.equal(readSchemaVersion(target), SCHEMA_VERSION);
 });
+
+test('phục hồi từ tệp backup SQLite cũ: dữ liệu được nâng cấp ngay', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const { DatabaseSync } = await import('node:sqlite');
+  const { createBackupHandlers } = require('../../app-dist/main/ipc/backup-handlers.js');
+  const admin = { userId: 'u', username: 'admin', name: 'Quản trị', role: 'admin', clientId: 'c' };
+  const dir = mkdtempSync(join(tmpdir(), 'qclab-mig-'));
+  const source = openDatabase(':memory:');
+  source.prepare("INSERT INTO actions(id,date,nce_id,error_type) VALUES ('a1','2026-09-01','NCE-1','RE — Sai số ngẫu nhiên')").run();
+  const file = join(dir, 'cu.sqlite');
+  assert.equal(createBackupHandlers(source, dir).exportBackupTo(file, admin).ok, true);
+  // Biến tệp thành bản xuất từ phiên bản 1 chưa chuẩn hoá mã loại sai số.
+  const old = new DatabaseSync(file);
+  old.prepare("UPDATE app_meta SET value='1' WHERE key='schemaVersion'").run();
+  old.prepare("UPDATE backup_info SET value='1' WHERE key='schemaVersion'").run();
+  old.close();
+  const target = openDatabase(':memory:');
+  const restored = createBackupHandlers(target, dir).importBackupFrom(file, admin);
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  assert.equal(target.prepare("SELECT error_type FROM actions WHERE id='a1'").get().error_type, 'RE');
+  assert.equal(readSchemaVersion(target), SCHEMA_VERSION);
+});

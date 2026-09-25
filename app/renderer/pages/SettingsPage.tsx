@@ -20,6 +20,10 @@ const FIREBASE_CONFIG_PLACEHOLDER = `const firebaseConfig = {
   appId: "..."
 };`;
 
+function formatMb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function DataAdminIcon() {
   return (
     <svg className="settings-admin-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -35,7 +39,7 @@ export function SettingsPage() {
   const {
     profile, backup: backupInfo, lis, lisQueue, firebase,
     loadAll, loadStorage, save, loadFirebase,
-    exportBackup, importBackup, verifyBackup, resetOperationalData,
+    exportBackup, chooseBackupFile, importBackup, resetOperationalData,
     saveLis, pullLisQueue, importLisResult, rejectLisResult,
     connectFirebase: connectFirebaseApi, syncFirebase, disconnectFirebase: disconnectFirebaseApi,
   } = useSettingsStore();
@@ -50,7 +54,6 @@ export function SettingsPage() {
   const [logoFileName, setLogoFileName] = useState('');
   const [lisStatus, setLisStatus] = useState<{ kind: 'off' | 'idle' | 'ok' | 'error'; detail: string }>({ kind: 'off', detail: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const backupFileInputRef = useRef<HTMLInputElement>(null);
   const [lisEnabled, setLisEnabled] = useState(false);
   const [lisUrl, setLisUrl] = useState('');
   const [lisToken, setLisToken] = useState('');
@@ -156,30 +159,25 @@ export function SettingsPage() {
 
   const currentLogo = pendingLogo || profile.logo_data;
 
+  // Hộp thoại lưu/mở tệp do main process mở; `data` là null khi người dùng huỷ.
   async function exportBackupFile() {
     const result = await exportBackup();
     if (!result.ok) { await showError(result.error.message); return; }
-    const blob = new Blob([result.data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `qclab-v2-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (!result.data) return;
+    await infoDialog(`Đã xuất backup ${formatMb(result.data.bytes)} (${result.data.points} điểm QC) tại:\n${result.data.path}`, { type: 'success' });
   }
 
-  async function pickBackupFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const json = await file.text();
-    const verified = await verifyBackup(json);
+  async function pickBackupFile() {
+    const verified = await chooseBackupFile();
     if (!verified.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`, { type: 'warn' }); return; }
+    if (!verified.data) return;
+    const created = verified.data.createdAt ? ` tạo lúc ${new Date(verified.data.createdAt).toLocaleString('vi-VN')}` : '';
     if (!(await confirmDialog(
-      `File backup hợp lệ (${verified.data.points} điểm QC, checksum khớp). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè. Tiếp tục?`,
+      `File ${verified.data.fileName} hợp lệ (${verified.data.points} điểm QC${created}). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè. Tiếp tục?`,
       { title: 'Phục hồi từ backup', danger: true, confirmLabel: 'Phục hồi' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ backup là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
-    const result = await importBackup(json);
+    const result = await importBackup();
     if (!result.ok) { await showError(result.error.message); return; }
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
@@ -266,10 +264,7 @@ export function SettingsPage() {
     return days <= 0 ? 'Sao lưu gần nhất: hôm nay.' : `Sao lưu gần nhất: ${days} ngày trước.`;
   }
   function backupCapacityText(): string {
-    const limit = Math.round((backupInfo?.maxImportBytes ?? 0) / 1024 / 1024);
-    if (!backupInfo?.lastBackupBytes) return `Khuyến nghị dưới ${limit} MB.`;
-    const mb = (backupInfo.lastBackupBytes / 1024 / 1024).toFixed(1);
-    return `Backup gần nhất ${mb} MB (khuyến nghị dưới ${limit} MB).`;
+    return backupInfo?.lastBackupBytes ? `Backup gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
   }
 
   /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký
@@ -341,14 +336,13 @@ export function SettingsPage() {
         <div className="admin-tools">
           <div className="admin-tool">
             <b>Xuất backup</b>
-            <span>Lưu dữ liệu hiện tại ra file. {backupStatusText()} {backupCapacityText()}</span>
+            <span>Lưu toàn bộ dữ liệu ra một tệp .sqlite. {backupStatusText()} {backupCapacityText()}</span>
             <button className="btn ghost" onClick={exportBackupFile}>Xuất backup</button>
           </div>
           <div className="admin-tool">
             <b>Nhập backup</b>
             <span>Chọn file để kiểm tra tự động rồi khôi phục dữ liệu. Chỉ quản trị viên được nhập.</span>
-            <button className="btn ghost" onClick={() => backupFileInputRef.current?.click()}>Chọn file backup</button>
-            <input ref={backupFileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={pickBackupFile} />
+            <button className="btn ghost" onClick={pickBackupFile}>Chọn file backup</button>
           </div>
           <div className="admin-tool">
             <b>Xóa sạch dữ liệu test</b>
