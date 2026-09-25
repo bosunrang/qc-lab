@@ -182,6 +182,10 @@ export function EntryPage() {
     if (testId && levelNums.length) loadTestData(testId, levelNums);
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
+  // Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries` của MỌI xét nghiệm, nên
+  // không lọc theo testId. Trước đây chỉ bảng của xét nghiệm đang mở được nạp
+  // lại: nhập một điểm bị loại xong, cây vẫn ghi "Đạt" tới khi rời trang.
+  useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions', 'tests'], undefined, loadSummaries);
 
   const currentSummary = summaries.find((s) => s.testId === testId);
   const testName = currentSummary?.testName || '';

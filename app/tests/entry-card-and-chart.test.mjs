@@ -330,3 +330,11 @@ test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận 
 });
 
 
+
+test('EN14: cây Nhập QC nạp lại trạng thái của mọi xét nghiệm sau khi có điểm mới', () => {
+  // Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`. Trước đây chỉ dữ liệu
+  // của xét nghiệm đang mở được nạp lại, nên cây giữ nhãn cũ tới khi rời trang.
+  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /useStoreInvalidation\(\[[^\]]*'qc_points'[^\]]*\], undefined, loadSummaries\)/,
+    'summaries phải được nạp lại khi qc_points đổi, không lọc theo xét nghiệm đang mở');
+});
