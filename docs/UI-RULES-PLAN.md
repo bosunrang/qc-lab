@@ -1,7 +1,6 @@
 # Kế hoạch hoàn thiện quy tắc giao diện
 
-Lập ngày 2026-09-24, hoàn tất 2026-09-25 trên nhánh
-`refactor/ui-rules-remaining`. Tài liệu tổng hợp các quy tắc nằm ở
+Lập ngày 2026-09-24, hoàn tất và merge vào `main` ngày 2026-09-25. Tài liệu tổng hợp các quy tắc nằm ở
 `docs/DESIGN-SYSTEM.md`; tệp này chỉ còn ghi lại quá trình và việc còn chờ.
 
 Mỗi mục làm theo cùng một cách:
@@ -44,10 +43,6 @@ Người dùng tự kiểm tra giao diện; không dùng bản xem trước tron
 
 ## Việc ngoài giao diện đang chờ
 
-- Nhánh `refactor/ui-rules-remaining` chưa push, chưa merge vào `main`;
-  `main` vẫn đi trước `origin/main`.
-- Nhánh đã merge có thể xoá:
-  `refactor/ui-empty-state-heights`, `refactor/ui-field-badge-modal`.
 - LAN vẫn chạy HTTP thường: cần quyết định có dùng HTTPS (chứng chỉ tự ký
   hoặc CA nội bộ) hay không.
 - Một số câu thông báo trong test cũ còn viết không dấu (ví dụ
