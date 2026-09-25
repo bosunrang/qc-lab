@@ -12,6 +12,15 @@ export function hashPassword(password: string): string {
   return `pbkdf2$${PASSWORD_HASH_ITERATIONS}$${salt}$${hash}`;
 }
 
+/** Bản bất đồng bộ cho mọi handler tài khoản (tạo, đặt lại, đổi mật khẩu):
+ * cùng lý do với `verifyPasswordAsync` bên dưới — 600.000 vòng chạy đồng bộ
+ * làm đơ cả cửa sổ desktop lẫn máy chủ LAN. */
+export async function hashPasswordAsync(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const hash = (await pbkdf2Async(password, salt, PASSWORD_HASH_ITERATIONS, KEY_LENGTH, DIGEST)).toString('hex');
+  return `pbkdf2$${PASSWORD_HASH_ITERATIONS}$${salt}$${hash}`;
+}
+
 interface StoredHash { iterations: number; salt: string; expected: Buffer }
 
 function parseStored(stored: string): StoredHash | null {

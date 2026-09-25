@@ -1,10 +1,16 @@
 /** Định dạng thời gian nhìn thấy trong nhật ký và CSV audit. Giữ một hàm
  * thuần dùng chung cho main/renderer để tìm kiếm, bảng và file xuất không
  * lệch nhau theo locale. */
+// Dựng bộ định dạng MỘT lần: `toLocaleTimeString`/`toLocaleDateString` tạo lại
+// bộ định dạng ở mỗi lần gọi, và tìm kiếm nhật ký gọi hàm này cho từng dòng
+// (tới 50.000 dòng). Cùng tuỳ chọn nên cùng kết quả — test đối chiếu.
+const TIME_VN = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+const DATE_VN = new Intl.DateTimeFormat('vi-VN');
+
 export function formatAuditDateTimeVN(value: unknown): string {
   const date = new Date(String(value || ''));
   if (!Number.isFinite(+date)) return '';
-  return `${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })} ${date.toLocaleDateString('vi-VN')}`;
+  return `${TIME_VN.format(date)} ${DATE_VN.format(date)}`;
 }
 
 /** Đổi ngày ISO nằm trong phần mô tả audit sang định dạng người dùng Việt Nam.

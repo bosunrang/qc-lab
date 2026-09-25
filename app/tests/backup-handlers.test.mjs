@@ -139,7 +139,7 @@ const resetBackup = createBackupHandlers(resetDb, dir);
 const { createAuthHandlers } = require('../../app-dist/main/ipc/auth-handlers.js');
 const { verifyAuditChain } = require('../../app-dist/main/domain/audit-chain.js');
 const resetAuth = createAuthHandlers(resetDb);
-resetAuth.bootstrapAdmin({ data: { username: 'admin', name: 'Quản trị', password: 'mat-khau-dai-1' } });
+await resetAuth.bootstrapAdmin({ data: { username: 'admin', name: 'Quản trị', password: 'mat-khau-dai-1' } });
 const resetActor = { ...actor, userId: resetAuth.listUsers(actor).data[0].id, username: 'admin' };
 const resetInstrument = resetConfig.saveInstrument({ data: { name: 'Máy sẽ bị xoá' } }, resetActor).data;
 resetConfig.saveTest({ data: { name: 'Test sẽ bị xoá', instrumentId: resetInstrument.id } }, resetActor);
@@ -167,12 +167,7 @@ assert.equal(resetSettings.getLabProfile().name, '', 'tên đơn vị trở về
 assert.equal(resetSettings.getLabProfile().brand_title, 'QC Lab', 'thương hiệu trở về mặc định');
 
 // ── 8) Backup chỉ chạy trên máy chính ────────────────────────────────────
-// LAN tìm handler theo đuôi tên kênh, nên `backup:export` từng khớp với tên
-// `export` và trả cả CSDL qua mạng. Ba kênh backup phải nằm trong danh sách
-// chặn, và bước phục hồi không nhận đường dẫn tệp từ renderer.
-const mainSrc = readFileSync(new URL('../main/index.ts', import.meta.url), 'utf8');
-assert.match(mainSrc, /DESKTOP_ONLY_CHANNELS = new Set\(\['backup:export', 'backup:chooseFile', 'backup:import'\]\)/);
-assert.match(mainSrc, /DESKTOP_ONLY_CHANNELS\.has\(target\)/, 'invokeLan phải chặn theo kênh đích');
-assert.match(mainSrc, /ipcMain\.handle\('backup:import', \(\) => \{/, 'phục hồi dùng tệp main đã kiểm tra, không nhận tham số từ renderer');
+// Ba kênh backup không mở qua LAN và bước phục hồi không nhận đường dẫn tệp
+// từ renderer: kiểm bằng hành vi ở tests/ipc-operations.test.mjs.
 
 console.log('app backup-handlers end-to-end tests passed');

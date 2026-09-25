@@ -22,6 +22,12 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | Backup | Tệp SQLite (`VACUUM INTO`), không còn trần 128 MB; ba kênh backup không mở qua LAN |
 | Lỗi nhỏ | Mã NCE không trùng; token LIS và thao tác bỏ kết quả LIS có kiểm quyền; cây Nhập QC cập nhật ngay |
 | Công cụ | ESLint + luật React hooks trong CI |
+| A.1–A.4 (nhánh `refactor/ipc-channels`) | Bảng thao tác một nguồn `main/ipc/operations.ts` + `desktop-operations.ts`; IPC, RPC của LAN và bản xem trước sinh từ bảng; LAN chỉ gọi dòng `lan: true`; actor truyền theo từng lời gọi, bỏ `lanCalls`; test ở `tests/ipc-operations.test.mjs` |
+| A.5 (nhánh `refactor/ipc-error-boundary`) | Exception của thao tác trả `IpcResult` thành `{ ok: false }` (`unauthenticated` / `internal-error`) ở IPC, LAN và bản xem trước; thao tác đọc vẫn ném, danh sách do trình biên dịch kiểm theo `QcApi` |
+| A.6 (nhánh `refactor/window-hardening`) | `main/window-guard.ts`: mọi webContents chỉ hiện trang của app; `https:` ra ngoài mở bằng trình duyệt hệ thống; còn lại bị chặn. Cửa sổ chính khai `sandbox: true` |
+| E.1 (nhánh `perf/async-password-hash`) | Khởi tạo quản trị, tạo tài khoản, đặt lại, đổi và kiểm mật khẩu băm bất đồng bộ (`hashPasswordAsync`); điều kiện kiểm lại sau khi băm (trùng tên, tài khoản bị xoá, mật khẩu vừa bị đặt lại); test `tests/auth-async.test.mjs` |
+| E.2 (nhánh `perf/audit-sql-query`) | `audit.query` đếm, lọc ngày, phân trang bằng SQL; tìm chữ so trên vài cột rồi mới nạp đủ cột cho trang. 50.000 dòng: lật trang 351 ms → dưới 1 ms, tìm chữ 4,5 s → 0,6 s. Test đối chiếu với cách cũ trên 546 tổ hợp |
+| Lọc ngày Nhật ký (nhánh `fix/audit-local-date-filter`) | Lọc theo ngày giờ địa phương như bảng hiển thị, không theo ngày UTC (trước đây 00:00–06:59 sáng bị xếp vào hôm trước); ngày không hợp lệ bị bỏ qua |
 
 ## Thứ tự đề xuất
 
@@ -85,6 +91,29 @@ A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một ngu�
    `setWindowOpenHandler` từ chối mọi cửa sổ mới (liên kết ngoài, nếu cần,
    mở bằng `shell.openExternal` sau khi kiểm `https:`). Khai `sandbox: true`
    tường minh trong `webPreferences`.
+
+**Ghi chú khi làm A.1–A.4:**
+
+- Bảng nằm ở `main/ipc/` thay vì `shared/`: `tsconfig.app-main.json` đặt
+  `rootDir` là `app/main`, nên main không nạp được module thực thi ngoài đó.
+- Preload vẫn viết tay: preload chạy trong sandbox của Electron, không
+  `require` được module local. Test so preload với bảng (cùng tên hàm, cùng
+  kênh, không thừa không thiếu).
+- Máy trạm LAN chỉ nhập liệu (người dùng chốt 2026-09-25): mở mọi thao tác
+  đọc và thao tác ghi của KTV (điểm QC, ghi chú ngày, lập dải, NCE, Sigma, so
+  sánh hoá chất, nhận/bỏ kết quả LIS, mật khẩu và ảnh của mình). Mọi thao tác
+  quản trị chỉ làm trên máy chính, kể cả với tài khoản admin — gồm khởi tạo
+  lại dữ liệu, Nhật ký, cấu hình luật Westgard. Test canh quy tắc "handler đòi
+  admin thì `lan: false`" và khoá danh sách mở.
+- Đổi hành vi LAN so với trước: `createNce`, `saveNceProtocol`, `approveNce`,
+  `cancelNce`, `getReportTemplateSettings`, `backupStatus` trước đây bị chặn
+  nhầm vì tên hàm khác đuôi tên kênh, nay gọi được. `login`, `logout`,
+  `currentUser`, `listActivity` không còn gọi được qua `/api/rpc`.
+- Giao diện máy trạm vẫn hiện menu và nút quản trị; bấm vào sẽ báo "Thao tác
+  không được mở qua mạng nội bộ." Cần ẩn các phần này khi chạy qua LAN (việc
+  của giai đoạn D).
+- Máy trạm vẫn chưa xuất Excel/in PDF được (như trước); nên dùng
+  `browser-export.ts` như bản xem trước.
 
 **Test:** mỗi kênh trong preload có trong bảng; LAN gọi `login`, `htmlToPdf`,
 `bootstrapAdmin` bị từ chối; một handler bất đồng bộ chậm không chặn handler

@@ -11,17 +11,17 @@ const auth = createAuthHandlers(db);
 
 assert.equal(auth.hasAnyUsers(), false);
 
-const weak = auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri vien', password: '123' } });
+const weak = await auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri vien', password: '123' } });
 assert.equal(weak.ok, false);
 assert.equal(weak.error.code, 'weak-password');
 
-const boot = auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri vien', password: 'admin12345' } });
+const boot = await auth.bootstrapAdmin({ data: { username: 'admin', name: 'Quan tri vien', password: 'admin12345' } });
 assert.equal(boot.ok, true);
 assert.equal(boot.data.role, 'admin');
 assert.equal(boot.data.mustChangePassword, false);
 assert.equal(auth.hasAnyUsers(), true);
 
-const bootAgain = auth.bootstrapAdmin({ data: { username: 'admin2', name: 'X', password: 'admin12345' } });
+const bootAgain = await auth.bootstrapAdmin({ data: { username: 'admin2', name: 'X', password: 'admin12345' } });
 assert.equal(bootAgain.ok, false);
 assert.equal(bootAgain.error.code, 'already-bootstrapped');
 
@@ -38,11 +38,11 @@ const forbiddenList = auth.listUsers(technicianActor);
 assert.equal(forbiddenList.ok, false);
 assert.equal(forbiddenList.error.code, 'forbidden');
 
-const created = auth.createUser({ data: { username: 'kts1', name: 'Nguyen Van A', role: 'technician', password: 'ktv-pass-123' } }, adminActor);
+const created = await auth.createUser({ data: { username: 'kts1', name: 'Nguyen Van A', role: 'technician', password: 'ktv-pass-123' } }, adminActor);
 assert.equal(created.ok, true);
 assert.equal(created.data.mustChangePassword, true, 'tai khoan admin tao ho phai bi buoc doi mat khau lan dau');
 
-const dup = auth.createUser({ data: { username: 'KTS1', name: 'Trung ten', role: 'technician', password: 'ktv-pass-123' } }, adminActor);
+const dup = await auth.createUser({ data: { username: 'KTS1', name: 'Trung ten', role: 'technician', password: 'ktv-pass-123' } }, adminActor);
 assert.equal(dup.ok, false);
 assert.equal(dup.error.code, 'duplicate-username');
 
@@ -54,7 +54,7 @@ assert.equal(selfLock.ok, false);
 assert.equal(selfLock.error.code, 'last-admin');
 
 // 11) Tu sua quyen CHINH MINH bi chan (Giai doan D3.1) — hệ thống khong co
-const secondAdmin = auth.createUser({ data: { username: 'admin2', name: 'Quan tri vien 2', role: 'admin', password: 'admin2-pass-123' } }, adminActor);
+const secondAdmin = await auth.createUser({ data: { username: 'admin2', name: 'Quan tri vien 2', role: 'admin', password: 'admin2-pass-123' } }, adminActor);
 assert.equal(secondAdmin.ok, true);
 const secondAdminActor = { userId: secondAdmin.data.id, username: secondAdmin.data.username, name: secondAdmin.data.name, role: 'admin', clientId: 'test-client' };
 
@@ -70,18 +70,18 @@ assert.equal(selfRename.ok, true, 'doi ten chinh minh khong phai sua quyen, phai
 const demoteOk = auth.updateUser({ id: adminActor.userId, data: { name: 'Quan tri vien', role: 'technician', active: true } }, secondAdminActor);
 assert.equal(demoteOk.ok, true, 'con admin thu 2 active thi duoc ha quyen admin dau tien');
 
-const reset = auth.resetPassword({ id: created.data.id, data: { newPassword: 'mat-khau-moi-123' } }, secondAdminActor);
+const reset = await auth.resetPassword({ id: created.data.id, data: { newPassword: 'mat-khau-moi-123' } }, secondAdminActor);
 assert.equal(reset.ok, true);
 const loginAfterReset = await auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-123' } });
 assert.equal(loginAfterReset.ok, true);
 assert.equal(loginAfterReset.data.mustChangePassword, true);
 
 const kts1Actor = { userId: created.data.id, username: 'kts1', name: 'Nguyen Van A', role: 'technician', clientId: 'test-client' };
-const wrongOld = auth.changeOwnPassword({ data: { oldPassword: 'sai', newPassword: 'mat-khau-moi-456' } }, kts1Actor);
+const wrongOld = await auth.changeOwnPassword({ data: { oldPassword: 'sai', newPassword: 'mat-khau-moi-456' } }, kts1Actor);
 assert.equal(wrongOld.ok, false);
 assert.equal(wrongOld.error.code, 'wrong-password');
 
-const changeOwn = auth.changeOwnPassword({ data: { oldPassword: 'mat-khau-moi-123', newPassword: 'mat-khau-moi-456' } }, kts1Actor);
+const changeOwn = await auth.changeOwnPassword({ data: { oldPassword: 'mat-khau-moi-123', newPassword: 'mat-khau-moi-456' } }, kts1Actor);
 assert.equal(changeOwn.ok, true);
 const loginAfterOwnChange = await auth.login({ data: { username: 'kts1', password: 'mat-khau-moi-456' } });
 assert.equal(loginAfterOwnChange.ok, true);
@@ -94,26 +94,26 @@ assert.equal(lockedLogin.ok, false);
 assert.equal(lockedLogin.error.code, 'inactive');
 
 
-const withPerms = auth.createUser({
+const withPerms = await auth.createUser({
   data: { username: 'kts2', name: 'Nguyen Thi Lan', initials: 'XYZ', role: 'technician', password: 'mat-khau-kts2-1', pagePerms: ['dash', 'entry'] },
 }, secondAdminActor);
 assert.equal(withPerms.ok, true);
 assert.equal(withPerms.data.initials, 'NTL', 'ma viet tat phai lay tu ho ten, khong dung gia tri client gui len');
 assert.deepEqual(withPerms.data.pagePerms, ['dash', 'entry']);
 
-const overreach = auth.createUser({
+const overreach = await auth.createUser({
   data: { username: 'kts3', name: 'Tran Van B', role: 'technician', password: 'mat-khau-kts3-1', pagePerms: ['dash', 'manage', 'users'] },
 }, secondAdminActor);
 assert.equal(overreach.ok, true);
 assert.deepEqual(overreach.data.pagePerms, ['dash'], 'the admin-only bi loai bo, khong duoc luu');
 
-const emptyPerms = auth.createUser({
+const emptyPerms = await auth.createUser({
   data: { username: 'kts4', name: 'Le Thi C', role: 'viewer', password: 'mat-khau-kts4-1', pagePerms: ['manage'] },
 }, secondAdminActor);
 assert.equal(emptyPerms.ok, false);
 assert.equal(emptyPerms.error.code, 'missing-page-perms');
 
-const defaultPerms = auth.createUser({
+const defaultPerms = await auth.createUser({
   data: { username: 'kts5', name: 'Pham Van D', role: 'viewer', password: 'mat-khau-kts5-1' },
 }, secondAdminActor);
 assert.equal(defaultPerms.ok, true);
@@ -135,7 +135,7 @@ const selfDelete = auth.deleteUser({ id: secondAdminActor.userId }, secondAdminA
 assert.equal(selfDelete.ok, false);
 assert.equal(selfDelete.error.code, 'self-delete', 'admin duy nhat con lai cung la chinh minh — chan o cong tu-xoa truoc');
 const kts2Actor = { userId: withPerms.data.id, username: 'kts2', name: 'Nguyen Thi Lan', role: 'technician', clientId: 'test-client' };
-assert.equal(auth.changeOwnPassword({ data: { oldPassword: 'mat-khau-kts2-1', newPassword: 'mat-khau-kts2-2' } }, kts2Actor).ok, true);
+assert.equal((await auth.changeOwnPassword({ data: { oldPassword: 'mat-khau-kts2-1', newPassword: 'mat-khau-kts2-2' } }, kts2Actor)).ok, true);
 
 const deleteOk = auth.deleteUser({ id: withPerms.data.id }, secondAdminActor);
 assert.equal(deleteOk.ok, true);

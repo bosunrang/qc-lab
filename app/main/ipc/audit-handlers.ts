@@ -2,7 +2,9 @@ import type { Db } from '../db/sqlite-like';
 // Hình dạng trang nhật ký lấy từ hợp đồng dùng chung (đã có `total`).
 import type { ActivityArchivePreview, ActivityPage } from '../../shared/qc-api';
 import { rowToAuditEntry, setActivityAnchor, type Actor, type IpcResult, writeAudit, requireAdmin, withTransaction } from './shared';
-import { filterActivity, paginateActivity, type ActivityLike } from '../domain/audit-filter';
+import { activityPageWindow, activitySearchText, type ActivityLike, type ActivityPageWindow, type ActivitySearchFields } from '../domain/audit-filter';
+import { textKey } from '../domain/text-utils';
+import { localDayStartIso, validLocalDate } from '../domain/local-date';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../domain/audit-format';
 import { roleLabel } from '../domain/page-roles';
 
@@ -52,17 +54,54 @@ export function createAuditHandlers(db: Db) {
   }
 
 
+  /** Lọc và phân trang bằng SQL, chỉ nạp đủ cột cho các dòng của trang đang
+   * xem — trước đây mỗi lần lật trang nạp cả bảng (tới 50.000 dòng) rồi lọc
+   * bằng JS. Kết quả phải trùng `filterActivity` + `paginateActivity` (test
+   * đối chiếu):
+   * - Lọc ngày theo ngày GIỜ ĐỊA PHƯƠNG, đúng ngày bảng hiển thị: ngày chọn
+   *   đổi thành mốc 00:00 địa phương viết dạng ISO UTC rồi so thẳng với `ts`
+   *   (dùng được chỉ mục `idx_activity_ts`). `ts` luôn là ISO UTC do `nowIso()`
+   *   ghi trong `insertAudit` (nơi duy nhất ghi bảng này; phục hồi chỉ chép lại
+   *   dòng của chính app, và `ts` nằm trong chuỗi hash), nên so chuỗi là so
+   *   thời điểm.
+   * - Tìm chữ bỏ dấu và khớp cả giờ hiển thị, SQL không làm được: đọc các cột
+   *   cần so khớp của những dòng đã lọc ngày, so bằng `activitySearchText`,
+   *   rồi mới nạp đủ cột cho đúng các dòng thuộc trang. */
   function query(input: AuditQueryInput, actor: Actor): IpcResult<ActivityPage> {
     const denied = requireAdmin(actor); if (denied) return denied;
-    const all = allChronological();
-    const filtered = filterActivity(all, String(input.query || ''), String(input.from || ''), String(input.to || ''));
+    const text = textKey(String(input.query || ''));
+    const from = validLocalDate(input.from), to = validLocalDate(input.to);
+    const conditions: string[] = [];
+    const params: string[] = [];
+    if (from) { conditions.push('ts >= ?'); params.push(localDayStartIso(from)); }
+    if (to) { conditions.push('ts < ?'); params.push(localDayStartIso(to, 1)); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const page = Number(input.page) || 1, pageSize = Number(input.pageSize) || 25;
+
+    let pageWindow: ActivityPageWindow;
+    let rows: Record<string, unknown>[];
+    if (!text) {
+      const count = Number((db.prepare(`SELECT COUNT(*) AS n FROM activity ${where}`).get(...params) as { n: number }).n);
+      pageWindow = activityPageWindow(count, page, pageSize);
+      rows = db.prepare(`SELECT * FROM activity ${where} ORDER BY seq DESC LIMIT ? OFFSET ?`).all(...params, pageWindow.size, pageWindow.offset) as Record<string, unknown>[];
+    } else {
+      const candidates = db.prepare(`SELECT id, seq, ts, user, username, role, type, target, detail FROM activity ${where} ORDER BY seq DESC`).all(...params) as (ActivitySearchFields & { id: string })[];
+      const matched = candidates.filter((row) => activitySearchText(row).includes(text)).map((row) => row.id);
+      pageWindow = activityPageWindow(matched.length, page, pageSize);
+      const pageIds = matched.slice(pageWindow.offset, pageWindow.offset + pageWindow.size);
+      rows = [];
+      // Theo lô 500 id vì SQLite giới hạn số tham số của một câu lệnh.
+      for (let start = 0; start < pageIds.length; start += 500) {
+        const chunk = pageIds.slice(start, start + 500);
+        rows.push(...db.prepare(`SELECT * FROM activity WHERE id IN (${chunk.map(() => '?').join(',')})`).all(...chunk) as Record<string, unknown>[]);
+      }
+      rows.sort((a, b) => Number(b.seq) - Number(a.seq));
+    }
     // `total` = TOÀN BỘ nhật ký (không phụ thuộc bộ lọc) — trang Nhật ký của
     // hệ thống hiện cả "N dòng hoạt động đã ghi nhận" và "khớp/tổng".
-    const page = paginateActivity(filtered, Number(input.page) || 1, Number(input.pageSize) || 25);
-    // `paginateActivity` là hàm thuần generic trên `ActivityLike`; hợp đồng
-    // khai `rows: ActivityEntry[]`. Hai hình dạng khớp nhau ở runtime (cùng
-    // do `rowToAuditEntry` dựng), ép một lần ở ranh giới IPC.
-    return { ok: true, data: { ...page, rows: page.rows as ActivityPage['rows'], total: all.length } };
+    const total = Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n);
+    const { page: shownPage, pageCount, offset, resultFrom, resultTo, filteredCount } = pageWindow;
+    return { ok: true, data: { page: shownPage, pageCount, offset, resultFrom, resultTo, filteredCount, rows: rows.map(rowToAuditEntry), total } };
   }
 
   /** hệ thống luôn xuất TOÀN BỘ nhật ký theo thứ tự ghi (cũ đến mới), không
