@@ -40,9 +40,13 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | D | Tái cấu trúc renderer | L | Trung bình — màn hình chớp, lỗi render làm trắng app |
 | E | Hiệu năng | S–M | Trung bình — app đứng khi băm mật khẩu, nhật ký lớn |
 | F | Ranh giới nghiệp vụ còn lại | S | Thấp — lệch số liệu ở vài chỗ phụ |
+| G | Test end-to-end và vận hành (log, báo crash) | M | Trung bình — thay đổi không được chạy trên Electron thật; sự cố ở phòng xét nghiệm không có dữ liệu để tra |
 
 A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một nguồn giúp các giai
 đoạn sau (thêm kênh mới) ít sai hơn. C và D độc lập, có thể làm song song.
+G.1 nên làm trước các đợt tái cấu trúc lớn (C, D): bộ test end-to-end là thứ
+chứng minh app Electron thật vẫn chạy đúng sau mỗi đợt. E.5 chỉ làm sau khi
+có kết quả E.4.
 
 ## A. Bảng kênh IPC một nguồn và bảo mật LAN
 
@@ -217,18 +221,27 @@ tách (tách thuần, không đổi hành vi).
 
 ## E. Hiệu năng
 
-1. **Băm mật khẩu đồng bộ:** `createUser`, `resetPassword`,
-   `changeOwnPassword`, `verifyOwnPassword` gọi PBKDF2 600.000 vòng bản đồng
-   bộ, chặn cả app (gọi được cả qua LAN). Đã có sẵn bản bất đồng bộ
-   (`login` đang dùng); chuyển sang.
-2. **Nhật ký:** `audit.query` nạp cả bảng (tới 50.000 dòng) rồi lọc bằng
-   JavaScript; lọc và phân trang bằng SQL.
+1. ~~**Băm mật khẩu đồng bộ**~~ — đã xong, xem bảng "Đã xong".
+2. ~~**Nhật ký lọc bằng JavaScript**~~ — đã xong, xem bảng "Đã xong".
 3. **Chế độ WAL cho SQLite:** ghi nhanh hơn, đọc không bị chặn khi LAN ghi.
    Cần kiểm tra lại backup (`VACUUM INTO`) và bản an toàn khi bật WAL.
 4. **Bài đo sát thực tế:** bài đo hiện dồn 500.000 điểm vào một xét nghiệm
    (Westgard 8,3 s, Nhập QC 8,9 s). Dựng bài đo khoảng 60 xét nghiệm × 5 năm,
    nhiều lô, rồi mới quyết định có tối ưu các màn tổng hợp (Tổng quan,
    Westgard) hay không.
+5. **Việc tính nặng ra khỏi luồng chính.** Hiện SQLite (`node:sqlite`, đồng
+   bộ) và phép tính Westgard/Sigma chạy trên main process: trong lúc tính,
+   cửa sổ máy chính và mọi máy trạm LAN đứng (bài đo cũ: Westgard 8,3 s với
+   500.000 điểm). Hướng làm, chỉ khi E.4 cho thấy cần:
+   - chuyển phần tính thuần (`domain/westgard-engine.ts`, `sigma-*`) sang
+     `utilityProcess` hoặc `worker_threads`; main chỉ đọc dữ liệu và điều phối;
+   - worker mở kết nối SQLite chỉ đọc riêng (cần WAL, xem E.3) thay vì nhận
+     cả khối dữ liệu qua tin nhắn;
+   - bản xem trước giữ đường chạy đồng bộ như hiện nay (trình duyệt không có
+     `utilityProcess`), nên phần tính phải giữ là hàm thuần dùng chung.
+
+   **Test:** kết quả của đường worker trùng đường đồng bộ trên bộ dữ liệu của
+   E.4; trong lúc worker tính, một lời gọi IPC khác vẫn trả lời ngay.
 
 ## F. Ranh giới nghiệp vụ còn lại
 
@@ -243,6 +256,40 @@ tách (tách thuần, không đổi hành vi).
 5. 7 chỗ renderer tự `JSON.parse` cột `*_json` thô; main nên trả dữ liệu đã
    giải.
 
+## G. Test end-to-end và vận hành
+
+**Hiện trạng (đã xác nhận):** 92 tệp `node:test` kiểm nghiệp vụ ở main khá
+kỹ, nhưng 13 tệp kiểm bằng cách đọc mã nguồn như văn bản (regex), và không có
+test nào chạy app Electron thật: preload, đăng ký IPC, cửa sổ, máy chủ LAN chỉ
+được kiểm gián tiếp. Main không có `crashReporter` hay log ra tệp; lỗi chỉ nằm
+trong console của máy đang chạy.
+
+1. **Test end-to-end bằng Playwright cho Electron** (`_electron.launch`), chạy
+   trên thư mục dữ liệu tạm (không đụng CSDL thật của người dùng), 5–10 luồng
+   chính:
+   - khởi tạo quản trị, đăng nhập, đăng xuất;
+   - nhập điểm QC, huỷ điểm, tạo NCE từ điểm vi phạm;
+   - mở từng trang ở thanh bên không lỗi (bắt cả `PageErrorBoundary` và
+     console error);
+   - máy trạm: mở `http://127.0.0.1:3200`, đăng nhập, nhập điểm; thao tác quản
+     trị bị từ chối;
+   - liên kết nguồn TEa không mở trong cửa sổ app.
+
+   Chạy trong `verify-release` trước khi đóng gói. Khi đã có bộ này, thay dần
+   các test đọc mã bằng regex (vd kiểm `AppShell` bọc `PageErrorBoundary`)
+   bằng kiểm hành vi thật.
+2. **Log ra tệp và báo crash, chỉ lưu tại máy:**
+   - log có cấu trúc (thời điểm, mức, nguồn, thông báo) ghi vào thư mục dữ
+     liệu của app, xoay vòng theo cỡ tệp; gồm lỗi `internal-error` của
+     `errorResult()`, lỗi không được bắt ở renderer (gửi về main qua IPC), lỗi
+     máy chủ LAN;
+   - `crashReporter` với `uploadToServer: false`: tệp crash nằm cạnh log;
+   - trang Cài đặt có nút mở thư mục log / xuất gói log để gửi khi báo lỗi;
+   - không ghi mật khẩu, token LIS/Firebase hay nội dung yêu cầu vào log.
+
+   **Test:** lỗi `internal-error` ở main và lỗi không được bắt ở renderer đều
+   có dòng trong tệp log; log xoay vòng khi vượt cỡ; chuỗi nhạy cảm bị che.
+
 ## Quyết định cần người dùng chốt
 
 | Quyết định | Đề xuất |
@@ -250,3 +297,4 @@ tách (tách thuần, không đổi hành vi).
 | LAN có chuyển sang HTTPS | Có, sau giai đoạn A; chứng chỉ tự ký + tuỳ chọn CA nội bộ |
 | Chu kỳ đẩy Firebase | 15 phút và khi đóng app |
 | Bật/tắt luật Westgard chung cần quyền gì | Tra SOP; nếu là cấu hình chung của phòng thì nên là admin |
+| Log và báo crash có gửi ra ngoài không (G.2) | Không: chỉ lưu tại máy, người dùng tự xuất gói log khi cần báo lỗi |
