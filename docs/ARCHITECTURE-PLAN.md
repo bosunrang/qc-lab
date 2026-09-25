@@ -94,13 +94,19 @@ A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một ngu�
 - Preload vẫn viết tay: preload chạy trong sandbox của Electron, không
   `require` được module local. Test so preload với bảng (cùng tên hàm, cùng
   kênh, không thừa không thiếu).
-- Đổi hành vi LAN so với trước: 11 hàm trước đây bị chặn nhầm vì tên hàm khác
-  đuôi tên kênh nay gọi được — 5 hàm Nhật ký, `createNce`, `saveNceProtocol`,
-  `approveNce`, `cancelNce`, 2 hàm mẫu báo cáo — cùng `backupStatus`. Các hàm
-  này đều kiểm quyền theo actor. Ngược lại `listActivity`, `login`, `logout`,
-  `currentUser` không còn gọi được qua `/api/rpc`.
-- `resetOperationalData` chỉ làm trên máy chính (`lan: false`, người dùng
-  chốt 2026-09-25: máy trạm dùng để nhập dữ liệu).
+- Máy trạm LAN chỉ nhập liệu (người dùng chốt 2026-09-25): mở mọi thao tác
+  đọc và thao tác ghi của KTV (điểm QC, ghi chú ngày, lập dải, NCE, Sigma, so
+  sánh hoá chất, nhận/bỏ kết quả LIS, mật khẩu và ảnh của mình). Mọi thao tác
+  quản trị chỉ làm trên máy chính, kể cả với tài khoản admin — gồm khởi tạo
+  lại dữ liệu, Nhật ký, cấu hình luật Westgard. Test canh quy tắc "handler đòi
+  admin thì `lan: false`" và khoá danh sách mở.
+- Đổi hành vi LAN so với trước: `createNce`, `saveNceProtocol`, `approveNce`,
+  `cancelNce`, `getReportTemplateSettings`, `backupStatus` trước đây bị chặn
+  nhầm vì tên hàm khác đuôi tên kênh, nay gọi được. `login`, `logout`,
+  `currentUser`, `listActivity` không còn gọi được qua `/api/rpc`.
+- Giao diện máy trạm vẫn hiện menu và nút quản trị; bấm vào sẽ báo "Thao tác
+  không được mở qua mạng nội bộ." Cần ẩn các phần này khi chạy qua LAN (việc
+  của giai đoạn D).
 - Máy trạm vẫn chưa xuất Excel/in PDF được (như trước); nên dùng
   `browser-export.ts` như bản xem trước.
 

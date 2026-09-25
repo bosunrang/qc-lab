@@ -10,6 +10,15 @@
 //
 // LAN chỉ gọi được dòng có `lan: true` — danh sách cho phép tường minh, thay
 // cho cách cũ tìm handler theo đuôi tên kênh.
+//
+// Máy trạm LAN chỉ dùng để NHẬP LIỆU (người dùng chốt 2026-09-25): mở mọi
+// thao tác đọc và các thao tác ghi của KTV — điểm QC, ghi chú ngày, lập dải,
+// NCE, Sigma, so sánh hoá chất, nhận/bỏ kết quả LIS, mật khẩu và ảnh của
+// chính mình. Mọi thao tác quản trị chỉ làm trên máy chính, kể cả khi đăng
+// nhập bằng tài khoản admin: người dùng, danh mục, lô, TEa, cấu hình luật
+// Westgard, khoá kỳ, nhật ký, cài đặt LIS, hồ sơ đơn vị, mẫu báo cáo, xoá kỳ
+// Sigma và phép so sánh hoá chất. Quy tắc gọn: thao tác nào handler đòi quyền
+// admin thì `lan: false` (test canh điều này).
 import type { QcApi } from '../../shared/qc-api';
 import type { Actor } from './shared';
 import type { createAuditHandlers } from './audit-handlers';
@@ -37,8 +46,9 @@ export interface CallContext {
 export interface Operation<N extends ApiName> {
   channel: string;
   /** `true`: máy trạm LAN gọi được qua `/api/rpc`. Mặc định của dòng mới là
-   * `false`; chỉ mở khi handler tự kiểm quyền theo `ctx.actor()` và không đụng
-   * tới tài nguyên riêng của máy chính (hộp thoại, tệp, cửa sổ, phiên). */
+   * `false`; chỉ mở khi là thao tác nhập liệu (xem đầu tệp), handler tự kiểm
+   * quyền theo `ctx.actor()` và không đụng tới tài nguyên riêng của máy chính
+   * (hộp thoại, tệp, cửa sổ, phiên). */
   lan: boolean;
   run(ctx: CallContext, ...args: Args<N>): Result<N> | Promise<Result<N>>;
 }
@@ -87,59 +97,59 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
   const { auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis } = h;
   return {
     hasAnyUsers: { channel: 'auth:hasAnyUsers', lan: true, run: () => auth.hasAnyUsers() },
-    listUsers: { channel: 'auth:listUsers', lan: true, run: (ctx) => auth.listUsers(ctx.actor()) },
-    createUser: { channel: 'auth:createUser', lan: true, run: (ctx, input) => auth.createUser(input, ctx.actor()) },
-    updateUser: { channel: 'auth:updateUser', lan: true, run: (ctx, input) => auth.updateUser(input, ctx.actor()) },
-    deleteUser: { channel: 'auth:deleteUser', lan: true, run: (ctx, input) => auth.deleteUser(input, ctx.actor()) },
-    resetUserPassword: { channel: 'auth:resetPassword', lan: true, run: (ctx, input) => auth.resetPassword(input, ctx.actor()) },
+    listUsers: { channel: 'auth:listUsers', lan: false, run: (ctx) => auth.listUsers(ctx.actor()) },
+    createUser: { channel: 'auth:createUser', lan: false, run: (ctx, input) => auth.createUser(input, ctx.actor()) },
+    updateUser: { channel: 'auth:updateUser', lan: false, run: (ctx, input) => auth.updateUser(input, ctx.actor()) },
+    deleteUser: { channel: 'auth:deleteUser', lan: false, run: (ctx, input) => auth.deleteUser(input, ctx.actor()) },
+    resetUserPassword: { channel: 'auth:resetPassword', lan: false, run: (ctx, input) => auth.resetPassword(input, ctx.actor()) },
     changeOwnPassword: { channel: 'auth:changeOwnPassword', lan: true, run: (ctx, input) => auth.changeOwnPassword(input, ctx.actor()) },
     verifyOwnPassword: { channel: 'auth:verifyPassword', lan: true, run: (ctx, input) => auth.verifyOwnPassword(input, ctx.actor()) },
     setAvatar: { channel: 'auth:setAvatar', lan: true, run: (ctx, input) => auth.setAvatar(input, ctx.actor()) },
     clearAvatar: { channel: 'auth:clearAvatar', lan: true, run: (ctx) => auth.clearAvatar(ctx.actor()) },
 
     listInstruments: { channel: 'config:listInstruments', lan: true, run: () => config.listInstruments() },
-    saveInstrument: { channel: 'config:saveInstrument', lan: true, run: (ctx, input) => config.saveInstrument(input, ctx.actor()) },
-    removeInstrument: { channel: 'config:removeInstrument', lan: true, run: (ctx, input) => config.removeInstrument(input, ctx.actor()) },
+    saveInstrument: { channel: 'config:saveInstrument', lan: false, run: (ctx, input) => config.saveInstrument(input, ctx.actor()) },
+    removeInstrument: { channel: 'config:removeInstrument', lan: false, run: (ctx, input) => config.removeInstrument(input, ctx.actor()) },
     listTests: { channel: 'config:listTests', lan: true, run: () => config.listTests() },
-    saveTest: { channel: 'config:saveTest', lan: true, run: (ctx, input) => config.saveTest(input, ctx.actor()) },
+    saveTest: { channel: 'config:saveTest', lan: false, run: (ctx, input) => config.saveTest(input, ctx.actor()) },
     listTestLevels: { channel: 'config:listTestLevels', lan: true, run: (_ctx, testId) => config.listTestLevels(testId) },
-    saveTestLevel: { channel: 'config:saveTestLevel', lan: true, run: (ctx, input) => config.saveTestLevel(input, ctx.actor()) },
+    saveTestLevel: { channel: 'config:saveTestLevel', lan: false, run: (ctx, input) => config.saveTestLevel(input, ctx.actor()) },
     listPlannedTargets: { channel: 'config:listPlannedTargets', lan: true, run: () => config.listPlannedTargets() },
-    savePlannedTargets: { channel: 'config:savePlannedTargets', lan: true, run: (ctx, input) => config.savePlannedTargets(input, ctx.actor()) },
+    savePlannedTargets: { channel: 'config:savePlannedTargets', lan: false, run: (ctx, input) => config.savePlannedTargets(input, ctx.actor()) },
     // Không còn màn hình nào gọi, và đọc nhật ký mà không kiểm quyền admin:
     // không mở qua LAN. Xoá hẳn ở giai đoạn C.
     listActivity: { channel: 'config:listActivity', lan: false, run: (_ctx, limit) => config.listActivity(limit) },
     listRuleScopes: { channel: 'config:listRuleScopes', lan: true, run: (_ctx, testId) => config.listRuleScopes(testId) },
-    saveRuleScope: { channel: 'config:saveRuleScope', lan: true, run: (ctx, testId, ruleId, scope) => config.saveRuleScope(testId, ruleId, scope, ctx.actor()) },
+    saveRuleScope: { channel: 'config:saveRuleScope', lan: false, run: (ctx, testId, ruleId, scope) => config.saveRuleScope(testId, ruleId, scope, ctx.actor()) },
     listLots: { channel: 'config:listLots', lan: true, run: () => config.listLots() },
-    saveLot: { channel: 'config:saveLot', lan: true, run: (ctx, input) => config.saveLot(input, ctx.actor()) },
-    setTeaRefValue: { channel: 'config:setTeaRefValue', lan: true, run: (ctx, input) => config.setTeaRefValue(input, ctx.actor()) },
-    restoreTeaRefDefaults: { channel: 'config:restoreTeaRefDefaults', lan: true, run: (ctx, input) => config.restoreTeaRefDefaults(input, ctx.actor()) },
-    addTeaAnalyte: { channel: 'config:addTeaAnalyte', lan: true, run: (ctx, input) => config.addTeaAnalyte(input, ctx.actor()) },
-    removeTest: { channel: 'config:removeTest', lan: true, run: (ctx, input) => config.removeTest(input, ctx.actor()) },
-    removePanel: { channel: 'config:removePanel', lan: true, run: (ctx, input) => config.removePanel(input, ctx.actor()) },
-    removeLot: { channel: 'config:removeLot', lan: true, run: (ctx, input) => config.removeLot(input, ctx.actor()) },
+    saveLot: { channel: 'config:saveLot', lan: false, run: (ctx, input) => config.saveLot(input, ctx.actor()) },
+    setTeaRefValue: { channel: 'config:setTeaRefValue', lan: false, run: (ctx, input) => config.setTeaRefValue(input, ctx.actor()) },
+    restoreTeaRefDefaults: { channel: 'config:restoreTeaRefDefaults', lan: false, run: (ctx, input) => config.restoreTeaRefDefaults(input, ctx.actor()) },
+    addTeaAnalyte: { channel: 'config:addTeaAnalyte', lan: false, run: (ctx, input) => config.addTeaAnalyte(input, ctx.actor()) },
+    removeTest: { channel: 'config:removeTest', lan: false, run: (ctx, input) => config.removeTest(input, ctx.actor()) },
+    removePanel: { channel: 'config:removePanel', lan: false, run: (ctx, input) => config.removePanel(input, ctx.actor()) },
+    removeLot: { channel: 'config:removeLot', lan: false, run: (ctx, input) => config.removeLot(input, ctx.actor()) },
     listLotGroups: { channel: 'config:listLotGroups', lan: true, run: () => config.listLotGroups() },
-    removeLotGroup: { channel: 'config:removeLotGroup', lan: true, run: (ctx, input) => config.removeLotGroup(input, ctx.actor()) },
-    stopLotGroup: { channel: 'config:stopLotGroup', lan: true, run: (ctx, input) => config.stopLotGroup(input, ctx.actor()) },
-    activateLotGroup: { channel: 'config:activateLotGroup', lan: true, run: (ctx, input) => config.activateLotGroup(input, ctx.actor()) },
+    removeLotGroup: { channel: 'config:removeLotGroup', lan: false, run: (ctx, input) => config.removeLotGroup(input, ctx.actor()) },
+    stopLotGroup: { channel: 'config:stopLotGroup', lan: false, run: (ctx, input) => config.stopLotGroup(input, ctx.actor()) },
+    activateLotGroup: { channel: 'config:activateLotGroup', lan: false, run: (ctx, input) => config.activateLotGroup(input, ctx.actor()) },
     previewLotRename: { channel: 'config:previewLotRename', lan: true, run: (_ctx, input) => config.previewLotRename(input) },
-    removeLotTransition: { channel: 'config:removeLotTransition', lan: true, run: (ctx, input) => config.removeLotTransition(input, ctx.actor()) },
-    saveLotGroup: { channel: 'config:saveLotGroup', lan: true, run: (ctx, input) => config.saveLotGroup(input, ctx.actor()) },
+    removeLotTransition: { channel: 'config:removeLotTransition', lan: false, run: (ctx, input) => config.removeLotTransition(input, ctx.actor()) },
+    saveLotGroup: { channel: 'config:saveLotGroup', lan: false, run: (ctx, input) => config.saveLotGroup(input, ctx.actor()) },
     listPanels: { channel: 'config:listPanels', lan: true, run: () => config.listPanels() },
-    savePanel: { channel: 'config:savePanel', lan: true, run: (ctx, input) => config.savePanel(input, ctx.actor()) },
+    savePanel: { channel: 'config:savePanel', lan: false, run: (ctx, input) => config.savePanel(input, ctx.actor()) },
     listLotTransitions: { channel: 'config:listLotTransitions', lan: true, run: () => config.listLotTransitions() },
-    createLotTransition: { channel: 'config:createLotTransition', lan: true, run: (ctx, input) => config.createLotTransition(input, ctx.actor()) },
+    createLotTransition: { channel: 'config:createLotTransition', lan: false, run: (ctx, input) => config.createLotTransition(input, ctx.actor()) },
     listTeaRefs: { channel: 'config:listTeaRefs', lan: true, run: () => config.listTeaRefs() },
-    saveTeaRef: { channel: 'config:saveTeaRef', lan: true, run: (ctx, input) => config.saveTeaRef(input, ctx.actor()) },
-    removeTeaRef: { channel: 'config:removeTeaRef', lan: true, run: (ctx, input) => config.removeTeaRef(input, ctx.actor()) },
-    removeTeaLabProfile: { channel: 'config:removeTeaLabProfile', lan: true, run: (ctx, input) => config.removeTeaLabProfile(input, ctx.actor()) },
+    saveTeaRef: { channel: 'config:saveTeaRef', lan: false, run: (ctx, input) => config.saveTeaRef(input, ctx.actor()) },
+    removeTeaRef: { channel: 'config:removeTeaRef', lan: false, run: (ctx, input) => config.removeTeaRef(input, ctx.actor()) },
+    removeTeaLabProfile: { channel: 'config:removeTeaLabProfile', lan: false, run: (ctx, input) => config.removeTeaLabProfile(input, ctx.actor()) },
 
-    queryActivity: { channel: 'audit:query', lan: true, run: (ctx, input) => audit.query(input, ctx.actor()) },
-    previewArchiveActivity: { channel: 'audit:previewArchive', lan: true, run: (ctx, input) => audit.previewArchive(input, ctx.actor()) },
-    exportActivityCsv: { channel: 'audit:exportCsv', lan: true, run: (ctx, input) => audit.exportCsv(input, ctx.actor()) },
-    verifyActivityChainNow: { channel: 'audit:verifyChainNow', lan: true, run: (ctx) => audit.verifyChainNow(ctx.actor()) },
-    archiveActivity: { channel: 'audit:archive', lan: true, run: (ctx, input) => audit.archive(input, ctx.actor()) },
+    queryActivity: { channel: 'audit:query', lan: false, run: (ctx, input) => audit.query(input, ctx.actor()) },
+    previewArchiveActivity: { channel: 'audit:previewArchive', lan: false, run: (ctx, input) => audit.previewArchive(input, ctx.actor()) },
+    exportActivityCsv: { channel: 'audit:exportCsv', lan: false, run: (ctx, input) => audit.exportCsv(input, ctx.actor()) },
+    verifyActivityChainNow: { channel: 'audit:verifyChainNow', lan: false, run: (ctx) => audit.verifyChainNow(ctx.actor()) },
+    archiveActivity: { channel: 'audit:archive', lan: false, run: (ctx, input) => audit.archive(input, ctx.actor()) },
 
     queryPoints: { channel: 'entry:queryPoints', lan: true, run: (_ctx, testId, level) => entry.queryPoints(testId, level) },
     listEntryHistoryPoints: { channel: 'entry:listHistoryPoints', lan: true, run: (_ctx, testId) => entry.listHistoryPoints(testId) },
@@ -155,10 +165,12 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
 
     listTestSummaries: { channel: 'westgard:listTestSummaries', lan: true, run: () => westgard.listTestSummaries() },
     analyzeLevel: { channel: 'westgard:analyzeLevel', lan: true, run: (_ctx, testId, level) => westgard.analyzeLevel(testId, level) },
-    saveRuleAction: { channel: 'westgard:saveRuleAction', lan: true, run: (ctx, testId, ruleId, action) => westgard.saveRuleAction(testId, ruleId, action, ctx.actor()) },
+    // Ba dòng cấu hình luật dưới đây chỉ cần quyền ghi nhưng vẫn là việc quản
+    // trị, nên không mở qua LAN.
+    saveRuleAction: { channel: 'westgard:saveRuleAction', lan: false, run: (ctx, testId, ruleId, action) => westgard.saveRuleAction(testId, ruleId, action, ctx.actor()) },
     listRuleSettings: { channel: 'westgard:listRuleSettings', lan: true, run: () => westgard.listRuleSettings() },
-    saveRuleSetting: { channel: 'westgard:saveRuleSetting', lan: true, run: (ctx, ruleId, on) => westgard.saveRuleSetting(ruleId, on, ctx.actor()) },
-    resetRuleSettings: { channel: 'westgard:resetRuleSettings', lan: true, run: (ctx) => westgard.resetRuleSettings(ctx.actor()) },
+    saveRuleSetting: { channel: 'westgard:saveRuleSetting', lan: false, run: (ctx, ruleId, on) => westgard.saveRuleSetting(ruleId, on, ctx.actor()) },
+    resetRuleSettings: { channel: 'westgard:resetRuleSettings', lan: false, run: (ctx) => westgard.resetRuleSettings(ctx.actor()) },
     listArchivedBlocks: { channel: 'westgard:listArchivedBlocks', lan: true, run: (_ctx, testId, groupId) => westgard.listArchivedBlocks(testId, groupId) },
     listArchivedGroupTests: { channel: 'westgard:listArchivedGroupTests', lan: true, run: (_ctx, groupId) => westgard.listArchivedGroupTests(groupId) },
     listPreviousLotBlocks: { channel: 'westgard:listPreviousLotBlocks', lan: true, run: (_ctx, testId) => westgard.listPreviousLotBlocks(testId) },
@@ -168,7 +180,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     saveSigmaTeaConfig: { channel: 'sigma:saveTeaConfig', lan: true, run: (ctx, input) => sigma.saveTeaConfig(input, ctx.actor()) },
     saveSigmaPeriod: { channel: 'sigma:savePeriod', lan: true, run: (ctx, input) => sigma.savePeriod(input, ctx.actor()) },
     renameSigmaPeriod: { channel: 'sigma:renamePeriod', lan: true, run: (ctx, input) => sigma.renamePeriod(input, ctx.actor()) },
-    removeSigmaPeriod: { channel: 'sigma:removePeriod', lan: true, run: (ctx, input) => sigma.removePeriod(input, ctx.actor()) },
+    removeSigmaPeriod: { channel: 'sigma:removePeriod', lan: false, run: (ctx, input) => sigma.removePeriod(input, ctx.actor()) },
 
     listNceRecords: { channel: 'nce:listRecords', lan: true, run: () => nce.listRecords() },
     createNce: { channel: 'nce:create', lan: true, run: (ctx, input) => nce.create(input, ctx.actor()) },
@@ -186,25 +198,25 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     createReagentComparison: { channel: 'reagent:createComparison', lan: true, run: (ctx, input) => reagent.createComparison(input, ctx.actor()) },
     saveReagentMetadata: { channel: 'reagent:saveMetadata', lan: true, run: (ctx, input) => reagent.saveMetadata(input, ctx.actor()) },
     saveReagentRows: { channel: 'reagent:saveRows', lan: true, run: (ctx, input) => reagent.saveRows(input, ctx.actor()) },
-    removeReagentComparison: { channel: 'reagent:removeComparison', lan: true, run: (ctx, input) => reagent.removeComparison(input, ctx.actor()) },
+    removeReagentComparison: { channel: 'reagent:removeComparison', lan: false, run: (ctx, input) => reagent.removeComparison(input, ctx.actor()) },
     listReagentQuickValues: { channel: 'reagent:listQuickValues', lan: true, run: (_ctx, input) => reagent.listQuickValues(input) },
     addReagentQuickValue: { channel: 'reagent:addQuickValue', lan: true, run: (ctx, input) => reagent.addQuickListValue(input, ctx.actor()) },
     removeReagentQuickValue: { channel: 'reagent:removeQuickValue', lan: true, run: (ctx, input) => reagent.removeQuickListValue(input, ctx.actor()) },
 
     getLabProfile: { channel: 'settings:getLabProfile', lan: true, run: () => settings.getLabProfile() },
     getLoginBrand: { channel: 'settings:getLoginBrand', lan: true, run: () => settings.getLoginBrand() },
-    saveLabProfile: { channel: 'settings:saveLabProfile', lan: true, run: (ctx, input) => settings.saveLabProfile(input, ctx.actor()) },
+    saveLabProfile: { channel: 'settings:saveLabProfile', lan: false, run: (ctx, input) => settings.saveLabProfile(input, ctx.actor()) },
     getStorageInfo: { channel: 'settings:getStorageInfo', lan: true, run: () => settings.getStorageInfo() },
 
     listPeriodLocks: { channel: 'report:listPeriodLocks', lan: true, run: () => report.listPeriodLocks() },
     getReportTemplateSettings: { channel: 'report:getTemplateSettings', lan: true, run: () => report.getReportTemplateSettings() },
-    saveReportTemplateSettings: { channel: 'report:saveTemplateSettings', lan: true, run: (ctx, input) => report.saveReportTemplateSettings(input, ctx.actor()) },
-    lockPeriod: { channel: 'report:lockPeriod', lan: true, run: (ctx, input) => report.lockPeriod(input, ctx.actor()) },
-    unlockPeriod: { channel: 'report:unlockPeriod', lan: true, run: (ctx, input) => report.unlockPeriod(input, ctx.actor()) },
+    saveReportTemplateSettings: { channel: 'report:saveTemplateSettings', lan: false, run: (ctx, input) => report.saveReportTemplateSettings(input, ctx.actor()) },
+    lockPeriod: { channel: 'report:lockPeriod', lan: false, run: (ctx, input) => report.lockPeriod(input, ctx.actor()) },
+    unlockPeriod: { channel: 'report:unlockPeriod', lan: false, run: (ctx, input) => report.unlockPeriod(input, ctx.actor()) },
     queryReport: { channel: 'report:queryReport', lan: true, run: (_ctx, input) => report.queryReport(input) },
 
     getLisSettings: { channel: 'lis:getSettings', lan: true, run: (ctx) => lis.getSettings(ctx.actor()) },
-    saveLisSettings: { channel: 'lis:saveSettings', lan: true, run: (ctx, input) => lis.saveSettings(input, ctx.actor()) },
+    saveLisSettings: { channel: 'lis:saveSettings', lan: false, run: (ctx, input) => lis.saveSettings(input, ctx.actor()) },
     pullLisQueue: { channel: 'lis:pullQueue', lan: true, run: () => lis.pullQueue() },
     importLisResult: { channel: 'lis:importResult', lan: true, run: (ctx, input) => lis.importResult(input, ctx.actor()) },
     rejectLisResult: { channel: 'lis:rejectResult', lan: true, run: (ctx, input) => lis.rejectResult(input, ctx.actor()) },

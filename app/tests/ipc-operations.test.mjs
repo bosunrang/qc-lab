@@ -95,16 +95,43 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   assert.throws(() => registerIpcOperations({ handle() {} }, [tables[0], tables[0]], sessionContext(() => null)), /khai hai lần/);
 });
 
-test('LAN chỉ mở danh sách cho phép tường minh', () => {
+test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', () => {
   const { tables } = setup();
-  const closed = tables.flatMap((table) => Object.entries(table).filter(([, op]) => !op.lan).map(([name]) => name)).sort();
-  // Đổi danh sách này là quyết định bảo mật: phải sửa có chủ đích, kèm lý do
-  // ghi tại dòng tương ứng trong bảng.
-  assert.deepEqual(closed, [
-    'bootstrapAdmin', 'chooseBackupFile', 'connectFirebase', 'currentUser', 'disconnectFirebase',
-    'exportBackup', 'exportTableXlsx', 'importBackup', 'listActivity', 'login', 'logout',
-    'printHtmlToPdf', 'resetOperationalData', 'syncFirebase',
+  const open = tables.flatMap((table) => Object.entries(table).filter(([, op]) => op.lan).map(([name]) => name)).sort();
+  // Đổi danh sách này là quyết định bảo mật và nghiệp vụ (người dùng chốt
+  // 2026-09-25: máy trạm chỉ nhập liệu, quản trị làm trên máy chính). Sửa có
+  // chủ đích, kèm lý do ghi tại dòng tương ứng trong bảng.
+  assert.deepEqual(open, [
+    'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce', 'backupStatus',
+    'cancelNce', 'changeOwnPassword', 'clearAvatar', 'createNce', 'createReagentComparison',
+    'getFirebaseSettings', 'getLabProfile', 'getLisSettings', 'getLoginBrand', 'getRangeCandidate',
+    'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importLisResult',
+    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listInstruments',
+    'listLotGroups', 'listLotTransitions', 'listLots', 'listNceRecords', 'listPanels',
+    'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets', 'listPreviousEntryLotSeries',
+    'listPreviousLotBlocks', 'listReagentComparisons', 'listReagentQuickValues', 'listRuleScopes',
+    'listRuleSettings', 'listSigmaCohorts', 'listSigmaPeriods', 'listTeaRefs', 'listTestLevels',
+    'listTestSummaries', 'listTests', 'listVoidedEntryPoints', 'markNceEffectiveness',
+    'previewLotRename', 'pullLisQueue', 'queryPoints', 'queryReport', 'rejectLisResult',
+    'removeReagentQuickValue', 'renameSigmaPeriod', 'reopenNce', 'returnNce', 'revertManufacturerRange',
+    'saveNceProtocol', 'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig',
+    'setAvatar', 'setDayNote', 'setNceCompletedDate', 'setNceReleaseDecision', 'setNceRerunEvidence',
+    'verifyOwnPassword', 'voidPoint',
   ]);
+});
+
+test('thao tác nào handler đòi quyền admin thì không mở qua LAN', async () => {
+  // Quy tắc canh cho dòng mới: handler kiểm quyền TRƯỚC khi kiểm dữ liệu,
+  // nên gọi bằng KTV với dữ liệu rỗng là biết thao tác có phải của admin.
+  const { business } = setup();
+  const adminOnly = [];
+  for (const [name, op] of Object.entries(business)) {
+    let result;
+    try { result = await op.run({ actor: () => tech }, { data: {} }, 'x', 'y', 'z'); } catch { continue; }
+    if (result?.error?.code === 'forbidden') adminOnly.push([name, op.lan]);
+  }
+  assert.ok(adminOnly.length >= 40, 'phép dò có còn nhận ra thao tác admin?');
+  assert.deepEqual(adminOnly.filter(([, lan]) => lan).map(([name]) => name), []);
 });
 
 test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và tên thuộc prototype', async () => {
@@ -134,10 +161,11 @@ test('LAN chạy bằng actor của phiên HTTP, cổng quyền vẫn áp dụng
   const denied = await lan('createNce', [NCE_INPUT], viewer);
   assert.equal(denied.ok, false, 'vai trò chỉ xem vẫn bị chặn qua LAN');
 
-  // `createNce` và `queryActivity` từng bị chặn nhầm vì tên hàm khác đuôi
-  // tên kênh (`nce:create`, `audit:query`).
-  const auditPage = await lan('queryActivity', [{}], admin);
-  assert.equal(auditPage.ok, true, 'admin ở máy trạm mở được Nhật ký');
+  // Admin đăng nhập ở máy trạm cũng không làm việc quản trị được.
+  for (const [method, args] of [['saveInstrument', [{ data: { name: 'May' } }]], ['queryActivity', [{}]], ['lockPeriod', [{ data: { ym: '2026-09' } }]], ['saveRuleSetting', ['1-2s', false]]]) {
+    const result = await lan(method, args, admin);
+    assert.equal(result?.error?.code, 'unknown-operation', `admin ở máy trạm không được gọi ${method}`);
+  }
 });
 
 test('lời gọi LAN chậm không chặn lời gọi khác, và không lẫn danh tính', async () => {
