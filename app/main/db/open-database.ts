@@ -19,4 +19,11 @@ export function openDatabase(filePath: string): SqliteLike {
   return conn;
 }
 
+/** Mở một tệp SQLite có sẵn mà KHÔNG áp schema: đọc tệp backup trước khi phục
+ * hồi (`readOnly`, không sửa gì trong tệp) hoặc ghi phần mô tả vào bản backup
+ * vừa tạo. Người gọi phải `close()` để Windows nhả khoá tệp. */
+export function openExistingDatabase(filePath: string, options: { readOnly: boolean }): SqliteLike & { close(): void } {
+  return new DatabaseSync(filePath, { readOnly: options.readOnly, open: true });
+}
+
 

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'el
 import { networkInterfaces } from 'node:os';
 import * as path from 'node:path';
 import { openDatabase } from './db/open-database';
-import { type Actor, writeAudit, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier } from './ipc/shared';
+import { type Actor, writeAudit, requireAdmin, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier } from './ipc/shared';
 import { createConfigHandlers } from './ipc/config-handlers';
 import { createEntryHandlers } from './ipc/entry-handlers';
 import { createWestgardHandlers } from './ipc/westgard-handlers';
@@ -24,6 +24,8 @@ const LAN_PORT = 3200;
 let tray: Tray | null = null;
 let quitting = false;
 let mainWindow: BrowserWindow | null = null;
+/** Kênh IPC chỉ dùng được trên máy chính (mở hộp thoại tệp), không mở qua LAN. */
+const DESKTOP_ONLY_CHANNELS = new Set(['backup:export', 'backup:chooseFile', 'backup:import']);
 
 function showMainWindow(): void {
   const win = mainWindow;
@@ -124,7 +126,10 @@ async function createWindow(): Promise<void> {
     };
     const target = routes[channel] || [...lanHandlers.keys()].find((name) => name.endsWith(`:${channel}`));
     const handler = target ? lanHandlers.get(target) : undefined;
-    if (!handler || channel === 'auth:bootstrapAdmin') {
+    // Xuất/nhập backup mở hộp thoại chọn tệp trên MÁY CHÍNH và đọc/ghi tệp ở
+    // đó, nên không có nghĩa với máy trạm. Trước đây kênh `backup:export` vẫn
+    // khớp theo đuôi tên (`export`) và trả cả CSDL qua mạng.
+    if (!handler || channel === 'auth:bootstrapAdmin' || (target && DESKTOP_ONLY_CHANNELS.has(target))) {
       return { ok: false, error: { code: 'unknown-operation', message: 'Thao tác không được mở qua mạng nội bộ.' } };
     }
     let result: unknown;
@@ -309,10 +314,45 @@ async function createWindow(): Promise<void> {
   });
   ipcMain.handle('print:htmlToPdf', (_event, input: { html: string; defaultFileName: string; pageNumbers?: boolean }) =>
     printHtmlToPdf(win, input.html, input.defaultFileName, input.pageNumbers));
-  ipcMain.handle('backup:export', () => backup.exportBackup(requireActor()));
-  ipcMain.handle('backup:import', (_event, input) => backup.importBackup(input, requireActor()));
+  // Backup là tệp trên máy chính: main mở hộp thoại, renderer chỉ nhận kết
+  // quả. Tệp được chọn để phục hồi giữ ở đây sau bước kiểm tra, nên bước phục
+  // hồi không nhận đường dẫn từ renderer.
+  let pendingRestorePath: string | null = null;
+  ipcMain.handle('backup:export', async () => {
+    const actor = requireActor();
+    const denied = requireAdmin(actor); if (denied) return denied;
+    const picked = await dialog.showSaveDialog(win, {
+      title: 'Xuất backup QC Lab',
+      defaultPath: `qclab-backup-${new Date().toISOString().slice(0, 10)}.sqlite`,
+      filters: [{ name: 'Backup QC Lab', extensions: ['sqlite'] }],
+    });
+    if (picked.canceled || !picked.filePath) return { ok: true, data: null };
+    return backup.exportBackupTo(picked.filePath, actor);
+  });
+  ipcMain.handle('backup:chooseFile', async () => {
+    const actor = requireActor();
+    const denied = requireAdmin(actor); if (denied) return denied;
+    pendingRestorePath = null;
+    const picked = await dialog.showOpenDialog(win, {
+      title: 'Chọn tệp backup để phục hồi',
+      properties: ['openFile'],
+      filters: [{ name: 'Backup QC Lab', extensions: ['sqlite', 'json'] }],
+    });
+    const filePath = picked.filePaths[0];
+    if (picked.canceled || !filePath) return { ok: true, data: null };
+    const verified = backup.verifyBackupFile(filePath, actor);
+    if (!verified.ok) return verified;
+    pendingRestorePath = filePath;
+    return { ok: true, data: { ...verified.data, fileName: path.basename(filePath) } };
+  });
+  ipcMain.handle('backup:import', () => {
+    const actor = requireActor();
+    if (!pendingRestorePath) return { ok: false, error: { code: 'no-file', message: 'Chưa chọn tệp backup để phục hồi.' } };
+    const filePath = pendingRestorePath;
+    pendingRestorePath = null;
+    return backup.importBackupFrom(filePath, actor);
+  });
   ipcMain.handle('backup:status', () => backup.backupStatus());
-  ipcMain.handle('backup:verify', (_event, input) => backup.verifyBackup(input, requireActor()));
   ipcMain.handle('backup:resetAll', () => backup.resetOperationalData(requireActor()));
   ipcMain.handle('lis:getSettings', () => lis.getSettings());
   ipcMain.handle('lis:saveSettings', (_event, input) => lis.saveSettings(input, requireActor()));
