@@ -12,7 +12,7 @@ import {
   type UserCreateInput, type UserUpdateInput, type LoginInput,
 } from '../domain/auth-validation';
 import { roleLabel, roleOf } from '../domain/page-roles';
-import { type Actor, type IpcResult, writeAudit, notifyChanged } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, withTransaction } from './shared';
 
 interface UserRow {
   id: string; username: string; name: string; initials: string; external_code: string;
@@ -87,10 +87,14 @@ export function createAuthHandlers(db: Db) {
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, name, initials, password } = result.data;
     const id = uid();
-    db.prepare('INSERT INTO users(id,username,name,initials,role,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,1,0)')
-      .run(id, username, name, initials, 'admin', hashPassword(password));
-    const row = db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow;
-    writeAudit(db, { userId: id, username, name, role: 'admin', clientId: 'bootstrap' }, 'Khởi tạo tài khoản quản trị', `Tạo tài khoản quản trị đầu tiên "${username}"`, username);
+    // Băm mật khẩu (600.000 vòng) TRƯỚC khi mở transaction để transaction ngắn.
+    const passHash = hashPassword(password);
+    const row = withTransaction(db, () => {
+      db.prepare('INSERT INTO users(id,username,name,initials,role,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,1,0)')
+        .run(id, username, name, initials, 'admin', passHash);
+      writeAudit(db, { userId: id, username, name, role: 'admin', clientId: 'bootstrap' }, 'Khởi tạo tài khoản quản trị', `Tạo tài khoản quản trị đầu tiên "${username}"`, username);
+      return db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow;
+    });
     return { ok: true, data: toPublicUser(row) };
   }
 
@@ -121,9 +125,12 @@ export function createAuthHandlers(db: Db) {
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, name, initials, role, password, pagePerms } = result.data;
     const id = uid();
-    db.prepare('INSERT INTO users(id,username,name,initials,role,page_perms_json,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,?,1,1)')
-      .run(id, username, name, initials, role, JSON.stringify(pagePerms), hashPassword(password));
-    writeAudit(db, actor, 'Thêm người dùng', `Tạo tài khoản "${username}": ${roleLabel(role)} · ${pagePerms.length} thẻ · yêu cầu đổi mật khẩu`, username);
+    const passHash = hashPassword(password);
+    withTransaction(db, () => {
+      db.prepare('INSERT INTO users(id,username,name,initials,role,page_perms_json,pass_hash,active,must_change_password) VALUES (?,?,?,?,?,?,?,1,1)')
+        .run(id, username, name, initials, role, JSON.stringify(pagePerms), passHash);
+      writeAudit(db, actor, 'Thêm người dùng', `Tạo tài khoản "${username}": ${roleLabel(role)} · ${pagePerms.length} thẻ · yêu cầu đổi mật khẩu`, username);
+    });
     notifyChanged(['users']);
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
   }
@@ -156,11 +163,13 @@ export function createAuthHandlers(db: Db) {
     if (id === actor.userId && (pagePerms !== undefined || role !== existing.role)) {
       return { ok: false, error: { code: 'self-perms', message: 'Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.' } };
     }
-    db.prepare('UPDATE users SET name=?, initials=?, role=?, active=? WHERE id=?').run(name, initials, role, active ? 1 : 0, id);
-    // `pagePerms` là field tuỳ chọn: thiếu field nghĩa là giữ nguyên, không phải xoá.
-    if (pagePerms !== undefined) db.prepare('UPDATE users SET page_perms_json=? WHERE id=?').run(JSON.stringify(pagePerms), id);
     const permsText = pagePerms !== undefined ? ` · ${pagePerms.length} thẻ` : '';
-    writeAudit(db, actor, 'Sửa người dùng', `Cập nhật "${existing.username}": ${roleLabel(role)}${permsText}, ${active ? 'hoạt động' : 'đã khoá'}`, existing.username);
+    withTransaction(db, () => {
+      db.prepare('UPDATE users SET name=?, initials=?, role=?, active=? WHERE id=?').run(name, initials, role, active ? 1 : 0, id);
+      // `pagePerms` là field tuỳ chọn: thiếu field nghĩa là giữ nguyên, không phải xoá.
+      if (pagePerms !== undefined) db.prepare('UPDATE users SET page_perms_json=? WHERE id=?').run(JSON.stringify(pagePerms), id);
+      writeAudit(db, actor, 'Sửa người dùng', `Cập nhật "${existing.username}": ${roleLabel(role)}${permsText}, ${active ? 'hoạt động' : 'đã khoá'}`, existing.username);
+    });
     notifyChanged(['users']);
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
   }
@@ -175,8 +184,11 @@ export function createAuthHandlers(db: Db) {
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy người dùng.' } };
     const result = validateNewPassword(input.data?.newPassword);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    db.prepare('UPDATE users SET pass_hash=?, must_change_password=1 WHERE id=?').run(hashPassword(result.data), id);
-    writeAudit(db, actor, 'Đặt lại mật khẩu', `Đặt lại mật khẩu cho "${existing.username}"`, existing.username);
+    const passHash = hashPassword(result.data);
+    withTransaction(db, () => {
+      db.prepare('UPDATE users SET pass_hash=?, must_change_password=1 WHERE id=?').run(passHash, id);
+      writeAudit(db, actor, 'Đặt lại mật khẩu', `Đặt lại mật khẩu cho "${existing.username}"`, existing.username);
+    });
     notifyChanged(['users']);
     return { ok: true, data: { id } };
   }
@@ -198,8 +210,11 @@ export function createAuthHandlers(db: Db) {
     }
     const result = validateNewPassword(input.data?.newPassword);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    db.prepare('UPDATE users SET pass_hash=?, must_change_password=0 WHERE id=?').run(hashPassword(result.data), row.id);
-    writeAudit(db, actor, 'Đổi mật khẩu', `Tự đổi mật khẩu`, row.username);
+    const passHash = hashPassword(result.data);
+    withTransaction(db, () => {
+      db.prepare('UPDATE users SET pass_hash=?, must_change_password=0 WHERE id=?').run(passHash, row.id);
+      writeAudit(db, actor, 'Đổi mật khẩu', `Tự đổi mật khẩu`, row.username);
+    });
     return { ok: true, data: { id: row.id } };
   }
 
@@ -212,15 +227,19 @@ export function createAuthHandlers(db: Db) {
   function setAvatar(input: { data: { dataUrl?: unknown } }, actor: Actor): IpcResult<{ avatar: string }> {
     const result = validateSetAvatar(input.data?.dataUrl);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    db.prepare('UPDATE users SET avatar=? WHERE id=?').run(result.data, actor.userId);
-    writeAudit(db, actor, 'Cập nhật ảnh đại diện', 'Đổi ảnh đại diện cá nhân', actor.username);
+    withTransaction(db, () => {
+      db.prepare('UPDATE users SET avatar=? WHERE id=?').run(result.data, actor.userId);
+      writeAudit(db, actor, 'Cập nhật ảnh đại diện', 'Đổi ảnh đại diện cá nhân', actor.username);
+    });
     notifyChanged(['users']);
     return { ok: true, data: { avatar: result.data } };
   }
 
   function clearAvatar(actor: Actor): IpcResult<{ avatar: string }> {
-    db.prepare("UPDATE users SET avatar='' WHERE id=?").run(actor.userId);
-    writeAudit(db, actor, 'Cập nhật ảnh đại diện', 'Xoá ảnh đại diện cá nhân', actor.username);
+    withTransaction(db, () => {
+      db.prepare("UPDATE users SET avatar='' WHERE id=?").run(actor.userId);
+      writeAudit(db, actor, 'Cập nhật ảnh đại diện', 'Xoá ảnh đại diện cá nhân', actor.username);
+    });
     notifyChanged(['users']);
     return { ok: true, data: { avatar: '' } };
   }
@@ -237,8 +256,10 @@ export function createAuthHandlers(db: Db) {
     if (wouldRemoveLastActiveAdmin(db, id, 'viewer', false)) {
       return { ok: false, error: { code: 'last-admin', message: 'Phải còn ít nhất 1 quản trị viên đang hoạt động.' } };
     }
-    db.prepare('DELETE FROM users WHERE id=?').run(id);
-    writeAudit(db, actor, 'Xoá người dùng', `Xoá tài khoản "${existing.username}" (${roleLabel(existing.role)})`, existing.username);
+    withTransaction(db, () => {
+      db.prepare('DELETE FROM users WHERE id=?').run(id);
+      writeAudit(db, actor, 'Xoá người dùng', `Xoá tài khoản "${existing.username}" (${roleLabel(existing.role)})`, existing.username);
+    });
     notifyChanged(['users']);
     return { ok: true, data: { id } };
   }

@@ -21,21 +21,11 @@ import { WG_RULE_REGISTRY, isAllowedRuleScope, type RuleScope } from '../domain/
 import { readGlobalRules } from '../db/rule-settings';
 import { countOperationalLevels, listOperationalLevels } from '../db/operational-levels';
 import { isoLocalDate } from '../domain/local-date';
-import { type Actor, type IpcResult, nowIso, writeAudit, rowToAuditEntry, notifyChanged, requireAdmin } from './shared';
+import { type Actor, type IpcResult, nowIso, writeAudit, rowToAuditEntry, notifyChanged, requireAdmin, withTransaction } from './shared';
 import { ymOfDate } from '../domain/period-lock-validation';
 
 export function createConfigHandlers(db: Db) {
-  function inTransaction<T>(work: () => T): T {
-    db.exec('BEGIN');
-    try {
-      const result = work();
-      db.exec('COMMIT');
-      return result;
-    } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
-    }
-  }
+  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
 
   function listInstruments() {
     return db.prepare('SELECT * FROM instruments ORDER BY name').all();
@@ -554,7 +544,7 @@ export function createConfigHandlers(db: Db) {
           renaming ? `Đổi số lô "${before!.lot_no}" → "${lotNo}" mức ${level}, cập nhật ${renamed} điểm QC`
             : `Cập nhật lô "${lotNo}" mức ${level}`, lotNo);
         db.exec('COMMIT');
-      } catch (error) { db.exec('ROLLBACK'); throw error; }
+      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
       notifyChanged(renaming ? ['qc_lots', 'qc_points'] : ['qc_lots']);
       return { ok: true, data: db.prepare('SELECT * FROM qc_lots WHERE id=?').get(id) };
     }
@@ -845,30 +835,28 @@ export function createConfigHandlers(db: Db) {
     const approvedAt = finalChanged ? at : existing?.approved_at || '';
     const approvedBy = finalChanged ? actor.username : existing?.approved_by || '';
 
-    db.exec('BEGIN');
-    try {
-      let id = input.id || '';
+    // Hồ sơ, cascade chuyển lô và HAI dòng nhật ký là một đơn vị. Trước đây
+    // nhật ký ghi sau COMMIT: lỗi ở bước đó để lại chuyển lô đã áp dụng mà
+    // không có dấu vết, rồi ROLLBACK chạy khi không còn transaction.
+    const cascade = status === 'accepted' && finalChanged;
+    const id = withTransaction(db, () => {
+      let savedId = input.id || '';
       if (existing) {
         db.prepare('UPDATE lot_transitions SET panel_id=?, from_lot_id=?, to_lot_id=?, start_date=?, status=?, note=?, criteria_json=?, approved_at=?, approved_by=? WHERE id=?')
-          .run(panelId, fromLotId, toLotId, startDate, status, note, criteriaJson, approvedAt, approvedBy, id);
+          .run(panelId, fromLotId, toLotId, startDate, status, note, criteriaJson, approvedAt, approvedBy, savedId);
       } else {
-        id = cleanId(uid());
+        savedId = cleanId(uid());
         db.prepare(`INSERT INTO lot_transitions(id,panel_id,from_lot_id,to_lot_id,start_date,status,note,criteria_json,approved_at,approved_by)
-          VALUES (?,?,?,?,?,?,?,?,?,?)`).run(id, panelId, fromLotId, toLotId, startDate, status, note, criteriaJson, approvedAt, approvedBy);
+          VALUES (?,?,?,?,?,?,?,?,?,?)`).run(savedId, panelId, fromLotId, toLotId, startDate, status, note, criteriaJson, approvedAt, approvedBy);
       }
-      if (status === 'accepted' && finalChanged) applyCascade();
-      db.exec('COMMIT');
-
+      if (cascade) applyCascade();
       const detail = `${panel.name}: ${fromLot.lot_no} → ${toLot.lot_no} · ${LOT_TRANSITION_STATUS_TEXT[status]}`;
       writeAudit(db, actor, existing ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', detail, panel.name);
-      if (status === 'accepted' && finalChanged) {
-        writeAudit(db, actor, 'Áp dụng chuyển tiếp lô', `${panel.name} · ${fromLot.lot_no} → ${toLot.lot_no} · ${criteria.length} xét nghiệm`, panel.name);
-        notifyChanged(['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests']);
-      } else {
-        notifyChanged(['lot_transitions']);
-      }
-      return { ok: true, data: db.prepare('SELECT * FROM lot_transitions WHERE id=?').get(id) };
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
+      if (cascade) writeAudit(db, actor, 'Áp dụng chuyển tiếp lô', `${panel.name} · ${fromLot.lot_no} → ${toLot.lot_no} · ${criteria.length} xét nghiệm`, panel.name);
+      return savedId;
+    });
+    notifyChanged(cascade ? ['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests'] : ['lot_transitions']);
+    return { ok: true, data: db.prepare('SELECT * FROM lot_transitions WHERE id=?').get(id) };
   }
 
   // ---- Bảng TEa tham chiếu ----
@@ -1324,7 +1312,7 @@ export function createConfigHandlers(db: Db) {
         `Nhóm "${group.name}": áp Mean/SD cho ${candidates.length} mức QC`
         + (stoppedIds.size ? `, dừng ${stoppedIds.size} nhóm lô bị thay thế` : ''), group.name);
       db.exec('COMMIT');
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
     notifyChanged(['lot_groups', 'qc_lots', 'test_levels', 'tests', 'planned_targets']);
     return { ok: true, data: { status: 'applied', applied: candidates.length, stoppedGroups: [...stoppedIds] } };
   }

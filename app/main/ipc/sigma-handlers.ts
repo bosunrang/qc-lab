@@ -8,7 +8,7 @@ import { TEA_CATALOG_WITH_CLIA_ABSOLUTE } from '../domain/tea-catalog';
 import { isoLocalDate } from '../domain/local-date';
 import { sha256Hex } from '../domain/sha256';
 import { cleanId, cleanText, finiteNumber } from '../domain/text-utils';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin, withTransaction } from './shared';
 
 const PERIOD_RE = /^\d{4}-\d{2}$/;
 const TEA_SOURCES = new Set(['lab', 'eflm', 'clia', 'ricos']);
@@ -116,11 +116,7 @@ function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLeve
 }
 
 export function createSigmaHandlers(db: Db) {
-  function inTransaction<T>(work: () => T): T {
-    db.exec('BEGIN');
-    try { const result = work(); db.exec('COMMIT'); return result; }
-    catch (error) { db.exec('ROLLBACK'); throw error; }
-  }
+  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
   /** Dấu vân tay của ĐÚNG những gì `buildSigmaCohorts()` đọc, không hơn:
    * các điểm QC của (xét nghiệm, mức, lô) tới hết kỳ, và tập điểm đã có hồ sơ
    * khắc phục duyệt xong + hiệu quả (`resolvedPointIds`).

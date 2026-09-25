@@ -4,7 +4,7 @@ import {
   DEFAULT_LIS_GATEWAY_SETTINGS, normalizeGatewayUrl, resultToPointInput,
   type LisGatewaySettings, type LisQueueRecord,
 } from '../domain/lis-client';
-import { type Actor, type IpcResult, writeAudit } from './shared';
+import { type Actor, type IpcResult, writeAudit, requireWrite, withTransaction } from './shared';
 
 const APP_META_KEY = 'lisGatewaySettings';
 const FETCH_TIMEOUT_MS = 8000;
@@ -62,8 +62,10 @@ export function createLisHandlers(db: Db) {
       return { ok: false, error: { code: 'invalid-url', message: 'Địa chỉ Gateway không hợp lệ — chỉ chấp nhận http://127.0.0.1:8787 hoặc http://localhost:8787.' } };
     }
     const settings: LisGatewaySettings = { enabled: input.data.enabled === true, url: url || DEFAULT_LIS_GATEWAY_SETTINGS.url, token: String(input.data.token || '') };
-    db.prepare("INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(APP_META_KEY, JSON.stringify(settings));
-    writeAudit(db, actor, 'Cấu hình LIS Gateway', settings.enabled ? `Bật, url=${settings.url}` : 'Tắt', '');
+    withTransaction(db, () => {
+      db.prepare("INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(APP_META_KEY, JSON.stringify(settings));
+      writeAudit(db, actor, 'Cấu hình LIS Gateway', settings.enabled ? `Bật, url=${settings.url}` : 'Tắt', '');
+    });
     return { ok: true, data: settings };
   }
 
@@ -115,6 +117,9 @@ export function createLisHandlers(db: Db) {
   }
 
   async function rejectResult(input: { data: { messageId: string; note?: string } }, actor: Actor): Promise<IpcResult<{ messageId: string }>> {
+    // Bỏ một kết quả là quyết định về dữ liệu QC: cùng mức quyền với nhận kết
+    // quả. Trước đây vai trò chỉ-xem cũng bỏ được.
+    const denied = requireWrite(actor); if (denied) return denied;
     const settings = readSettings(db);
     try {
       await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: input.data.messageId, status: 'rejected', by: actor.name, note: input.data.note || '' } });

@@ -5,7 +5,7 @@ import {
   type ReagentMetadataInput, type QuickValueType,
 } from '../domain/reagent-validation';
 import { calculateReagentComparison, RC_MIN_PAIRS, type ReagentComparisonResult } from '../domain/reagent-stats';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin, withTransaction } from './shared';
 
 export interface ReagentComparisonRow {
   id: string; reagent: string; lot_old: string; lot_new: string; date: string; operator: string;
@@ -55,10 +55,12 @@ export function createReagentHandlers(db: Db) {
     const data = objectInput(objectInput(input).data);
     const name = cleanText(data.name, 120).trim() || 'Hóa chất mới';
     const unit = cleanText(data.unit, 40).trim();
-    db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
-      .run(id, name, '', '', '', '', 'Mẫu bệnh nhân', unit, 6, 0.05, JSON.stringify(prepareReagentRows(null)));
-    writeAudit(db, actor, 'Tạo phép so sánh hóa chất', `Tạo "${name}"`, name);
+    withTransaction(db, () => {
+      db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
+        .run(id, name, '', '', '', '', 'Mẫu bệnh nhân', unit, 6, 0.05, JSON.stringify(prepareReagentRows(null)));
+      writeAudit(db, actor, 'Tạo phép so sánh hóa chất', `Tạo "${name}"`, name);
+    });
     notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
   }
@@ -82,9 +84,11 @@ export function createReagentHandlers(db: Db) {
       && meta.unit === existing.unit && meta.biasTarget === (existing.bias_target ?? 6) && meta.alpha === (existing.alpha ?? 0.05)
       && meta.coverageConfirmed === !!existing.coverage_confirmed;
     if (unchanged) return { ok: true, data: toView(existing) };
-    db.prepare(`UPDATE reagent_tests SET reagent=?,lot_old=?,lot_new=?,date=?,operator=?,sample_type=?,unit=?,bias_target=?,alpha=?,coverage_confirmed=? WHERE id=?`)
-      .run(meta.reagent, meta.lotOld, meta.lotNew, meta.date, meta.operator, meta.sampleType, meta.unit, meta.biasTarget, meta.alpha, meta.coverageConfirmed ? 1 : 0, id);
-    writeAudit(db, actor, 'Sửa thông tin so sánh hóa chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
+    withTransaction(db, () => {
+      db.prepare(`UPDATE reagent_tests SET reagent=?,lot_old=?,lot_new=?,date=?,operator=?,sample_type=?,unit=?,bias_target=?,alpha=?,coverage_confirmed=? WHERE id=?`)
+        .run(meta.reagent, meta.lotOld, meta.lotNew, meta.date, meta.operator, meta.sampleType, meta.unit, meta.biasTarget, meta.alpha, meta.coverageConfirmed ? 1 : 0, id);
+      writeAudit(db, actor, 'Sửa thông tin so sánh hóa chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
+    });
     notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
   }
@@ -98,8 +102,10 @@ export function createReagentHandlers(db: Db) {
     const rows = prepareReagentRows(payload.rows);
     const rowsJson = JSON.stringify(rows);
     if (rowsJson === existing.rows_json) return { ok: true, data: toView(existing) };
-    db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run(rowsJson, id);
-    writeAudit(db, actor, 'Sửa dữ liệu so sánh hóa chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
+    withTransaction(db, () => {
+      db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run(rowsJson, id);
+      writeAudit(db, actor, 'Sửa dữ liệu so sánh hóa chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
+    });
     notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
   }
@@ -111,8 +117,10 @@ export function createReagentHandlers(db: Db) {
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy phép so sánh.' } };
     const count = (db.prepare('SELECT COUNT(*) as c FROM reagent_tests').get() as { c: number }).c;
     if (count <= 1) return { ok: false, error: { code: 'last-comparison', message: 'Phải giữ lại ít nhất 1 phép so sánh.' } };
-    db.prepare('DELETE FROM reagent_tests WHERE id=?').run(id);
-    writeAudit(db, actor, 'Xóa phép so sánh hóa chất', `Xóa "${existing.reagent}"`, existing.reagent);
+    withTransaction(db, () => {
+      db.prepare('DELETE FROM reagent_tests WHERE id=?').run(id);
+      writeAudit(db, actor, 'Xóa phép so sánh hóa chất', `Xóa "${existing.reagent}"`, existing.reagent);
+    });
     notifyChanged(['reagent_tests']);
     return { ok: true, data: { id } };
   }
@@ -124,6 +132,7 @@ export function createReagentHandlers(db: Db) {
    * Loại mẫu luôn có sẵn 3 giá trị mặc định (`prepareReagentMetadata()` cũng
    * fallback về đúng giá trị đầu — "Mẫu bệnh nhân" — khi bỏ trống). */
   function metaKey(type: QuickValueType): string { return `reagent_quick_${type}`; }
+  function quickTypeLabel(type: QuickValueType): string { return type === 'sampleType' ? 'Loại mẫu' : 'Người thực hiện'; }
   function readQuickList(type: QuickValueType): string[] {
     const row = db.prepare('SELECT value FROM app_meta WHERE key=?').get(metaKey(type)) as { value: string } | undefined;
     if (!row) return type === 'sampleType' ? [...DEFAULT_SAMPLE_TYPES] : [];
@@ -146,7 +155,13 @@ export function createReagentHandlers(db: Db) {
     if (!type) return { ok: false, error: { code: 'invalid-type', message: 'Loại giá trị chọn nhanh không hợp lệ.' } };
     const result = addQuickValue(readQuickList(type), payload.value);
     if ('error' in result) return { ok: false, error: { code: result.error, message: 'Nhập giá trị cần thêm.' } };
-    if (result.added) { writeQuickList(type, result.items); notifyChanged(['app_meta']); }
+    if (result.added) {
+      withTransaction(db, () => {
+        writeQuickList(type, result.items);
+        writeAudit(db, actor, 'Thêm giá trị chọn nhanh', `${quickTypeLabel(type)}: "${result.value}"`, '');
+      });
+      notifyChanged(['app_meta']);
+    }
     return { ok: true, data: { items: result.items, value: result.value } };
   }
 
@@ -158,8 +173,11 @@ export function createReagentHandlers(db: Db) {
     const items = readQuickList(type);
     const index = Number(payload.index);
     if (!Number.isInteger(index) || index < 0 || index >= items.length) return { ok: false, error: { code: 'invalid-index', message: 'Không tìm thấy giá trị cần xoá.' } };
-    items.splice(index, 1);
-    writeQuickList(type, items);
+    const [removed] = items.splice(index, 1);
+    withTransaction(db, () => {
+      writeQuickList(type, items);
+      writeAudit(db, actor, 'Xoá giá trị chọn nhanh', `${quickTypeLabel(type)}: "${removed}"`, '');
+    });
     notifyChanged(['app_meta']);
     return { ok: true, data: { items } };
   }

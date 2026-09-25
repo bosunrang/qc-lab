@@ -8,7 +8,7 @@ import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, t
 import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
 
@@ -37,11 +37,7 @@ export type { TestSummary };
 export type { LevelAnalysis } from '../../shared/qc-api';
 
 export function createWestgardHandlers(db: Db) {
-  function inTransaction<T>(work: () => T): T {
-    db.exec('BEGIN');
-    try { const result = work(); db.exec('COMMIT'); return result; }
-    catch (error) { db.exec('ROLLBACK'); throw error; }
-  }
+  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
   type ActivePoint = QcPointLike & { id: string; date: string; run_id: string; val: number; qcMean: number | null; qcSd: number | null };
   type ActiveLevel = { level: number; mean: number | null; sd: number | null; qc_lot_id: string | null; lot_no: string; exp: string; pts: ActivePoint[] };
   const pointOrder = compareQcPointOrder;

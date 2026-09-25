@@ -25,7 +25,8 @@ import { ymOfDate } from '../domain/period-lock-validation';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDateAfter } from '../domain/local-date';
 import { initialsFromName } from '../domain/name-initials';
-import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireWrite } from './shared';
+import { nextNceId } from '../db/nce-ids';
+import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
 
 interface QcPointRow {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
@@ -49,29 +50,8 @@ export interface RangeCandidateView {
 
 
 export function createEntryHandlers(db: Db) {
-  function inTransaction<T>(work: () => T): T {
-    db.exec('BEGIN');
-    try {
-      const result = work();
-      db.exec('COMMIT');
-      return result;
-    } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
-    }
-  }
+  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
 
-  /** Sinh mã kế tiếp theo hậu tố lớn nhất. COUNT(*) có thể trùng mã khi dữ
-   * liệu nhập từ backup có khoảng trống (ví dụ còn 01 và 03 nhưng đã mất 02). */
-  function nextDailyNceId(date: string): string {
-    const prefix = `NCE-${date.replace(/-/g, '')}-`;
-    const rows = db.prepare('SELECT nce_id FROM actions WHERE nce_id LIKE ?').all(`${prefix}%`) as { nce_id: string }[];
-    const maxSuffix = rows.reduce((max, row) => {
-      const suffix = row.nce_id.startsWith(prefix) ? Number(row.nce_id.slice(prefix.length)) : NaN;
-      return Number.isInteger(suffix) && suffix > max ? suffix : max;
-    }, 0);
-    return `${prefix}${String(maxSuffix + 1).padStart(2, '0')}`;
-  }
 
   /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
    * đó — trên tất cả xét nghiệm, không phải theo từng xét nghiệm riêng.
@@ -308,7 +288,7 @@ export function createEntryHandlers(db: Db) {
 
   function createRangeAction(testId: string, level: number, lot: string, rule: string, reason: string, actor: Actor, detail: Record<string, unknown>): void {
     const id = uid(), now = nowIso();
-    const nceId = nextDailyNceId(now.slice(0, 10));
+    const nceId = nextNceId(db, now.slice(0, 10));
     db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,rule,error_type,nce_id,protocol_version,approval_status,effectiveness_status,record_status,detail_json)
       VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,3,'pending','pending','active',?)`)
       // `error_type` chỉ chứa mã SE/RE — hồ sơ quản lý dải KHÔNG phân loại sai số
@@ -358,7 +338,7 @@ export function createEntryHandlers(db: Db) {
       });
       writeAudit(db, actor, 'Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
       db.exec('COMMIT');
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
     notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   }
@@ -386,7 +366,7 @@ export function createEntryHandlers(db: Db) {
       createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor, { selection: 'nhà sản xuất', applied: { mean: m, sd } });
       writeAudit(db, actor, 'Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
       db.exec('COMMIT');
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
     notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   }
@@ -504,7 +484,7 @@ export function createEntryHandlers(db: Db) {
         if (existing) { nceId = existing.nce_id; reusedAction = true; }
         else {
           const id = uid();
-          nceId = nextDailyNceId(nowIso().slice(0, 10));
+          nceId = nextNceId(db, nowIso().slice(0, 10));
           const dueDate = isoLocalDateAfter(7);
           const correction = `Hủy điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}. Lý do: ${composedReason}`;
           const now = nowIso();

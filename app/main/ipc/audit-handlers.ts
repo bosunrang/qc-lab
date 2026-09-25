@@ -1,7 +1,7 @@
 import type { Db } from '../db/sqlite-like';
 // Hình dạng trang nhật ký lấy từ hợp đồng dùng chung (đã có `total`).
 import type { ActivityArchivePreview, ActivityPage } from '../../shared/qc-api';
-import { rowToAuditEntry, setActivityAnchor, type Actor, type IpcResult, writeAudit, requireAdmin } from './shared';
+import { rowToAuditEntry, setActivityAnchor, type Actor, type IpcResult, writeAudit, requireAdmin, withTransaction } from './shared';
 import { filterActivity, paginateActivity, type ActivityLike } from '../domain/audit-filter';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../domain/audit-format';
 import { roleLabel } from '../domain/page-roles';
@@ -117,14 +117,22 @@ export function createAuditHandlers(db: Db) {
     if (!toRemove.length) return { ok: true, data: { removedCount: 0, retainedCount, cutoffIso: window.cutoffIso } };
     const lastRemovedHash = [...toRemove].reverse().find((a) => a.hash)?.hash || getAnchor(db);
     const ids = toRemove.map((a) => a.id);
-    const placeholders = ids.map(() => '?').join(',');
-    db.prepare(`DELETE FROM activity WHERE id IN (${placeholders})`).run(...ids);
-    // Nếu không còn dòng giữ lại, chuỗi mới phải bắt đầu lại rỗng. Giữ anchor
-    // trong trường hợp này sẽ khiến dòng audit ngay sau cắt có prevHash rỗng
-    // nhưng verifier lại đòi prevHash=anchor — lỗi từng có ở app.
-    setActivityAnchor(db, retainedCount ? lastRemovedHash : '');
-    writeAudit(db, actor, 'Lưu trữ nhật ký hoạt động',
-      `Đã xuất CSV và gỡ ${toRemove.length} dòng cũ hơn ${window.months} tháng (mốc ${window.cutoffIso.slice(0, 10)}), còn lại ${retainedCount} dòng. Hash đỉnh phần lưu trữ: ${lastRemovedHash || '—'}.`, 'Nhật ký');
+    // Xoá dòng, dời anchor và ghi dòng giải thích là MỘT đơn vị: dừng giữa
+    // chừng thì chuỗi hash báo sai ngay dòng đầu. Xoá theo từng lô 500 id vì
+    // SQLite giới hạn số tham số của một câu lệnh (mặc định 32.766), trong khi
+    // phần cần gỡ có thể tới 50.000 dòng.
+    withTransaction(db, () => {
+      for (let start = 0; start < ids.length; start += 500) {
+        const chunk = ids.slice(start, start + 500);
+        db.prepare(`DELETE FROM activity WHERE id IN (${chunk.map(() => '?').join(',')})`).run(...chunk);
+      }
+      // Nếu không còn dòng giữ lại, chuỗi mới phải bắt đầu lại rỗng. Giữ anchor
+      // trong trường hợp này sẽ khiến dòng audit ngay sau cắt có prevHash rỗng
+      // nhưng verifier lại đòi prevHash=anchor — lỗi từng có ở app.
+      setActivityAnchor(db, retainedCount ? lastRemovedHash : '');
+      writeAudit(db, actor, 'Lưu trữ nhật ký hoạt động',
+        `Đã xuất CSV và gỡ ${toRemove.length} dòng cũ hơn ${window.months} tháng (mốc ${window.cutoffIso.slice(0, 10)}), còn lại ${retainedCount} dòng. Hash đỉnh phần lưu trữ: ${lastRemovedHash || '—'}.`, 'Nhật ký');
+    });
     return { ok: true, data: { removedCount: toRemove.length, retainedCount, cutoffIso: window.cutoffIso } };
   }
 

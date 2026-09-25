@@ -3,7 +3,7 @@
 import { dbFileBytes } from './db-file-size';
 import type { Db } from '../db/sqlite-like';
 import { prepareLabProfile, type LabProfileInput } from '../domain/settings-validation';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireAdmin } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
 
 export interface LabProfile {
   id: number; name: string; dept: string; address: string;
@@ -38,9 +38,11 @@ export function createSettingsHandlers(db: Db, dbPath: string) {
     const { name, dept, address, brandTitle, brandSub, logoText, logoData } = prepareLabProfile(input.data, {
       logoText: existing.logo_text, logoData: existing.logo_data,
     });
-    db.prepare('UPDATE lab SET name=?,dept=?,address=?,brand_title=?,brand_sub=?,logo_text=?,logo_data=? WHERE id=1')
-      .run(name, dept, address, brandTitle, brandSub, logoText, logoData);
-    writeAudit(db, actor, 'Sửa thông tin phòng xét nghiệm', `Cập nhật hồ sơ "${name || brandTitle}"`, name || brandTitle);
+    withTransaction(db, () => {
+      db.prepare('UPDATE lab SET name=?,dept=?,address=?,brand_title=?,brand_sub=?,logo_text=?,logo_data=? WHERE id=1')
+        .run(name, dept, address, brandTitle, brandSub, logoText, logoData);
+      writeAudit(db, actor, 'Sửa thông tin phòng xét nghiệm', `Cập nhật hồ sơ "${name || brandTitle}"`, name || brandTitle);
+    });
     notifyChanged(['lab']);
     return { ok: true, data: getLabProfile() };
   }
