@@ -337,7 +337,7 @@ export function SettingsPage() {
       </div>
 
       <div className="panel settings-admin-panel">
-        <h2 className="settings-admin-title"><DataAdminIcon />Quản trị dữ liệu</h2>
+        <h2 className="panel-title settings-admin-title"><DataAdminIcon />Quản trị dữ liệu</h2>
         <div className="admin-tools">
           <div className="admin-tool">
             <b>Xuất backup</b>

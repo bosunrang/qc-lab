@@ -117,7 +117,9 @@
 .admin-tool span{color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body)}
 .admin-tool .btn{width:100%;align-self:end}
 
-.settings-admin-title{display:flex;align-items:center;gap:8px;margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
+/* Header dùng `.panel-title` chuẩn (nền, đường kẻ đáy, cỡ chữ); lớp này chỉ
+   thêm khoảng cách giữa icon và chữ. */
+.settings-admin-title{gap:var(--space-2)}
 .settings-admin-icon{width:var(--icon-md);height:var(--icon-md);flex:none;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 .lis-gateway-body{display:grid;gap:var(--space-2);margin:var(--panel-content-gap) 16px 0}
@@ -147,7 +149,7 @@
    stylesheet mặc định của trình duyệt nâng H2 lên 1.5em. */
 .settings-profile-grid > .panel > h2.panel-title:first-child,
 .settings-cloud-grid > .panel > h2.panel-title:first-child,
-.settings-admin-panel > h2.settings-admin-title:first-child{
+.settings-admin-panel > h2.panel-title:first-child{
   min-height:var(--panel-header-h);
   padding:10px 14px;
   background:var(--surface-subtle);
