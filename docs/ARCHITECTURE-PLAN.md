@@ -22,6 +22,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | Backup | Tệp SQLite (`VACUUM INTO`), không còn trần 128 MB; ba kênh backup không mở qua LAN |
 | Lỗi nhỏ | Mã NCE không trùng; token LIS và thao tác bỏ kết quả LIS có kiểm quyền; cây Nhập QC cập nhật ngay |
 | Công cụ | ESLint + luật React hooks trong CI |
+| A.1–A.4 (nhánh `refactor/ipc-channels`) | Bảng thao tác một nguồn `main/ipc/operations.ts` + `desktop-operations.ts`; IPC, RPC của LAN và bản xem trước sinh từ bảng; LAN chỉ gọi dòng `lan: true`; actor truyền theo từng lời gọi, bỏ `lanCalls`; test ở `tests/ipc-operations.test.mjs` |
 
 ## Thứ tự đề xuất
 
@@ -85,6 +86,23 @@ A làm trước vì là lỗ hổng bảo mật và vì bảng kênh một ngu�
    `setWindowOpenHandler` từ chối mọi cửa sổ mới (liên kết ngoài, nếu cần,
    mở bằng `shell.openExternal` sau khi kiểm `https:`). Khai `sandbox: true`
    tường minh trong `webPreferences`.
+
+**Ghi chú khi làm A.1–A.4:**
+
+- Bảng nằm ở `main/ipc/` thay vì `shared/`: `tsconfig.app-main.json` đặt
+  `rootDir` là `app/main`, nên main không nạp được module thực thi ngoài đó.
+- Preload vẫn viết tay: preload chạy trong sandbox của Electron, không
+  `require` được module local. Test so preload với bảng (cùng tên hàm, cùng
+  kênh, không thừa không thiếu).
+- Đổi hành vi LAN so với trước: 11 hàm trước đây bị chặn nhầm vì tên hàm khác
+  đuôi tên kênh nay gọi được — 5 hàm Nhật ký, `createNce`, `saveNceProtocol`,
+  `approveNce`, `cancelNce`, 2 hàm mẫu báo cáo — cùng `backupStatus`. Các hàm
+  này đều kiểm quyền theo actor. Ngược lại `listActivity`, `login`, `logout`,
+  `currentUser` không còn gọi được qua `/api/rpc`.
+- `resetOperationalData` vẫn mở qua LAN như trước (chỉ admin, có bản an
+  toàn). Cần chốt: có nên chỉ cho làm trên máy chính không.
+- Máy trạm vẫn chưa xuất Excel/in PDF được (như trước); nên dùng
+  `browser-export.ts` như bản xem trước.
 
 **Test:** mỗi kênh trong preload có trong bảng; LAN gọi `login`, `htmlToPdf`,
 `bootstrapAdmin` bị từ chối; một handler bất đồng bộ chậm không chặn handler
@@ -220,3 +238,4 @@ tách (tách thuần, không đổi hành vi).
 | LAN có chuyển sang HTTPS | Có, sau giai đoạn A; chứng chỉ tự ký + tuỳ chọn CA nội bộ |
 | Chu kỳ đẩy Firebase | 15 phút và khi đóng app |
 | Bật/tắt luật Westgard chung cần quyền gì | Tra SOP; nếu là cấu hình chung của phòng thì nên là admin |
+| Khởi tạo lại dữ liệu từ máy trạm LAN | Chỉ cho làm trên máy chính (`lan: false`) |

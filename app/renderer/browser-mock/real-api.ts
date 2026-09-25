@@ -30,6 +30,7 @@ import { createAuditHandlers } from '../../main/ipc/audit-handlers';
 import { createSettingsHandlers } from '../../main/ipc/settings-handlers';
 import { createReportHandlers } from '../../main/ipc/report-handlers';
 import { createLisHandlers } from '../../main/ipc/lis-handlers';
+import { bindOperations, createBusinessOperations, sessionContext } from '../../main/ipc/operations';
 import type { QcApi, IpcResult } from '../../shared/qc-api';
 import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from './browser-export';
 
@@ -85,8 +86,9 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   // `connect-src 'self'` của renderer chặn và gateway là tiến trình riêng.
   const lis = createLisHandlers(db);
 
-  // Danh tính đang đăng nhập — sao đúng cách `main/index.ts` làm (một biến
-  // trong bộ nhớ, app một cửa sổ, không session token).
+  // Danh tính đang đăng nhập — cùng cách `main/index.ts` làm (một biến trong
+  // bộ nhớ, app một cửa sổ, không session token); bảng thao tác đọc biến này
+  // bằng `sessionContext()`.
   //
   // KHÁC một điểm, và là điểm BẮT BUỘC phải bù: trong Electron, biến này nằm
   // ở MAIN PROCESS nên tải lại cửa sổ renderer không làm mất đăng nhập. Ở
@@ -112,10 +114,10 @@ export async function createRealBrowserApi(): Promise<QcApi> {
       clientId: 'app-browser-preview',
     };
   }
-  function requireActor(): Actor {
-    if (!sessionActor) throw new Error('Chưa đăng nhập.');
-    return sessionActor;
-  }
+  const business = bindOperations(
+    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis }),
+    sessionContext(() => sessionActor),
+  );
 
   // Khôi phục phiên sau F5 — đọc lại từ DB (không tin dữ liệu trong
   // sessionStorage ngoài mỗi id), và bỏ qua nếu tài khoản đã bị khoá/xoá.
@@ -129,7 +131,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   } catch { /* không có sessionStorage: coi như chưa đăng nhập */ }
 
   const api = {
-    hasAnyUsers: async () => auth.hasAnyUsers(),
     currentUser: async () => (sessionActor ? auth.getUser(sessionActor.userId) : null),
     bootstrapAdmin: async (input) => {
       const result = auth.bootstrapAdmin(input);
@@ -149,118 +150,8 @@ export async function createRealBrowserApi(): Promise<QcApi> {
       rememberSession();
       return { ok: true as const, data: null };
     },
-    listUsers: async () => auth.listUsers(requireActor()),
-    createUser: async (input) => auth.createUser(input, requireActor()),
-    updateUser: async (input) => auth.updateUser(input, requireActor()),
-    deleteUser: async (input) => auth.deleteUser(input, requireActor()),
-    resetUserPassword: async (input) => auth.resetPassword(input, requireActor()),
-    changeOwnPassword: async (input) => auth.changeOwnPassword(input, requireActor()),
-    verifyOwnPassword: async (input) => auth.verifyOwnPassword(input, requireActor()),
-    setAvatar: async (input) => auth.setAvatar(input, requireActor()),
-    clearAvatar: async () => auth.clearAvatar(requireActor()),
-
-    listInstruments: async () => config.listInstruments(),
-    saveInstrument: async (input) => config.saveInstrument(input, requireActor()),
-    removeInstrument: async (input) => config.removeInstrument(input, requireActor()),
-    listTests: async () => config.listTests(),
-    saveTest: async (input) => config.saveTest(input, requireActor()),
-    listTestLevels: async (testId: string) => config.listTestLevels(testId),
-    saveTestLevel: async (input) => config.saveTestLevel(input, requireActor()),
-    listPlannedTargets: async () => config.listPlannedTargets(),
-    savePlannedTargets: async (input) => config.savePlannedTargets(input, requireActor()),
-    listActivity: async (limit?: number) => config.listActivity(limit),
-    listRuleScopes: async (testId: string) => config.listRuleScopes(testId),
-    saveRuleScope: async (testId: string, ruleId: string, scope) => config.saveRuleScope(testId, ruleId, scope, requireActor()),
-    listLots: async () => config.listLots(),
-    saveLot: async (input) => config.saveLot(input, requireActor()),
-    setTeaRefValue: async (input) => config.setTeaRefValue(input, requireActor()),
-    restoreTeaRefDefaults: async (input) => config.restoreTeaRefDefaults(input, requireActor()),
-    addTeaAnalyte: async (input) => config.addTeaAnalyte(input, requireActor()),
-    removeTest: async (input) => config.removeTest(input, requireActor()),
-    removePanel: async (input) => config.removePanel(input, requireActor()),
-    removeLot: async (input) => config.removeLot(input, requireActor()),
-    listLotGroups: async () => config.listLotGroups(),
-    removeLotGroup: async (input) => config.removeLotGroup(input, requireActor()),
-    stopLotGroup: async (input) => config.stopLotGroup(input, requireActor()),
-    activateLotGroup: async (input) => config.activateLotGroup(input, requireActor()),
-    previewLotRename: async (input) => config.previewLotRename(input),
-    removeLotTransition: async (input) => config.removeLotTransition(input, requireActor()),
-    saveLotGroup: async (input) => config.saveLotGroup(input, requireActor()),
-    listPanels: async () => config.listPanels(),
-    savePanel: async (input) => config.savePanel(input, requireActor()),
-    listLotTransitions: async () => config.listLotTransitions(),
-    createLotTransition: async (input) => config.createLotTransition(input, requireActor()),
-    listTeaRefs: async () => config.listTeaRefs(),
-    saveTeaRef: async (input) => config.saveTeaRef(input, requireActor()),
-    removeTeaRef: async (input) => config.removeTeaRef(input, requireActor()),
-    removeTeaLabProfile: async (input) => config.removeTeaLabProfile(input, requireActor()),
-
-    queryActivity: async (input) => audit.query(input, requireActor()),
-    previewArchiveActivity: async (input) => audit.previewArchive(input, requireActor()),
-    exportActivityCsv: async (input) => audit.exportCsv(input, requireActor()),
-    verifyActivityChainNow: async () => audit.verifyChainNow(requireActor()),
-    archiveActivity: async (input) => audit.archive(input, requireActor()),
-
-    queryPoints: async (testId: string, level: number) => entry.queryPoints(testId, level),
-    listEntryHistoryPoints: async (testId: string) => entry.listHistoryPoints(testId),
-    listVoidedEntryPoints: async (testId: string) => entry.listVoidedPoints(testId),
-    listParallelEntryColumns: async (testId: string) => entry.listParallelColumns(testId),
-    listPreviousEntryLotSeries: async (testId: string) => entry.listPreviousLotSeries(testId),
-    getRangeCandidate: async (testId: string, level: number) => entry.rangeCandidate(testId, level),
-    applyLabRange: async (input) => entry.applyLabRange(input, requireActor()),
-    revertManufacturerRange: async (input) => entry.revertManufacturerRange(input, requireActor()),
-    addPoint: async (input) => entry.addPoint(input, requireActor()),
-    voidPoint: async (input) => entry.voidPoint(input, requireActor()),
-    setDayNote: async (input) => entry.setDayNote(input, requireActor()),
-
-    listTestSummaries: async () => westgard.listTestSummaries(),
-    analyzeLevel: async (testId: string, level: number) => westgard.analyzeLevel(testId, level),
-    saveRuleAction: async (testId: string, ruleId: string, action) => westgard.saveRuleAction(testId, ruleId, action, requireActor()),
-    listRuleSettings: async () => westgard.listRuleSettings(),
-    saveRuleSetting: async (ruleId: string, on: boolean) => westgard.saveRuleSetting(ruleId, on, requireActor()),
-    resetRuleSettings: async () => westgard.resetRuleSettings(requireActor()),
-    listArchivedBlocks: async (testId: string, groupId: string) => westgard.listArchivedBlocks(testId, groupId),
-    listArchivedGroupTests: async (groupId: string) => westgard.listArchivedGroupTests(groupId),
-    listPreviousLotBlocks: async (testId: string) => westgard.listPreviousLotBlocks(testId),
-
-    listSigmaPeriods: async (testId: string) => sigma.listPeriods(testId),
-    listSigmaCohorts: async (testId: string, period: string, levels: number[]) => sigma.listCohorts(testId, period, levels),
-    saveSigmaTeaConfig: async (input) => sigma.saveTeaConfig(input, requireActor()),
-    saveSigmaPeriod: async (input) => sigma.savePeriod(input, requireActor()),
-    renameSigmaPeriod: async (input) => sigma.renamePeriod(input, requireActor()),
-    removeSigmaPeriod: async (input) => sigma.removePeriod(input, requireActor()),
-
-    listNceRecords: async () => nce.listRecords(),
-    createNce: async (input) => nce.create(input, requireActor()),
-    saveNceProtocol: async (input) => nce.saveProtocol(input, requireActor()),
-    approveNce: async (input) => nce.approve(input, requireActor()),
-    returnNce: async (input) => nce.returnForRevision(input, requireActor()),
-    cancelNce: async (input) => nce.cancel(input, requireActor()),
-    setNceCompletedDate: async (input) => nce.setActionCompletedDate(input, requireActor()),
-    markNceEffectiveness: async (input) => nce.markEffectiveness(input, requireActor()),
-    setNceReleaseDecision: async (input) => nce.setReleaseDecision(input, requireActor()),
-    setNceRerunEvidence: async (input) => nce.setRerunEvidence(input, requireActor()),
-    reopenNce: async (input) => nce.reopenNce(input, requireActor()),
-
-    listReagentComparisons: async () => reagent.listComparisons(),
-    createReagentComparison: async (input) => reagent.createComparison(input, requireActor()),
-    saveReagentMetadata: async (input) => reagent.saveMetadata(input, requireActor()),
-    saveReagentRows: async (input) => reagent.saveRows(input, requireActor()),
-    removeReagentComparison: async (input) => reagent.removeComparison(input, requireActor()),
-    listReagentQuickValues: async (input) => reagent.listQuickValues(input),
-    addReagentQuickValue: async (input) => reagent.addQuickListValue(input, requireActor()),
-    removeReagentQuickValue: async (input) => reagent.removeQuickListValue(input, requireActor()),
-
-    getLabProfile: async () => settings.getLabProfile(),
-    getLoginBrand: async () => settings.getLoginBrand(),
-    saveLabProfile: async (input) => settings.saveLabProfile(input, requireActor()),
-    getStorageInfo: async () => settings.getStorageInfo(),
-    getReportTemplateSettings: async () => report.getReportTemplateSettings(),
-    saveReportTemplateSettings: async (input) => report.saveReportTemplateSettings(input, requireActor()),
-    listPeriodLocks: async () => report.listPeriodLocks(),
-    lockPeriod: async (input) => report.lockPeriod(input, requireActor()),
-    unlockPeriod: async (input) => report.unlockPeriod(input, requireActor()),
-    queryReport: async (input) => report.queryReport(input),
+    // Mọi thao tác nghiệp vụ: CÙNG bảng với IPC của Electron và RPC của LAN.
+    ...business,
 
     backupStatus: async () => {
       const rows = db.prepare("SELECT key, value FROM app_meta WHERE key IN ('lastBackupAt','lastBackupBytes')").all() as { key: string; value: string }[];
@@ -273,7 +164,8 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     },
 
     // Cần Electron thật — khớp đúng danh sách `api.ts` cũ đã trả
-    // not-available, không nới thêm ở bước này.
+    // not-available, không nới thêm ở bước này. Ba hàm LIS gọi HTTP ra
+    // ngoài ghi đè dòng cùng tên của `business` ở trên.
     // Trả TRỰC TIẾP (không bọc `IpcResult`) đúng như `firebase-handlers.ts`.
     getFirebaseSettings: async () => ({ labCode: '', email: '', config: '', connected: false, status: 'Chưa kết nối', dataPath: '' }),
     connectFirebase: async () => notAvailable(),
@@ -285,8 +177,6 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     chooseBackupFile: async () => notAvailable(),
     importBackup: async () => notAvailable(),
     resetOperationalData: async () => notAvailable(),
-    getLisSettings: async () => lis.getSettings(requireActor()),
-    saveLisSettings: async (input) => lis.saveSettings(input, requireActor()),
     pullLisQueue: async () => ({
       ok: false as const,
       error: {
