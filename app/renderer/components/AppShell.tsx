@@ -8,7 +8,8 @@
 // router.tsx, chặn ghi thật nằm ở main/ipc/shared.ts. `pagePerms` tuỳ biến
 // theo từng người dùng vẫn chưa làm (Giai đoạn A2/D3.1).
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { PageErrorBoundary } from './ErrorBoundary';
 import { useAuthStore } from '../store/auth-store';
 import { useSettingsStore } from '../store/settings-store';
 import { canUserAccessPage, pageById, type PageDef } from '../lib/permissions';
@@ -36,6 +37,7 @@ const RUNTIME_LABEL = `Cổng 3200 · V${import.meta.env.VITE_APP_VERSION}`;
 export function AppShell() {
   const { user } = useAuthStore();
   const { profile, load } = useSettingsStore();
+  const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } });
 
   useEffect(() => { load(); }, [load]);
@@ -93,7 +95,11 @@ export function AppShell() {
         </div>
       </aside>
       <main tabIndex={-1}>
-        <Outlet />
+        {/* Lỗi hiển thị của một trang chỉ thay vùng nội dung; đổi trang thì
+            tự bỏ trạng thái lỗi. */}
+        <PageErrorBoundary resetKey={pathname}>
+          <Outlet />
+        </PageErrorBoundary>
       </main>
       <DialogHost />
       <DatePickerPopup />
