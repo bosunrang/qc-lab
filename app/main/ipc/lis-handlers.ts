@@ -51,8 +51,11 @@ async function gatewayFetch(settings: LisGatewaySettings, path: string, init: { 
 export function createLisHandlers(db: Db) {
   const entry = createEntryHandlers(db);
 
-  function getSettings(): LisGatewaySettings {
-    return readSettings(db);
+  /** Token Gateway là bí mật: chỉ quản trị viên (người cấu hình) nhận được.
+   * Trước đây kênh này trả cả token mà không cần đăng nhập. */
+  function getSettings(actor: Actor): LisGatewaySettings {
+    const settings = readSettings(db);
+    return actor.role === 'admin' ? settings : { ...settings, token: '' };
   }
 
   function saveSettings(input: { data: { enabled: boolean; url: string; token: string } }, actor: Actor): IpcResult<LisGatewaySettings> {

@@ -31,7 +31,7 @@ function fakeRecord(messageId, dateIso) {
   };
 }
 
-const defaults = lis.getSettings();
+const defaults = lis.getSettings(actor);
 assert.equal(defaults.enabled, false);
 assert.equal(defaults.url, 'http://127.0.0.1:8787');
 
@@ -45,7 +45,9 @@ assert.equal(badUrl.error.code, 'invalid-url');
 
 const saved = lis.saveSettings({ data: { enabled: true, url: 'http://127.0.0.1:8787', token: 'tok1' } }, actor);
 assert.equal(saved.ok, true);
-assert.deepEqual(lis.getSettings(), { enabled: true, url: 'http://127.0.0.1:8787', token: 'tok1' });
+assert.deepEqual(lis.getSettings(actor), { enabled: true, url: 'http://127.0.0.1:8787', token: 'tok1' });
+assert.equal(lis.getSettings(viewer).token, '', 'token Gateway chỉ trả cho quản trị viên');
+assert.equal(lis.getSettings(viewer).url, 'http://127.0.0.1:8787', 'các trường còn lại vẫn đọc được');
 
 const fetchCalls = [];
 const originalFetch = globalThis.fetch;

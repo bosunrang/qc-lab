@@ -314,7 +314,7 @@ async function createWindow(): Promise<void> {
   ipcMain.handle('backup:status', () => backup.backupStatus());
   ipcMain.handle('backup:verify', (_event, input) => backup.verifyBackup(input, requireActor()));
   ipcMain.handle('backup:resetAll', () => backup.resetOperationalData(requireActor()));
-  ipcMain.handle('lis:getSettings', () => lis.getSettings());
+  ipcMain.handle('lis:getSettings', () => lis.getSettings(requireActor()));
   ipcMain.handle('lis:saveSettings', (_event, input) => lis.saveSettings(input, requireActor()));
   ipcMain.handle('lis:pullQueue', () => lis.pullQueue());
   ipcMain.handle('lis:importResult', (_event, input) => lis.importResult(input, requireActor()));

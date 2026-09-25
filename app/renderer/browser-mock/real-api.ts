@@ -287,7 +287,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     importBackup: async () => notAvailable(),
     verifyBackup: async () => notAvailable(),
     resetOperationalData: async () => notAvailable(),
-    getLisSettings: async () => lis.getSettings(),
+    getLisSettings: async () => lis.getSettings(requireActor()),
     saveLisSettings: async (input) => lis.saveSettings(input, requireActor()),
     pullLisQueue: async () => ({
       ok: false as const,
