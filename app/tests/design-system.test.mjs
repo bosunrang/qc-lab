@@ -925,3 +925,43 @@ test('z-index: thang theo vai trò, không số thô', () => {
   }
   assert.deepEqual(bad, [], 'dùng var(--z-*) theo vai trò; chỉ 0, 1, auto được viết thô');
 });
+
+// Icon SVG từng có 8 cỡ (10/14/15/16/17/21/23/27px): nút xoá hàng Nhập QC
+// 15px nằm cạnh nút sửa/xoá dùng chung 14px, sidebar 17px, icon minh hoạ
+// 23 và 27px. Luật: width/height của SVG đặt bằng var(--icon*); biểu đồ SVG
+// co theo khung nên được dùng %/auto.
+test('cỡ icon: năm bậc theo khung chứa, không số thô', () => {
+  assert.deepEqual(['xs', 'sm', '', 'md', 'lg'].map((k) => flat(`--icon${k ? `-${k}` : ''}`)),
+    ['10px', '14px', '16px', '20px', '24px']);
+
+  // Lớp CSS gắn thẳng lên thẻ <svg> trong TSX (ví dụ `btn-ico`) cũng là icon.
+  const RENDERER = join(ROOT, 'renderer');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const svgClasses = new Set();
+  for (const file of tsxFiles(RENDERER)) {
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/<svg\b[^>]*className="([^"]+)"/g)) m[1].split(/\s+/).forEach((c) => svgClasses.add(c));
+    for (const m of src.matchAll(/className:\s*'([^']+)'/g)) m[1].split(/\s+/).forEach((c) => svgClasses.add(c));
+  }
+  assert.ok(svgClasses.has('btn-ico'), 'không đọc được lớp của icon nút — bộ đọc TSX hỏng?');
+
+  const bad = [];
+  for (const file of PAGE_CSS) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      const targetsSvg = m[1].split(',').some((p) => {
+        const last = p.trim().split(/\s*[>+~]\s*|\s+/).pop() || '';
+        return /^svg(?![\w-])/.test(last) || [...svgClasses].some((c) => new RegExp(`\.${c}(?![\w-])`).test(last));
+      });
+      if (!targetsSvg) continue;
+      for (const d of m[2].matchAll(/(?:^|;)\s*(width|height)\s*:\s*([^;]+)/g)) {
+        const value = d[2].trim();
+        if (!/^var\(--icon(?:-[a-z]+)?\)$/.test(value) && !/%|^auto$/.test(value)) bad.push(`${relative(ROOT, file)}: ${m[1].trim()} ${d[1]}:${value}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], 'đặt cỡ icon bằng var(--icon-xs|sm|md|lg) hoặc var(--icon)');
+});

@@ -280,6 +280,18 @@
      dãn dòng của phần tử cha nên cao 25px trong bảng, 27px ngoài bảng, và
      các bản tự dựng ra 20/22/25/26px. */
   --badge-h:24px;
+  /* Cỡ icon SVG — đặt theo khung chứa. Trước 2026-09-25 có 10/14/15/16/17/
+     21/23/27px, cùng vai trò mà nơi 14 nơi 15 (nút xoá hàng 32px).
+       xs 10  mũi tên mở rộng trong ô vuông 16px của cây;
+       sm 14  nút vuông 32px trong hàng bảng, nút cụm tài khoản;
+       (chuẩn) 16  icon cạnh chữ trong nút, sidebar, ô chọn ngày;
+       md 20  icon đứng cạnh tiêu đề panel 16px;
+       lg 24  icon minh hoạ trong vòng tròn của trạng thái trống/chờ. */
+  --icon-xs:10px;
+  --icon-sm:14px;
+  --icon:16px;
+  --icon-md:20px;
+  --icon-lg:24px;
   --control-padding-x:var(--space-3);
   --control-radius:var(--radius-sm);
   --button-padding-x:var(--space-3-5);

@@ -17,7 +17,7 @@
 .entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 6px 12px;background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);}
 button.entry-tree-toggle,button.entry-tree-expand{width:28px;height:var(--control-h-sm);min-height:var(--control-h-sm);display:flex;align-items:center;justify-content:center;flex:none;padding:0;border:1px solid var(--accent-control-border);border-radius:var(--radius-md);background:var(--accent-control-surface);color:var(--tealink);cursor:pointer;transition:.18s ease;}
 button.entry-tree-toggle:hover,button.entry-tree-expand:hover{background:var(--accent-control-surface-hover);}
-button.entry-tree-toggle svg,button.entry-tree-expand svg{width:16px;height:16px;}
+button.entry-tree-toggle svg,button.entry-tree-expand svg{width:var(--icon);height:var(--icon);}
 button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-index:var(--z-float);background:var(--panel);border-color:var(--line);color:var(--ink);box-shadow:var(--surface-shadow);}
 .entrygrid.tree-collapsed button.entry-tree-expand{display:flex;}
 .entrygrid.tree-collapsed button.entry-tree-expand svg{transform:rotate(180deg);}
@@ -37,7 +37,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .tn-config:hover{background:var(--surface-subtle);}
 .tn-config.on{background:var(--surface-sunken);font-weight:var(--weight-bold);}
 .tnode .caret{display:grid;place-items:center;width:16px;height:16px;flex:0 0 16px;padding:0;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--panel);color:var(--text-subtle);}
-.tnode .caret svg{display:block;width:10px;height:10px;}
+.tnode .caret svg{display:block;width:var(--icon-xs);height:var(--icon-xs);}
 .tnode:hover .caret{border-color:var(--accent-border-hover);background:var(--surface-subtle);color:var(--tealink);}
 /* Trạng thái trong cây là `.tag` chuẩn; ở đây chỉ canh phải trong hàng. */
 .tree .tnode .tag{justify-self:end;margin-left:6px;}
@@ -228,7 +228,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-empty{margin:var(--space-3-5);}
 .qc-row-actions{text-align:center;white-space:nowrap;}
 .qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:.15s ease;}
-.qc-row-void svg{width:15px;height:15px;}
+.qc-row-void svg{width:var(--icon-sm);height:var(--icon-sm);}
 .qc-row-void:hover{border-color:var(--danger-accent);background:var(--danger-bg);}
 /* Đây là mô tả phạm vi dữ liệu, dài và cần đọc như nội dung; không phải nhãn
    phụ ngắn nên dùng cấp thân chữ 13px thay vì `.hint` mặc định 12px. */

@@ -124,7 +124,7 @@
 .admin-tool .btn{width:100%;align-self:end}
 
 .settings-admin-title{display:flex;align-items:center;gap:8px;margin:0;color:var(--section-head-ink);font-size:var(--title-panel);font-weight:var(--section-heading-weight);line-height:var(--line-heading)}
-.settings-admin-icon{width:21px;height:21px;flex:none;fill:none;stroke:var(--teal);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.settings-admin-icon{width:var(--icon-md);height:var(--icon-md);flex:none;fill:none;stroke:var(--teal);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 .lis-gateway-body{display:grid;gap:var(--gap-control);margin:var(--panel-content-gap) 16px 0}
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
