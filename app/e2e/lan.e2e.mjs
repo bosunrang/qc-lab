@@ -89,6 +89,15 @@ test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao t
     const instruments = await page.evaluate(() => window.qcApi.listInstruments());
     assert.deepEqual(instruments.map((i) => i.name), ['Máy E2E'], 'máy chính không nhận thao tác quản trị từ LAN');
 
+    // Ngay trên máy chính, KTV cũng không đổi được luật chung: chỉ quản trị viên.
+    await page.getByRole('button', { name: 'Đăng xuất' }).first().click();
+    await login(page, TECH);
+    await openPage(page, 'Phân tích Westgard');
+    await mainRules.first().waitFor();
+    assert.equal(await mainRules.first().isDisabled(), true, 'KTV trên máy chính không đổi được luật chung');
+    assert.equal(await page.getByRole('button', { name: 'Khôi phục mặc định' }).count(), 0);
+    await page.locator('.wg-rules', { hasText: 'Chỉ quản trị viên đổi được.' }).waitFor();
+
     assert.deepEqual(stationErrors, []);
     assert.deepEqual(errors, []);
   } finally {

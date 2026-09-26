@@ -34,15 +34,14 @@ export function WestgardPage() {
     saveRuleSetting: s.saveRuleSetting, resetRuleSettings: s.resetRuleSettings, analysisByLevel: s.analysisByLevel, loadAnalysis: s.loadAnalysis,
     previousLotBlocks: s.previousLotBlocks, analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
   })));
-  // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`) — vai trò
-  // chỉ-xem thấy đúng trạng thái luật nhưng không thay đổi được.
   const role = useAuthStore((s) => s.user)?.role;
   const writable = canWrite(role);
   const admin = isAdmin(role);
-  // Cấu hình luật chung chỉ đổi trên máy chính (main khai `lan: false`); máy
-  // trạm LAN vẫn thấy trạng thái từng luật.
+  // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`): chỉ quản
+  // trị viên, chỉ trên máy chính (main dùng `requireAdmin` và `lan: false`).
+  // Người khác vẫn thấy trạng thái từng luật.
   const lanStation = isLanStation();
-  const ruleSettingsEditable = writable && !lanStation;
+  const ruleSettingsEditable = admin && !lanStation;
   const [view, setView] = useState<'current' | 'archived'>('current');
   // Tìm nhanh theo tên xét nghiệm, LOT hoặc máy (không dấu); tự chọn xét
   // nghiệm đầu tiên khi lựa chọn hiện tại không còn trong danh sách. Không còn
@@ -240,7 +239,7 @@ export function WestgardPage() {
                         <label><input type="checkbox" checked={r.on} disabled={!ruleSettingsEditable} onChange={(e) => onToggleRule(r.id, e.target.checked)} /><span className="pill">{r.id}</span></label>
                       </span>
                     ))}
-                    {writable && lanStation && <span className="hint-inline">Chỉ đổi được trên máy chính.</span>}
+                    {!ruleSettingsEditable && <span className="hint-inline">{lanStation ? 'Chỉ đổi được trên máy chính.' : 'Chỉ quản trị viên đổi được.'}</span>}
                     {ruleSettingsEditable && <span className="wg-rule-reset"><button className="btn ghost sm" title="Khôi phục mặc định" aria-label="Khôi phục mặc định" onClick={resetRules}><RestoreIcon />Khôi phục</button></span>}
                   </div>
                 </div>

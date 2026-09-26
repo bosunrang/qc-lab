@@ -106,10 +106,17 @@ assertForbidden(report.lockPeriod({ data: { ym: '2026-09' } }, tech), 'KTV lockP
 assertForbidden(reagent.removeComparison({ id: comparison.id }, tech), 'KTV removeReagentComparison');
 assertForbidden(settings.saveLabProfile({ data: { name: 'Khoa cua KTV' } }, tech), 'KTV saveLabProfile');
 assertForbidden(audit.archive({ data: { months: 12 } }, tech), 'KTV archiveActivity');
+// Luật Westgard CHUNG là cấu hình của cả phòng: chỉ quản trị viên (người dùng
+// chốt 2026-09-26); luật riêng từng xét nghiệm ở mục 3 thì KTV vẫn sửa được.
+assertForbidden(westgard.saveRuleSetting('1-2s', false, tech), 'KTV saveRuleSetting');
+assertForbidden(westgard.resetRuleSettings(tech), 'KTV resetRuleSettings');
+assert.equal(westgard.listRuleSettings().find((rule) => rule.id === '1-2s').on, true, 'KTV bị chặn thì luật chung không đổi');
 
 // ── 5) admin: làm được cả 2 nhóm ──────────────────────────────────────────
 assert.equal(config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 5, sd: 0.2, qcLotId: operational.lotIds[0] } }, admin).ok, true, 'admin phai luu duoc Mean/SD');
 assert.equal(report.lockPeriod({ data: { ym: '2026-10' } }, admin).ok, true, 'admin phai khoa duoc ky bao cao');
+assert.equal(westgard.saveRuleSetting('1-2s', false, admin).ok, true, 'admin phai tat duoc luat chung');
+assert.equal(westgard.resetRuleSettings(admin).ok, true, 'admin phai khoi phuc duoc luat chung');
 assert.equal(settings.saveLabProfile({ data: { name: 'Khoa Xet nghiem' } }, admin).ok, true, 'admin phai luu duoc ho so PXN');
 assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-03', val: 5.1, runId: 'r1' } }, admin).ok, true, 'admin phai them duoc diem QC');
 
