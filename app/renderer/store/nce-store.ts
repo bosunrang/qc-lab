@@ -34,54 +34,47 @@ export const useNceStore = create<NceState>((set, get) => ({
   load: async () => set({ records: await window.qcApi.listNceRecords() }),
   latestSigmaBias: async (testId, level) => latestNceSigmaBias(await window.qcApi.listSigmaPeriods(testId), level),
 
+  // Không tự nạp lại sau khi ghi (kế hoạch kiến trúc D.1): main báo `actions`
+  // sau commit và trang Khắc phục sự cố nạp lại qua `useStoreInvalidation` — tự nạp ở đây làm
+  // danh sách nạp HAI lần. Không chỗ gọi nào đọc danh sách ngay sau `await`.
   create: async (data) => {
     const result = await window.qcApi.createNce({ data });
-    if (result.ok) await get().load();
     return result;
   },
   saveProtocol: async (id, dueDate, protocol) => {
     const result = await window.qcApi.saveNceProtocol({ data: { id, dueDate, protocol } });
-    if (result.ok) await get().load();
     return result;
   },
   approve: async (id) => {
     const result = await window.qcApi.approveNce({ data: { id } });
-    if (result.ok) await get().load();
     return result;
   },
   returnForRevision: async (id, note) => {
     const result = await window.qcApi.returnNce({ data: { id, note } });
-    if (result.ok) await get().load();
     return result;
   },
   cancel: async (id, note) => {
     const result = await window.qcApi.cancelNce({ data: { id, note } });
-    if (result.ok) await get().load();
     return result;
   },
   setCompletedDate: async (id, date) => {
     const result = await window.qcApi.setNceCompletedDate({ data: { id, actionCompletedDate: date } });
-    if (result.ok) await get().load();
     return result;
   },
   markEffectiveness: async (id, status, residualRisk, note) => {
     const result = await window.qcApi.markNceEffectiveness({ data: { id, status, residualRisk, note } });
-    if (result.ok) await get().load();
     return result;
   },
   setReleaseDecision: async (id, decision, note) => {
     const result = await window.qcApi.setNceReleaseDecision({ data: { id, decision, note } });
-    if (result.ok) await get().load();
     return result;
   },
   setRerunEvidence: async (id, rerunPointId, note) => {
     const result = await window.qcApi.setNceRerunEvidence({ data: { id, rerunPointId, note } });
-    if (result.ok) await get().load();
     return result;
   },
   reopen: async (id, note) => {
     const result = await window.qcApi.reopenNce({ data: { id, note } });
-    if (result.ok) await get().load();
     return result;
   },
 }));
