@@ -73,6 +73,22 @@ test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao t
     for (const box of await stationRules.all()) assert.equal(await box.isDisabled(), true, 'máy trạm không đổi được luật chung');
     assert.equal(await station.getByRole('button', { name: 'Khôi phục mặc định' }).count(), 0);
     await station.locator('.wg-rules', { hasText: 'Chỉ đổi được trên máy chính.' }).waitFor();
+    // Xuất Excel trên máy trạm: trình duyệt của máy trạm tự tạo tệp và tải về,
+    // không nhờ hộp thoại lưu tệp của máy chính (thao tác đó là `lan: false`).
+    await app.evaluate(({ session }) => {
+      globalThis.__stationDownloads = [];
+      session.fromPartition('station').on('will-download', (event, item) => {
+        globalThis.__stationDownloads.push({ name: item.getFilename(), bytes: item.getTotalBytes() });
+        event.preventDefault();
+      });
+    });
+    await station.getByRole('button', { name: 'Xuất Excel' }).click();
+    await waitFor(async () => (await app.evaluate(() => globalThis.__stationDownloads)).length === 1, 'máy trạm tải được tệp Excel');
+    const [download] = await app.evaluate(() => globalThis.__stationDownloads);
+    assert.match(download.name, /^westgard-.+\.xlsx$/);
+    assert.ok(download.bytes > 1000, `tệp Excel có nội dung (${download.bytes} byte)`);
+    assert.equal(await station.locator('.modal, [role="dialog"]').count(), 0, 'không có hộp thoại báo lỗi');
+
     const ruleDenied = await station.evaluate(() => window.qcApi.saveRuleSetting('1-2s', false));
     assert.equal(ruleDenied.ok, false, 'gọi thẳng API từ máy trạm vẫn bị máy chủ từ chối');
     await openPage(page, 'Phân tích Westgard');

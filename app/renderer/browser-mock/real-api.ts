@@ -14,7 +14,7 @@
 //
 // Những gì KHÔNG chạy được trong trình duyệt (file system, BrowserWindow,
 // HTTP tới LIS Gateway) trả `not-available-in-browser-preview`. Riêng Excel
-// và PDF có đường thay thế thuần trình duyệt ở `browser-export.ts`, để xem và
+// và PDF có đường thay thế thuần trình duyệt ở `lib/browser-export.ts`, để xem và
 // xuất báo cáo ngay trên cổng 5174.
 import { openPreviewDatabase } from './sqlite-loader';
 import { setBrowserDbSizeSource } from '../../main/ipc/db-file-size-browser';
@@ -32,7 +32,7 @@ import { createReportHandlers } from '../../main/ipc/report-handlers';
 import { createLisHandlers } from '../../main/ipc/lis-handlers';
 import { bindOperations, createBusinessOperations, sessionContext } from '../../main/ipc/operations';
 import type { QcApi, IpcResult } from '../../shared/qc-api';
-import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from './browser-export';
+import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from '../lib/browser-export';
 
 
 /** Hiện ở thẻ "Dung lượng" trang Cài đặt. Không phải file thật — nói rõ điều

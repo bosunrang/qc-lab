@@ -131,11 +131,15 @@ có kết quả E.4.
   `cancelNce`, `getReportTemplateSettings`, `backupStatus` trước đây bị chặn
   nhầm vì tên hàm khác đuôi tên kênh, nay gọi được. `login`, `logout`,
   `currentUser`, `listActivity` không còn gọi được qua `/api/rpc`.
-- Giao diện máy trạm vẫn hiện menu và nút quản trị; bấm vào sẽ báo "Thao tác
-  không được mở qua mạng nội bộ." Cần ẩn các phần này khi chạy qua LAN (việc
-  của giai đoạn D).
-- Máy trạm vẫn chưa xuất Excel/in PDF được (như trước); nên dùng
-  `browser-export.ts` như bản xem trước.
+- Menu và nút quản trị đã ẩn theo vai trò ở cả hai nơi (`PAGE_DEFS`, các nút
+  `admin &&`), nên KTV ở máy trạm không thấy. Chỉ khi QUẢN TRỊ VIÊN đăng nhập
+  từ máy trạm thì còn thấy, bấm vào báo "Thao tác không được mở qua mạng nội
+  bộ." — người dùng chốt 2026-09-26 không cần ẩn thêm (quản trị làm trên máy
+  chính). Riêng luật Westgard chung đã khoá trên máy trạm (C.7).
+- ~~Máy trạm chưa xuất Excel/in PDF được~~ — đã làm 2026-09-26: `lan/http-api.ts`
+  dùng `lib/browser-export.ts` (chung với bản xem trước), trình duyệt của máy
+  trạm tự tạo tệp Excel và mở hộp in. Số trang ở chân trang PDF do tuỳ chọn
+  "Đầu trang và chân trang" của hộp in trình duyệt.
 
 **Test:** mỗi kênh trong preload có trong bảng; LAN gọi `login`, `htmlToPdf`,
 `bootstrapAdmin` bị từ chối; một handler bất đồng bộ chậm không chặn handler

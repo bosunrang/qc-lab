@@ -133,3 +133,12 @@ test('WG17: lý do lần chạy bị loại đọc từ main, không tự dò l�
 });
 
 
+
+test('nút sang Cấu hình chung và luật chung chỉ hiện với quản trị viên', () => {
+  // Cấu hình chung là trang chỉ quản trị viên vào được (`PAGE_DEFS`); trước
+  // 2026-09-26 nút "Mở cấu hình xét nghiệm" hiện cả với KTV.
+  const page = readWestgardPageSources();
+  assert.match(page, /action=\{admin && <button className="btn teal" onClick=\{\(\) => navigate\('\/manage'/);
+  assert.doesNotMatch(page, /writable && <button className="btn teal" onClick=\{\(\) => navigate/);
+  assert.match(page, /const ruleSettingsEditable = admin && !lanStation;/);
+});

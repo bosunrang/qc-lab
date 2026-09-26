@@ -1,6 +1,7 @@
-// Xuất tệp trong bản xem trước: Electron vẫn dùng handler native (ExcelJS ở
-// main process + webContents.printToPDF), còn trình duyệt tự tạo XLSX và gọi
-// hộp in của chính nó. Hai đường dùng cùng dữ liệu/headers từ renderer.
+// Xuất tệp khi renderer chạy trong trình duyệt — bản xem trước (cổng 5174) và
+// máy trạm LAN. App Electron trên máy chính vẫn dùng handler native (ExcelJS ở
+// main process + webContents.printToPDF); ở trình duyệt thì tự tạo XLSX và gọi
+// hộp in của chính trình duyệt. Hai đường dùng cùng dữ liệu/headers từ renderer.
 import type { IpcResult } from '../../shared/qc-api';
 
 type ExportTableInput = { sheetName: string; headers: string[]; rows: (string | number | null)[][] };

@@ -9,7 +9,7 @@ import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
-import { canWrite, isAdmin } from '../lib/permissions';
+import { isAdmin } from '../lib/permissions';
 import { QcChart, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
@@ -35,7 +35,6 @@ export function WestgardPage() {
     previousLotBlocks: s.previousLotBlocks, analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
   })));
   const role = useAuthStore((s) => s.user)?.role;
-  const writable = canWrite(role);
   const admin = isAdmin(role);
   // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`): chỉ quản
   // trị viên, chỉ trên máy chính (main dùng `requireAdmin` và `lan: false`).
@@ -285,8 +284,9 @@ export function WestgardPage() {
       {view === 'current' && testId && analysisReady && chartMode === 'cusum' && !cusumOn && (
         <div className="panel"><EmptyState
           title="Chưa bật CUSUM cho xét nghiệm này"
-          action={writable && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests', editTestId: testId } })}>Mở cấu hình xét nghiệm</button>}
-        >Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.</EmptyState></div>
+          // Cấu hình chung chỉ quản trị viên vào được — cùng cách trang Sigma, Báo cáo.
+          action={admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests', editTestId: testId } })}>Mở cấu hình xét nghiệm</button>}
+        >{admin ? 'Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.' : 'Liên hệ quản trị viên để bật CUSUM cho xét nghiệm này.'}</EmptyState></div>
       )}
       {view === 'current' && testId && chartMode === 'cusum' && cusumOn && levels.length >= 2 && cusumView === 'summary' && (
         <div className="panel wg-multi-panel">
