@@ -14,6 +14,7 @@ const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createWestgardHandlers } = require('../../app-dist/main/ipc/westgard-handlers.js');
+const { notifyChanged } = require('../../app-dist/main/ipc/shared.js');
 
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri', role: 'admin', clientId: 'test-client' };
 
@@ -86,6 +87,9 @@ for (const state of [{ groupBStatus: 'stopped' }, { groupBStatus: 'planned' }, {
   db.prepare('UPDATE test_levels SET qc_lot_id=NULL WHERE test_id=? AND level=2').run(test.id);
   assert.deepEqual(westgard.listTestSummaries()[0].levels.map((lv) => lv.level), [1]);
   db.prepare("UPDATE qc_lots SET group_id=NULL WHERE id='lA1'").run();
+  // Sửa thẳng CSDL thì phải báo như handler thật, nếu không main giữ kết
+  // quả tóm tắt đã tính (bộ nhớ đệm E.6).
+  notifyChanged(['qc_lots']);
   assert.deepEqual(westgard.listTestSummaries()[0].levels, [], 'lô không thuộc nhóm nào thì mức không vận hành');
 }
 

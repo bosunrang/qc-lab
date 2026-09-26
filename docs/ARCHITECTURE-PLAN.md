@@ -44,6 +44,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | D.2 (nhánh `perf/store-selectors`) | 42 chỗ đọc cả store (`useXStore()`) ở 22 tệp chuyển sang `useShallow` với đúng các trường dùng, nên component không vẽ lại khi trường không liên quan của store đổi. Luật ESLint `no-restricted-syntax` chặn gọi `useXStore()` không có selector |
 | D.3 (nhánh `perf/store-selectors`) | `lib/useCatalog.ts`: danh mục dùng chung (máy, xét nghiệm, lô, nhóm lô, Panel, TEa, tóm tắt) tự nạp khi trang mở và tự nạp lại theo MỘT bảng phụ thuộc khai tại hook; `SUMMARY_TABLES` dùng chung với Tổng quan. Áp cho Nhập QC, Westgard, Sigma, Báo cáo, Khắc phục sự cố, So sánh hoá chất, Cấu hình chung. Sửa kèm: Nhập QC chỉ nạp lô/nhóm lô/Panel một lần lúc mở, nên dừng nhóm lô ở nơi khác thì cây và ô nhập vẫn giữ dữ liệu cũ; Báo cáo và Khắc phục sự cố chỉ nạp lại tóm tắt khi `tests`/`qc_points` đổi. State vẫn ở `manage-store`/`westgard-store` (không tách store mới). e2e `catalog-refresh.e2e.mjs` |
 | B.1–B.4 (nhánh `feat/firebase-backup-only`) | Đẩy tự động 15 phút một lần khi có thay đổi (hẹn từ thay đổi ĐẦU TIÊN, không dời theo mỗi thao tác; sau một lần hỏng thì chờ đủ chu kỳ mới thử lại) và đẩy nốt khi đóng app (chờ tối đa 30 giây); nút "Đẩy lên ngay" giữ nguyên. Gói dựng và gửi ở `utilityProcess` (`sync/firebase-push-worker.ts`) với kết nối SQLite chỉ đọc riêng, đọc trong một transaction (bản chụp nhất quán nhờ WAL); main không bị chặn. Đo cỡ trước khi gửi: từ 80% giới hạn 256 MB thì cảnh báo trong trạng thái, vượt giới hạn thì không gửi và hướng dẫn dùng backup .sqlite. `disconnect()` là một transaction. Test `tests/firebase-schedule.test.mjs`, `e2e/firebase-push-worker.e2e.mjs`. Đã chạy thử trên bản đóng gói 1.0.5 (tiến trình phụ nạp mã trong `app.asar`, gửi được gói) |
+| E.6 bước 3 (nhánh `perf/per-test-summaries`) | `listTestSummaries` giữ phần tính Westgard theo mức của từng xét nghiệm (`ipc/summary-cache.ts`); tên, đơn vị, máy vẫn đọc mới mỗi lần. Chỉ bỏ đúng xét nghiệm khi lời báo `notifyChanged` chỉ gồm bảng theo xét nghiệm (`qc_points`, `test_levels`, `tests`, `actions`) và có `testIds`; bảng dùng chung (lô, nhóm lô, Panel, máy, luật chung) hay bảng lạ thì bỏ hết; bảng tóm tắt không đọc tới (người dùng, TEa, Sigma…) thì giữ. Thao tác ghi nhật ký mà không báo bảng đổi thì lần đọc sau bỏ hết; qua nửa đêm cũng bỏ hết. Bộ nhớ đệm nghe qua `addChangeListener` ở `shared.ts`, chạy cả khi chưa có cửa sổ. 60 xét nghiệm × 5 năm: Tổng quan sau khi nhập một điểm 534 → 29 ms. Test `tests/summary-cache.test.mjs` đối chiếu 17 bước ghi thật (nhập/huỷ điểm, Mean/SD, luật riêng/chung, phạm vi luật, đổi tên máy, đổi số lô dùng chung, NCE hiệu quả, ghi thiếu lời báo, xoá xét nghiệm, dừng nhóm lô) với lượt tính mới hoàn toàn |
 | LAN qua HTTPS (nhánh `feat/lan-https`) | Máy chính tự tạo một CA (`lan/tls-certs.ts`, ECDSA P-256, 10 năm), khoá CA mã hoá bằng `safeStorage`/DPAPI ở `userData/lan-tls` (`lan/tls-store.ts`). Chứng chỉ máy chủ cấp theo IP nội bộ hiện có, 397 ngày, khoá chỉ trong bộ nhớ; IP đổi thì cấp lại trong vòng 1 phút mà không khởi động lại, máy nhân viên không phải cài lại. CA có Name Constraints chỉ cho IPv4 nội bộ (10/8, 172.16/12, 192.168/16, 100.64/10, 169.254/16, 127/8) và EKU serverAuth: khoá CA có lộ cũng không giả được trang Internet trên máy đã cài chứng chỉ gốc. Cổng 3200 nhận cả hai giao thức theo byte đầu: HTTPS phục vụ app; HTTP thường chỉ có trang hướng dẫn cài chứng chỉ (tự chuyển sang https:// khi máy đã tin CA) và tệp `/qclab-ca.crt`, không đăng nhập, không API (403 `https-required`). Cookie phiên thêm `Secure`. Menu khay "Địa chỉ cho máy nhân viên…" hiện địa chỉ https://, Thumbprint để đối chiếu khi cài và nút lưu tệp chứng chỉ. Test `tests/lan-tls.test.mjs` (bắt tay TLS thật, Name Constraints chặn IP/tên miền ngoài dải), `e2e/lan.e2e.mjs` chạy máy trạm qua HTTPS. Đã chạy thử trên bản đóng gói 1.0.5 (HTTPS, trang HTTP, khoá CA mã hoá `S1`). Người dùng đã thử trên máy nhân viên thật (cài chứng chỉ gốc vào kho Windows, mở bằng trình duyệt): hoạt động tốt |
 
 ## Thứ tự đề xuất
@@ -273,8 +274,8 @@ tách (tách thuần, không đổi hành vi).
    **Test:** kết quả của đường worker trùng đường đồng bộ trên bộ dữ liệu của
    E.4; trong lúc worker tính, một lời gọi IPC khác vẫn trả lời ngay.
 
-6. **Giảm số lần nạp lại Tổng quan** — bước 1–2 đã xong, xem bảng "Đã xong";
-   bước 3 (tính lại theo từng xét nghiệm) chưa làm. `listTestSummaries`
+6. **Giảm số lần nạp lại Tổng quan** — bước 1–3 đã xong, xem bảng "Đã
+   xong". Mô tả gốc: `listTestSummaries`
    tính lại mọi xét nghiệm mỗi lần được gọi, và được gọi rất thường xuyên:
    Tổng quan nạp lại khi bảng `activity` đổi, tức sau MỌI thao tác ghi; cây
    Nhập QC nạp lại khi `qc_points` đổi, còn `entry-store` tự gọi thêm một lần
@@ -287,10 +288,10 @@ tách (tách thuần, không đổi hành vi).
      thay đổi ở `test_levels`, `lot_groups`, `qc_panels`, `app_meta` (không có
      trong danh sách nghe): phải thay bằng danh sách bảng tường minh, không
      chỉ bỏ `activity`;
-   - cân nhắc tính lại theo từng xét nghiệm: `notifyChanged` đã mang
-     `testIds`, main giữ kết quả của từng xét nghiệm và chỉ tính lại xét
-     nghiệm đổi. Rủi ro là kết quả cũ nếu một đường ghi quên báo, nên cần test
-     canh "mọi handler ghi đều gọi `notifyChanged`" trước khi làm.
+   - ~~cân nhắc tính lại theo từng xét nghiệm~~ — đã làm 2026-09-26.
+     Thay cho test canh "mọi handler ghi đều gọi `notifyChanged`": thao tác
+     ghi nhật ký mà không báo bảng nào đổi thì lần đọc sau bỏ hết, và test
+     đối chiếu từng thao tác ghi thật với lượt tính mới hoàn toàn.
 
 ## F. Ranh giới nghiệp vụ còn lại
 
