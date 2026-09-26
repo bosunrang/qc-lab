@@ -16,7 +16,9 @@ let remote = null;
 const fakeClient = {
   async signIn(_config, email, password) { if (password !== 'secret') throw new Error('INVALID_PASSWORD'); return { idToken: 'token', uid: `uid-${email}` }; },
   async read() { return remote; },
-  async write(_config, _code, _token, value) { remote = value; },
+  // Handler gửi chuỗi JSON đã dựng và đo cỡ sẵn (`writeJson`), không gửi object.
+  async writeJson(_config, _code, _token, json) { remote = JSON.parse(json); },
+  uploadUrl: (_config, code) => `https://test.firebaseio.com/qclab-shared/${code}.json`,
 };
 
 // 1) Máy có dữ liệu + Firebase trống: kết nối đẩy dữ liệu lên, không lưu password.

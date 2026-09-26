@@ -20,6 +20,7 @@ import { buildXlsxBase64, printHtmlToPdf } from './ipc/export-handlers';
 import { createBackupHandlers } from './ipc/backup-handlers';
 import { createLisHandlers } from './ipc/lis-handlers';
 import { createFirebaseHandlers } from './ipc/firebase-handlers';
+import { createUtilityPushRunner } from './sync/firebase-push-runner';
 import { lanAddresses } from './lan/addresses';
 import { LanHttpServer } from './lan/http-server';
 import { classifyNavigation } from './window-guard';
@@ -145,7 +146,22 @@ async function createWindow(): Promise<void> {
   const report = createReportHandlers(db);
   const backup = createBackupHandlers(db, userDataDir);
   const lis = createLisHandlers(db);
-  const firebase = createFirebaseHandlers(db, userDataDir);
+  // Gói sao lưu Firebase dựng và gửi ở tiến trình phụ (đọc tệp CSDL bằng kết
+  // nối chỉ đọc riêng), không chặn cửa sổ và máy trạm LAN.
+  const firebase = createFirebaseHandlers(db, userDataDir, undefined, {
+    dbPath,
+    pushRunner: createUtilityPushRunner(path.join(__dirname, 'sync', 'firebase-push-worker.js')),
+  });
+  // Đóng app mà còn thay đổi chưa đẩy lên Firebase: đẩy nốt rồi mới thoát,
+  // chờ tối đa 30 giây để một mạng chậm không giữ app mãi.
+  let flushedBeforeQuit = false;
+  app.on('before-quit', (event) => {
+    if (flushedBeforeQuit || !firebase.hasPendingPush()) return;
+    event.preventDefault();
+    flushedBeforeQuit = true;
+    logEvent({ level: 'info', source: 'app', message: 'Đẩy nốt thay đổi lên Firebase trước khi thoát' });
+    void Promise.race([firebase.flushPending(), new Promise((resolve) => setTimeout(resolve, 30_000))]).finally(() => app.quit());
+  });
   setCloudChangeNotifier(firebase.onDataChanged);
 
   // Phiên của máy chính: app một cửa sổ nên giữ ngay trong bộ nhớ main

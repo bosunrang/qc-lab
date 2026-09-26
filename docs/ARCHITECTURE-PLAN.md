@@ -43,6 +43,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | D.8 phần bộ chọn (nhánh `refactor/test-picker`) | `lib/useTestSelection.ts` + `components/TestPicker.tsx` cho Báo cáo và Westgard: tìm không dấu (Westgard trước đây chỉ hạ chữ thường, gõ "dien giai" không ra "Điện giải"), lựa chọn luôn nằm trong danh sách lọc; mỗi trang giữ nhãn, id, chữ gợi ý. Sigma giữ bộ chọn riêng (dùng danh sách `tests`, xoá ô tìm sau khi chọn, có test thiết kế khoá). e2e `test-picker.e2e.mjs` |
 | D.2 (nhánh `perf/store-selectors`) | 42 chỗ đọc cả store (`useXStore()`) ở 22 tệp chuyển sang `useShallow` với đúng các trường dùng, nên component không vẽ lại khi trường không liên quan của store đổi. Luật ESLint `no-restricted-syntax` chặn gọi `useXStore()` không có selector |
 | D.3 (nhánh `perf/store-selectors`) | `lib/useCatalog.ts`: danh mục dùng chung (máy, xét nghiệm, lô, nhóm lô, Panel, TEa, tóm tắt) tự nạp khi trang mở và tự nạp lại theo MỘT bảng phụ thuộc khai tại hook; `SUMMARY_TABLES` dùng chung với Tổng quan. Áp cho Nhập QC, Westgard, Sigma, Báo cáo, Khắc phục sự cố, So sánh hoá chất, Cấu hình chung. Sửa kèm: Nhập QC chỉ nạp lô/nhóm lô/Panel một lần lúc mở, nên dừng nhóm lô ở nơi khác thì cây và ô nhập vẫn giữ dữ liệu cũ; Báo cáo và Khắc phục sự cố chỉ nạp lại tóm tắt khi `tests`/`qc_points` đổi. State vẫn ở `manage-store`/`westgard-store` (không tách store mới). e2e `catalog-refresh.e2e.mjs` |
+| B.1–B.4 (nhánh `feat/firebase-backup-only`) | Đẩy tự động 15 phút một lần khi có thay đổi (hẹn từ thay đổi ĐẦU TIÊN, không dời theo mỗi thao tác; sau một lần hỏng thì chờ đủ chu kỳ mới thử lại) và đẩy nốt khi đóng app (chờ tối đa 30 giây); nút "Đẩy lên ngay" giữ nguyên. Gói dựng và gửi ở `utilityProcess` (`sync/firebase-push-worker.ts`) với kết nối SQLite chỉ đọc riêng, đọc trong một transaction (bản chụp nhất quán nhờ WAL); main không bị chặn. Đo cỡ trước khi gửi: từ 80% giới hạn 256 MB thì cảnh báo trong trạng thái, vượt giới hạn thì không gửi và hướng dẫn dùng backup .sqlite. `disconnect()` là một transaction. Test `tests/firebase-schedule.test.mjs`, `e2e/firebase-push-worker.e2e.mjs`. Chưa kiểm trên bản đóng gói (`npm run dist`, mã trong `app.asar`) |
 
 ## Thứ tự đề xuất
 
@@ -156,14 +157,14 @@ app chỉ báo "Lỗi đồng bộ tự động".
 
 **Việc cần làm:**
 
-1. Đẩy theo chu kỳ khi có thay đổi (đề xuất 15 phút) và khi đóng app, thay vì
-   sau mỗi thao tác. Giữ nút "Đẩy lên ngay".
-2. Dựng dữ liệu ở worker thread để không chặn luồng chính.
-3. Đo kích thước trước khi gửi; cảnh báo rõ khi vượt 80% giới hạn.
-4. Bọc transaction cho `disconnect()` (còn sót từ mức 1).
-5. Về sau: gửi tệp `.sqlite` nén thay JSON (cần đổi cả phía tải về).
+1–4. ~~Đẩy theo chu kỳ, dựng ngoài luồng chính, đo cỡ, transaction cho
+   `disconnect()`~~ — đã xong 2026-09-26, xem bảng "Đã xong". Dùng
+   `utilityProcess` của Electron thay cho `worker_threads` vì nó nạp được mã
+   trong `app.asar`.
+5. Về sau: gửi tệp `.sqlite` nén thay JSON (cần đổi cả phía tải về). Giới hạn
+   256 MB mỗi lần ghi vẫn còn nguyên với JSON; app đã cảnh báo khi tới 80%.
 
-**Quyết định còn chờ:** chu kỳ đẩy (15 phút hay khác).
+**Đã chốt (2026-09-26):** chu kỳ đẩy 15 phút và khi đóng app.
 
 ## C. Tái cấu trúc main process
 
@@ -352,6 +353,6 @@ trong console của máy đang chạy.
 | Quyết định | Đề xuất |
 | --- | --- |
 | LAN có chuyển sang HTTPS | Có, sau giai đoạn A; chứng chỉ tự ký + tuỳ chọn CA nội bộ |
-| Chu kỳ đẩy Firebase | 15 phút và khi đóng app |
+| ~~Chu kỳ đẩy Firebase~~ | Đã chốt 2026-09-26: 15 phút và khi đóng app |
 | Bật/tắt luật Westgard chung cần quyền gì | Tra SOP; nếu là cấu hình chung của phòng thì nên là admin |
 | Log và báo crash có gửi ra ngoài không (G.2) | Không: chỉ lưu tại máy, người dùng tự xuất gói log khi cần báo lỗi |
