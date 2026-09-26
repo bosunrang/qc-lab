@@ -1,7 +1,7 @@
 // Báo cáo & Biểu mẫu — bố cục Clinical Precision.
 // Bộ lọc, tuỳ chọn xuất và thao tác được gom thành các vùng rõ ràng; khóa kỳ
 // giữ dạng điều khiển theo tháng/năm và danh sách kỳ, không dùng bảng dữ liệu.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWestgardStore } from '../store/westgard-store';
 import { useReportStore } from '../store/report-store';
@@ -9,6 +9,8 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
 import { isAdmin } from '../lib/permissions';
 import { DateField } from '../components/DateField';
+import { TestPicker } from '../components/TestPicker';
+import { normalizeSearch, useTestSelection } from '../lib/useTestSelection';
 import { PrintIcon } from '../components/PrintIcon';
 import { Modal } from '../components/Modal';
 import { ERROR_CLASS_LABEL, normalizeErrorClass } from '../../main/domain/westgard-rules';
@@ -39,14 +41,11 @@ function dateTimeVN(value: string): string {
   return isNaN(+date) ? '' : `${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${date.toLocaleDateString('vi-VN')}`;
 }
 
-function normalize(value: unknown): string {
-  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
-}
 
 
 function testSelectLabel(test: TestSummary, all: TestSummary[]): string {
   const lots = [...new Set(test.levels.map((l) => l.lot).filter(Boolean))];
-  const sameName = all.filter((t) => normalize(t.testName) === normalize(test.testName)).length > 1;
+  const sameName = all.filter((t) => normalizeSearch(t.testName) === normalizeSearch(test.testName)).length > 1;
   return `${test.testName}${lots.length ? ' · LOT ' + lots.join('/') : ''}${sameName && test.instrumentName ? ' · ' + test.instrumentName : ''}`;
 }
 
@@ -112,8 +111,6 @@ export function ReportPage() {
   const { locks, template, loadLocks, loadTemplate, saveTemplate, lock, unlock } = useReportStore();
   const admin = isAdmin(useAuthStore((s) => s.user)?.role);
 
-  const [query, setQuery] = useState('');
-  const [testId, setTestId] = useState('');
   const [start, setStart] = useState(`${isoMonth()}-01`);
   const [end, setEnd] = useState(isoToday());
   const [withNce, setWithNce] = useState(true);
@@ -127,15 +124,10 @@ export function ReportPage() {
   useEffect(() => { if (template) { setFormCode(template.formCode); setFormVersion(template.version); } }, [template]);
   useStoreInvalidation(['period_locks', 'report_templates', 'tests', 'qc_points'], undefined, () => { loadLocks(); loadTemplate(); loadSummaries(); });
 
-  const matched = useMemo(() => {
-    const q = normalize(query);
-    return summaries.filter((t) => !q || normalize(testSelectLabel(t, summaries)).includes(q));
-  }, [summaries, query]);
-
-  // Giữ lựa chọn hợp lệ: mất khỏi danh sách khớp thì nhảy về phần tử đầu —
-  // đúng `reportModel()` hệ thống (nó tự sửa `reportTest` mỗi lần dựng model).
-  const selectedId = matched.some((t) => t.testId === testId) ? testId : (matched[0]?.testId || '');
-  useEffect(() => { if (selectedId !== testId) setTestId(selectedId); }, [selectedId, testId]);
+  // Tìm không dấu trên nhãn hiển thị; lựa chọn mất khỏi danh sách khớp thì
+  // nhảy về phần tử đầu — đúng `reportModel()` hệ thống.
+  const selection = useTestSelection({ items: summaries, idOf: (t) => t.testId, searchTextOf: (t) => testSelectLabel(t, summaries) });
+  const { matched, selectedId } = selection;
 
   const selected = matched.find((t) => t.testId === selectedId) || null;
   // Đảo ngược Từ/Đến thì mọi truy vấn trả rỗng và báo cáo in ra một bảng
@@ -247,18 +239,9 @@ export function ReportPage() {
           <h2 className="panel-title">Báo cáo nội kiểm theo ngày</h2>
           <div className="report-panel-body">
             <div className="grid4 report-filter-grid">
-              <div className="field">
-                <label htmlFor="reportSearch">Tìm xét nghiệm</label>
-                <input id="reportSearch" type="search" placeholder="Tìm tên xét nghiệm" value={query} onChange={(e) => setQuery(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="rTest">Xét nghiệm <span id="reportTestCount" className="hint">({matched.length}/{summaries.length})</span></label>
-                <select id="rTest" aria-label="Xét nghiệm" disabled={!matched.length} value={selectedId} onChange={(e) => setTestId(e.target.value)}>
-                  {matched.length
-                    ? matched.map((t) => <option value={t.testId} key={t.testId}>{testSelectLabel(t, summaries)}</option>)
-                    : <option value="">Không tìm thấy xét nghiệm phù hợp</option>}
-                </select>
-              </div>
+              <TestPicker selection={selection} total={summaries.length} idOf={(t) => t.testId} labelOf={(t) => testSelectLabel(t, summaries)}
+                searchId="reportSearch" searchLabel="Tìm xét nghiệm" searchPlaceholder="Tìm tên xét nghiệm"
+                selectId="rTest" selectLabel="Xét nghiệm" selectAriaLabel="Xét nghiệm" countId="reportTestCount" />
               <div className="field"><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
               <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
             </div>

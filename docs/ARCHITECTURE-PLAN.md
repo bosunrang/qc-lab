@@ -40,6 +40,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | G.2 (nhánh `feat/local-logging`) | Log ra `userData/logs/qclab.log`, mỗi dòng một JSON, xoay vòng 1 MB × 5 tệp (`main/logging/`). Nguồn: `internal-error` của IPC (kèm tên thao tác), lỗi không được bắt và lỗi hiển thị của renderer (kênh `log:clientError`, chỉ máy chính), yêu cầu LAN hỏng, exception/promise không được bắt ở main (`uncaughtExceptionMonitor`, không đổi hành vi), tiến trình hiển thị dừng. Che mật khẩu, token, khoá API trước khi ghi (`domain/log-redact.ts`). `crashReporter` với `uploadToServer: false`, tệp crash ở `logs/crashes`. Trang Cài đặt có nút "Mở thư mục log" (chỉ quản trị viên). Test `tests/logging.test.mjs`, `e2e/logging.e2e.mjs` |
 | F.1, F.2, F.4 (nhánh `fix/business-boundaries`) | F.1: gợi ý TEa khi thêm xét nghiệm lấy mặc định của danh mục khi ô ghi đè trống, như `resolveTea()` của main (trước đây chỉ ghi đè Ricos là mất CLIA); test đối chiếu trên toàn danh mục. F.2: quy tắc NCE quá hạn chuyển sang `domain/nce-overdue.ts`, `listNceRecords` trả `overdue_days`, Tổng quan chỉ hiển thị. F.4: `sigmaDesignEligible` đọc `qualityDesign` của main thay vì dò lại điều kiện; fixture SG08 sửa cho khớp đầu ra thật của main (quyết định SG08 không đổi) |
 | D.9–D.12 (nhánh `refactor/renderer-shared-bits`) | D.9: mọi CSV tải về đi qua `downloadCsv()` có BOM (Nhật ký hoạt động và Khắc phục sự cố trước đây thiếu). D.10 phần sửa lỗi: tự hỏi hàng chờ LIS theo cấu hình đã lưu, không theo ô tick đang sửa. D.11: chi tiết lô ở Lịch sử dữ liệu phân trang 100 điểm; thanh phân trang thành lớp dùng chung `.table-pagination`. D.12: luật ESLint canh ranh giới thay cho việc chuyển tệp sang `shared/domain` (renderer chỉ import `main/domain`; `main/domain` không import handler, CSDL, Electron hay I/O) |
+| D.8 phần bộ chọn (nhánh `refactor/test-picker`) | `lib/useTestSelection.ts` + `components/TestPicker.tsx` cho Báo cáo và Westgard: tìm không dấu (Westgard trước đây chỉ hạ chữ thường, gõ "dien giai" không ra "Điện giải"), lựa chọn luôn nằm trong danh sách lọc; mỗi trang giữ nhãn, id, chữ gợi ý. Sigma giữ bộ chọn riêng (dùng danh sách `tests`, xoá ô tìm sau khi chọn, có test thiết kế khoá). e2e `test-picker.e2e.mjs` |
 
 ## Thứ tự đề xuất
 
@@ -222,10 +223,11 @@ tách (tách thuần, không đổi hành vi).
 
 **Dùng chung:**
 
-8. `<TestPicker>` + `useTestSelection()` thay 3 bản bộ chọn xét nghiệm
-   (Báo cáo, Sigma, Westgard); `useCanvasDraw()` cho phần khung canvas lặp ở 3
-   biểu đồ trong `QcChart.tsx`; `zText`/`lotLabelFor` trùng giữa Nhập QC và
-   Westgard.
+8. `<TestPicker>` + `useTestSelection()` — đã xong cho Báo cáo và Westgard,
+   xem bảng "Đã xong". Còn lại: `useCanvasDraw()` cho phần khung canvas lặp ở
+   3 biểu đồ trong `QcChart.tsx`; `lotLabelFor` trùng giữa Nhập QC và
+   Westgard (`zText` hai nơi khác nhau có chủ đích: Nhập QC tính Z theo
+   Mean/SD chốt lúc nhập, Westgard in Z main đã tính).
 9. ~~`downloadCsv()` có BOM~~ — đã xong, xem bảng "Đã xong".
 10. Hỏi hàng chờ LIS: phần "theo cấu hình đã lưu" đã xong. **Chưa làm, chờ
     quyết định:** chuyển vòng hỏi ra ngoài trang Cài đặt. Hàng chờ chỉ hiện ở

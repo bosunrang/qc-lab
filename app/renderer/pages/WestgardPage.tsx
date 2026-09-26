@@ -20,6 +20,8 @@ import { displayedWestgardBlocks, statText, westgardExportRows, WESTGARD_EXPORT_
 import { WestgardPointTable } from './westgard/shared';
 import { useArchivedWestgard } from './westgard/useArchivedWestgard';
 import { ArchivedGroupPicker, ArchivedGroupResults } from './westgard/ArchivedGroupView';
+import { TestPicker } from '../components/TestPicker';
+import { useTestSelection } from '../lib/useTestSelection';
 
 export function WestgardPage() {
   const { tests, instruments, lots, levelsByTestId, loadTests, loadInstruments, loadLevels, loadLots, lotGroups, loadLotGroups } = useManageStore(useShallow((s) => ({
@@ -37,10 +39,16 @@ export function WestgardPage() {
   const writable = canWrite(role);
   const admin = isAdmin(role);
   const [view, setView] = useState<'current' | 'archived'>('current');
-  const [testId, setTestId] = useState('');
+  // Tìm nhanh theo tên xét nghiệm, LOT hoặc máy (không dấu); tự chọn xét
+  // nghiệm đầu tiên khi lựa chọn hiện tại không còn trong danh sách. Không còn
+  // mục nào khớp thì giữ xét nghiệm đang xem để vùng phân tích không trắng.
+  const selection = useTestSelection({
+    items: summaries, idOf: (s) => s.testId, keepWhenNoMatch: true,
+    searchTextOf: (s) => [s.testName, s.instrumentName, ...s.levels.map((lv) => lv.lot)].filter(Boolean).join(' '),
+  });
+  const testId = selection.selectedId;
   const selectedTestRef = useRef(testId);
   selectedTestRef.current = testId;
-  const [query, setQuery] = useState('');
   const [chartMode, setChartMode] = useState<'lj' | 'cusum'>('lj');
   // Công tắc "Xem lô cũ" theo từng mức; khoá `testId|level` để lựa chọn của xét nghiệm này
   // không dính sang xét nghiệm khác cùng số mức.
@@ -50,13 +58,6 @@ export function WestgardPage() {
   const [cusumView, setCusumView] = useState<'summary' | 'levels'>('summary');
 
   useEffect(() => { loadTests(); loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadRuleSettings(); }, [loadTests, loadInstruments, loadLots, loadLotGroups, loadSummaries, loadRuleSettings]);
-  // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ; để rỗng
-  // thì cả trang chỉ hiện vỏ.
-  useEffect(() => {
-    if (!summaries.length) return;
-    if (testId && summaries.some((s) => s.testId === testId)) return;
-    setTestId(summaries[0].testId);
-  }, [summaries, testId]);
   const currentSummary = summaries.find((s) => s.testId === testId);
   // Ghi nhớ các mảng/đối tượng dẫn xuất: chúng là phụ thuộc của useMemo dựng
   // dữ liệu biểu đồ bên dưới. Tạo mới mỗi lần render thì biểu đồ bị dựng lại
@@ -98,21 +99,6 @@ export function WestgardPage() {
     const label = lots.length ? `${s.testName} · LOT ${lots.join('/')}` : s.testName;
     return s.instrumentName ? `${label} · ${s.instrumentName}` : label;
   };
-  /** Lọc theo ô "Tìm nhanh": tên xét nghiệm, LOT hoặc máy. */
-  const matchedTests = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return summaries;
-    return summaries.filter((s) => [s.testName, s.instrumentName, ...s.levels.map((lv) => lv.lot)]
-      .filter(Boolean).join(' ').toLowerCase().includes(needle));
-  }, [summaries, query]);
-  // Khi gõ tìm nhanh, giá trị của <select> phải luôn là một xét nghiệm ĐANG
-  // có trong danh sách đã lọc. Nếu không, select nhìn trống nhưng bảng lại
-  // vẫn phân tích xét nghiệm cũ — một trạng thái mâu thuẫn dễ gây nhầm lẫn.
-  useEffect(() => {
-    if (!matchedTests.length || matchedTests.some((summary) => summary.testId === testId)) return;
-    setTestId(matchedTests[0].testId);
-  }, [matchedTests, testId]);
-
   const lotLabelFor = useCallback((level: number) => {
     const lv = levels.find((l) => l.level === level);
     const lot = lv?.qc_lot_id ? lots.find((l) => l.id === lv.qc_lot_id) : null;
@@ -227,18 +213,9 @@ export function WestgardPage() {
         {view === 'current' && (
           <>
             <div className={`wg-test-picker${chartMode === 'lj' ? ' wg-test-picker-3' : ''}`}>
-              <div className="field">
-                <label>Tìm nhanh</label>
-                <input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value={query} onChange={(e) => setQuery(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Chọn xét nghiệm <span id="wgTestCount" className="hint">({matchedTests.length}/{summaries.length})</span></label>
-                <select id="wgTestSelect" aria-label="Chọn xét nghiệm" disabled={!matchedTests.length} value={testId} onChange={(e) => setTestId(e.target.value)}>
-                  {matchedTests.length
-                    ? matchedTests.map((s) => <option key={s.testId} value={s.testId}>{testPickerLabel(s)}</option>)
-                    : <option value="">Không tìm thấy xét nghiệm phù hợp</option>}
-                </select>
-              </div>
+              <TestPicker selection={selection} total={summaries.length} idOf={(s) => s.testId} labelOf={testPickerLabel}
+                searchId="wgTestSearch" searchLabel="Tìm nhanh" searchPlaceholder="Tên xét nghiệm, LOT hoặc máy..."
+                selectId="wgTestSelect" selectLabel="Chọn xét nghiệm" selectAriaLabel="Chọn xét nghiệm" countId="wgTestCount" />
               {chartMode === 'lj' && (
                 <div>
                   <label>&nbsp;</label>
