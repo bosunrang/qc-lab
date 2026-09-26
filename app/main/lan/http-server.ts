@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import type { Actor, IpcResult } from '../ipc/shared';
 import { LanSessionStore } from './session-store';
+import { describeError, logEvent } from '../logging/log-sink';
 import { DEFAULT_LOGIN_THROTTLE, LoginThrottle, type LoginThrottleOptions } from './login-throttle';
 
 type LoginResult<T> = IpcResult<T>;
@@ -108,7 +109,12 @@ export class LanHttpServer<User> {
         return send(res, 200, await this.deps.invoke(input.method, input.args, session.actor));
       }
       return send(res, 404, { ok: false, error: { code: 'not-found', message: 'Không tìm thấy API.' } });
-    } catch (error) { return send(res, 400, { ok: false, error: { code: 'bad-request', message: error instanceof Error ? error.message : 'Yêu cầu không hợp lệ.' } }); }
+    } catch (error) {
+      // Yêu cầu hỏng từ máy trạm (JSON sai, thân quá lớn…) hoặc lỗi của chính
+      // máy chủ: ghi lại để lần được sự cố mạng nội bộ; không ghi nội dung yêu cầu.
+      logEvent({ level: 'warn', source: 'lan', message: `${req.method || '?'} ${(req.url || '').split('?')[0]}: ${describeError(error).message}` });
+      return send(res, 400, { ok: false, error: { code: 'bad-request', message: error instanceof Error ? error.message : 'Yêu cầu không hợp lệ.' } });
+    }
   }
 
   private async staticFile(pathname: string): Promise<{ content: Buffer; type: string; html: boolean } | null> {

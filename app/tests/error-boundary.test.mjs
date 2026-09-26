@@ -83,6 +83,11 @@ test('lỗi không được bắt: báo người dùng, không mở đè hộp t
   reportUnhandled(new Error('ResizeObserver loop completed with undelivered notifications.'), deps);
   assert.equal(shown.length, 1, 'lỗi ResizeObserver của trình duyệt không phải lỗi thao tác');
 
+  const reported = [];
+  reportUnhandled(new Error('lỗi cần ghi log'), { ...deps, report: (reason) => reported.push(reason.message) });
+  reportUnhandled(new Error('ResizeObserver loop limit exceeded'), { ...deps, report: (reason) => reported.push(reason.message) });
+  assert.deepEqual(reported, ['lỗi cần ghi log'], 'lỗi thật được gửi về tệp log của máy chính, lỗi vô hại thì không');
+
   assert.equal(unhandledMessage('chuỗi'), 'chuỗi');
   assert.equal(unhandledMessage({ code: 1 }), 'không có mô tả');
 });

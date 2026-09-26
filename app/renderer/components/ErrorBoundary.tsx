@@ -7,6 +7,7 @@
 // bị kẹt thông báo của trang cũ.
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { EmptyState } from './EmptyState';
+import { sendClientError } from '../lib/unhandled-errors';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,10 @@ export class PageErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('Lỗi hiển thị trang', error, info.componentStack);
+    const withComponents = new Error(`Lỗi hiển thị trang: ${error.message}`);
+    withComponents.stack = `${error.stack || ''}
+Component:${info.componentStack || ''}`;
+    sendClientError(withComponents);
   }
 
   componentDidUpdate(prevProps: Props): void {

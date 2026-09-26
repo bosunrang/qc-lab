@@ -662,6 +662,12 @@ export interface QcApi {
    * toàn của dữ liệu hiện tại trước khi thay thế. */
   importBackup(): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
   backupStatus(): Promise<{ lastBackupAt: string | null; lastBackupBytes: number }>;
+  /** Ghi lỗi không được bắt của renderer vào tệp log của máy chính. Chỉ cửa
+   * sổ Electron của máy chính gọi được; máy trạm LAN không mở kênh này. */
+  reportClientError(input: { message: string; stack?: string }): Promise<IpcResult<null>>;
+  /** Mở thư mục log (và tệp crash) bằng trình quản lý tệp của hệ điều hành,
+   * để người quản trị gửi kèm khi báo lỗi. Chỉ quản trị viên, chỉ máy chính. */
+  openLogFolder(): Promise<IpcResult<{ path: string }>>;
   /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. */
   resetOperationalData(): Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
 

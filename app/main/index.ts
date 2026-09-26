@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type WebContents } from 'electron';
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, shell, Tray, type WebContents } from 'electron';
 import { networkInterfaces } from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -23,6 +23,8 @@ import { createFirebaseHandlers } from './ipc/firebase-handlers';
 import { lanAddresses } from './lan/addresses';
 import { LanHttpServer } from './lan/http-server';
 import { classifyNavigation } from './window-guard';
+import { createFileLogger } from './logging/file-logger';
+import { describeError, logEvent, setLogSink } from './logging/log-sink';
 
 // Test end-to-end (`app/e2e/`) chạy app thật trên thư mục dữ liệu tạm và một
 // cổng LAN riêng, để không đụng CSDL của người dùng và chạy được cả khi
@@ -30,6 +32,30 @@ import { classifyNavigation } from './window-guard';
 // với thư mục dữ liệu, nên phải đặt trước khi xin khóa.
 if (process.env.QCLAB_USER_DATA_DIR) app.setPath('userData', process.env.QCLAB_USER_DATA_DIR);
 const LAN_PORT = Number(process.env.QCLAB_LAN_PORT) || 3200;
+
+// Log và báo crash CHỈ lưu tại máy (người dùng chốt ở kế hoạch G.2): không
+// gửi đi đâu, người quản trị tự mở thư mục ở trang Cài đặt khi cần báo lỗi.
+const LOG_DIR = path.join(app.getPath('userData'), 'logs');
+app.setPath('crashDumps', path.join(LOG_DIR, 'crashes'));
+crashReporter.start({ uploadToServer: false });
+const fileLogger = createFileLogger({ dir: LOG_DIR });
+setLogSink((entry) => fileLogger.write(entry));
+// `uncaughtExceptionMonitor` chỉ quan sát: Electron vẫn xử lý exception như
+// trước (hộp thoại lỗi của main), khác `uncaughtException` sẽ nuốt mất nó.
+process.on('uncaughtExceptionMonitor', (error) => {
+  const described = describeError(error);
+  logEvent({ level: 'error', source: 'main', message: `Exception không được bắt: ${described.message}`, detail: described.stack });
+});
+process.on('unhandledRejection', (reason) => {
+  const described = describeError(reason);
+  logEvent({ level: 'error', source: 'main', message: `Promise bị từ chối không được bắt: ${described.message}`, detail: described.stack });
+});
+app.on('render-process-gone', (_event, _contents, details) => {
+  logEvent({ level: 'error', source: 'main', message: `Tiến trình hiển thị dừng: ${details.reason} (mã ${details.exitCode})` });
+});
+app.on('child-process-gone', (_event, details) => {
+  logEvent({ level: 'error', source: 'main', message: `Tiến trình phụ ${details.type} dừng: ${details.reason} (mã ${details.exitCode})` });
+});
 let tray: Tray | null = null;
 let quitting = false;
 let mainWindow: BrowserWindow | null = null;
@@ -171,6 +197,8 @@ async function createWindow(): Promise<void> {
       buildXlsxBase64,
       printHtmlToPdf: (input) => printHtmlToPdf(win, input.html, input.defaultFileName, input.pageNumbers),
       basename: (filePath) => path.basename(filePath),
+      logDir: LOG_DIR,
+      openFolder: (folder) => shell.openPath(folder),
     }),
   ];
   registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor));
@@ -213,7 +241,11 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', showMainWindow);
   app.on('web-contents-created', (_event, contents) => guardNavigation(contents));
-  app.whenReady().then(createWindow).catch((error) => {
+  app.whenReady().then(() => {
+    logEvent({ level: 'info', source: 'app', message: `Khởi động QC Lab ${app.getVersion()} · Electron ${process.versions.electron}` });
+    return createWindow();
+  }).catch((error) => {
+    logEvent({ level: 'error', source: 'app', message: `Không khởi động được: ${describeError(error).message}` });
     dialog.showErrorBox('Không khởi động được QC Lab', error instanceof Error ? error.message : 'Không thể khởi động máy chủ LAN.');
     app.quit();
   });

@@ -20,6 +20,7 @@
 // Sigma và phép so sánh hoá chất. Quy tắc gọn: thao tác nào handler đòi quyền
 // admin thì `lan: false` (test canh điều này).
 import type { QcApi } from '../../shared/qc-api';
+import { describeError, logEvent } from '../logging/log-sink';
 import type { Actor } from './shared';
 import type { createAuditHandlers } from './audit-handlers';
 import type { createAuthHandlers } from './auth-handlers';
@@ -62,7 +63,8 @@ export type HostApiName =
   | 'currentUser' | 'bootstrapAdmin' | 'login' | 'logout'
   | 'getFirebaseSettings' | 'connectFirebase' | 'syncFirebase' | 'disconnectFirebase'
   | 'exportTableXlsx' | 'printHtmlToPdf'
-  | 'exportBackup' | 'chooseBackupFile' | 'importBackup' | 'backupStatus' | 'resetOperationalData';
+  | 'exportBackup' | 'chooseBackupFile' | 'importBackup' | 'backupStatus' | 'resetOperationalData'
+  | 'reportClientError' | 'openLogFolder';
 export type BusinessApiName = Exclude<ApiName, HostApiName>;
 
 export interface BusinessHandlers {
@@ -123,10 +125,12 @@ void dataApiListIsComplete;
 const DATA_APIS: ReadonlySet<string> = new Set(DATA_API_NAMES);
 
 /** Chuyển exception thành `IpcResult` lỗi. Lỗi ngoài dự kiến ghi ra console
- * của main để lần được, vì renderer chỉ thấy câu thông báo. */
-export function errorResult(error: unknown): { ok: false; error: { code: string; message: string } } {
+ * và tệp log của main để lần được, vì renderer chỉ thấy câu thông báo. */
+export function errorResult(error: unknown, operation?: string): { ok: false; error: { code: string; message: string } } {
   if (error instanceof NotSignedInError) return { ok: false, error: { code: error.code, message: error.message } };
   console.error(error);
+  const described = describeError(error);
+  logEvent({ level: 'error', source: 'ipc', message: operation ? `${operation}: ${described.message}` : described.message, detail: described.stack });
   const message = error instanceof Error && error.message ? error.message : 'Đã xảy ra lỗi không xác định.';
   return { ok: false, error: { code: 'internal-error', message } };
 }
@@ -136,7 +140,7 @@ async function invokeOperation(name: string, operation: AnyOperation, ctx: CallC
   try {
     return await operation.run(ctx, ...args);
   } catch (error) {
-    return errorResult(error);
+    return errorResult(error, name);
   }
 }
 

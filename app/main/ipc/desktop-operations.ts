@@ -11,6 +11,7 @@ import type { BackupHandlers } from './backup-handlers';
 import type { createFirebaseHandlers } from './firebase-handlers';
 import type { ExportTableInput } from './export-handlers';
 import type { HostApiName, OperationTable } from './operations';
+import { logEvent } from '../logging/log-sink';
 
 export interface DesktopSession {
   get(): Actor | null;
@@ -26,6 +27,9 @@ export interface DesktopHost {
   buildXlsxBase64(input: ExportTableInput): Promise<string>;
   printHtmlToPdf(input: { html: string; defaultFileName: string; pageNumbers?: boolean }): Promise<{ ok: true; data: { path: string } } | { ok: false; error: { code: string; message: string } }>;
   basename(filePath: string): string;
+  /** Thư mục log; mở bằng trình quản lý tệp. Trả chuỗi lỗi, rỗng khi mở được. */
+  logDir: string;
+  openFolder(path: string): Promise<string>;
 }
 
 export interface DesktopHandlers {
@@ -132,5 +136,26 @@ export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): 
     // Xoá dữ liệu vận hành của cả phòng: chỉ làm trên máy chính, máy trạm LAN
     // dùng để nhập dữ liệu (người dùng chốt 2026-09-25).
     resetOperationalData: { channel: 'backup:resetAll', lan: false, run: (ctx) => backup.resetOperationalData(ctx.actor()) },
+    // Lỗi không được bắt của cửa sổ app (kể cả ở màn hình đăng nhập, nên
+    // không đòi phiên). Cắt độ dài để một vòng lỗi không làm phình tệp log.
+    reportClientError: {
+      channel: 'log:clientError', lan: false,
+      run: (_ctx, input) => {
+        const data = (input && typeof input === 'object' ? input : {}) as { message?: unknown; stack?: unknown };
+        const message = String(data.message ?? '').slice(0, 2000) || 'Lỗi không có mô tả';
+        const stack = typeof data.stack === 'string' ? data.stack.slice(0, 8000) : undefined;
+        logEvent({ level: 'error', source: 'renderer', message, detail: stack });
+        return { ok: true as const, data: null };
+      },
+    },
+    openLogFolder: {
+      channel: 'log:openFolder', lan: false,
+      run: async (ctx) => {
+        const denied = requireAdmin(ctx.actor()); if (denied) return denied;
+        const failure = await host.openFolder(host.logDir);
+        if (failure) return { ok: false as const, error: { code: 'open-failed', message: `Không mở được thư mục log: ${failure}` } };
+        return { ok: true as const, data: { path: host.logDir } };
+      },
+    },
   };
 }
