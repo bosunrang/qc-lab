@@ -47,6 +47,12 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | E.6 bước 3 (nhánh `perf/per-test-summaries`) | `listTestSummaries` giữ phần tính Westgard theo mức của từng xét nghiệm (`ipc/summary-cache.ts`); tên, đơn vị, máy vẫn đọc mới mỗi lần. Chỉ bỏ đúng xét nghiệm khi lời báo `notifyChanged` chỉ gồm bảng theo xét nghiệm (`qc_points`, `test_levels`, `tests`, `actions`) và có `testIds`; bảng dùng chung (lô, nhóm lô, Panel, máy, luật chung) hay bảng lạ thì bỏ hết; bảng tóm tắt không đọc tới (người dùng, TEa, Sigma…) thì giữ. Thao tác ghi nhật ký mà không báo bảng đổi thì lần đọc sau bỏ hết; qua nửa đêm cũng bỏ hết. Bộ nhớ đệm nghe qua `addChangeListener` ở `shared.ts`, chạy cả khi chưa có cửa sổ. 60 xét nghiệm × 5 năm: Tổng quan sau khi nhập một điểm 534 → 29 ms. Test `tests/summary-cache.test.mjs` đối chiếu 17 bước ghi thật (nhập/huỷ điểm, Mean/SD, luật riêng/chung, phạm vi luật, đổi tên máy, đổi số lô dùng chung, NCE hiệu quả, ghi thiếu lời báo, xoá xét nghiệm, dừng nhóm lô) với lượt tính mới hoàn toàn |
 | Cổng ghi `writeCommand` (nhánh `refactor/write-command`, đánh giá kiến trúc 2026-09-26) | Trình tự "quyền → kiểm dữ liệu → transaction → nhật ký → báo thay đổi" thành ràng buộc trong mã: `writeCommand()`/`writeCommandAsync()` kiểm quyền trước thân handler; phần ghi trong `w.commit(tx => …)`; thiếu `tx.audit()` hoặc `tx.changed()` thì huỷ cả transaction; lời báo renderer chỉ gửi sau commit; trả `ok` mà không commit là lỗi, trừ khi khai `w.noChange(data)`. 71 thao tác ghi ở 16 tệp handler đã chuyển; ESLint cấm gọi thẳng `writeAudit`/`notifyChanged`/`withTransaction` trong `*-handlers.ts`, ngoại lệ duy nhất là khởi tạo quản trị và đăng nhập (chưa có actor). Lúc chuyển lộ ra 4 chỗ ghi mà không báo thay đổi (cấu hình LIS, mốc xuất backup, tự đổi mật khẩu, ngắt Firebase) và 2 nhánh kết nối Firebase lưu cấu hình mà không có nhật ký — đều đã sửa. Test `tests/write-command.test.mjs` |
 | LAN qua HTTPS (nhánh `feat/lan-https`) | Máy chính tự tạo một CA (`lan/tls-certs.ts`, ECDSA P-256, 10 năm), khoá CA mã hoá bằng `safeStorage`/DPAPI ở `userData/lan-tls` (`lan/tls-store.ts`). Chứng chỉ máy chủ cấp theo IP nội bộ hiện có, 397 ngày, khoá chỉ trong bộ nhớ; IP đổi thì cấp lại trong vòng 1 phút mà không khởi động lại, máy nhân viên không phải cài lại. CA có Name Constraints chỉ cho IPv4 nội bộ (10/8, 172.16/12, 192.168/16, 100.64/10, 169.254/16, 127/8) và EKU serverAuth: khoá CA có lộ cũng không giả được trang Internet trên máy đã cài chứng chỉ gốc. Cổng 3200 nhận cả hai giao thức theo byte đầu: HTTPS phục vụ app; HTTP thường chỉ có trang hướng dẫn cài chứng chỉ (tự chuyển sang https:// khi máy đã tin CA) và tệp `/qclab-ca.crt`, không đăng nhập, không API (403 `https-required`). Cookie phiên thêm `Secure`. Menu khay "Địa chỉ cho máy nhân viên…" hiện địa chỉ https://, Thumbprint để đối chiếu khi cài và nút lưu tệp chứng chỉ. Test `tests/lan-tls.test.mjs` (bắt tay TLS thật, Name Constraints chặn IP/tên miền ngoài dải), `e2e/lan.e2e.mjs` chạy máy trạm qua HTTPS. Đã chạy thử trên bản đóng gói 1.0.5 (HTTPS, trang HTTP, khoá CA mã hoá `S1`). Người dùng đã thử trên máy nhân viên thật (cài chứng chỉ gốc vào kho Windows, mở bằng trình duyệt): hoạt động tốt |
+| C.6 (nhánh `chore/small-architecture-items`) | `db/sql-ident.ts`: `quoteIdent()` đặt nháy kép cho tên bảng/cột và từ chối tên ngoài `[A-Za-z_][A-Za-z0-9_]*`; áp cho mọi chỗ ghép tên vào SQL (`table-io`, `schema`, backup, Firebase, trường TEa). Test `tests/sql-ident.test.mjs` quét mã main tìm tên ghép trần |
+| G.2 phần gói log (nhánh `chore/small-architecture-items`) | Nút "Xuất gói log…" ở Cài đặt (chỉ quản trị viên, chỉ máy chính): một tệp ZIP gồm các tệp log, tệp crash và `thong-tin.txt` (phiên bản app/Electron, người xuất); không kèm CSDL. ZIP dựng bằng `node:zlib` (`logging/zip-writer.ts`), không thêm thư viện. Có dòng nhật ký hoạt động. Test `tests/log-bundle.test.mjs` đọc lại ZIP bằng bộ đọc độc lập |
+| D.8 phần còn lại (nhánh `chore/small-architecture-items`) | `useCanvasDraw()` trong `QcChart.tsx` gom phần khung canvas (đo khung, tỉ lệ điểm ảnh, vẽ lại khi đổi cỡ) của 3 biểu đồ; `lib/lot-label.ts` `lotNoOfLevel()` thay hai bản ở Nhập QC và Westgard. `zText` giữ hai bản có chủ đích |
+| D.1 (nhánh `chore/small-architecture-items`) | Bỏ lần tự nạp lại sau khi ghi ở `users-store`, `nce-store` (10 thao tác), `report-store` (khoá/mở kỳ), `reagent-store` (sửa, lưu dòng, xoá): trang đã nạp lại qua `useStoreInvalidation`. Giữ tự nạp ở chỗ trang đọc danh sách mới ngay sau `await` (tạo phép so sánh hoá chất rồi chọn luôn mục mới; lưu kỳ Sigma); `manage-store` và `settings-store` giữ nguyên. Test `tests/store-no-self-reload.test.mjs` chạy store thật với `qcApi` giả, đếm lời gọi |
+| C.1 phần còn lại (nhánh `chore/small-architecture-items`) | Kích hoạt nhóm lô: truy vấn và phần ghi chuyển xuống `db/lot-activation.ts` (`activationCandidates`, `replacedGroupsOf`, `applyLotGroupActivation`), hàm thuần `lotTargetSnapshot` ở `domain/lot-target.ts`. Cascade chấp nhận lô mới của chuyển tiếp lô ở `db/lot-transition.ts`. Handler chỉ còn kiểm dữ liệu, `w.commit`, nhật ký, báo thay đổi. Tách thuần, test lô/nhóm lô và bộ thẩm định qua nguyên vẹn |
+| G.1 phần còn lại (nhánh `chore/small-architecture-items`) | e2e `backup-reset.e2e.mjs`: xuất backup (kể cả huỷ hộp thoại), xoá sạch, phục hồi lại từ tệp vừa xuất qua đúng các nút, hộp xác nhận và xác thực lại; hộp thoại lưu/mở tệp của hệ thống giả lập ở main. e2e `window-shell.e2e.mjs` thay 3 test đọc mã: cửa sổ sandbox/tách ngữ cảnh/không Node và chặn điều hướng lạ; mở app lần hai thì phiên mới thoát, cửa sổ đang thu nhỏ hiện lên; trang lỗi khi vẽ chỉ thay vùng nội dung, đổi trang hết lỗi; lỗi không được bắt hiện hộp thoại |
 
 ## Thứ tự đề xuất
 
@@ -176,11 +182,9 @@ app chỉ báo "Lỗi đồng bộ tự động".
 
 ## C. Tái cấu trúc main process
 
-1. **Tách `ipc/config-handlers.ts`** — phần tách tệp đã xong, xem bảng "Đã
-   xong". Còn lại: logic kích hoạt nhóm lô (`activateLotGroup`, khoảng 110
-   dòng) và cascade chuyển lô (`createLotTransition`, khoảng 130 dòng) vẫn
-   nằm trong `config-lot-handlers.ts`, chưa chuyển xuống `domain/` hoặc `db/`;
-   và thống nhất kiểu báo lỗi transaction (xem C.3).
+1. ~~**Tách `ipc/config-handlers.ts`**~~ — đã xong cả phần tách tệp lẫn kích
+   hoạt nhóm lô và cascade chuyển lô, xem bảng "Đã xong". Còn lại: thống nhất
+   kiểu báo lỗi transaction (xem C.3).
 2. ~~**`isPeriodLocked` có 3 bản**~~ — đã xong, xem bảng "Đã xong".
 3. ~~**Khối BEGIN/COMMIT viết tay**~~ — đã xong, xem bảng "Đã xong". Còn lại
    hai kiểu báo lỗi: phần lớn handler cấu hình bắt lỗi transaction thành
@@ -189,8 +193,7 @@ app chỉ báo "Lỗi đồng bộ tự động".
    renderer đang hiện; thống nhất khi tách `config-handlers.ts` (C.1).
 4. ~~**Đọc mà ghi**~~ — đã xong, xem bảng "Đã xong".
 5. ~~**API chết `config:listActivity`**~~ — đã xong, xem bảng "Đã xong".
-6. **Tên bảng/cột trong SQL:** hiện chỉ lấy từ `sqlite_master` hoặc hằng số
-   nên an toàn; thêm dấu nháy định danh để phòng xa.
+6. ~~**Tên bảng/cột trong SQL**~~ — đã xong, xem bảng "Đã xong".
 7. ~~**Cần xác nhận nghiệp vụ:** bật/tắt luật Westgard chung chỉ cần quyền
    ghi~~ — người dùng chốt 2026-09-26: chỉ làm trên máy chính. Main đã chặn từ
    giai đoạn A (`saveRuleSetting`, `resetRuleSettings` là `lan: false`); nay
@@ -206,7 +209,8 @@ tách (tách thuần, không đổi hành vi).
 
 **Dữ liệu và trạng thái:**
 
-1. **Một nguồn làm mới** (đã làm cho `entry-store` và Tổng quan, xem E.6;
+1. **Một nguồn làm mới** — đã xong, xem bảng "Đã xong" (D.1); các store
+   còn tự nạp là có chủ đích. Mô tả gốc: (đã làm cho `entry-store` và Tổng quan, xem E.6;
    còn `manage-store`, `nce-store`, `reagent-store`, `sigma-store`,
    `settings-store`, `users-store`, `report-store` — các store này nạp lại
    danh sách nhỏ nên ít tốn, làm cùng `catalog-store` ở mục 3): mỗi hàm ghi
@@ -237,11 +241,9 @@ tách (tách thuần, không đổi hành vi).
 
 **Dùng chung:**
 
-8. `<TestPicker>` + `useTestSelection()` — đã xong cho Báo cáo và Westgard,
-   xem bảng "Đã xong". Còn lại: `useCanvasDraw()` cho phần khung canvas lặp ở
-   3 biểu đồ trong `QcChart.tsx`; `lotLabelFor` trùng giữa Nhập QC và
-   Westgard (`zText` hai nơi khác nhau có chủ đích: Nhập QC tính Z theo
-   Mean/SD chốt lúc nhập, Westgard in Z main đã tính).
+8. ~~`<TestPicker>` + `useTestSelection()`, `useCanvasDraw()`, `lotLabelFor`~~
+   — đã xong, xem bảng "Đã xong". `zText` hai nơi khác nhau có chủ đích: Nhập
+   QC tính Z theo Mean/SD chốt lúc nhập, Westgard in Z main đã tính.
 9. ~~`downloadCsv()` có BOM~~ — đã xong, xem bảng "Đã xong".
 10. Hỏi hàng chờ LIS: phần "theo cấu hình đã lưu" đã xong. **Chưa làm, chờ
     quyết định:** chuyển vòng hỏi ra ngoài trang Cài đặt. Hàng chờ chỉ hiện ở
@@ -344,12 +346,12 @@ trong console của máy đang chạy.
    các test đọc mã bằng regex (vd kiểm `AppShell` bọc `PageErrorBoundary`)
    bằng kiểm hành vi thật.
 
-   **Đã xong 2026-09-26**, xem bảng "Đã xong". Còn lại: thay dần 13 test đọc
-   mã bằng regex; luồng khởi tạo lại dữ liệu/backup qua hộp thoại hệ thống
-   chưa có (cần giả lập `dialog.showSaveDialog`).
+   **Đã xong 2026-09-26**, xem bảng "Đã xong" (kể cả e2e backup/xoá sạch/phục
+   hồi). Các test đọc mã còn lại phần lớn canh quy ước giao diện
+   (`design-system`, chú thích tiếng Việt, phiên bản) hoặc quyết định nghiệp vụ
+   đã chốt; chỉ thay khi có cách kiểm hành vi rẻ hơn.
 2. ~~**Log ra tệp và báo crash, chỉ lưu tại máy**~~ — đã xong, xem bảng "Đã
-   xong". Còn lại: nút xuất gói log thành một tệp nén (hiện chỉ mở thư mục để
-   người quản trị tự gửi). Mô tả gốc:
+   xong", kể cả nút xuất gói log thành một tệp ZIP. Mô tả gốc:
    - log có cấu trúc (thời điểm, mức, nguồn, thông báo) ghi vào thư mục dữ
      liệu của app, xoay vòng theo cỡ tệp; gồm lỗi `internal-error` của
      `errorResult()`, lỗi không được bắt ở renderer (gửi về main qua IPC), lỗi
