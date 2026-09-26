@@ -11,6 +11,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
+import { readEntryPageSources } from './helpers/entry-page-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STYLE_DIR = join(ROOT, 'renderer/styles');
@@ -308,7 +309,7 @@ test('header mức QC có tooltip nhưng không giả làm liên kết', () => {
 
 test('Nhập QC không rò kiểu dáng sang Sigma và không giữ dữ liệu ghi chú cũ', () => {
   const entry = readFileSync(join(STYLE_DIR, 'pages', 'entry.css'), 'utf8');
-  const page = readFileSync(join(ROOT, 'renderer', 'pages', 'EntryPage.tsx'), 'utf8');
+  const page = readEntryPageSources();
   assert.doesNotMatch(entry, /\.sg-chart-box/,
     'CSS Nhập QC không được sở hữu selector của thẻ Sigma');
   assert.doesNotMatch(entry, /\.entrygrid>\.tree/,

@@ -34,6 +34,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | C.2–C.5 (nhánh `refactor/main-process-small`) | `db/period-locks.ts` thay 3 bản `isPeriodLocked`; 15 khối BEGIN/COMMIT viết tay (config, entry, report, sigma, phục hồi, xoá sạch) chuyển sang `withTransaction()`, không còn khối nào trong `app/main`; `listComparisons` chỉ đọc, dòng so sánh trống do `seedInitialRows()` tạo khi mở CSDL và sau phục hồi/xoá sạch; xoá kênh `config:listActivity`. Kèm sửa: Firebase không còn coi phép so sánh trống là dữ liệu cục bộ (trước đây chỉ cần mở trang So sánh hoá chất là máy mới không tải được từ đám mây) |
 | G.1 (nhánh `test/e2e-electron`) | `npm run test:e2e`: Playwright (`playwright-core`, không tải trình duyệt) chạy app Electron đã build trên thư mục dữ liệu tạm và cổng LAN trống (`QCLAB_USER_DATA_DIR`, `QCLAB_LAN_PORT`). 5 luồng ở `app/e2e/`: tài khoản; nhập điểm → vi phạm 1-3s → lập NCE → huỷ điểm; mở mọi trang không lỗi; máy trạm LAN nhập điểm, thao tác quản trị bị từ chối; liên kết TEa ra ngoài không mở cửa sổ app. Chạy trong `verify-release`. Kèm sửa: renderer nhận biết máy trạm LAN theo cổng 3200 gắn cứng, nay theo cách được phục vụ (bản build qua HTTP, không có preload) |
 | E.6 bước 1–2, D.1 phần dữ liệu QC (nhánh `perf/fewer-summary-reloads`) | `entry-store` không tự nạp lại sau nhập/huỷ điểm và sửa ghi chú ngày (EntryPage đã nạp lại qua `useStoreInvalidation`); dải QC giữ nguyên trong lúc nạp lại cùng mức, không chớp trống. Tổng quan nghe danh sách bảng tường minh thay cho `activity`. Nhập một điểm: `listTestSummaries` 2 → 1 lần, nạp dữ liệu xét nghiệm 2 → 1 lần; thao tác không liên quan QC không còn làm Tổng quan tính lại. Test `e2e/reload-count.e2e.mjs` đếm lời gọi IPC ở main |
+| D.6 (nhánh `refactor/split-entry-page`) | `EntryPage.tsx` 1.068 → 373 dòng, chỉ điều phối dữ liệu; khối hiển thị ở `pages/entry/`: `EntryTree`, `EntrySheet`, `EntryLjPanel`, `EntryPointsPanel`, `EntryRangePanel` (bọc `memo`), `VoidPointModal`, `RangeWorkflowModal` (tự giữ form), `operational.ts`, `shared.tsx`. Cột dựng bằng `useMemo`, callback bằng `useCallback`, store đọc bằng `useShallow` (D.2 cho trang này). Test đọc mã chuyển sang đọc gộp trang và thư mục con (`tests/helpers/entry-page-source.mjs`). Chưa đo số lần render bằng công cụ; hiệu quả `memo` suy từ cấu trúc props |
 
 ## Thứ tự đề xuất
 
@@ -206,7 +207,7 @@ tách (tách thuần, không đổi hành vi).
 
 **Tách trang lớn:**
 
-6. `EntryPage.tsx` (khoảng 1.080 dòng, 35 state): `EntryTree`,
+6. ~~`EntryPage.tsx`~~ — đã xong, xem bảng "Đã xong". Mô tả gốc: (khoảng 1.080 dòng, 35 state): `EntryTree`,
    `EntrySheet`, `EntryLjPanel`, `VoidPointModal`, `RangeWorkflowModal`, hook
    `useEntryColumns()` có memo. Hiện gõ vào ô lý do huỷ làm render lại cả bảng
    31 ngày và vẽ lại mọi biểu đồ.

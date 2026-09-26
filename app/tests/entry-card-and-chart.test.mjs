@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
+import { readEntryPageSources } from './helpers/entry-page-source.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -70,7 +71,7 @@ test('EN01: mức thuộc nhóm lô đã dừng bị bảng nhập loại khỏi
 
   // Bên renderer, `EntryPage` phải lọc theo đúng cờ đó TRƯỚC khi dựng cột —
   // `levels.length` còn là mẫu số của vệt cam "ngày còn thiếu" ở `rowClass()`.
-  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const page = readEntryPageSources();
   assert.match(page, /allLevels\.filter\(\(l\) => l\.operational !== 0\)/);
   assert.match(page, /const levels = useMemo\(/);
 });
@@ -159,7 +160,7 @@ test('EN06: tooltip và Z của bảng đọc Mean/SD đã chốt, không phải
   assert.match(chart, /const valueOf = \(p: QcChartPoint\) => plotValue\(p, hasTarget, mean, sd\);/, 'drawLJ đặt điểm qua plotValue');
   assert.match(chart, /const value = plotValue\(point, hasTarget, targetMean, targetSd\);/, 'hit-test dùng CHUNG plotValue với hàm vẽ');
   assert.match(chart, /point\.val\.toFixed\(decimals\)/, 'tooltip theo số thập phân của xét nghiệm');
-  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const page = readEntryPageSources();
   assert.match(page, /point\.qc_mean != null && point\.qc_sd != null && point\.qc_sd > 0/);
 });
 
@@ -268,7 +269,7 @@ test('EN10: ô nhắc chạy lại mở cho MỌI mức của lần chạy bị 
   assert.ok((lastOf(1).runRejectedBy?.length ?? 0) > 0, 'mức tự vi phạm được nhắc chạy lại');
   assert.ok((lastOf(2).runRejectedBy?.length ?? 0) > 0, 'mức bị kéo theo CŨNG được nhắc chạy lại');
 
-  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const page = readEntryPageSources();
   assert.match(page, /const autoOpen = !!lastRun && \(lastRun\.runRejectedBy\?\.length \?\? 0\) > 0;/);
 
   // Ô giá trị trên lưới worksheet mang nét đứt + tooltip cho đúng điểm đó.
@@ -296,13 +297,13 @@ test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại
   assert.equal(cumulative.length, 2, 'điểm thuộc lần chạy bị loại không vào thống kê');
   assert.equal(recorded.length - cumulative.length, 1);
 
-  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const page = readEntryPageSources();
   assert.match(page, /const cumulative = recorded\.filter\(\(p\) => p\.accepted !== false\);/);
   assert.match(page, /Tổng ghi nhận \{recorded\.length\}/);
 });
 
 test('EN13: thẻ biểu đồ là vùng thông tin, không lồng tương tác giả; số điểm nói rõ phần dùng thống kê', () => {
-  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const page = readEntryPageSources();
   const chart = readFileSync(new URL('../renderer/components/QcChart.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(page, /role="button" tabIndex=\{0\}/,
     'không đặt role button cho cả thẻ khi bên trong còn có nút Xem lô cũ');
@@ -334,7 +335,7 @@ test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận 
 test('EN14: cây Nhập QC nạp lại trạng thái của mọi xét nghiệm sau khi có điểm mới', () => {
   // Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`. Trước đây chỉ dữ liệu
   // của xét nghiệm đang mở được nạp lại, nên cây giữ nhãn cũ tới khi rời trang.
-  const page = readFileSync(new URL('../renderer/pages/EntryPage.tsx', import.meta.url), 'utf8');
+  const page = readEntryPageSources();
   assert.match(page, /useStoreInvalidation\(\[[^\]]*'qc_points'[^\]]*\], undefined, loadSummaries\)/,
     'summaries phải được nạp lại khi qc_points đổi, không lọc theo xét nghiệm đang mở');
 });
