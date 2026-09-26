@@ -57,6 +57,8 @@ function setup({ backup, pickOpen = async () => null } = {}) {
     buildXlsxBase64: async () => 'eGxzeA==',
     printHtmlToPdf: async (input) => { printed.push(input); return { ok: true, data: { path: 'x.pdf' } }; },
     basename: (filePath) => filePath.split(/[\\/]/).pop(),
+    logDir: 'C:/qclab/logs',
+    openFolder: async () => '',
   });
   const tables = [business, desktop];
   return { db, auth, business, desktop, tables, session, printed, lan: createLanInvoker(tables) };
@@ -84,7 +86,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   const { tables, session, db } = setup();
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 124);
+  assert.equal(handlers.size, 126);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -143,6 +145,7 @@ test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và t�
     'login', 'logout', 'currentUser', 'bootstrapAdmin', 'auth:bootstrapAdmin', 'auth:login',
     'htmlToPdf', 'printHtmlToPdf', 'print:htmlToPdf', 'export', 'exportBackup', 'backup:export',
     'chooseFile', 'import', 'listActivity', 'resetOperationalData', 'backup:resetAll', 'config:listTests', 'constructor', '__proto__', 'toString', '',
+    'reportClientError', 'openLogFolder', 'log:clientError', 'log:openFolder',
   ]) {
     const result = await lan(method, [{ data: { username: 'admin', password: 'admin12345' } }], viewer);
     assert.equal(result?.error?.code, 'unknown-operation', `LAN phải chặn "${method}"`);

@@ -167,6 +167,13 @@ export function SettingsPage() {
     await infoDialog(`Đã xuất backup ${formatMb(result.data.bytes)} (${result.data.points} điểm QC) tại:\n${result.data.path}`, { type: 'success' });
   }
 
+  /** Log và tệp crash chỉ lưu tại máy; người quản trị mở thư mục để gửi kèm
+   * khi báo lỗi. */
+  async function openLogs() {
+    const result = await window.qcApi.openLogFolder();
+    if (!result.ok) await showError(result.error.message);
+  }
+
   async function pickBackupFile() {
     const verified = await chooseBackupFile();
     if (!verified.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`, { type: 'warn' }); return; }
@@ -348,6 +355,11 @@ export function SettingsPage() {
             <b>Xóa sạch dữ liệu test</b>
             <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
             <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
+          </div>
+          <div className="admin-tool">
+            <b>Nhật ký lỗi của ứng dụng</b>
+            <span>Lỗi và tệp crash chỉ lưu trên máy này, không gửi đi đâu. Mở thư mục để gửi kèm khi báo lỗi; tệp log không chứa mật khẩu hay token.</span>
+            <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
           </div>
         </div>
       </div>

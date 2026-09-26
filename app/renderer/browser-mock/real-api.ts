@@ -177,6 +177,9 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     chooseBackupFile: async () => notAvailable(),
     importBackup: async () => notAvailable(),
     resetOperationalData: async () => notAvailable(),
+    // Bản xem trước không có tệp log: lỗi đã nằm trong console của trình duyệt.
+    reportClientError: async () => ({ ok: true as const, data: null }),
+    openLogFolder: async () => notAvailable(),
     pullLisQueue: async () => ({
       ok: false as const,
       error: {
