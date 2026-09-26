@@ -7,7 +7,7 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
-const { writeCommand, WRITE_COMMAND } = require('../../app-dist/main/ipc/write-command.js');
+const { writeCommand, WRITE_COMMAND, WriteCommandError } = require('../../app-dist/main/ipc/write-command.js');
 const { addChangeListener } = require('../../app-dist/main/ipc/shared.js');
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
 
@@ -102,6 +102,25 @@ test('trả thành công mà không ghi, hoặc commit hai lần: báo lỗi l�
   stopNoChange();
   const rejected = writeCommand(db, 'probe', 'write', () => ({ ok: false, error: { code: 'invalid', message: 'Sai.' } }));
   assert.deepEqual(rejected(tech), { ok: false, error: { code: 'invalid', message: 'Sai.' } }, 'lỗi kiểm dữ liệu trả nguyên, không cần ghi');
+  stop();
+});
+
+test('handler bắt lỗi quanh commit: lỗi lập trình vẫn nổi lên, lỗi dữ liệu thì trả "Lưu thất bại"', () => {
+  const { db, stop, rows } = setup();
+  const guarded = (finish) => writeCommand(db, 'probe', 'write', (w) => {
+    try {
+      w.commit((tx) => { db.prepare("INSERT INTO wc_probe(id,val) VALUES ('c','3')").run(); finish(tx); });
+    } catch (e) {
+      return { ok: false, error: { code: 'save-failed', message: e.message } };
+    }
+    return { ok: true, data: null };
+  });
+  // Thiếu nhật ký: không được biến thành "Lưu thất bại" để lọt khỏi log.
+  assert.throws(() => guarded((tx) => { tx.changed(['wc_probe']); })(tech), (e) => e instanceof WriteCommandError && /thiếu nhật ký/.test(e.message));
+  // Lỗi dữ liệu thật (vd ràng buộc CSDL): handler trả lỗi như thiết kế.
+  const dataError = guarded((tx) => { tx.audit('wc:x', ''); tx.changed(['wc_probe']); throw new Error('UNIQUE constraint failed'); })(tech);
+  assert.deepEqual(dataError, { ok: false, error: { code: 'save-failed', message: 'UNIQUE constraint failed' } });
+  assert.deepEqual(rows(), [], 'cả hai trường hợp đều huỷ phần ghi');
   stop();
 });
 

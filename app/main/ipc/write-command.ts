@@ -47,6 +47,12 @@ function guardOf(guard: WriteGuard): (actor: Actor) => PermissionDenied | null {
   return guard;
 }
 
+/** Lỗi lập trình của cổng ghi (thiếu nhật ký, thiếu khai bảng đổi, commit hai
+ * lần, trả ok mà không ghi). Khác lỗi dữ liệu: handler có `try/catch` quanh
+ * `w.commit()` không được biến nó thành "Lưu thất bại" — cổng ghi nhớ lỗi
+ * và ném lại khi handler trả về, để lớp IPC ghi log `internal-error`. */
+export class WriteCommandError extends Error {}
+
 /** Dấu nhận biết handler đã đi qua cổng ghi — test đọc để khoá danh sách. */
 export const WRITE_COMMAND = Symbol('write-command');
 
@@ -55,7 +61,11 @@ export type AsyncWriteCommand<A extends unknown[], T> = ((...args: [...A, Actor]
 
 /** Các bước của MỘT lần ghi, cùng hai cờ để kiểm sau khi thân handler xong. */
 function beginWrite(db: Db, name: string, actor: Actor) {
-  const state = { committed: false, declaredNoChange: false };
+  const state: { committed: boolean; declaredNoChange: boolean; violation: WriteCommandError | null } = { committed: false, declaredNoChange: false, violation: null };
+  const violate = (message: string): never => {
+    state.violation = new WriteCommandError(`${name}: ${message}`);
+    throw state.violation;
+  };
   const steps: WriteSteps = {
     actor,
     noChange<D>(data: D): IpcResult<D> {
@@ -63,7 +73,7 @@ function beginWrite(db: Db, name: string, actor: Actor) {
       return { ok: true, data };
     },
     commit<R>(work: (tx: WriteTx) => R): R {
-      if (state.committed) throw new Error(`${name}: commit() chỉ được gọi một lần cho mỗi lần ghi.`);
+      if (state.committed) violate('commit() chỉ được gọi một lần cho mỗi lần ghi.');
       let audited = 0;
       const pending: Array<[string[], string[]]> = [];
       const tx: WriteTx = {
@@ -73,8 +83,8 @@ function beginWrite(db: Db, name: string, actor: Actor) {
       const result = withTransaction(db, () => {
         const value = work(tx);
         // Ném TRONG transaction để phần đã ghi bị huỷ theo.
-        if (!audited) throw new Error(`${name}: thao tác ghi thiếu nhật ký (tx.audit).`);
-        if (!pending.length) throw new Error(`${name}: thao tác ghi thiếu khai báo bảng đổi (tx.changed).`);
+        if (!audited) violate('thao tác ghi thiếu nhật ký (tx.audit).');
+        if (!pending.length) violate('thao tác ghi thiếu khai báo bảng đổi (tx.changed).');
         return value;
       });
       state.committed = true;
@@ -85,7 +95,9 @@ function beginWrite(db: Db, name: string, actor: Actor) {
     },
   };
   const finish = <T>(result: IpcResult<T>): IpcResult<T> => {
-    if (result.ok && !state.committed && !state.declaredNoChange) throw new Error(`${name}: trả kết quả thành công mà không ghi gì (thiếu w.commit).`);
+    // Thân handler có thể đã bắt lỗi của commit và trả "Lưu thất bại": vẫn ném lại.
+    if (state.violation) throw state.violation;
+    if (result.ok && !state.committed && !state.declaredNoChange) violate('trả kết quả thành công mà không ghi gì (thiếu w.commit).');
     return result;
   };
   return { steps, finish };
