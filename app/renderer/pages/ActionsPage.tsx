@@ -11,6 +11,7 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite } from '../lib/permissions';
+import { downloadCsv } from '../lib/export';
 import type { NceRecord, NceDetail, QcPointView } from '../../shared/qc-api';
 import { vnDate as formatVnDate, todayIso } from '../lib/format';
 import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
@@ -59,7 +60,7 @@ export function ActionsPage() {
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
 
-  /** Xuất CSV nhật ký — cùng cơ chế `downloadCsv` đã dùng ở Audit/Report. */
+  /** Xuất CSV nhật ký — cùng `downloadCsv()` (có BOM) với Nhật ký và Báo cáo. */
   const exportLogCsv = () => exportNceLogCsv(store.records, testName);
   const [showGuide, setShowGuide] = useState(false);
 
@@ -209,15 +210,7 @@ function exportNceLogCsv(records: NceRecord[], testName: (id: string | null) => 
       record.record_status, record.due_date ? vnDate(record.due_date) : '',
     ].map(csvCell).join(','));
   }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'nhat-ky-khac-phuc.csv';
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadCsv(lines.join('\n'), 'nhat-ky-khac-phuc.csv');
 }
 
 function ActionLogPanel({

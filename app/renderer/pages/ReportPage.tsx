@@ -13,7 +13,7 @@ import { PrintIcon } from '../components/PrintIcon';
 import { Modal } from '../components/Modal';
 import { ERROR_CLASS_LABEL, normalizeErrorClass } from '../../main/domain/westgard-rules';
 import { reauthDialog, infoDialog, confirmDialog } from '../state/dialog-store';
-import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
+import { downloadCsv, exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
@@ -105,21 +105,6 @@ function buildPrintHtml(label: string, from: string, to: string, points: ReportP
   <p class="meta">Khoảng thời gian: ${esc(from ? vnDate(from) : '') || '(không giới hạn)'} — ${esc(to ? vnDate(to) : '') || '(không giới hạn)'} · In lúc ${new Date().toLocaleString('vi-VN')}</p>
   <table><thead><tr>${POINT_HEADERS.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
   ${appendix}</body></html>`;
-}
-
-/** CSV ghi kèm BOM UTF-8.
- *
- * `type: 'text/csv;charset=utf-8'` chỉ là MIME của Blob — Excel trên Windows
- * KHÔNG đọc MIME khi mở một tệp cục bộ, nó đoán mã hoá theo codepage hệ
- * thống. Thiếu BOM thì toàn bộ tiếng Việt trong báo cáo ("Người thực hiện",
- * "Đã huỷ", tên xét nghiệm) mở ra là ký tự rác. Bản xuất Excel đi qua
- * `exceljs` nên không dính; chỉ nhánh CSV này cần. */
-function download(content: string, filename: string, type: string) {
-  const url = URL.createObjectURL(new Blob(['﻿', content], { type }));
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 export function ReportPage() {
@@ -219,7 +204,7 @@ export function ReportPage() {
       if (nce) {
         lines.push('', 'PHỤ LỤC NCE', NCE_HEADERS.map(csvCell).join(','), ...nce.map((r) => nceRow(r).map(csvCell).join(',')));
       }
-      download(lines.join('\n'), `bao-cao-${stamp()}.csv`, 'text/csv;charset=utf-8');
+      downloadCsv(lines.join('\n'), `bao-cao-${stamp()}.csv`);
     });
   }
 
