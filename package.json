@@ -12,6 +12,7 @@
     "build": "npm run app:build",
     "test": "npm run app:test",
     "test:e2e": "npm run build && node app/scripts/run-e2e.cjs",
+    "validate": "npm run app:build:main && node app/validation/run-validation.mjs",
     "test:performance": "npm run app:build:main && node --test app/tests/large-dataset-performance.perf.mjs app/tests/realistic-dataset-performance.perf.mjs",
     "typecheck": "npm run app:typecheck",
     "lint": "eslint app",
