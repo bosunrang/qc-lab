@@ -12,6 +12,7 @@ import type { createFirebaseHandlers } from './firebase-handlers';
 import type { ExportTableInput } from './export-handlers';
 import type { HostApiName, OperationTable } from './operations';
 import { logEvent } from '../logging/log-sink';
+import { buildLogBundle } from '../logging/log-bundle';
 
 export interface DesktopSession {
   get(): Actor | null;
@@ -30,6 +31,12 @@ export interface DesktopHost {
   /** Thư mục log; mở bằng trình quản lý tệp. Trả chuỗi lỗi, rỗng khi mở được. */
   logDir: string;
   openFolder(path: string): Promise<string>;
+  /** Hộp thoại lưu gói log; `null` khi người dùng huỷ. */
+  pickLogBundleSavePath(defaultName: string): Promise<string | null>;
+  /** Ghi tệp ra đĩa (tách ra để test không ghi tệp thật). */
+  writeFile(path: string, data: Buffer): Promise<void>;
+  appVersion: string;
+  electronVersion: string;
 }
 
 export interface DesktopHandlers {
@@ -155,6 +162,27 @@ export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): 
         const failure = await host.openFolder(host.logDir);
         if (failure) return { ok: false as const, error: { code: 'open-failed', message: `Không mở được thư mục log: ${failure}` } };
         return { ok: true as const, data: { path: host.logDir } };
+      },
+    },
+    // Gói ZIP gồm log, tệp crash và thông tin môi trường, để gửi kèm khi báo
+    // lỗi (kế hoạch G.2). Không kèm CSDL. Chỉ quản trị viên, chỉ máy chính.
+    exportLogBundle: {
+      channel: 'log:exportBundle', lan: false,
+      run: async (ctx) => {
+        const actor = ctx.actor();
+        const denied = requireAdmin(actor); if (denied) return denied;
+        const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+        const filePath = await host.pickLogBundleSavePath(`QC-Lab-log-${stamp}.zip`);
+        if (!filePath) return { ok: true as const, data: null };
+        try {
+          const bundle = buildLogBundle(host.logDir, { appVersion: host.appVersion, electronVersion: host.electronVersion, exportedBy: actor.name || actor.username });
+          await host.writeFile(filePath, bundle.zip);
+          // Không đổi dữ liệu QC; chỉ nhật ký ghi lại việc log rời khỏi máy.
+          writeAudit(db, actor, 'Xuất gói log', `${bundle.files} tệp log/crash, ${(bundle.zip.length / 1024).toFixed(0)} KB`, '');
+          return { ok: true as const, data: { path: filePath, files: bundle.files, bytes: bundle.zip.length } };
+        } catch (e) {
+          return { ok: false as const, error: { code: 'export-failed', message: `Không xuất được gói log: ${e instanceof Error ? e.message : String(e)}` } };
+        }
       },
     },
   };

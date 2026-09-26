@@ -670,6 +670,10 @@ export interface QcApi {
   /** Mở thư mục log (và tệp crash) bằng trình quản lý tệp của hệ điều hành,
    * để người quản trị gửi kèm khi báo lỗi. Chỉ quản trị viên, chỉ máy chính. */
   openLogFolder(): Promise<IpcResult<{ path: string }>>;
+  /** Ghi gói ZIP gồm log, tệp crash và thông tin môi trường tới nơi người
+   * dùng chọn; `data: null` khi huỷ hộp thoại. Không kèm CSDL. Chỉ quản trị
+   * viên, chỉ máy chính. */
+  exportLogBundle(): Promise<IpcResult<{ path: string; files: number; bytes: number } | null>>;
   /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. */
   resetOperationalData(): Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
 
