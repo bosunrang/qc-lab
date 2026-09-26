@@ -10,6 +10,7 @@
 // Giai đoạn B6) — trang này chỉ trình bày, không tự tính lại thống kê nào.
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useReagentStore } from '../store/reagent-store';
 import { useManageStore } from '../store/manage-store';
 import { useAuthStore } from '../store/auth-store';
@@ -280,12 +281,12 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
 
 function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, unit: string) => Promise<boolean> }) {
   const [query, setQuery] = useState('');
-  const { teaRefs, loadTeaRefs } = useManageStore(useShallow((s) => ({ teaRefs: s.teaRefs, loadTeaRefs: s.loadTeaRefs })));
+  const { teaRefs } = useManageStore(useShallow((s) => ({ teaRefs: s.teaRefs })));
   const needle = query.trim().toLocaleLowerCase('vi');
 
   // Bảng TEa tham chiếu do trang Cấu hình chung sở hữu — đọc qua store của
-  // nó để nếu ai sửa TEa ở đó thì danh sách gợi ý ở đây cũng đúng.
-  useEffect(() => { loadTeaRefs(); }, [loadTeaRefs]);
+  // nó và tự nạp lại khi ai sửa TEa ở đó, để danh sách gợi ý ở đây cũng đúng.
+  useCatalog(['teaRefs']);
   const groups = useMemo(() => {
     const visible = makeTeaChoices(teaRefs).filter((item) => !needle || item.search.includes(needle));
     return visible.reduce<Record<string, TeaChoice[]>>((all, item) => {

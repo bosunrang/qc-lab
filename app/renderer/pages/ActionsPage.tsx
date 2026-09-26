@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useNceStore } from '../store/nce-store';
@@ -44,9 +45,9 @@ type NcePrefill = { testId: string; level: number; pointId: string; lot: string;
 
 export function ActionsPage() {
   const location = useLocation();
-  const { tests, loadTests } = useManageStore(useShallow((s) => ({ tests: s.tests, loadTests: s.loadTests })));
+  const { tests } = useManageStore(useShallow((s) => ({ tests: s.tests })));
   const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
-  const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
+  const { summaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries })));
   const [form, setForm] = useState<{ prefill: NcePrefill | null; record: NceRecord | null } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
@@ -65,7 +66,8 @@ export function ActionsPage() {
   const exportLogCsv = () => exportNceLogCsv(store.records, testName);
   const [showGuide, setShowGuide] = useState(false);
 
-  useEffect(() => { loadTests(); store.load(); loadSummaries(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useCatalog(['tests', 'summaries']);
   useEffect(() => {
     if (!requestedRecordId.current) return;
     const record = store.records.find(item => item.id === requestedRecordId.current);
@@ -75,7 +77,6 @@ export function ActionsPage() {
     }
   }, [store.records]);
   useStoreInvalidation(['actions'], undefined, store.load);
-  useStoreInvalidation(['qc_points', 'tests'], undefined, loadSummaries);
 
   const testName = (id: string | null) => tests.find((t) => t.id === id)?.name ?? '(không rõ)';
   const detailRecord = store.records.find((r) => r.id === detailId) || null;

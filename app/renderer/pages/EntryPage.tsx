@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
 import { useEntryStore } from '../store/entry-store';
@@ -37,10 +38,9 @@ function isoDay(d: Date): string {
 }
 
 export function EntryPage() {
-  const { instruments, lots, lotGroups, tests, panels, levelsByTestId, loadInstruments, loadLevels, loadLots, loadLotGroups, loadTests, loadPanels } = useManageStore(useShallow((s) => ({
+  const { instruments, lots, lotGroups, tests, panels, levelsByTestId, loadLevels } = useManageStore(useShallow((s) => ({
     instruments: s.instruments, lots: s.lots, lotGroups: s.lotGroups, tests: s.tests, panels: s.panels, levelsByTestId: s.levelsByTestId,
-    loadInstruments: s.loadInstruments, loadLevels: s.loadLevels, loadLots: s.loadLots, loadLotGroups: s.loadLotGroups, loadTests: s.loadTests, loadPanels: s.loadPanels,
-  })));
+    loadLevels: s.loadLevels, })));
   const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
   const { pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, addPoint, setDayNote } = useEntryStore(useShallow((s) => ({
     pointsByLevel: s.pointsByLevel, analysisByLevel: s.analysisByLevel, parallelColumns: s.parallelColumns, previousLotSeries: s.previousLotSeries,
@@ -82,7 +82,10 @@ export function EntryPage() {
   }
   const collapseTree = useCallback(() => setTreeVisibility(true), []);
 
-  useEffect(() => { loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadTests(); loadPanels(); }, [loadInstruments, loadLots, loadLotGroups, loadSummaries, loadTests, loadPanels]);
+  // Danh mục tự nạp lại khi quản trị viên đổi máy, xét nghiệm, lô, nhóm lô
+  // hay Panel ở máy khác. Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`
+  // của MỌI xét nghiệm, nên không lọc theo testId.
+  useCatalog(['instruments', 'lots', 'lotGroups', 'summaries', 'tests', 'panels']);
   // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
   // Mean/SD và Lịch sử dữ liệu cần thấy cả mức đã dừng). Thẻ Nhập QC thì chỉ
   // được dựng cột cho mức ĐANG VẬN HÀNH — cùng tập mà `listOperationalLevels()`
@@ -113,10 +116,6 @@ export function EntryPage() {
     if (testId && levelNums.length) loadTestData(testId, levelNums);
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
-  // Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries` của MỌI xét nghiệm, nên
-  // không lọc theo testId. Trước đây chỉ bảng của xét nghiệm đang mở được nạp
-  // lại: nhập một điểm bị loại xong, cây vẫn ghi "Đạt" tới khi rời trang.
-  useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions', 'tests'], undefined, loadSummaries);
 
   const catalog = useMemo(() => createOperationalCatalog(tests, panels, lots, lotGroups), [tests, panels, lots, lotGroups]);
   const currentSummary = summaries.find((s) => s.testId === testId);
