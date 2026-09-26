@@ -1,6 +1,7 @@
 // Nhật ký hoạt động: xuất CSV, lưu trữ bản ghi cũ theo 12/24/36 tháng sau khi
 // xác thực lại và xác minh thủ công chuỗi hash.
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuditStore, type ChainVerifyView } from '../store/audit-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { Modal } from '../components/Modal';
@@ -15,7 +16,7 @@ import { downloadCsv } from '../lib/export';
 const AUTO_VERIFY_MAX = 5000;
 
 export function AuditPage() {
-  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow, archive } = useAuditStore();
+  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow, archive } = useAuditStore(useShallow((s) => ({ result: s.result, error: s.error, query: s.query, from: s.from, to: s.to, pageSize: s.pageSize, load: s.load, setQuery: s.setQuery, setRange: s.setRange, setPage: s.setPage, setPageSize: s.setPageSize, clearFilters: s.clearFilters, exportCsv: s.exportCsv, verifyChainNow: s.verifyChainNow, archive: s.archive })));
   const [archiving, setArchiving] = useState(false);
   const [chain, setChain] = useState<ChainVerifyView | null>(null);
   const chainEpoch = useRef(0);
@@ -169,7 +170,7 @@ function AuditIntegrityStatus({
 }
 
 function ArchiveModal({ onClose }: { onClose: () => void }) {
-  const { archive, previewArchive } = useAuditStore();
+  const { archive, previewArchive } = useAuditStore(useShallow((s) => ({ archive: s.archive, previewArchive: s.previewArchive })));
   const [months, setMonths] = useState<'12' | '24' | '36'>('24');
   const [err, setErr] = useState<string | null>(null);
 

@@ -1,6 +1,7 @@
 // Tab "TestsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
@@ -31,7 +32,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string; onNeedInstrument?: () => void } = {}) {
-  const { tests, instruments, teaRefs, saveTest, removeTest, saveRuleAction, saveRuleScope, ruleScopesByTestId, loadRuleScopes } = useManageStore();
+  const { tests, instruments, teaRefs, saveTest, removeTest, saveRuleAction, saveRuleScope, ruleScopesByTestId, loadRuleScopes } = useManageStore(useShallow((s) => ({ tests: s.tests, instruments: s.instruments, teaRefs: s.teaRefs, saveTest: s.saveTest, removeTest: s.removeTest, saveRuleAction: s.saveRuleAction, saveRuleScope: s.saveRuleScope, ruleScopesByTestId: s.ruleScopesByTestId, loadRuleScopes: s.loadRuleScopes })));
   // Gợi ý TEa: danh mục tích hợp đã phủ ghi đè của phòng xét nghiệm.
   const suggestions = useMemo(() => teaSuggestions(teaRefs), [teaRefs]);
 

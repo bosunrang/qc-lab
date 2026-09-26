@@ -1,6 +1,7 @@
 // Tab "PanelsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
@@ -9,7 +10,7 @@ import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 
 export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => void; onGoInstruments?: () => void } = {}) {
-  const { panels, instruments, tests, savePanel, removePanel } = useManageStore();
+  const { panels, instruments, tests, savePanel, removePanel } = useManageStore(useShallow((s) => ({ panels: s.panels, instruments: s.instruments, tests: s.tests, savePanel: s.savePanel, removePanel: s.removePanel })));
 
 
   async function removePanelRow(panel: QcPanel) {

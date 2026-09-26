@@ -1,4 +1,5 @@
 import { useEffect, type ReactElement } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardPage } from './pages/DashboardPage';
 import { ManagePage } from './pages/ManagePage';
@@ -43,7 +44,7 @@ const PAGE_ELEMENTS: Record<string, ReactElement> = {
 // vẫn mở). Không có quyền thì điều hướng về trang đầu tiên vai trò đó vào
 // được, không hiện trang trắng.
 export function AppRouter() {
-  const { status, user, init } = useAuthStore();
+  const { status, user, init } = useAuthStore(useShallow((s) => ({ status: s.status, user: s.user, init: s.init })));
 
   useEffect(() => { init(); }, [init]);
 

@@ -1,6 +1,7 @@
 // Tab "InstrumentsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
@@ -9,7 +10,7 @@ import { EmptyState, FieldRow } from './shared';
 import type { Instrument } from '../../../shared/qc-api';
 
 export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { createRequest?: number; onCreateRequestHandled?: () => void } = {}) {
-  const { instruments, tests, panels, saveInstrument, removeInstrument } = useManageStore();
+  const { instruments, tests, panels, saveInstrument, removeInstrument } = useManageStore(useShallow((s) => ({ instruments: s.instruments, tests: s.tests, panels: s.panels, saveInstrument: s.saveInstrument, removeInstrument: s.removeInstrument })));
   const [editing, setEditing] = useState<Instrument | 'new' | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [query, setQuery] = useState('');

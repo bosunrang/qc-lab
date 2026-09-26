@@ -8,6 +8,7 @@
 // trong phiên này, một thiết kế app tự nghĩ ra khác hẳn hệ thống mà người
 // dùng đã yêu cầu sửa lại cho giống. Xem CLAUDE.md mục "chuyển tiếp lô".
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
@@ -34,7 +35,7 @@ const STATUS_TEXT: Record<string, { text: string; cls: string }> = {
 function statusOf(status: string) { return STATUS_TEXT[status] || { text: 'Dự kiến', cls: 'none' }; }
 
 export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => void; onGoLots?: () => void } = {}) {
-  const { lotTransitions, panels, lots, tests, instruments, levelsByTestId, loadLevels, createLotTransition, removeLotTransition } = useManageStore();
+  const { lotTransitions, panels, lots, tests, instruments, levelsByTestId, loadLevels, createLotTransition, removeLotTransition } = useManageStore(useShallow((s) => ({ lotTransitions: s.lotTransitions, panels: s.panels, lots: s.lots, tests: s.tests, instruments: s.instruments, levelsByTestId: s.levelsByTestId, loadLevels: s.loadLevels, createLotTransition: s.createLotTransition, removeLotTransition: s.removeLotTransition })));
   const instrumentName = (id: string) => instruments.find((i) => i.id === id)?.name || '';
   const [targetQuery, setTargetQuery] = useState('');
 

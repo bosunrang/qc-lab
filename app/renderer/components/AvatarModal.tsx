@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
 import { Modal } from './Modal';
 
 const AVATAR_SIZE = 160;
 
 export function AvatarModal({ onClose }: { onClose: () => void }) {
-  const { user, setAvatar, clearAvatar } = useAuthStore();
+  const { user, setAvatar, clearAvatar } = useAuthStore(useShallow((s) => ({ user: s.user, setAvatar: s.setAvatar, clearAvatar: s.clearAvatar })));
   const [fileName, setFileName] = useState('Chưa chọn ảnh nào');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);

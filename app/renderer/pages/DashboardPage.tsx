@@ -3,6 +3,8 @@
 // đầu file đó: báo động theo ĐIỂM CUỐI, 1 dòng cho mỗi MỨC, % hoàn tất theo
 // XÉT NGHIỆM) — file này chỉ dựng JSX.
 import { useEffect, useMemo, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { SUMMARY_TABLES } from '../lib/useCatalog';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDashboardStore, type OverdueAction } from '../store/dashboard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -155,7 +157,7 @@ function TestRow({ test }: { test: DashboardTestItem }) {
 }
 
 function TestsPanel({ model }: { model: Model }) {
-  const { query, status, setQuery, setStatus } = useDashboardStore();
+  const { query, status, setQuery, setStatus } = useDashboardStore(useShallow((s) => ({ query: s.query, status: s.status, setQuery: s.setQuery, setStatus: s.setStatus })));
   const admin = isAdmin(useAuthStore((state) => state.user)?.role);
   const visible = useMemo(() => {
     const normalized = normalizeDashboardSearch(query);
@@ -175,18 +177,16 @@ function LoadingView({ subtitle }: { subtitle: string }) {
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <div className="dash-kpi" key={label}><div className="k">{label}</div><div className="v">—</div></div>)}</div></div></>;
 }
 
-const DASHBOARD_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'actions', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
-
 export function DashboardPage() {
-  const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore();
-  const { profile, load: loadProfile } = useSettingsStore();
+  const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore(useShallow((s) => ({ testSummaries: s.testSummaries, overdueActions: s.overdueActions, lots: s.lots, loading: s.loading, error: s.error, load: s.load })));
+  const { profile, load: loadProfile } = useSettingsStore(useShallow((s) => ({ profile: s.profile, load: s.load })));
   useEffect(() => { load(); loadProfile(); }, [load, loadProfile]);
   // Liệt kê đúng các bảng mà Tổng quan hiển thị hoặc dùng để đánh giá
   // Westgard (Mean/SD, lô, nhóm lô, Panel, luật chung trong `app_meta`, mốc
   // khắc phục trong `actions`). Không nghe `activity`: bảng đó đổi sau MỌI
   // thao tác ghi, kể cả đổi ảnh đại diện, và mỗi lần nạp lại là một lượt tính
   // Westgard cho mọi xét nghiệm trên máy chính.
-  useStoreInvalidation(DASHBOARD_TABLES, undefined, load);
+  useStoreInvalidation(SUMMARY_TABLES, undefined, load);
   const subtitle = (profile?.name || 'Khoa Xét nghiệm') + (profile?.dept ? ` · ${profile.dept}` : '');
   if (error) return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="panel"><EmptyState title="Không tải được Tổng quan" action={<button type="button" className="btn teal" onClick={() => { void load(); }}>Thử lại</button>}>Dữ liệu đã lưu không bị ảnh hưởng. Nội dung lỗi: {error}</EmptyState></div></>;
   if (loading) return <LoadingView subtitle={subtitle} />;

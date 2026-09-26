@@ -4,6 +4,8 @@
 // thuần nằm ở `pages/sigma/`. Bộ chọn luôn lấy toàn bộ danh mục
 // Cấu hình chung — không tạo hay bật/tắt xét nghiệm riêng trong Sigma.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useNavigate } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useSigmaStore, type SigmaLevelSaveInput } from '../store/sigma-store';
@@ -30,8 +32,8 @@ import { SigmaChartsPanel, SigmaMuPanel, SigmaOpspecsPanel, SigmaStatusPanel } f
 import { TEA_SOURCES, editablePercent, isKnownTeaSource, missingSigmaInputs, sigmaZone, vnDate, vnPeriod } from './sigma/shared';
 
 export function SigmaPage() {
-  const { tests, teaRefs, levelsByTestId, loadTests, loadTeaRefs, loadLevels, instruments, loadInstruments} = useManageStore();
-  const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
+  const { tests, teaRefs, levelsByTestId, loadTests, loadLevels, instruments} = useManageStore(useShallow((s) => ({ tests: s.tests, teaRefs: s.teaRefs, levelsByTestId: s.levelsByTestId, loadTests: s.loadTests, loadLevels: s.loadLevels, instruments: s.instruments })));
+  const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, saveTeaConfig: saveTeaConfigStore } = useSigmaStore(useShallow((s) => ({ periods: s.periods, loading: s.loading, error: s.error, loadPeriods: s.loadPeriods, loadCohorts: s.loadCohorts, savePeriod: s.savePeriod, removePeriod: s.removePeriod, saveTeaConfig: s.saveTeaConfig })));
   // Vai trò chỉ-xem: vẫn đọc được bảng kỳ/Sigma/MU, không sửa được (main
   // chặn bằng requireWrite ở sigma-handlers.savePeriod).
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
@@ -54,7 +56,7 @@ export function SigmaPage() {
   useEffect(() => { setBiasModal(null); setMuModal(null); setCohortModal(null); setAddPeriodOpen(false); }, [testId]);
   const navigate = useNavigate();
 
-  useEffect(() => { loadTests(); loadTeaRefs(); loadInstruments(); }, [loadTests, loadTeaRefs, loadInstruments]);
+  useCatalog(['tests', 'teaRefs', 'instruments']);
   // Mọi xét nghiệm đã khai trong Cấu hình chung đều có thể được đánh giá
   // Sigma. Tự chọn dòng đầu tiên để mở trang là thấy ngay không gian làm việc.
   useEffect(() => {
@@ -65,7 +67,7 @@ export function SigmaPage() {
   useEffect(() => { loadPeriods(testId); if (testId) loadLevels(testId); }, [testId, loadPeriods, loadLevels]);
   useStoreInvalidation(['sigma_data', 'qc_points', 'actions', 'app_meta'], testId || undefined, () => { if (testId) loadPeriods(testId); });
   useStoreInvalidation(['tests', 'test_levels', 'instruments', 'tea_refs'], testId || undefined, () => {
-    loadTests(); loadTeaRefs(); loadInstruments();
+    // Xét nghiệm, TEa tham chiếu và máy do `useCatalog` nạp lại.
     if (testId) loadLevels(testId);
     if (testId) loadPeriods(testId);
   });

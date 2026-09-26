@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -24,12 +25,11 @@ import { TestPicker } from '../components/TestPicker';
 import { useTestSelection } from '../lib/useTestSelection';
 
 export function WestgardPage() {
-  const { tests, instruments, lots, levelsByTestId, loadTests, loadInstruments, loadLevels, loadLots, lotGroups, loadLotGroups } = useManageStore(useShallow((s) => ({
+  const { tests, instruments, lots, levelsByTestId, loadLevels, lotGroups } = useManageStore(useShallow((s) => ({
     tests: s.tests, instruments: s.instruments, lots: s.lots, levelsByTestId: s.levelsByTestId, lotGroups: s.lotGroups,
-    loadTests: s.loadTests, loadInstruments: s.loadInstruments, loadLevels: s.loadLevels, loadLots: s.loadLots, loadLotGroups: s.loadLotGroups,
-  })));
-  const { summaries, loadSummaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, previousLotBlocks: loadedPrevious, analysisTestId, analysisLoading, analysisError } = useWestgardStore(useShallow((s) => ({
-    summaries: s.summaries, loadSummaries: s.loadSummaries, ruleSettings: s.ruleSettings, loadRuleSettings: s.loadRuleSettings,
+    loadLevels: s.loadLevels, })));
+  const { summaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, previousLotBlocks: loadedPrevious, analysisTestId, analysisLoading, analysisError } = useWestgardStore(useShallow((s) => ({
+    summaries: s.summaries, ruleSettings: s.ruleSettings, loadRuleSettings: s.loadRuleSettings,
     saveRuleSetting: s.saveRuleSetting, resetRuleSettings: s.resetRuleSettings, analysisByLevel: s.analysisByLevel, loadAnalysis: s.loadAnalysis,
     previousLotBlocks: s.previousLotBlocks, analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
   })));
@@ -57,7 +57,8 @@ export function WestgardPage() {
   // để rà soát. Dù ở cách xem nào, chuỗi CUSUM luôn được tính độc lập ở main.
   const [cusumView, setCusumView] = useState<'summary' | 'levels'>('summary');
 
-  useEffect(() => { loadTests(); loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadRuleSettings(); }, [loadTests, loadInstruments, loadLots, loadLotGroups, loadSummaries, loadRuleSettings]);
+  useCatalog(['tests', 'instruments', 'lots', 'lotGroups', 'summaries']);
+  useEffect(() => { loadRuleSettings(); }, [loadRuleSettings]);
   const currentSummary = summaries.find((s) => s.testId === testId);
   // Ghi nhớ các mảng/đối tượng dẫn xuất: chúng là phụ thuộc của useMemo dựng
   // dữ liệu biểu đồ bên dưới. Tạo mới mỗi lần render thì biểu đồ bị dựng lại
@@ -73,11 +74,8 @@ export function WestgardPage() {
   // tập điểm đang vận hành và nhãn LOT. Không chỉ nghe `qc_points`: nếu không
   // thẻ này sẽ tiếp tục hiện phân tích cũ cho đến khi người dùng tự đổi trang.
   useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], undefined, () => {
-    void loadSummaries();
-    void loadTests();
+    // Danh mục (xét nghiệm, lô, nhóm lô, tóm tắt) do `useCatalog` nạp lại.
     void loadRuleSettings();
-    void loadLots();
-    void loadLotGroups();
     // Lọc theo cờ `operational` đúng như tập mức đang render: `listTestLevels()`
     // cố ý trả về đủ mọi mức (Bảng Mean/SD và Lịch sử cần mức đã dừng), nên
     // truyền thẳng danh sách thô vào đây là gọi `analyzeLevel` cho cả những

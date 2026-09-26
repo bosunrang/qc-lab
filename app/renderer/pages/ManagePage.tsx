@@ -2,6 +2,8 @@
 // trong ./manage (tách 2026-09-03; trước đó 6 tab nằm chung file này, 1121
 // dòng). Phần dùng chung giữa các tab ở ./manage/shared.
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -26,26 +28,19 @@ export function ManagePage() {
   const navState = useLocation().state as { tab?: TabId; editTestId?: string } | null;
   const [tab, setTab] = useState<TabId>(navState?.tab || 'instruments');
   const [instrumentCreateRequest, setInstrumentCreateRequest] = useState(0);
-  const store = useManageStore();
-  const { loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs, loadPlannedTargets } = store;
+  const store = useManageStore(useShallow((s) => ({ instruments: s.instruments, levelsByTestId: s.levelsByTestId, loadLotTransitions: s.loadLotTransitions, loadPlannedTargets: s.loadPlannedTargets, lotGroups: s.lotGroups, lotTransitions: s.lotTransitions, lots: s.lots, panels: s.panels, teaRefs: s.teaRefs, tests: s.tests })));
+  const { loadLotTransitions, loadPlannedTargets } = store;
 
-  useEffect(() => {
-    loadInstruments(); loadTests(); loadLots(); loadLotGroups();
-    loadPanels(); loadLotTransitions(); loadTeaRefs(); loadPlannedTargets();
-  }, [loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs, loadPlannedTargets]);
-
-  useStoreInvalidation(['instruments'], undefined, store.loadInstruments);
-  useStoreInvalidation(['tests'], undefined, store.loadTests);
-  useStoreInvalidation(['qc_lots', 'lot_groups'], undefined, () => { store.loadLots(); store.loadLotGroups(); });
-  useStoreInvalidation(['qc_panels', 'qc_panel_tests'], undefined, store.loadPanels);
+  // Danh mục dùng chung (và tóm tắt xét nghiệm cho bộ đếm tab) do
+  // `useCatalog` nạp và nạp lại; hai danh mục riêng của trang này tự nghe.
+  useCatalog(['instruments', 'tests', 'lots', 'lotGroups', 'panels', 'teaRefs', 'summaries']);
+  useEffect(() => { loadLotTransitions(); loadPlannedTargets(); }, [loadLotTransitions, loadPlannedTargets]);
   useStoreInvalidation(['lot_transitions'], undefined, store.loadLotTransitions);
-  useStoreInvalidation(['tea_refs'], undefined, store.loadTeaRefs);
   useStoreInvalidation(['planned_targets', 'test_levels'], undefined, store.loadPlannedTargets);
 
   // Đúng `counts` của hệ thống (manage-page-controller.ts): tab Lô hiện
   // "số lô / số nhóm" dạng chuỗi, không phải 1 con số.
-  const { summaries, loadSummaries } = useWestgardStore();
-  useEffect(() => { loadSummaries(); }, [loadSummaries]);
+  const summaries = useWestgardStore((s) => s.summaries);
   const allLevels = summaries.flatMap((summary) => summary.levels);
   const levelsWithLot = allLevels.filter((level) => level.qcLotId).length;
   const counts: Partial<Record<TabId, number | string>> = {

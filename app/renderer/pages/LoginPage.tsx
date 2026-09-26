@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
 import type { LoginBrand } from '../../shared/qc-api';
 
@@ -20,7 +21,7 @@ function AuthBrand({ brand }: { brand: LoginBrand | null }) {
 }
 
 export function LoginPage() {
-  const { status, error, bootstrapAdmin, login, clearError } = useAuthStore();
+  const { status, error, bootstrapAdmin, login, clearError } = useAuthStore(useShallow((s) => ({ status: s.status, error: s.error, bootstrapAdmin: s.bootstrapAdmin, login: s.login, clearError: s.clearError })));
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');

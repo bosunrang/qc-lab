@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useNceStore } from '../store/nce-store';
@@ -43,9 +45,9 @@ type NcePrefill = { testId: string; level: number; pointId: string; lot: string;
 
 export function ActionsPage() {
   const location = useLocation();
-  const { tests, loadTests } = useManageStore();
-  const store = useNceStore();
-  const { summaries, loadSummaries } = useWestgardStore();
+  const { tests } = useManageStore(useShallow((s) => ({ tests: s.tests })));
+  const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
+  const { summaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries })));
   const [form, setForm] = useState<{ prefill: NcePrefill | null; record: NceRecord | null } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
@@ -64,7 +66,8 @@ export function ActionsPage() {
   const exportLogCsv = () => exportNceLogCsv(store.records, testName);
   const [showGuide, setShowGuide] = useState(false);
 
-  useEffect(() => { loadTests(); store.load(); loadSummaries(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useCatalog(['tests', 'summaries']);
   useEffect(() => {
     if (!requestedRecordId.current) return;
     const record = store.records.find(item => item.id === requestedRecordId.current);
@@ -74,7 +77,6 @@ export function ActionsPage() {
     }
   }, [store.records]);
   useStoreInvalidation(['actions'], undefined, store.load);
-  useStoreInvalidation(['qc_points', 'tests'], undefined, loadSummaries);
 
   const testName = (id: string | null) => tests.find((t) => t.id === id)?.name ?? '(không rõ)';
   const detailRecord = store.records.find((r) => r.id === detailId) || null;
@@ -313,7 +315,7 @@ function NceSelect({ value, onChange, options, disabled = false }: { value: stri
 /** Form protocol-v3 đặt ngay trong panel như hệ thống. Modal chỉ còn dùng cho
  * xem chi tiết/bằng chứng, tránh một form dài bị bó hẹp trong cửa sổ popup. */
 function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | null; record: NceRecord | null; onClose: () => void }) {
-  const { tests } = useManageStore(); const store = useNceStore();
+  const { tests } = useManageStore(useShallow((s) => ({ tests: s.tests }))); const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
   const latestSigmaBias = useNceStore((state) => state.latestSigmaBias);
   const old = record ? parseDetail(record.detail_json) : {};
   const [protocol, setProtocol] = useState<NceDetail>(() => protocolDefaults(old, record));
@@ -424,7 +426,7 @@ function SectionTitle({ n, title }: { n?: number; title: string }) {
 }
 
 function DetailModal({ record, testName, onClose }: { record: NceRecord; testName: string; onClose: () => void }) {
-  const store = useNceStore();
+  const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
   const detail = parseDetail(record.detail_json);
   const [completedDate, setCompletedDate] = useState('');
   const [returnNote, setReturnNote] = useState('');

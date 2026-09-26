@@ -335,7 +335,12 @@ test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận 
 test('EN14: cây Nhập QC nạp lại trạng thái của mọi xét nghiệm sau khi có điểm mới', () => {
   // Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`. Trước đây chỉ dữ liệu
   // của xét nghiệm đang mở được nạp lại, nên cây giữ nhãn cũ tới khi rời trang.
+  // Từ 2026-09-26 danh mục nạp lại qua `useCatalog` (kế hoạch D.3): hook nghe
+  // theo bảng, không lọc theo testId. Hành vi thật được đếm ở
+  // `e2e/reload-count.e2e.mjs`; ở đây khoá việc trang có đăng ký `summaries`.
   const page = readEntryPageSources();
-  assert.match(page, /useStoreInvalidation\(\[[^\]]*'qc_points'[^\]]*\], undefined, loadSummaries\)/,
-    'summaries phải được nạp lại khi qc_points đổi, không lọc theo xét nghiệm đang mở');
+  assert.match(page, /useCatalog\(\[[^\]]*'summaries'[^\]]*\]\)/, 'Nhập QC phải đăng ký danh mục summaries');
+  const catalog = readFileSync(new URL('../renderer/lib/useCatalog.ts', import.meta.url), 'utf8');
+  assert.match(catalog, /export const SUMMARY_TABLES = \[[^\]]*'qc_points'/, 'summaries phải nạp lại khi qc_points đổi');
+  assert.doesNotMatch(catalog.slice(catalog.indexOf('export function useCatalog')), /testId/, 'không lọc theo xét nghiệm đang mở');
 });

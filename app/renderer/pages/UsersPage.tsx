@@ -8,6 +8,7 @@
 //      main (`auth-handlers.ts` gọi `selectUserPermissions`), lưới này chỉ
 //      là giao diện.
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useUsersStore } from '../store/users-store';
 import { useAuthStore } from '../store/auth-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -56,7 +57,7 @@ function narrowSelection(selected: ReadonlySet<string>, role: string): Set<strin
 }
 
 function CreatePanel() {
-  const { create } = useUsersStore();
+  const { create } = useUsersStore(useShallow((s) => ({ create: s.create })));
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('technician');
@@ -110,7 +111,7 @@ function CreatePanel() {
 function UserActions({ user, current, onPerms, onReset }: {
   user: PublicUser; current: boolean; onPerms: () => void; onReset: () => void;
 }) {
-  const { update, remove } = useUsersStore();
+  const { update, remove } = useUsersStore(useShallow((s) => ({ update: s.update, remove: s.remove })));
 
   async function toggle() {
     const result = await update(user.id, { name: user.name, role: user.role, active: !user.active });
@@ -137,8 +138,8 @@ function UserActions({ user, current, onPerms, onReset }: {
 }
 
 export function UsersPage() {
-  const { users, load } = useUsersStore();
-  const { user: me } = useAuthStore();
+  const { users, load } = useUsersStore(useShallow((s) => ({ users: s.users, load: s.load })));
+  const { user: me } = useAuthStore(useShallow((s) => ({ user: s.user })));
   const [permsFor, setPermsFor] = useState<PublicUser | null>(null);
   const [resetFor, setResetFor] = useState<PublicUser | null>(null);
 
@@ -179,7 +180,7 @@ export function UsersPage() {
 /** "Sửa quyền" — modal của hệ thống (`UserPermissionsModal.tsx`): 1 select vai
  * trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở đây, đúng phạm vi hệ thống. */
 function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
-  const { update } = useUsersStore();
+  const { update } = useUsersStore(useShallow((s) => ({ update: s.update })));
   const [role, setRole] = useState<string>(user.role);
   // `pagePerms` null = chưa thu hẹp → tick sẵn toàn bộ thẻ của vai trò.
   const [selected, setSelected] = useState<Set<string>>(() => new Set(user.pagePerms ?? rolePageIds(user.role)));
@@ -211,7 +212,7 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
 }
 
 function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
-  const { resetPassword } = useUsersStore();
+  const { resetPassword } = useUsersStore(useShallow((s) => ({ resetPassword: s.resetPassword })));
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);

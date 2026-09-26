@@ -1,6 +1,7 @@
 // Tab "LotsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { useWestgardStore } from '../../store/westgard-store';
 import { Modal } from '../../components/Modal';
@@ -51,13 +52,13 @@ export function LotsTab() {
     nameEl.value = lots.filter((lot) => checked.has(lot.id)).map((lot) => lot.lot_no).filter(Boolean).join('/');
   }
 
-  const { lots: allLots, lotGroups: allGroups, lotTransitions, saveLot, saveLotGroup, removeLot, removeLotGroup, stopLotGroup, activateLotGroup } = useManageStore();
+  const { lots: allLots, lotGroups: allGroups, lotTransitions, saveLot, saveLotGroup, removeLot, removeLotGroup, stopLotGroup, activateLotGroup } = useManageStore(useShallow((s) => ({ lots: s.lots, lotGroups: s.lotGroups, lotTransitions: s.lotTransitions, saveLot: s.saveLot, saveLotGroup: s.saveLotGroup, removeLot: s.removeLot, removeLotGroup: s.removeLotGroup, stopLotGroup: s.stopLotGroup, activateLotGroup: s.activateLotGroup })));
 
   const transitionToNo = (lotId: string): string | undefined => {
     const accepted = lotTransitions.find((tr) => tr.from_lot_id === lotId && tr.status === 'accepted');
     return accepted ? allLots.find((lot) => lot.id === accepted.to_lot_id)?.lot_no : undefined;
   };
-  const { summaries } = useWestgardStore();
+  const { summaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries })));
   const allLevels = summaries.flatMap((summary) => summary.levels);
   const [query, setQuery] = useState('');
   const [lotPage, setLotPage] = useState(1);

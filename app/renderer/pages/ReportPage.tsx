@@ -2,6 +2,8 @@
 // Bộ lọc, tuỳ chọn xuất và thao tác được gom thành các vùng rõ ràng; khóa kỳ
 // giữ dạng điều khiển theo tháng/năm và danh sách kỳ, không dùng bảng dữ liệu.
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useCatalog } from '../lib/useCatalog';
 import { Link } from 'react-router-dom';
 import { useWestgardStore } from '../store/westgard-store';
 import { useReportStore } from '../store/report-store';
@@ -107,8 +109,8 @@ function buildPrintHtml(label: string, from: string, to: string, points: ReportP
 }
 
 export function ReportPage() {
-  const { summaries, loadSummaries } = useWestgardStore();
-  const { locks, template, loadLocks, loadTemplate, saveTemplate, lock, unlock } = useReportStore();
+  const { summaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries })));
+  const { locks, template, loadLocks, loadTemplate, saveTemplate, lock, unlock } = useReportStore(useShallow((s) => ({ locks: s.locks, template: s.template, loadLocks: s.loadLocks, loadTemplate: s.loadTemplate, saveTemplate: s.saveTemplate, lock: s.lock, unlock: s.unlock })));
   const admin = isAdmin(useAuthStore((s) => s.user)?.role);
 
   const [start, setStart] = useState(`${isoMonth()}-01`);
@@ -120,9 +122,10 @@ export function ReportPage() {
   const [formCode, setFormCode] = useState('');
   const [formVersion, setFormVersion] = useState('');
 
-  useEffect(() => { loadSummaries(); loadLocks(); loadTemplate(); }, [loadSummaries, loadLocks, loadTemplate]);
+  useEffect(() => { loadLocks(); loadTemplate(); }, [loadLocks, loadTemplate]);
+  useCatalog(['summaries']);
   useEffect(() => { if (template) { setFormCode(template.formCode); setFormVersion(template.version); } }, [template]);
-  useStoreInvalidation(['period_locks', 'report_templates', 'tests', 'qc_points'], undefined, () => { loadLocks(); loadTemplate(); loadSummaries(); });
+  useStoreInvalidation(['period_locks', 'report_templates'], undefined, () => { loadLocks(); loadTemplate(); });
 
   // Tìm không dấu trên nhãn hiển thị; lựa chọn mất khỏi danh sách khớp thì
   // nhảy về phần tử đầu — đúng `reportModel()` hệ thống.

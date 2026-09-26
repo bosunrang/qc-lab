@@ -1,5 +1,6 @@
 // Cài đặt: hồ sơ đơn vị, sao lưu/phục hồi, LIS Gateway và đồng bộ Firebase.
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store/settings-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { infoDialog, confirmDialog, reauthDialog } from '../state/dialog-store';
@@ -42,7 +43,7 @@ export function SettingsPage() {
     exportBackup, chooseBackupFile, importBackup, resetOperationalData,
     saveLis, pullLisQueue, importLisResult, rejectLisResult,
     connectFirebase: connectFirebaseApi, syncFirebase, disconnectFirebase: disconnectFirebaseApi,
-  } = useSettingsStore();
+  } = useSettingsStore(useShallow((s) => ({ profile: s.profile, backup: s.backup, lis: s.lis, lisQueue: s.lisQueue, firebase: s.firebase, loadAll: s.loadAll, loadStorage: s.loadStorage, save: s.save, loadFirebase: s.loadFirebase, exportBackup: s.exportBackup, chooseBackupFile: s.chooseBackupFile, importBackup: s.importBackup, resetOperationalData: s.resetOperationalData, saveLis: s.saveLis, pullLisQueue: s.pullLisQueue, importLisResult: s.importLisResult, rejectLisResult: s.rejectLisResult, connectFirebase: s.connectFirebase, syncFirebase: s.syncFirebase, disconnectFirebase: s.disconnectFirebase })));
   const [name, setName] = useState('');
   const [dept, setDept] = useState('');
   const [address, setAddress] = useState('');
