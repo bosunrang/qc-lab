@@ -1,8 +1,9 @@
 // Chặn điều hướng cho mọi cửa sổ của app (`main/window-guard.ts`): chỉ hiện
 // trang của app, `https:` ra ngoài mở bằng trình duyệt hệ thống, còn lại chặn.
+// Main áp chặn cho mọi cửa sổ và khai sandbox: kiểm trên app thật ở
+// `e2e/window-shell.e2e.mjs` và `e2e/external-link.e2e.mjs`.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
@@ -36,12 +37,4 @@ test('https ra ngoài mở bằng trình duyệt hệ thống, giao thức khác
   for (const url of ['http://example.com/', 'javascript:alert(1)', 'data:text/html,<b>x</b>', 'ms-settings:', 'smb://server/share', 'không phải url']) {
     assert.equal(classifyNavigation(url, PACKAGED), 'deny', url);
   }
-});
-
-test('main áp chặn điều hướng cho mọi webContents và khai sandbox tường minh', () => {
-  const source = readFileSync(new URL('../main/index.ts', import.meta.url), 'utf8');
-  assert.match(source, /app\.on\('web-contents-created', \(_event, contents\) => guardNavigation\(contents\)\);/);
-  assert.match(source, /contents\.on\('will-navigate',/);
-  assert.match(source, /contents\.setWindowOpenHandler\(/);
-  assert.match(source, /nodeIntegration: false,\s*sandbox: true,/, 'cửa sổ chính khai sandbox: true');
 });
