@@ -9,6 +9,7 @@ import type { TeaRef } from '../../shared/qc-api';
 import { cleanId, cleanText, uid } from '../domain/text-utils';
 import { validateTeaRef, TEA_LAB_SOURCE_LABELS, type TeaRefInput } from '../domain/tea-ref-validation';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { writeCommand } from './write-command';
 
 export function createTeaRefHandlers(db: Db) {
   const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
@@ -140,52 +141,49 @@ export function createTeaRefHandlers(db: Db) {
 
   /** Bỏ MỌI ghi đè CLIA/Ricos của 1 analyte (nút "Khôi phục" hệ thống) — giữ
    * lại hồ sơ TEa PXN nếu có, chỉ trả 2 giá trị tham chiếu về mặc định. */
-  function restoreTeaRefDefaults(input: { analyteId: unknown }, actor: Actor): IpcResult<{ analyteId: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const restoreTeaRefDefaults = writeCommand(db, 'restoreTeaRefDefaults', 'admin', (w, input: { analyteId: unknown }): IpcResult<{ analyteId: string }> => {
     const analyteId = cleanId(String(input.analyteId || ''));
     const existing = db.prepare('SELECT id, name, lab FROM tea_refs WHERE analyte_id=?').get(analyteId) as
       { id: string; name: string; lab: number | null } | undefined;
-    if (!existing) return { ok: true, data: { analyteId } };
-    inTransaction(() => {
+    if (!existing) return w.noChange({ analyteId });
+    w.commit((tx) => {
       if (existing.lab == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
       else db.prepare('UPDATE tea_refs SET clia=NULL, ricos=NULL, clia_rule=\'\', clia_absolute=NULL, clia_absolute_unit=\'\' WHERE id=?').run(existing.id);
-      writeAudit(db, actor, 'Khôi phục TEa tham chiếu', `Bỏ ghi đè CLIA/Ricos của "${existing.name}"`, existing.name);
+      tx.audit('Khôi phục TEa tham chiếu', `Bỏ ghi đè CLIA/Ricos của "${existing.name}"`, existing.name);
+      tx.changed(['tea_refs']);
     });
-    notifyChanged(['tea_refs']);
     return { ok: true, data: { analyteId } };
-  }
+  });
 
-  function removeTeaRef(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeTeaRef = writeCommand(db, 'removeTeaRef', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name FROM tea_refs WHERE id=?').get(id) as { id: string; name: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa.' } };
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá hồ sơ TEa', `Xoá "${existing.name}"`, existing.name);
+      tx.audit('Xoá hồ sơ TEa', `Xoá "${existing.name}"`, existing.name);
+      tx.changed(['tea_refs']);
     });
-    notifyChanged(['tea_refs']);
     return { ok: true, data: { id } };
-  }
+  });
 
 
-  function removeTeaLabProfile(input: { id: unknown }, actor: Actor): IpcResult<{ id: string; removedRecord: boolean }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeTeaLabProfile = writeCommand(db, 'removeTeaLabProfile', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string; removedRecord: boolean }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name, clia, ricos, clia_absolute, abbreviation, matrix, lab FROM tea_refs WHERE id=?').get(id) as
       { id: string; name: string; clia: number | null; ricos: number | null; clia_absolute: number | null; abbreviation: string; matrix: string; lab: number | null } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa.' } };
-    if (existing.lab == null) return { ok: true, data: { id, removedRecord: false } };
+    if (existing.lab == null) return w.noChange({ id, removedRecord: false });
     const isCustomAnalyte = !!(existing.abbreviation || existing.matrix);
     const removedRecord = !isCustomAnalyte && existing.clia == null && existing.ricos == null && existing.clia_absolute == null;
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare(`UPDATE tea_refs SET lab=NULL, lab_source='', lab_prepared_by='', lab_next_review_date='', sources_json='{}' WHERE id=?`).run(id);
       if (removedRecord) db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xóa TEa chuẩn hóa', `${existing.name} · ${Number(existing.lab).toFixed(2)}%`, existing.name);
+      tx.audit('Xóa TEa chuẩn hóa', `${existing.name} · ${Number(existing.lab).toFixed(2)}%`, existing.name);
+      tx.changed(['tea_refs']);
     });
-    notifyChanged(['tea_refs']);
     return { ok: true, data: { id, removedRecord } };
-  }
+  });
 
   return { listTeaRefs, saveTeaRef, setTeaRefValue, addTeaAnalyte, restoreTeaRefDefaults, removeTeaRef, removeTeaLabProfile };
 }

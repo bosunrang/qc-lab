@@ -3,7 +3,8 @@
 import { dbFileBytes } from './db-file-size';
 import type { Db } from '../db/sqlite-like';
 import { prepareLabProfile, type LabProfileInput } from '../domain/settings-validation';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { type IpcResult } from './shared';
+import { writeCommand } from './write-command';
 
 export interface LabProfile {
   id: number; name: string; dept: string; address: string;
@@ -32,20 +33,19 @@ export function createSettingsHandlers(db: Db, dbPath: string) {
     return { brand_title, brand_sub, logo_text, logo_data };
   }
 
-  function saveLabProfile(input: { data: LabProfileInput }, actor: Actor): IpcResult<LabProfile> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveLabProfile = writeCommand(db, 'saveLabProfile', 'admin', (w, input: { data: LabProfileInput }): IpcResult<LabProfile> => {
     const existing = getLabProfile();
     const { name, dept, address, brandTitle, brandSub, logoText, logoData } = prepareLabProfile(input.data, {
       logoText: existing.logo_text, logoData: existing.logo_data,
     });
-    withTransaction(db, () => {
+    w.commit((tx) => {
       db.prepare('UPDATE lab SET name=?,dept=?,address=?,brand_title=?,brand_sub=?,logo_text=?,logo_data=? WHERE id=1')
         .run(name, dept, address, brandTitle, brandSub, logoText, logoData);
-      writeAudit(db, actor, 'Sửa thông tin phòng xét nghiệm', `Cập nhật hồ sơ "${name || brandTitle}"`, name || brandTitle);
+      tx.audit('Sửa thông tin phòng xét nghiệm', `Cập nhật hồ sơ "${name || brandTitle}"`, name || brandTitle);
+      tx.changed(['lab']);
     });
-    notifyChanged(['lab']);
     return { ok: true, data: getLabProfile() };
-  }
+  });
 
   /** Đọc trạng thái trực tiếp từ chính kết nối SQLite thay vì để renderer
    * ghi cứng tên engine/schema. Bản Electron dùng file SQLite trên đĩa;

@@ -82,8 +82,7 @@ export default [
       'app/main/ipc/audit-handlers.ts', 'app/main/ipc/auth-handlers.ts', 'app/main/ipc/backup-handlers.ts',
       'app/main/ipc/config-catalog-handlers.ts', 'app/main/ipc/config-lot-handlers.ts', 'app/main/ipc/config-tea-handlers.ts',
       'app/main/ipc/firebase-handlers.ts', 'app/main/ipc/lis-handlers.ts', 'app/main/ipc/nce-handlers.ts',
-      'app/main/ipc/reagent-handlers.ts', 'app/main/ipc/report-handlers.ts', 'app/main/ipc/settings-handlers.ts',
-      'app/main/ipc/sigma-handlers.ts', 'app/main/ipc/westgard-handlers.ts',
+      'app/main/ipc/report-handlers.ts',
     ],
     rules: {
       'no-restricted-syntax': ['error', {

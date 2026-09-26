@@ -10,6 +10,7 @@ import { cleanId, cleanText, uid, sameText } from '../domain/text-utils';
 import { validateTestLevel, appendMeanSdHistory, validateLot, validateLotGroup, validateLotTransition, type LotInput, type LotGroupInput, type LotTransitionInput, type PreparedLotTransition } from '../domain/manage-validation';
 import { isPeriodLocked } from '../db/period-locks';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { writeCommand } from './write-command';
 import { ymOfDate } from '../domain/period-lock-validation';
 import { isLotGroupInUse } from '../db/lot-groups';
 
@@ -480,8 +481,7 @@ export function createLotConfigHandlers(db: Db) {
 
   /** Dừng một nhóm lô đang chạy. CHỈ đổi trạng thái; chiều ngược lại nằm ở
    * `activateLotGroup()` bên dưới và áp lại Mean/SD đã lưu của nhóm. */
-  function stopLotGroup(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const stopLotGroup = writeCommand(db, 'stopLotGroup', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name, status FROM lot_groups WHERE id=?').get(id) as { id: string; name: string; status: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy nhóm lô QC.' } };
@@ -489,13 +489,13 @@ export function createLotConfigHandlers(db: Db) {
     if (existing.status === 'stopped' || existing.status === 'planned' || !lotGroupInUse(lotIds)) {
       return { ok: false, error: { code: 'not-stoppable', message: 'Chỉ dừng được nhóm lô đang chạy.' } };
     }
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare("UPDATE lot_groups SET status='stopped', stopped_at=? WHERE id=?").run(nowIso(), id);
-      writeAudit(db, actor, 'Dừng nhóm lô QC', `Dừng nhóm "${existing.name}"`, existing.name);
+      tx.audit('Dừng nhóm lô QC', `Dừng nhóm "${existing.name}"`, existing.name);
+      tx.changed(['lot_groups']);
     });
-    notifyChanged(['lot_groups']);
     return { ok: true, data: { id } };
-  }
+  });
 
 
   function lotTargetSnapshot(level: { qc_lot_id?: string | null; mean: number | null; sd: number | null; low: number | null; high: number | null; mean_sd_history_json?: string | null }, lotId: string) {
@@ -627,8 +627,7 @@ export function createLotConfigHandlers(db: Db) {
     return lot ? `${lot.lot_no} · Mức ${lot.level}` : 'Chưa chọn lô';
   }
 
-  function removeLotTransition(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeLotTransition = writeCommand(db, 'removeLotTransition', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, status, from_lot_id, to_lot_id FROM lot_transitions WHERE id=?').get(id) as
       { id: string; status: string; from_lot_id: string; to_lot_id: string } | undefined;
@@ -637,13 +636,13 @@ export function createLotConfigHandlers(db: Db) {
       return { ok: false, error: { code: 'accepted-applied', message: 'Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xóa trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công.' } };
     }
     const detail = `${lotLabel(existing.from_lot_id)} → ${lotLabel(existing.to_lot_id)}`;
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('DELETE FROM lot_transitions WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá hồ sơ chuyển lô', detail, 'Chuyển tiếp lô');
+      tx.audit('Xoá hồ sơ chuyển lô', detail, 'Chuyển tiếp lô');
+      tx.changed(['lot_transitions']);
     });
-    notifyChanged(['lot_transitions']);
     return { ok: true, data: { id } };
-  }
+  });
 
   return { listPlannedTargets, savePlannedTargets, listLots, previewLotRename, saveLot, listLotGroups, saveLotGroup, listLotTransitions, createLotTransition, removeLot, removeLotGroup, stopLotGroup, activateLotGroup, removeLotTransition };
 }

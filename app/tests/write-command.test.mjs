@@ -94,6 +94,12 @@ test('trả thành công mà không ghi, hoặc commit hai lần: báo lỗi l�
     return { ok: true, data: null };
   });
   assert.throws(() => twice(tech), /chỉ được gọi một lần/);
+  const { events } = { events: [] };
+  const stopNoChange = addChangeListener((payload) => events.push(payload));
+  const unchanged = writeCommand(db, 'probe', 'write', (w) => w.noChange('giữ nguyên'));
+  assert.deepEqual(unchanged(tech), { ok: true, data: 'giữ nguyên' }, 'không đổi thì khai tường minh w.noChange()');
+  assert.deepEqual(events, [], 'không đổi thì không nhật ký, không báo renderer');
+  stopNoChange();
   const rejected = writeCommand(db, 'probe', 'write', () => ({ ok: false, error: { code: 'invalid', message: 'Sai.' } }));
   assert.deepEqual(rejected(tech), { ok: false, error: { code: 'invalid', message: 'Sai.' } }, 'lỗi kiểm dữ liệu trả nguyên, không cần ghi');
   stop();

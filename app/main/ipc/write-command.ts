@@ -12,7 +12,8 @@
 // 5. Báo thay đổi: trong commit phải gọi `tx.changed()`; lời báo chỉ gửi SAU
 //    khi commit xong, nên renderer không bao giờ nạp lại dữ liệu chưa ghi.
 //
-// Handler trả `{ ok: true }` mà không commit cũng là lỗi lập trình.
+// Handler trả `{ ok: true }` mà không commit cũng là lỗi lập trình, trừ khi
+// khai tường minh `w.noChange(data)` (lưu lại đúng giá trị cũ).
 import type { Db } from '../db/sqlite-like';
 import { type Actor, type IpcResult, type PermissionDenied, notifyChanged, requireAdmin, requireWrite, withTransaction, writeAudit } from './shared';
 
@@ -33,6 +34,10 @@ export interface WriteSteps {
   /** Chạy phần ghi trong MỘT transaction; trả đúng giá trị `work` trả về. Lỗi
    * ném ra trong `work` huỷ toàn bộ phần ghi (kể cả nhật ký) và không báo gì. */
   commit<R>(work: (tx: WriteTx) => R): R;
+  /** Trả thành công mà CỐ Ý không ghi gì (vd lưu lại đúng giá trị cũ): không
+   * nhật ký, không báo renderer. Phải gọi tường minh — trả `{ ok: true }` trơn
+   * mà không commit vẫn là lỗi lập trình. */
+  noChange<T>(data: T): IpcResult<T>;
 }
 
 function guardOf(guard: WriteGuard): (actor: Actor) => PermissionDenied | null {
@@ -58,8 +63,13 @@ export function writeCommand<A extends unknown[], T>(
     const denied = check(actor);
     if (denied) return denied;
     let committed = false;
+    let declaredNoChange = false;
     const steps: WriteSteps = {
       actor,
+      noChange<D>(data: D): IpcResult<D> {
+        declaredNoChange = true;
+        return { ok: true, data };
+      },
       commit<R>(work: (tx: WriteTx) => R): R {
         if (committed) throw new Error(`${name}: commit() chỉ được gọi một lần cho mỗi lần ghi.`);
         let audited = 0;
@@ -81,7 +91,7 @@ export function writeCommand<A extends unknown[], T>(
       },
     };
     const result = body(steps, ...(args.slice(0, -1) as unknown as A));
-    if (result.ok && !committed) throw new Error(`${name}: trả kết quả thành công mà không ghi gì (thiếu w.commit).`);
+    if (result.ok && !committed && !declaredNoChange) throw new Error(`${name}: trả kết quả thành công mà không ghi gì (thiếu w.commit).`);
     return result;
   };
   return Object.assign(command, { [WRITE_COMMAND]: name });

@@ -5,7 +5,8 @@ import {
   type ReagentMetadataInput, type QuickValueType,
 } from '../domain/reagent-validation';
 import { calculateReagentComparison, RC_MIN_PAIRS, type ReagentComparisonResult } from '../domain/reagent-stats';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin, withTransaction } from './shared';
+import { type IpcResult } from './shared';
+import { writeCommand } from './write-command';
 
 export interface ReagentComparisonRow {
   id: string; reagent: string; lot_old: string; lot_new: string; date: string; operator: string;
@@ -42,24 +43,22 @@ export function createReagentHandlers(db: Db) {
     return rows.map(toView);
   }
 
-  function createComparison(input: unknown, actor: Actor): IpcResult<ReagentComparisonView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const createComparison = writeCommand(db, 'createComparison', 'write', (w, input: unknown): IpcResult<ReagentComparisonView> => {
     const id = cleanId(uid());
     const data = objectInput(objectInput(input).data);
     const name = cleanText(data.name, 120).trim() || DEFAULT_REAGENT_NAME;
     const unit = cleanText(data.unit, 40).trim();
-    withTransaction(db, () => {
+    w.commit((tx) => {
       db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
         VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
         .run(id, name, '', '', '', '', 'Mẫu bệnh nhân', unit, 6, 0.05, JSON.stringify(prepareReagentRows(null)));
-      writeAudit(db, actor, 'Tạo phép so sánh hóa chất', `Tạo "${name}"`, name);
+      tx.audit('Tạo phép so sánh hóa chất', `Tạo "${name}"`, name);
+      tx.changed(['reagent_tests']);
     });
-    notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
-  }
+  });
 
-  function saveMetadata(input: unknown, actor: Actor): IpcResult<ReagentComparisonView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const saveMetadata = writeCommand(db, 'saveMetadata', 'write', (w, input: unknown): IpcResult<ReagentComparisonView> => {
     const payload = objectInput(input);
     const id = cleanId(payload.id);
     const existing = db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as ReagentComparisonRow | undefined;
@@ -76,47 +75,45 @@ export function createReagentHandlers(db: Db) {
       && meta.date === existing.date && meta.operator === existing.operator && meta.sampleType === existing.sample_type
       && meta.unit === existing.unit && meta.biasTarget === (existing.bias_target ?? 6) && meta.alpha === (existing.alpha ?? 0.05)
       && meta.coverageConfirmed === !!existing.coverage_confirmed;
-    if (unchanged) return { ok: true, data: toView(existing) };
-    withTransaction(db, () => {
+    if (unchanged) return w.noChange(toView(existing));
+    w.commit((tx) => {
       db.prepare(`UPDATE reagent_tests SET reagent=?,lot_old=?,lot_new=?,date=?,operator=?,sample_type=?,unit=?,bias_target=?,alpha=?,coverage_confirmed=? WHERE id=?`)
         .run(meta.reagent, meta.lotOld, meta.lotNew, meta.date, meta.operator, meta.sampleType, meta.unit, meta.biasTarget, meta.alpha, meta.coverageConfirmed ? 1 : 0, id);
-      writeAudit(db, actor, 'Sửa thông tin so sánh hóa chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
+      tx.audit('Sửa thông tin so sánh hóa chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
+      tx.changed(['reagent_tests']);
     });
-    notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
-  }
+  });
 
-  function saveRows(input: unknown, actor: Actor): IpcResult<ReagentComparisonView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const saveRows = writeCommand(db, 'saveRows', 'write', (w, input: unknown): IpcResult<ReagentComparisonView> => {
     const payload = objectInput(input);
     const id = cleanId(payload.id);
     const existing = db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as ReagentComparisonRow | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy phép so sánh.' } };
     const rows = prepareReagentRows(payload.rows);
     const rowsJson = JSON.stringify(rows);
-    if (rowsJson === existing.rows_json) return { ok: true, data: toView(existing) };
-    withTransaction(db, () => {
+    if (rowsJson === existing.rows_json) return w.noChange(toView(existing));
+    w.commit((tx) => {
       db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run(rowsJson, id);
-      writeAudit(db, actor, 'Sửa dữ liệu so sánh hóa chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
+      tx.audit('Sửa dữ liệu so sánh hóa chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
+      tx.changed(['reagent_tests']);
     });
-    notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
-  }
+  });
 
-  function removeComparison(input: unknown, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeComparison = writeCommand(db, 'removeComparison', 'admin', (w, input: unknown): IpcResult<{ id: string }> => {
     const id = cleanId(objectInput(input).id);
     const existing = db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as ReagentComparisonRow | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy phép so sánh.' } };
     const count = (db.prepare('SELECT COUNT(*) as c FROM reagent_tests').get() as { c: number }).c;
     if (count <= 1) return { ok: false, error: { code: 'last-comparison', message: 'Phải giữ lại ít nhất 1 phép so sánh.' } };
-    withTransaction(db, () => {
+    w.commit((tx) => {
       db.prepare('DELETE FROM reagent_tests WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xóa phép so sánh hóa chất', `Xóa "${existing.reagent}"`, existing.reagent);
+      tx.audit('Xóa phép so sánh hóa chất', `Xóa "${existing.reagent}"`, existing.reagent);
+      tx.changed(['reagent_tests']);
     });
-    notifyChanged(['reagent_tests']);
     return { ok: true, data: { id } };
-  }
+  });
 
   /** "Chọn nhanh" người thực hiện/loại mẫu — 1 danh sách CHUNG cho toàn app
    * (không gắn theo phép so sánh), lưu ở `app_meta` cùng cơ chế key/value đã
@@ -141,25 +138,23 @@ export function createReagentHandlers(db: Db) {
     return { ok: true, data: readQuickList(type) };
   }
 
-  function addQuickListValue(input: unknown, actor: Actor): IpcResult<{ items: string[]; value: string }> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const addQuickListValue = writeCommand(db, 'addQuickListValue', 'write', (w, input: unknown): IpcResult<{ items: string[]; value: string }> => {
     const payload = objectInput(input);
     const type = cleanQuickValueType(payload.type);
     if (!type) return { ok: false, error: { code: 'invalid-type', message: 'Loại giá trị chọn nhanh không hợp lệ.' } };
     const result = addQuickValue(readQuickList(type), payload.value);
     if ('error' in result) return { ok: false, error: { code: result.error, message: 'Nhập giá trị cần thêm.' } };
-    if (result.added) {
-      withTransaction(db, () => {
-        writeQuickList(type, result.items);
-        writeAudit(db, actor, 'Thêm giá trị chọn nhanh', `${quickTypeLabel(type)}: "${result.value}"`, '');
-      });
-      notifyChanged(['app_meta']);
-    }
+    // Giá trị đã có sẵn trong danh sách: không ghi, không nhật ký.
+    if (!result.added) return w.noChange({ items: result.items, value: result.value });
+    w.commit((tx) => {
+      writeQuickList(type, result.items);
+      tx.audit('Thêm giá trị chọn nhanh', `${quickTypeLabel(type)}: "${result.value}"`, '');
+      tx.changed(['app_meta']);
+    });
     return { ok: true, data: { items: result.items, value: result.value } };
-  }
+  });
 
-  function removeQuickListValue(input: unknown, actor: Actor): IpcResult<{ items: string[] }> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const removeQuickListValue = writeCommand(db, 'removeQuickListValue', 'write', (w, input: unknown): IpcResult<{ items: string[] }> => {
     const payload = objectInput(input);
     const type = cleanQuickValueType(payload.type);
     if (!type) return { ok: false, error: { code: 'invalid-type', message: 'Loại giá trị chọn nhanh không hợp lệ.' } };
@@ -167,13 +162,13 @@ export function createReagentHandlers(db: Db) {
     const index = Number(payload.index);
     if (!Number.isInteger(index) || index < 0 || index >= items.length) return { ok: false, error: { code: 'invalid-index', message: 'Không tìm thấy giá trị cần xoá.' } };
     const [removed] = items.splice(index, 1);
-    withTransaction(db, () => {
+    w.commit((tx) => {
       writeQuickList(type, items);
-      writeAudit(db, actor, 'Xoá giá trị chọn nhanh', `${quickTypeLabel(type)}: "${removed}"`, '');
+      tx.audit('Xoá giá trị chọn nhanh', `${quickTypeLabel(type)}: "${removed}"`, '');
+      tx.changed(['app_meta']);
     });
-    notifyChanged(['app_meta']);
     return { ok: true, data: { items } };
-  }
+  });
 
   return { listComparisons, createComparison, saveMetadata, saveRows, removeComparison, listQuickValues, addQuickListValue, removeQuickListValue };
 }

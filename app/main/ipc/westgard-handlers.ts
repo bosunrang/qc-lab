@@ -9,7 +9,8 @@ import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { observedStats } from '../domain/observed-stats';
-import { type Actor, type IpcResult, addChangeListener, writeAudit, notifyChanged, requireAdmin, requireWrite, withTransaction } from './shared';
+import { type IpcResult, addChangeListener } from './shared';
+import { writeCommand } from './write-command';
 import { TestSummaryCache } from './summary-cache';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
@@ -39,7 +40,6 @@ export type { TestSummary };
 export type { LevelAnalysis } from '../../shared/qc-api';
 
 export function createWestgardHandlers(db: Db) {
-  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
   type ActivePoint = QcPointLike & { id: string; date: string; run_id: string; val: number; qcMean: number | null; qcSd: number | null };
   type ActiveLevel = { level: number; mean: number | null; sd: number | null; qc_lot_id: string | null; lot_no: string; exp: string; pts: ActivePoint[] };
   const pointOrder = compareQcPointOrder;
@@ -77,36 +77,34 @@ export function createWestgardHandlers(db: Db) {
    * chỉ xét nghiệm đang xem. Là cấu hình chung của phòng xét nghiệm nên chỉ
    * quản trị viên được đổi, và chỉ trên máy chính (`lan: false`) — người dùng
    * chốt 2026-09-26. */
-  function saveRuleSetting(ruleId: string, on: boolean, actor: Actor): IpcResult<{ ruleId: string; on: boolean }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveRuleSetting = writeCommand(db, 'saveRuleSetting', 'admin', (w, ruleId: string, on: boolean): IpcResult<{ ruleId: string; on: boolean }> => {
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (typeof on !== 'boolean') return { ok: false, error: { code: 'invalid-value', message: 'Trạng thái luật không hợp lệ.' } };
-    inTransaction(() => {
+    w.commit((tx) => {
       const map = globalRules(); map[ruleId] = on;
       writeGlobalRules(db, map);
-      writeAudit(db, actor, 'Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${on ? 'bật' : 'tắt'} (cấu hình chung)`, ruleId);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${on ? 'bật' : 'tắt'} (cấu hình chung)`, ruleId);
+      tx.changed(['app_meta']);
     });
-    notifyChanged(['app_meta']);
     return { ok: true, data: { ruleId, on } };
-  }
+  });
 
   /** Khôi phục toàn bộ cấu hình mặc định của `WG_RULE_REGISTRY`, không phải
    * bật tất cả luật. */
-  function resetRuleSettings(actor: Actor): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const resetRuleSettings = writeCommand(db, 'resetRuleSettings', 'admin', (w): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> => {
     const defaults: RuleActionsMap = {};
     for (const rule of WG_RULE_REGISTRY) defaults[rule.id] = rule.defaultOn;
-    inTransaction(() => {
+    w.commit((tx) => {
       writeGlobalRules(db, defaults);
-      writeAudit(db, actor, 'Sửa cấu hình luật Westgard', 'Khôi phục cấu hình chung của luật về mặc định', 'Westgard');
+      tx.audit('Sửa cấu hình luật Westgard', 'Khôi phục cấu hình chung của luật về mặc định', 'Westgard');
+      tx.changed(['app_meta']);
     });
-    notifyChanged(['app_meta']);
     const data = globalRuleList(defaults).map(r => {
       const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
       return { id: r.id, on: r.on, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
     });
     return { ok: true, data };
-  }
+  });
 
   // Phần `levels` đã tính của từng xét nghiệm — xem `summary-cache.ts`.
   const summaryCache = new TestSummaryCache<TestSummary['levels']>();
@@ -258,8 +256,7 @@ export function createWestgardHandlers(db: Db) {
 
   /** Ghi đè riêng cho một xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
    * hình chung. */
-  function saveRuleAction(testId: string, ruleId: string, value: RuleAction | '', actor: Actor): IpcResult<{ ruleId: string; action: RuleAction | '' }> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const saveRuleAction = writeCommand(db, 'saveRuleAction', 'write', (w, testId: string, ruleId: string, value: RuleAction | ''): IpcResult<{ ruleId: string; action: RuleAction | '' }> => {
     const test = db.prepare('SELECT id, name, rule_actions_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
@@ -268,13 +265,13 @@ export function createWestgardHandlers(db: Db) {
     const action: RuleAction | '' = value;
     if (action) overrides[ruleId] = action; else delete overrides[ruleId];
     const label = action === '' ? 'theo cấu hình chung' : action === 'inactive' ? 'không dùng' : action === 'alert' ? 'cảnh báo' : 'loại bỏ';
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('UPDATE tests SET rule_actions_json=? WHERE id=?').run(serializeRuleActions(overrides), testId);
-      writeAudit(db, actor, 'Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${label}`, test.name);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${label}`, test.name);
+      tx.changed(['tests'], [testId]);
     });
-    notifyChanged(['tests'], [testId]);
     return { ok: true, data: { ruleId, action } };
-  }
+  });
 
   return { listTestSummaries, analyzeLevel, saveRuleAction, listRuleSettings, saveRuleSetting, resetRuleSettings, listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks };
 }

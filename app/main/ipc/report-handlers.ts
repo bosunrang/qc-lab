@@ -7,6 +7,7 @@ import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type Un
 import { isPeriodLocked as isLocked } from '../db/period-locks';
 import { DEFAULT_SIGMA_REPORT_TEMPLATE, validateReportTemplate, type ReportTemplateInput } from '../domain/report-template-validation';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { writeCommand } from './write-command';
 // Kiểu hàng báo cáo lấy từ HỢP ĐỒNG dùng chung thay vì khai lại ở đây — bản
 // trước có hai khai báo song song cùng tên và bản ở đây thiếu cột `lot`.
 import type { ReportPointRow } from '../../shared/qc-api';
@@ -55,34 +56,33 @@ export function createReportHandlers(db: Db) {
 
   const isPeriodLocked = (ym: string): boolean => isLocked(db, ym);
 
-  function lockPeriod(input: { data: LockPeriodInput }, actor: Actor): IpcResult<PeriodLockRow> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const lockPeriod = writeCommand(db, 'lockPeriod', 'admin', (w, input: { data: LockPeriodInput }): IpcResult<PeriodLockRow> => {
+    const actor = w.actor;
     const result = validateLockPeriod(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { ym, note } = result.data;
     if (isPeriodLocked(ym)) return { ok: false, error: { code: 'already-locked', message: `Kỳ ${ym} đã được khoá trước đó.` } };
     const id = uid();
-    withTransaction(db, () => {
+    w.commit((tx) => {
       db.prepare('INSERT INTO period_locks(id,ym,locked_at,locked_by,note) VALUES (?,?,?,?,?)').run(id, ym, nowIso(), actor.username, note);
-      writeAudit(db, actor, 'Khoá kỳ báo cáo', `Khoá kỳ ${ym}${note ? ': ' + note : ''}`, ym);
+      tx.audit('Khoá kỳ báo cáo', `Khoá kỳ ${ym}${note ? ': ' + note : ''}`, ym);
+      tx.changed(['period_locks']);
     });
-    notifyChanged(['period_locks']);
     return { ok: true, data: db.prepare('SELECT * FROM period_locks WHERE id=?').get(id) as unknown as PeriodLockRow };
-  }
+  });
 
-  function unlockPeriod(input: { data: UnlockPeriodInput }, actor: Actor): IpcResult<{ ym: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const unlockPeriod = writeCommand(db, 'unlockPeriod', 'admin', (w, input: { data: UnlockPeriodInput }): IpcResult<{ ym: string }> => {
     const result = validateUnlockPeriod(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { ym, note } = result.data;
     if (!isPeriodLocked(ym)) return { ok: false, error: { code: 'not-locked', message: `Kỳ ${ym} chưa bị khoá.` } };
-    withTransaction(db, () => {
+    w.commit((tx) => {
       db.prepare('DELETE FROM period_locks WHERE ym=?').run(ym);
-      writeAudit(db, actor, 'Mở khoá kỳ báo cáo', `Mở khoá kỳ ${ym}: ${note}`, ym);
+      tx.audit('Mở khoá kỳ báo cáo', `Mở khoá kỳ ${ym}: ${note}`, ym);
+      tx.changed(['period_locks']);
     });
-    notifyChanged(['period_locks']);
     return { ok: true, data: { ym } };
-  }
+  });
 
   /** Điểm QC của 1 xét nghiệm (mọi mức, MỌI lô) trong khoảng ngày.
    *

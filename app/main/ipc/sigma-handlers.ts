@@ -8,7 +8,8 @@ import { TEA_CATALOG_WITH_CLIA_ABSOLUTE } from '../domain/tea-catalog';
 import { isoLocalDate } from '../domain/local-date';
 import { sha256Hex } from '../domain/sha256';
 import { cleanId, cleanText, finiteNumber } from '../domain/text-utils';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin, withTransaction } from './shared';
+import { type IpcResult } from './shared';
+import { writeCommand } from './write-command';
 
 const PERIOD_RE = /^\d{4}-\d{2}$/;
 const TEA_SOURCES = new Set(['lab', 'eflm', 'clia', 'ricos']);
@@ -116,7 +117,6 @@ function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLeve
 }
 
 export function createSigmaHandlers(db: Db) {
-  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
   /** Dấu vân tay của ĐÚNG những gì `buildSigmaCohorts()` đọc, không hơn:
    * các điểm QC của (xét nghiệm, mức, lô) tới hết kỳ, và tập điểm đã có hồ sơ
    * khắc phục duyệt xong + hiệu quả (`resolvedPointIds`).
@@ -256,8 +256,7 @@ export function createSigmaHandlers(db: Db) {
     }));
   }
 
-  function saveTeaConfig(input: { testId?: unknown; source?: unknown; tea?: unknown; eflmAnalyte?: unknown; eflmAps?: unknown; eflmLookupDate?: unknown; eflmRef?: unknown }, actor: Actor): IpcResult<Test> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const saveTeaConfig = writeCommand(db, 'saveTeaConfig', 'write', (w, input: { testId?: unknown; source?: unknown; tea?: unknown; eflmAnalyte?: unknown; eflmAps?: unknown; eflmLookupDate?: unknown; eflmRef?: unknown }): IpcResult<Test> => {
     const testId = cleanId(input?.testId), source = cleanText(input?.source, 20).trim();
     if (!TEA_SOURCES.has(source)) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
     const test = db.prepare('SELECT * FROM tests WHERE id=?').get(testId) as {
@@ -270,7 +269,7 @@ export function createSigmaHandlers(db: Db) {
     if (!['minimum', 'desirable', 'optimum'].includes(eflmAps || 'desirable')) return { ok: false, error: { code: 'invalid-eflm-aps', message: 'Mức APS EFLM không hợp lệ.' } };
     // API vá từng trường: đổi nguồn không được làm mất thông tin EFLM đã nhập
     // trước đó, kể cả khi lời gọi đến từ một màn hình khác trong tương lai.
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('UPDATE tests SET tea_source=?,tea=?,eflm_analyte=?,eflm_aps=?,eflm_lookup_date=?,eflm_ref=?,eflm_tea=? WHERE id=?').run(
         source, Number.isFinite(tea) ? tea : 0,
         input?.eflmAnalyte == null ? test.eflm_analyte : cleanText(input.eflmAnalyte, 160).trim(),
@@ -279,14 +278,14 @@ export function createSigmaHandlers(db: Db) {
         input?.eflmRef == null ? test.eflm_ref : cleanText(input.eflmRef, 500).trim(),
         source === 'eflm' && input.tea != null && input.tea !== '' ? tea : test.eflm_tea, testId,
       );
-      writeAudit(db, actor, 'Cập nhật TEa Six Sigma', `Nguồn ${source} cho xét nghiệm "${test.name}"`, test.name);
+      tx.audit('Cập nhật TEa Six Sigma', `Nguồn ${source} cho xét nghiệm "${test.name}"`, test.name);
+      tx.changed(['tests'], [testId]);
     });
-    notifyChanged(['tests'], [testId]);
     return { ok: true, data: db.prepare('SELECT * FROM tests WHERE id=?').get(testId) as Test };
-  }
+  });
 
-  function savePeriod(input: SigmaPeriodInput, actor: Actor): IpcResult<SigmaPeriodView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const savePeriod = writeCommand(db, 'savePeriod', 'write', (w, input: SigmaPeriodInput): IpcResult<SigmaPeriodView> => {
+    const actor = w.actor;
     const testId = cleanId(input.testId);
     const test = db.prepare('SELECT id, name FROM tests WHERE id=?').get(testId) as { id: string; name: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
@@ -414,23 +413,22 @@ export function createSigmaHandlers(db: Db) {
     // Mã nguồn được chuẩn hóa riêng, mô tả tiêu chí nằm trong snapshot mức.
     // Luồng "+ Thêm kỳ" chọn trực tiếp tháng/năm nhưng tuyệt đối không ghi đè
     // bản đã có. Cổng lưu chung vẫn cho phép cập nhật CV/Bias/MU của kỳ đã chốt.
-    inTransaction(() => {
+    w.commit((tx) => {
       if (existing) {
         db.prepare('UPDATE sigma_data SET tea=?, tea_source=?, lv_json=? WHERE id=?').run(tea, teaSource, JSON.stringify(stored), id);
       } else {
         db.prepare('INSERT INTO sigma_data(id,test_id,period,tea,tea_source,lv_json) VALUES (?,?,?,?,?,?)').run(id, testId, period, tea, teaSource, JSON.stringify(stored));
       }
       const reviewed = stored.filter(level => level.cohortReview).map(level => `M${level.level}: ${level.sourceLot}, n=${level.cohortN}, rà soát ${level.cohortReview!.by}`).join('; ');
-      writeAudit(db, actor, existing ? 'Sửa kỳ Six Sigma' : 'Thêm kỳ Six Sigma', `Kỳ ${period} của xét nghiệm "${test.name}"${reviewed ? `; ${reviewed}` : ''}`, test.name);
+      tx.audit(existing ? 'Sửa kỳ Six Sigma' : 'Thêm kỳ Six Sigma', `Kỳ ${period} của xét nghiệm "${test.name}"${reviewed ? `; ${reviewed}` : ''}`, test.name);
+      tx.changed(['sigma_data'], [testId]);
     });
-    notifyChanged(['sigma_data'], [testId]);
     return { ok: true, data: listPeriods(testId).find(item => item.id === id)! };
-  }
+  });
 
   /** Đổi kỳ phải là một giao dịch duy nhất. Không dùng "lưu mới rồi xoá bản trước"
    * vì KTV được sửa Sigma nhưng không có quyền xóa kỳ, dễ để lại hai bản ghi. */
-  function renamePeriod(input: { id?: unknown; period?: unknown }, actor: Actor): IpcResult<SigmaPeriodView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const renamePeriod = writeCommand(db, 'renamePeriod', 'write', (w, input: { id?: unknown; period?: unknown }): IpcResult<SigmaPeriodView> => {
     const id = cleanText(input?.id, 200).trim();
     const period = cleanText(input?.period, 7).trim();
     if (!PERIOD_RE.test(period) || Number(period.slice(5)) < 1 || Number(period.slice(5)) > 12) return { ok: false, error: { code: 'invalid-period', message: 'Kỳ phải có định dạng YYYY-MM hợp lệ.' } };
@@ -439,36 +437,35 @@ export function createSigmaHandlers(db: Db) {
     if (row.period === period) {
       const stored = readStoredLevels(row.lv_json);
       const sameChain = teaChain(makeLevelTeaResolver(row.test_id), row.tea_source);
-      return { ok: true, data: { id: row.id, testId: row.test_id, period: row.period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea, sameChain.bySource, designLevelCount(row.test_id, stored), sameChain.fallback)) } };
+      return w.noChange({ id: row.id, testId: row.test_id, period: row.period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea, sameChain.bySource, designLevelCount(row.test_id, stored), sameChain.fallback)) });
     }
     if (readStoredLevels(row.lv_json).some(level => level.cvSource === 'iqc-cohort')) return { ok: false, error: { code: 'cohort-period-fixed', message: 'Kỳ có snapshot IQC không được đổi tháng. Hãy tạo kỳ mới và nạp lại dữ liệu đúng kỳ.' } };
     const nextId = `${row.test_id}:${period}`;
     if (db.prepare('SELECT 1 FROM sigma_data WHERE id=?').get(nextId)) return { ok: false, error: { code: 'duplicate-period', message: `Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.` } };
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('UPDATE sigma_data SET id=?, period=? WHERE id=?').run(nextId, period, row.id);
       const test = db.prepare('SELECT name FROM tests WHERE id=?').get(row.test_id) as { name: string } | undefined;
-      writeAudit(db, actor, 'Đổi kỳ Six Sigma', `Đổi kỳ ${row.period} thành ${period} của xét nghiệm "${test?.name || ''}"`, test?.name || '');
+      tx.audit('Đổi kỳ Six Sigma', `Đổi kỳ ${row.period} thành ${period} của xét nghiệm "${test?.name || ''}"`, test?.name || '');
+      tx.changed(['sigma_data'], [row.test_id]);
     });
-    notifyChanged(['sigma_data'], [row.test_id]);
     const stored = readStoredLevels(row.lv_json);
     const renamedChain = teaChain(makeLevelTeaResolver(row.test_id), row.tea_source);
     return { ok: true, data: { id: nextId, testId: row.test_id, period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea, renamedChain.bySource, designLevelCount(row.test_id, stored), renamedChain.fallback)) } };
-  }
+  });
 
   /** Xoá một kỳ Sigma — chỉ quản trị viên. */
-  function removePeriod(input: { data: { id: string } }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removePeriod = writeCommand(db, 'removePeriod', 'admin', (w, input: { data: { id: string } }): IpcResult<{ id: string }> => {
     const id = cleanText(input.data?.id, 200).trim();
     const row = db.prepare('SELECT id, test_id, period FROM sigma_data WHERE id=?').get(id) as { id: string; test_id: string; period: string } | undefined;
     if (!row) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy kỳ Six Sigma.' } };
     const test = db.prepare('SELECT name FROM tests WHERE id=?').get(row.test_id) as { name: string } | undefined;
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('DELETE FROM sigma_data WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá kỳ Six Sigma', `Kỳ ${row.period} của xét nghiệm "${test ? test.name : ''}"`, test ? test.name : '');
+      tx.audit('Xoá kỳ Six Sigma', `Kỳ ${row.period} của xét nghiệm "${test ? test.name : ''}"`, test ? test.name : '');
+      tx.changed(['sigma_data'], [row.test_id]);
     });
-    notifyChanged(['sigma_data'], [row.test_id]);
     return { ok: true, data: { id } };
-  }
+  });
 
   return { listPeriods, listCohorts, saveTeaConfig, savePeriod, renamePeriod, removePeriod };
 }
