@@ -114,9 +114,9 @@ export function SettingsPage() {
     setFbCode(firebase.labCode || 'khoaXN'); setFbEmail(firebase.email); setFbConfig(firebase.config); setFbSeeded(true);
   }, [firebase, fbSeeded]);
 
-  // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn hệ thống
-  // hứa (`LIS_POLL_MS`). Trước Giai đoạn D3.3 app chỉ lấy hàng chờ khi
-  // bấm nút, nên nhãn đó là lời hứa suông — nay có bộ đếm thật.
+  // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn trên trang
+  // hứa (`LIS_POLL_MS`). Trước đây app chỉ lấy hàng chờ khi bấm nút, nên
+  // nhãn đó là lời hứa suông — nay có bộ đếm thật.
   // Chạy theo cấu hình ĐÃ LƯU (`lis.enabled`), không theo ô tick đang sửa:
   // tick mà chưa lưu thì main vẫn coi Gateway là tắt, và trước 2026-09-26 vòng
   // hỏi chạy ngay rồi báo lỗi "LIS Gateway chưa được bật" (kế hoạch D.10).
@@ -227,7 +227,7 @@ export function SettingsPage() {
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
 
-  // Giai đoạn C5 — LIS Gateway (xem main/ipc/lis-handlers.ts).
+  // Lưu cấu hình LIS Gateway (xem main/ipc/lis-handlers.ts).
   async function saveLisSettings() {
     setLisErr(null);
     const result = await saveLis({ enabled: lisEnabled, url: lisUrl, token: lisToken });
@@ -312,9 +312,9 @@ export function SettingsPage() {
     return backupInfo?.lastBackupBytes ? `Backup gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
   }
 
-  /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký
-   * (ánh xạ `ResetOperationalDataCommand` hệ thống). Không thể hoàn tác nên đi
-   * qua đủ confirm + reauth, và main tự chốt 1 bản an toàn ra đĩa trước. */
+  /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký.
+   * Không thể hoàn tác nên đi qua đủ confirm + reauth, và main tự chốt 1 bản
+   * an toàn ra đĩa trước. */
   async function resetAll() {
     if (!(await confirmDialog(
       'Toàn bộ máy xét nghiệm, xét nghiệm, mức QC, điểm QC, hồ sơ NCE, so sánh hoá chất, kỳ Sigma, khoá kỳ báo cáo và bảng TEa sẽ bị xoá. Tài khoản người dùng và nhật ký hoạt động được giữ lại. Một bản sao lưu an toàn sẽ được tạo tự động trước khi xoá. Tiếp tục?',
@@ -329,7 +329,6 @@ export function SettingsPage() {
 
   return (
     <>
-      {/* Tiêu đề/phụ đề đã trở về đúng hệ thống từ khi C2 Firebase hoàn tất. */}
       <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">

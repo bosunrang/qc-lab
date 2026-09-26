@@ -95,7 +95,7 @@ export function TeaRefsTab() {
             const hasOverride = !!override && (override.clia != null || override.ricos != null);
             const kind = hasOverride ? 'override' : labRef?.lab != null ? 'lab' : 'default';
             const status = TEA_STATUS[kind];
-            // hệ thống chỉ ghép viết tắt khi nó KHÁC tên (bỏ qua khác biệt
+            // Chỉ ghép viết tắt khi nó KHÁC tên (bỏ qua khác biệt
             // hoa/thường): "Sodium (Na)" nhưng chỉ "Urea", "pH", "D-dimer".
             const sameAbbr = !ref.abbr || ref.abbr.trim().toLocaleLowerCase('vi') === ref.name.trim().toLocaleLowerCase('vi');
             const displayName = sameAbbr ? ref.name : `${ref.name} (${ref.abbr})`;

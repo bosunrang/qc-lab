@@ -184,8 +184,8 @@ export function UsersPage() {
   );
 }
 
-/** "Sửa quyền" — modal của hệ thống (`UserPermissionsModal.tsx`): 1 select vai
- * trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở đây, đúng phạm vi hệ thống. */
+/** "Sửa quyền": 1 select vai trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở
+ * đây — modal này chỉ lo quyền. */
 function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
   const { update } = useUsersStore(useShallow((s) => ({ update: s.update })));
   const [role, setRole] = useState<string>(user.role);
