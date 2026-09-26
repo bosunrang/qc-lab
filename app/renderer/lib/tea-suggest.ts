@@ -32,6 +32,12 @@ export function analyteDisplayName(item: { name: string; abbr: string }): string
 }
 
 
+/** Danh mục TEa sau khi áp hồ sơ ghi đè của phòng xét nghiệm. Ô ghi đè để
+ * trống nghĩa là "dùng giá trị mặc định của danh mục", đúng quy tắc main giải
+ * TEa (`resolveTea()`: `ref?.clia ?? catalog?.clia`) và đúng ý nghĩa của nút
+ * "Khôi phục mặc định" (ghi NULL vào ô ghi đè). Trước 2026-09-26 hàm này thay
+ * ô trống bằng `null`: chỉ ghi đè Ricos là gợi ý mất CLIA của danh mục, lệch
+ * với TEa mà Six Sigma dùng cho cùng xét nghiệm. */
 export function effectiveTeaCatalog(teaRefs: readonly TeaRef[]): TeaCatalogItem[] {
   const overrides = new Map<string, TeaRef>();
   for (const ref of teaRefs) if (ref.analyte_id) overrides.set(ref.analyte_id, ref);
@@ -43,8 +49,8 @@ export function effectiveTeaCatalog(teaRefs: readonly TeaRef[]): TeaCatalogItem[
       name: over.name || item.name,
       unit: over.unit || item.unit,
       section: over.section || item.section,
-      clia: over.clia ?? null,
-      ricos: over.ricos ?? null,
+      clia: over.clia ?? item.clia,
+      ricos: over.ricos ?? item.ricos,
     };
   });
 }

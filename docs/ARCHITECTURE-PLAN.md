@@ -38,6 +38,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | C.1 phần tách tệp (nhánh `refactor/split-config-handlers`) | `config-handlers.ts` 1.358 → 23 dòng, chỉ ghép ba nhóm: `config-catalog-handlers.ts` (máy, xét nghiệm, mức QC, phạm vi luật, Panel), `config-lot-handlers.ts` (lô, nhóm lô, Mean/SD dự kiến, chuyển tiếp lô), `config-tea-handlers.ts` (TEa). `lotGroupInUse` chuyển xuống `db/lot-groups.ts`. Tách thuần: đối chiếu từng dòng thân hàm với bản gốc, chỉ khác đúng hàm vừa chuyển; 34 hàm xuất ra giữ nguyên |
 | D.7 (nhánh `refactor/split-sigma-westgard-pages`) | `WestgardPage.tsx` 652 → 413 dòng: tab nhóm lô đã dừng ở `westgard/useArchivedWestgard.ts` + `ArchivedGroupView.tsx`; hai bảng điểm gần giống nhau gộp thành `WestgardPointTable` (điểm lịch sử có `cusumSignal: null` nên hiển thị như cũ). `SigmaPage.tsx` 946 → 535 dòng: hàm thuần ở `sigma/shared.ts`, 4 hộp thoại mỗi cái một tệp, 4 khối hiển thị ở `SigmaPanels.tsx`; phần thiết lập và vùng làm việc theo kỳ (các thao tác ghi) giữ ở trang. Trang Westgard đọc store bằng `useShallow`. Test đọc mã dùng `tests/helpers/page-source.mjs`; e2e thêm luồng tab nhóm lô đã dừng |
 | G.2 (nhánh `feat/local-logging`) | Log ra `userData/logs/qclab.log`, mỗi dòng một JSON, xoay vòng 1 MB × 5 tệp (`main/logging/`). Nguồn: `internal-error` của IPC (kèm tên thao tác), lỗi không được bắt và lỗi hiển thị của renderer (kênh `log:clientError`, chỉ máy chính), yêu cầu LAN hỏng, exception/promise không được bắt ở main (`uncaughtExceptionMonitor`, không đổi hành vi), tiến trình hiển thị dừng. Che mật khẩu, token, khoá API trước khi ghi (`domain/log-redact.ts`). `crashReporter` với `uploadToServer: false`, tệp crash ở `logs/crashes`. Trang Cài đặt có nút "Mở thư mục log" (chỉ quản trị viên). Test `tests/logging.test.mjs`, `e2e/logging.e2e.mjs` |
+| F.1, F.2, F.4 (nhánh `fix/business-boundaries`) | F.1: gợi ý TEa khi thêm xét nghiệm lấy mặc định của danh mục khi ô ghi đè trống, như `resolveTea()` của main (trước đây chỉ ghi đè Ricos là mất CLIA); test đối chiếu trên toàn danh mục. F.2: quy tắc NCE quá hạn chuyển sang `domain/nce-overdue.ts`, `listNceRecords` trả `overdue_days`, Tổng quan chỉ hiển thị. F.4: `sigmaDesignEligible` đọc `qualityDesign` của main thay vì dò lại điều kiện; fixture SG08 sửa cho khớp đầu ra thật của main (quyết định SG08 không đổi) |
 
 ## Thứ tự đề xuất
 
@@ -283,16 +284,21 @@ tách (tách thuần, không đổi hành vi).
 
 ## F. Ranh giới nghiệp vụ còn lại
 
-1. Gợi ý TEa ở renderer (`lib/tea-suggest.ts`) bỏ mất giá trị CLIA/Ricos mặc
-   định khi có dòng ghi đè, khác cách main giải TEa (cần xác nhận bằng test).
-2. Quy tắc NCE quá hạn chỉ có ở `view-models/dashboard-view-model.ts`; main
-   nên trả `overdueDays` trong `listNceRecords`.
-3. Suy SD từ giới hạn (`lib/target-range.ts`) chỉ có ở renderer; main chỉ
-   kiểm hình thức.
-4. `sigmaDesignEligible` ở renderer lặp điều kiện main đã áp khi đặt
-   `qualityDesign = null`; rút về kiểm tra kết quả của main.
+1. ~~Gợi ý TEa bỏ mất giá trị mặc định khi có dòng ghi đè~~ — đã xác nhận là
+   lỗi thật và sửa, xem bảng "Đã xong".
+2. ~~Quy tắc NCE quá hạn chỉ có ở renderer~~ — đã xong (trường tên
+   `overdue_days` theo quy ước dòng SQLite giữ `snake_case`).
+3. **Suy SD từ giới hạn — đã rà soát 2026-09-26, KHÔNG chuyển sang main.**
+   `lib/target-range.ts` chỉ điền sẵn Mean/SD vào ô nhập khi người dùng gõ
+   giới hạn; người dùng thấy và sửa được, và main nhận Mean/SD tường minh rồi
+   kiểm đầy đủ. Chuyển phép suy SD = (cao − thấp)/(2k) vào main sẽ biến nó
+   thành quy tắc nghiệp vụ, trong khi CLSI C24 khuyến cáo không đặt SD từ dải
+   của nhà sản xuất.
+4. ~~`sigmaDesignEligible` lặp điều kiện của main~~ — đã xong.
 5. 7 chỗ renderer tự `JSON.parse` cột `*_json` thô; main nên trả dữ liệu đã
-   giải.
+   giải. **Chưa làm, chờ quyết định:** phải đổi hợp đồng IPC của 5 loại bản
+   ghi (hồ sơ NCE, mức QC, chuyển lô, TEa, xét nghiệm). Cả 7 chỗ đã bắt lỗi
+   JSON và có giá trị mặc định, nên rủi ro sai số liệu thấp.
 
 ## G. Test end-to-end và vận hành
 

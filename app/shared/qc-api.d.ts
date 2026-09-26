@@ -393,6 +393,8 @@ export interface NceRecord {
   point_id: string | null; rule: string; error_type: string; nce_id: string; parent_nce_id: string; follow_up_nce_id: string; protocol_version: number;
   approval_status: 'pending' | 'approved' | 'returned'; effectiveness_status: 'pending' | 'effective' | 'ineffective';
   record_status: 'active' | 'cancelled'; risk_level?: string; due_date: string; action_completed_date: string; detail_json: string;
+  /** Số ngày quá hạn, main tính lúc đọc (`domain/nce-overdue.ts`); 0 là chưa quá hạn. */
+  overdue_days: number;
 }
 
 export interface NceDetail {

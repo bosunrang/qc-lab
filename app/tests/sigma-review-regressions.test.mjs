@@ -219,12 +219,16 @@ test('SG07: missing targets cannot be approved by client, shifted series needs e
 });
 
 test('SG08: common design requires ALL levels; choose worst only after every level passes', () => {
+  // Fixture mô phỏng đúng đầu ra của main: `listPeriods()` đặt
+  // `qualityDesign = null` cho mức không `eligible` hoặc chưa rà soát (khoá ở
+  // SG07 và sigma-cohort-trust). Từ 2026-09-26 renderer đọc kết quả đó thay vì
+  // dò lại từng điều kiện (kế hoạch F.4), nên mức mất kiểm soát mang `null`.
   const ready = { cvSource: 'iqc-cohort', cohortStatus: 'eligible', cohortReviewed: true, qualityDesign: {} };
-  const levels = [{ ...ready, level: 1, sigma: { sigma: 6 } }, { ...ready, level: 2, sigma: { sigma: 2 }, cohortStatus: 'out-of-control' }];
+  const levels = [{ ...ready, level: 1, sigma: { sigma: 6 } }, { ...ready, level: 2, sigma: { sigma: 2 }, cohortStatus: 'out-of-control', qualityDesign: null }];
   assert.equal(helpers.governingSigmaLevel({ levels }), undefined);
-  levels[1].cohortStatus = 'eligible';
+  levels[1].cohortStatus = 'eligible'; levels[1].qualityDesign = {};
   assert.equal(helpers.governingSigmaLevel({ levels }).level, 2);
-  levels[1].cohortReviewed = false;
+  levels[1].cohortReviewed = false; levels[1].qualityDesign = null;
   assert.equal(helpers.governingSigmaLevel({ levels }), undefined);
 });
 
