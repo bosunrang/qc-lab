@@ -65,6 +65,14 @@ npm run lint
 npm run build
 ```
 
+Khi thay đổi preload, đăng ký IPC, cửa sổ, máy chủ LAN hoặc tách trang lớn, chạy
+thêm test end-to-end trên app Electron thật (khoảng 30 giây, cũng nằm trong
+`npm run verify-release`):
+
+```powershell
+npm run test:e2e
+```
+
 Khi cần đo khả năng xử lý dữ liệu lớn, chạy riêng bài đo 500.000 điểm QC để
 không làm chậm hồi quy thường ngày:
 

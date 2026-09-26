@@ -32,6 +32,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | E.3 (nhánh `perf/sqlite-wal`) | CSDL mở ở WAL, giữ `synchronous = FULL`: mỗi thao tác ghi có nhật ký 11 ms → 3 ms. Backup và bản an toàn (`VACUUM INTO`) vẫn là tệp SQLite thường, đọc chỉ đọc không để lại tệp phụ; đóng kết nối khi thoát app để gộp `-wal`; cỡ dữ liệu ở Cài đặt tính cả `-wal`. Test `tests/sqlite-wal.test.mjs` |
 | E.4 (nhánh `perf/realistic-benchmark`) | Bài đo `realistic-dataset-performance.perf.mjs`: 60 xét nghiệm × 5 năm × 2 lần chạy/ngày, lô đổi mỗi 6 tháng (492.750 điểm, tệp WAL thật). Phát hiện câu đọc điểm theo lô không dùng được chỉ mục; thêm `idx_qc_points_lot_active (test_id, level, lot, date) WHERE voided = 0`. Tổng quan/Westgard 3,8 s → 0,59 s; một mức Westgard 75 → 11 ms, Nhập QC 86 → 20 ms; lô cũ Westgard 1,4 s → 0,30 s, Nhập QC 2,0 s → 0,45 s. Tệp lớn thêm khoảng 15%. Test `tests/qc-points-index.test.mjs` kiểm kế hoạch truy vấn của mọi câu đọc theo lô |
 | C.2–C.5 (nhánh `refactor/main-process-small`) | `db/period-locks.ts` thay 3 bản `isPeriodLocked`; 15 khối BEGIN/COMMIT viết tay (config, entry, report, sigma, phục hồi, xoá sạch) chuyển sang `withTransaction()`, không còn khối nào trong `app/main`; `listComparisons` chỉ đọc, dòng so sánh trống do `seedInitialRows()` tạo khi mở CSDL và sau phục hồi/xoá sạch; xoá kênh `config:listActivity`. Kèm sửa: Firebase không còn coi phép so sánh trống là dữ liệu cục bộ (trước đây chỉ cần mở trang So sánh hoá chất là máy mới không tải được từ đám mây) |
+| G.1 (nhánh `test/e2e-electron`) | `npm run test:e2e`: Playwright (`playwright-core`, không tải trình duyệt) chạy app Electron đã build trên thư mục dữ liệu tạm và cổng LAN trống (`QCLAB_USER_DATA_DIR`, `QCLAB_LAN_PORT`). 5 luồng ở `app/e2e/`: tài khoản; nhập điểm → vi phạm 1-3s → lập NCE → huỷ điểm; mở mọi trang không lỗi; máy trạm LAN nhập điểm, thao tác quản trị bị từ chối; liên kết TEa ra ngoài không mở cửa sổ app. Chạy trong `verify-release`. Kèm sửa: renderer nhận biết máy trạm LAN theo cổng 3200 gắn cứng, nay theo cách được phục vụ (bản build qua HTTP, không có preload) |
 
 ## Thứ tự đề xuất
 
@@ -304,6 +305,10 @@ trong console của máy đang chạy.
    Chạy trong `verify-release` trước khi đóng gói. Khi đã có bộ này, thay dần
    các test đọc mã bằng regex (vd kiểm `AppShell` bọc `PageErrorBoundary`)
    bằng kiểm hành vi thật.
+
+   **Đã xong 2026-09-26**, xem bảng "Đã xong". Còn lại: thay dần 13 test đọc
+   mã bằng regex; luồng khởi tạo lại dữ liệu/backup qua hộp thoại hệ thống
+   chưa có (cần giả lập `dialog.showSaveDialog`).
 2. **Log ra tệp và báo crash, chỉ lưu tại máy:**
    - log có cấu trúc (thời điểm, mức, nguồn, thông báo) ghi vào thư mục dữ
      liệu của app, xoay vòng theo cỡ tệp; gồm lỗi `internal-error` của

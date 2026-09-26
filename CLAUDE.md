@@ -14,13 +14,16 @@ nằm tại `app/shared/qc-api.d.ts`.
 npm run dev
 npm start
 npm test
+npm run test:e2e
 npm run typecheck
 npm run lint
 npm run build
 npm run dist
 ```
 
-`npm run dev` phục vụ bản xem trước trên cổng 5174. `npm start` build và mở
+`npm run dev` phục vụ bản xem trước trên cổng 5174. `npm run test:e2e` build rồi
+chạy app Electron thật bằng Playwright (`app/e2e/`), trên thư mục dữ liệu tạm
+và cổng LAN trống, không đụng CSDL của người dùng. `npm start` build và mở
 Electron. Bản xem trước dùng sql.js/WASM trong trình duyệt; Electron đóng gói
 dùng `node:sqlite` và không kèm tài nguyên WASM.
 
