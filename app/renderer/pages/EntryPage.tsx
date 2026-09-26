@@ -521,7 +521,7 @@ export function EntryPage() {
     if (!voiding) return;
     if (voidChoice.reasonRequired && voidReason.trim().length < 5) { setVoidErr('Cần ghi lý do hủy tối thiểu 5 ký tự.'); return; }
     const openNce = voidChoice.forced ? voidChoice.openNce : voidOpenNce;
-    const result = await voidPoint(voiding.id, voidReason.trim(), voidKind, openNce, voiding.test_id, voiding.level);
+    const result = await voidPoint(voiding.id, voidReason.trim(), voidKind, openNce);
     if (!result.ok) { setVoidErr(result.error.message); return; }
     const followup = result.data.nceId
       ? (result.data.reusedAction ? ' Đã giữ liên kết với hồ sơ NCE đang mở.' : ` Đã mở hồ sơ ${result.data.nceId} để tiếp tục điều tra.`)

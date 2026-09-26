@@ -175,11 +175,18 @@ function LoadingView({ subtitle }: { subtitle: string }) {
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <div className="dash-kpi" key={label}><div className="k">{label}</div><div className="v">—</div></div>)}</div></div></>;
 }
 
+const DASHBOARD_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'actions', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
+
 export function DashboardPage() {
   const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore();
   const { profile, load: loadProfile } = useSettingsStore();
   useEffect(() => { load(); loadProfile(); }, [load, loadProfile]);
-  useStoreInvalidation(['qc_points', 'tests', 'actions', 'activity', 'qc_lots'], undefined, load);
+  // Liệt kê đúng các bảng mà Tổng quan hiển thị hoặc dùng để đánh giá
+  // Westgard (Mean/SD, lô, nhóm lô, Panel, luật chung trong `app_meta`, mốc
+  // khắc phục trong `actions`). Không nghe `activity`: bảng đó đổi sau MỌI
+  // thao tác ghi, kể cả đổi ảnh đại diện, và mỗi lần nạp lại là một lượt tính
+  // Westgard cho mọi xét nghiệm trên máy chính.
+  useStoreInvalidation(DASHBOARD_TABLES, undefined, load);
   const subtitle = (profile?.name || 'Khoa Xét nghiệm') + (profile?.dept ? ` · ${profile.dept}` : '');
   if (error) return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="panel"><EmptyState title="Không tải được Tổng quan" action={<button type="button" className="btn teal" onClick={() => { void load(); }}>Thử lại</button>}>Dữ liệu đã lưu không bị ảnh hưởng. Nội dung lỗi: {error}</EmptyState></div></>;
   if (loading) return <LoadingView subtitle={subtitle} />;

@@ -109,3 +109,23 @@ export async function enterValue(page, date, level, value) {
   await cell.fill(String(value));
   await cell.blur();
 }
+
+/** Đếm số lần main process nhận từng kênh IPC, để test canh số lần nạp lại
+ * dữ liệu sau một thao tác ghi. Bọc handler đã đăng ký trong bảng nội bộ của
+ * `ipcMain`; Electron đổi cấu trúc này thì hàm báo lỗi rõ thay vì đếm sai. */
+export async function countIpcCalls(app, channels) {
+  await app.evaluate(({ ipcMain }, names) => {
+    const handlers = ipcMain._invokeHandlers;
+    if (!(handlers instanceof Map)) throw new Error('ipcMain._invokeHandlers không còn là Map — cần sửa countIpcCalls().');
+    globalThis.__ipcCounts = Object.fromEntries(names.map((name) => [name, 0]));
+    for (const name of names) {
+      const original = handlers.get(name);
+      if (!original) throw new Error(`Không có kênh IPC ${name}.`);
+      handlers.set(name, (...args) => { globalThis.__ipcCounts[name] += 1; return original(...args); });
+    }
+  }, channels);
+  return {
+    read: () => app.evaluate(() => ({ ...globalThis.__ipcCounts })),
+    reset: () => app.evaluate(() => { for (const key of Object.keys(globalThis.__ipcCounts)) globalThis.__ipcCounts[key] = 0; }),
+  };
+}

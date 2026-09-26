@@ -33,6 +33,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | E.4 (nhánh `perf/realistic-benchmark`) | Bài đo `realistic-dataset-performance.perf.mjs`: 60 xét nghiệm × 5 năm × 2 lần chạy/ngày, lô đổi mỗi 6 tháng (492.750 điểm, tệp WAL thật). Phát hiện câu đọc điểm theo lô không dùng được chỉ mục; thêm `idx_qc_points_lot_active (test_id, level, lot, date) WHERE voided = 0`. Tổng quan/Westgard 3,8 s → 0,59 s; một mức Westgard 75 → 11 ms, Nhập QC 86 → 20 ms; lô cũ Westgard 1,4 s → 0,30 s, Nhập QC 2,0 s → 0,45 s. Tệp lớn thêm khoảng 15%. Test `tests/qc-points-index.test.mjs` kiểm kế hoạch truy vấn của mọi câu đọc theo lô |
 | C.2–C.5 (nhánh `refactor/main-process-small`) | `db/period-locks.ts` thay 3 bản `isPeriodLocked`; 15 khối BEGIN/COMMIT viết tay (config, entry, report, sigma, phục hồi, xoá sạch) chuyển sang `withTransaction()`, không còn khối nào trong `app/main`; `listComparisons` chỉ đọc, dòng so sánh trống do `seedInitialRows()` tạo khi mở CSDL và sau phục hồi/xoá sạch; xoá kênh `config:listActivity`. Kèm sửa: Firebase không còn coi phép so sánh trống là dữ liệu cục bộ (trước đây chỉ cần mở trang So sánh hoá chất là máy mới không tải được từ đám mây) |
 | G.1 (nhánh `test/e2e-electron`) | `npm run test:e2e`: Playwright (`playwright-core`, không tải trình duyệt) chạy app Electron đã build trên thư mục dữ liệu tạm và cổng LAN trống (`QCLAB_USER_DATA_DIR`, `QCLAB_LAN_PORT`). 5 luồng ở `app/e2e/`: tài khoản; nhập điểm → vi phạm 1-3s → lập NCE → huỷ điểm; mở mọi trang không lỗi; máy trạm LAN nhập điểm, thao tác quản trị bị từ chối; liên kết TEa ra ngoài không mở cửa sổ app. Chạy trong `verify-release`. Kèm sửa: renderer nhận biết máy trạm LAN theo cổng 3200 gắn cứng, nay theo cách được phục vụ (bản build qua HTTP, không có preload) |
+| E.6 bước 1–2, D.1 phần dữ liệu QC (nhánh `perf/fewer-summary-reloads`) | `entry-store` không tự nạp lại sau nhập/huỷ điểm và sửa ghi chú ngày (EntryPage đã nạp lại qua `useStoreInvalidation`); dải QC giữ nguyên trong lúc nạp lại cùng mức, không chớp trống. Tổng quan nghe danh sách bảng tường minh thay cho `activity`. Nhập một điểm: `listTestSummaries` 2 → 1 lần, nạp dữ liệu xét nghiệm 2 → 1 lần; thao tác không liên quan QC không còn làm Tổng quan tính lại. Test `e2e/reload-count.e2e.mjs` đếm lời gọi IPC ở main |
 
 ## Thứ tự đề xuất
 
@@ -181,7 +182,11 @@ tách (tách thuần, không đổi hành vi).
 
 **Dữ liệu và trạng thái:**
 
-1. **Một nguồn làm mới:** mỗi hàm ghi trong store tự nạp lại, rồi
+1. **Một nguồn làm mới** (đã làm cho `entry-store` và Tổng quan, xem E.6;
+   còn `manage-store`, `nce-store`, `reagent-store`, `sigma-store`,
+   `settings-store`, `users-store`, `report-store` — các store này nạp lại
+   danh sách nhỏ nên ít tốn, làm cùng `catalog-store` ở mục 3): mỗi hàm ghi
+   trong store tự nạp lại, rồi
    `notifyChanged` làm `useStoreInvalidation` nạp thêm lần nữa. Bỏ phần tự
    nạp trong store; giữ dữ liệu cũ trong lúc nạp (cờ `refreshing`) thay vì
    xoá mảng — hiện Westgard, Sigma, Nhập QC chớp trống sau mỗi lần ghi.
@@ -252,7 +257,8 @@ tách (tách thuần, không đổi hành vi).
    **Test:** kết quả của đường worker trùng đường đồng bộ trên bộ dữ liệu của
    E.4; trong lúc worker tính, một lời gọi IPC khác vẫn trả lời ngay.
 
-6. **Giảm số lần nạp lại Tổng quan (đề xuất, chưa làm).** `listTestSummaries`
+6. **Giảm số lần nạp lại Tổng quan** — bước 1–2 đã xong, xem bảng "Đã xong";
+   bước 3 (tính lại theo từng xét nghiệm) chưa làm. `listTestSummaries`
    tính lại mọi xét nghiệm mỗi lần được gọi, và được gọi rất thường xuyên:
    Tổng quan nạp lại khi bảng `activity` đổi, tức sau MỌI thao tác ghi; cây
    Nhập QC nạp lại khi `qc_points` đổi, còn `entry-store` tự gọi thêm một lần
