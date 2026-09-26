@@ -120,7 +120,7 @@ export function AuditPage() {
         )}
 
         {result.resultTo > 0 && (
-          <div className="audit-pagination">
+          <div className="table-pagination">
             <span className="hint">Hiển thị {result.resultFrom}–{result.resultTo} / {result.filteredCount} dòng</span>
             <div>
               <button className="btn ghost sm" disabled={result.page <= 1} onClick={() => setPage(result.page - 1)}>‹ Trước</button>

@@ -38,15 +38,6 @@
 .audit-clear-filter{
   align-self:flex-end;
 }
-.audit-pagination{
-  display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin:var(--space-3) var(--space-4) var(--space-4);
-}
-.audit-pagination > div{
-  display:flex;align-items:center;gap:var(--space-2);
-}
-.audit-pagination b{
-  min-width:82px;color:var(--text-tertiary);font-size:var(--text-sm);font-weight:var(--weight-bold);text-align:center;
-}
 .audit-table-wrap{
   margin:0 var(--space-4);overflow-x:auto;
 }
