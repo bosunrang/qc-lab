@@ -1,7 +1,6 @@
 // Dashboard KHÔNG có module/domain riêng — chỉ tổng hợp lại dữ liệu từ các
 // IPC đã có. Quy tắc trình bày/ lọc nghiệp vụ thuần nằm trong view-model.
 import { create } from 'zustand';
-import { todayIso } from '../lib/format';
 import { dashboardNceOverdue, operationalDashboardSummaries, type DashboardStatus } from '../view-models/dashboard-view-model';
 import type { TestSummary, NceRecord, Test, QcLot } from '../../shared/qc-api';
 
@@ -54,9 +53,8 @@ async function loadDashboard(set: (partial: Partial<DashboardState>) => void): P
   ]);
   const testSummaries = operationalDashboardSummaries(allSummaries, tests, panels);
   const testNameById = new Map<string, string>(tests.map((t: Test) => [t.id, t.name]));
-  const today = todayIso();
   const overdueActions = nceRecords
-    .map(record => ({ record, info: dashboardNceOverdue(record, today) }))
+    .map(record => ({ record, info: dashboardNceOverdue(record) }))
     .filter(item => item.info.overdue)
     .sort((a, b) => b.info.days - a.info.days)
     .map(({ record, info }) => ({

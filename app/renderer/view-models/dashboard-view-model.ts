@@ -48,18 +48,13 @@ export function operationalDashboardSummaries(summaries: TestSummary[], tests: T
 }
 
 
-export function dashboardNceOverdue(record: NceRecord | null | undefined, today: string): DashboardOverdueInfo {
-  let detail: NceDetail = {};
-  try { detail = JSON.parse(record?.detail_json || '{}') as NceDetail; } catch { /* dữ liệu cũ lỗi JSON được coi là hồ sơ chưa ghi đủ */ }
-  const due = String(record?.due_date || '').trim();
-  const owner = String(detail.owner || '').trim();
-  const recorded = owner.length > 0 && String(detail.correction || '').trim().length >= 5;
-  if (!record || !due || record.record_status === 'cancelled' || record.approval_status === 'approved' || !recorded || due >= today) {
-    return { overdue: false, days: 0, label: '', owner };
-  }
-  const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86400000);
-  if (!Number.isFinite(days) || days <= 0) return { overdue: false, days: 0, label: '', owner };
-  return { overdue: true, days, label: `Quá hạn ${days} ngày`, owner };
+/** Thông tin hiển thị cho hồ sơ quá hạn. Số ngày do main tính
+ * (`NceRecord.overdue_days`); ở đây chỉ dựng nhãn và người phụ trách. */
+export function dashboardNceOverdue(record: NceRecord | null | undefined): DashboardOverdueInfo {
+  const days = Number(record?.overdue_days) || 0;
+  let owner = '';
+  try { owner = String((JSON.parse(record?.detail_json || '{}') as NceDetail).owner || '').trim(); } catch { /* JSON hỏng: chưa ghi người phụ trách */ }
+  return days > 0 ? { overdue: true, days, label: `Quá hạn ${days} ngày`, owner } : { overdue: false, days: 0, label: '', owner };
 }
 
 /** Thứ tự bảng xét nghiệm hệ thống: loại bỏ → cảnh báo → chưa đủ QC hôm nay

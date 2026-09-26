@@ -1,8 +1,12 @@
 import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 
+/** Mức có đủ điều kiện dùng cho thiết kế QC hay không — đọc kết quả của main,
+ * không dò lại điều kiện. `listPeriods()` chỉ để `qualityDesign` khác `null`
+ * khi CV lấy từ IQC theo lô, cohort `eligible`, đã rà soát, dữ liệu nền chưa
+ * đổi và Sigma tính được (xem `docs/SIGMA-REVIEW-2026-09-22-lan2.md`). Trước
+ * 2026-09-26 hàm này chép lại từng điều kiện đó ở renderer (kế hoạch F.4). */
 export function sigmaDesignEligible(level: SigmaLevelResult): boolean {
-  return level.cvSource === 'iqc-cohort' && level.cohortStatus === 'eligible'
-    && level.cohortReviewed === true && !level.cohortStale && !!level.sigma && !!level.qualityDesign;
+  return level.qualityDesign != null;
 }
 export function governingSigmaLevel(period: SigmaPeriodView | undefined): SigmaLevelResult | undefined {
   if (!period?.levels.length || !period.levels.every(sigmaDesignEligible)) return undefined;

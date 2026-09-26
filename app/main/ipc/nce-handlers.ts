@@ -9,6 +9,8 @@ import {
   type PreparedNceProtocol,
 } from '../domain/nce-validation';
 import { nextNceId } from '../db/nce-ids';
+import { nceOverdueDays } from '../domain/nce-overdue';
+import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
 
 function todayIso(): string { return nowIso().slice(0, 10); }
@@ -33,8 +35,19 @@ function protocolJson(protocol: PreparedNceProtocol, previous: Record<string, un
 }
 
 export function createNceHandlers(db: Db) {
-  function listRecords(): NceRecord[] { return db.prepare('SELECT * FROM actions ORDER BY created_at DESC').all() as unknown as NceRecord[]; }
-  function get(id: string): NceRecord | undefined { return db.prepare('SELECT * FROM actions WHERE id=?').get(id) as NceRecord | undefined; }
+  /** Kèm `overdue_days` do main tính theo ngày giờ địa phương của máy chính —
+   * nguồn duy nhất của quy tắc quá hạn (`domain/nce-overdue.ts`). */
+  function withOverdue(row: Omit<NceRecord, 'overdue_days'>, today: string): NceRecord {
+    return { ...row, overdue_days: nceOverdueDays(row, today) };
+  }
+  function listRecords(): NceRecord[] {
+    const today = isoLocalDate();
+    return (db.prepare('SELECT * FROM actions ORDER BY created_at DESC').all() as unknown as Omit<NceRecord, 'overdue_days'>[]).map((row) => withOverdue(row, today));
+  }
+  function get(id: string): NceRecord | undefined {
+    const row = db.prepare('SELECT * FROM actions WHERE id=?').get(id) as Omit<NceRecord, 'overdue_days'> | undefined;
+    return row ? withOverdue(row, isoLocalDate()) : undefined;
+  }
   function result(record: NceRecord): IpcResult<NceRecord> { return { ok: true, data: get(record.id)! }; }
   function changed(record: NceRecord): void { notifyChanged(['actions'], record.test_id ? [record.test_id] : []); }
 
