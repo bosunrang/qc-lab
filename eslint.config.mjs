@@ -80,7 +80,6 @@ export default [
     files: ['app/main/ipc/*-handlers.ts'],
     ignores: [
       'app/main/ipc/audit-handlers.ts', 'app/main/ipc/auth-handlers.ts', 'app/main/ipc/backup-handlers.ts',
-      'app/main/ipc/config-catalog-handlers.ts', 'app/main/ipc/config-lot-handlers.ts', 'app/main/ipc/config-tea-handlers.ts',
       'app/main/ipc/firebase-handlers.ts',
     ],
     rules: {

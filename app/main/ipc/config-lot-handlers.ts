@@ -9,13 +9,12 @@ import type { LotGroup, LotTransition, PlannedTarget, QcLot } from '../../shared
 import { cleanId, cleanText, uid, sameText } from '../domain/text-utils';
 import { validateTestLevel, appendMeanSdHistory, validateLot, validateLotGroup, validateLotTransition, type LotInput, type LotGroupInput, type LotTransitionInput, type PreparedLotTransition } from '../domain/manage-validation';
 import { isPeriodLocked } from '../db/period-locks';
-import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
 import { ymOfDate } from '../domain/period-lock-validation';
 import { isLotGroupInUse } from '../db/lot-groups';
 
 export function createLotConfigHandlers(db: Db) {
-  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
   const lotGroupInUse = (lotIds: string[]): boolean => isLotGroupInUse(db, lotIds);
 
   // ── Mean/SD "Dự kiến" ────────────────────────────────────────────────────
@@ -33,12 +32,12 @@ export function createLotConfigHandlers(db: Db) {
     return db.prepare('SELECT * FROM planned_targets ORDER BY test_id, level').all() as PlannedTarget[];
   }
 
-  function savePlannedTargets(
+  const savePlannedTargets = writeCommand(db, 'savePlannedTargets', 'admin', (
+    w,
     input: { items?: { testId: unknown; level: unknown; qcLotId: unknown; mean: unknown; sd: unknown; low: unknown; high: unknown }[];
       remove?: { testId: unknown; level: unknown; qcLotId: unknown }[] },
-    actor: Actor,
-  ): IpcResult<{ saved: number; removed: number }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  ): IpcResult<{ saved: number; removed: number }> => {
+    const actor = w.actor;
     const items = Array.isArray(input.items) ? input.items : [];
     const remove = Array.isArray(input.remove) ? input.remove : [];
     if (!items.length && !remove.length) {
@@ -79,7 +78,10 @@ export function createLotConfigHandlers(db: Db) {
       .map((item) => ({ testId: cleanId(item.testId), level: Number(item.level), lotId: cleanId(item.qcLotId) }))
       .filter((key) => key.testId && key.lotId && Number.isFinite(key.level))
       .map((key) => `${key.testId}:${key.level}:${key.lotId}`);
-    const removed = inTransaction(() => {
+    // Chỉ bỏ các mục không còn tồn tại và không lưu gì mới: không có gì để ghi.
+    const present = removedIds.filter((id) => db.prepare('SELECT 1 FROM planned_targets WHERE id=?').get(id));
+    if (!prepared.length && !present.length) return w.noChange({ saved: 0, removed: 0 });
+    const removed = w.commit((tx) => {
       let count = 0;
       for (const id of removedIds) {
         count += db.prepare('DELETE FROM planned_targets WHERE id=?').run(id).changes ? 1 : 0;
@@ -95,17 +97,15 @@ export function createLotConfigHandlers(db: Db) {
         const lotIds = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(groupId) as { id: string }[]).map((r) => r.id);
         if (!lotGroupInUse(lotIds)) db.prepare("UPDATE lot_groups SET status='planned', stopped_at='' WHERE id=?").run(groupId);
       }
-      if (prepared.length || count) {
-        const lotNos = [...new Set(prepared.map((row) => row.lotNo))].join(', ');
-        writeAudit(db, actor, 'Lưu Mean/SD dự kiến',
-          `${prepared.length} mức QC${lotNos ? ` cho lô ${lotNos}` : ''}${count ? `, bỏ ${count} mục dự kiến` : ''} — chưa áp vào cấu hình đang chạy`,
-          'Mean/SD dự kiến');
-      }
+      const lotNos = [...new Set(prepared.map((row) => row.lotNo))].join(', ');
+      tx.audit('Lưu Mean/SD dự kiến',
+        `${prepared.length} mức QC${lotNos ? ` cho lô ${lotNos}` : ''}${count ? `, bỏ ${count} mục dự kiến` : ''} — chưa áp vào cấu hình đang chạy`,
+        'Mean/SD dự kiến');
+      tx.changed(['planned_targets', 'lot_groups'], [...new Set(prepared.map((row) => row.testId))]);
       return count;
     });
-    notifyChanged(['planned_targets', 'lot_groups'], [...new Set(prepared.map((row) => row.testId))]);
     return { ok: true, data: { saved: prepared.length, removed } };
-  }
+  });
 
   // ---- Lô QC ("Lô & nhóm lô QC") ----
   function listLots() {
@@ -138,8 +138,7 @@ export function createLotConfigHandlers(db: Db) {
     return { ok: true, data: { rename: { oldLotNo: existing.lot_no, newLotNo, affected: rows.length, lockedCount, lockedPeriods } } };
   }
 
-  function saveLot(input: { id?: string; data: LotInput }, actor: Actor): IpcResult<QcLot> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveLot = writeCommand(db, 'saveLot', 'admin', (w, input: { id?: string; data: LotInput }): IpcResult<QcLot> => {
     const id = input.id || '';
     const result = validateLot(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
@@ -164,7 +163,7 @@ export function createLotConfigHandlers(db: Db) {
       // không đổi điểm, hoặc ngược lại) là trạng thái không thể tự phục hồi.
       const renaming = !!before?.lot_no && before.lot_no !== lotNo;
       let renamed = 0;
-      inTransaction(() => {
+      w.commit((tx) => {
         // KHÔNG gửi `groupId` nghĩa là "giữ nguyên nhóm", không phải "gỡ khỏi
         // nhóm" — cùng ngữ nghĩa `prepareLabProfile(existing)` dùng cho logo.
         // Form "Sửa lô QC" không có ô chọn nhóm (membership do modal Nhóm lô
@@ -180,24 +179,24 @@ export function createLotConfigHandlers(db: Db) {
           renamed = Number(db.prepare('UPDATE qc_points SET lot=? WHERE level=? AND lot=?')
             .run(lotNo, before!.level, before!.lot_no).changes || 0);
         }
-        writeAudit(db, actor, 'Sửa lô QC',
+        tx.audit('Sửa lô QC',
           renaming ? `Đổi số lô "${before!.lot_no}" → "${lotNo}" mức ${level}, cập nhật ${renamed} điểm QC`
             : `Cập nhật lô "${lotNo}" mức ${level}`, lotNo);
+        tx.changed(renaming ? ['qc_lots', 'qc_points'] : ['qc_lots']);
       });
-      notifyChanged(renaming ? ['qc_lots', 'qc_points'] : ['qc_lots']);
       return { ok: true, data: db.prepare('SELECT * FROM qc_lots WHERE id=?').get(id) };
     }
     const newId = cleanId(uid());
-    const savedLot = inTransaction(() => {
+    const savedLot = w.commit((tx) => {
       db.prepare(`INSERT INTO qc_lots(id,group_id,lot_no,level,description,supplier,program,exp,opened,active,depleted,note)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(newId, groupId || null, lotNo, level, description, supplier, program, exp, opened, active ? 1 : 0, depleted ? 1 : 0, note);
-      writeAudit(db, actor, 'Thêm lô QC', `Tạo lô "${lotNo}" mức ${level}`, lotNo);
+      tx.audit('Thêm lô QC', `Tạo lô "${lotNo}" mức ${level}`, lotNo);
+      tx.changed(['qc_lots']);
       return db.prepare('SELECT * FROM qc_lots WHERE id=?').get(newId);
     });
-    notifyChanged(['qc_lots']);
     return { ok: true, data: savedLot };
-  }
+  });
 
   // ---- Nhóm lô QC ----
 
@@ -222,8 +221,7 @@ export function createLotConfigHandlers(db: Db) {
     });
   }
 
-  function saveLotGroup(input: { id?: string; data: LotGroupInput }, actor: Actor): IpcResult<LotGroup> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveLotGroup = writeCommand(db, 'saveLotGroup', 'admin', (w, input: { id?: string; data: LotGroupInput }): IpcResult<LotGroup> => {
     const id = input.id || '';
     const lotRows = db.prepare('SELECT id, lot_no FROM qc_lots').all() as { id: string; lot_no: string }[];
     const lotNoById = new Map(lotRows.map(row => [row.id, row.lot_no]));
@@ -257,7 +255,7 @@ export function createLotConfigHandlers(db: Db) {
     // lỗi ở giữa, rollback nguyên khối để không còn nhóm có danh sách thành
     // viên dở dang hoặc lô bị gỡ khỏi nhóm cũ mà chưa vào nhóm mới.
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         if (id) {
           db.prepare('UPDATE lot_groups SET name=?,manufacturer=?,material=?,catalog=?,note=?,active=?,status=? WHERE id=?')
             .run(name, manufacturer, material, catalog, note, active ? 1 : 0, status, id);
@@ -270,18 +268,18 @@ export function createLotConfigHandlers(db: Db) {
         // junction nhiều-nhiều).
         db.prepare('UPDATE qc_lots SET group_id=NULL WHERE group_id=?').run(groupId);
         for (const lotId of validLotIds) db.prepare('UPDATE qc_lots SET group_id=? WHERE id=?').run(groupId, lotId);
-        writeAudit(db, actor, id ? 'Sửa nhóm lô QC' : 'Thêm nhóm lô QC', `Nhóm "${name}" (${validLotIds.length} lô)`, name);
+        tx.audit(id ? 'Sửa nhóm lô QC' : 'Thêm nhóm lô QC', `Nhóm "${name}" (${validLotIds.length} lô)`, name);
+        tx.changed(['lot_groups', 'qc_lots']);
       });
     } catch (e) {
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu nhóm lô QC thất bại.' } };
     }
-    notifyChanged(['lot_groups', 'qc_lots']);
     // Ép về đúng kiểu hợp đồng thay vì `as object`: spread một `object` cho ra
     // `{}` nên TypeScript không còn thấy field nào, và hợp đồng
     // `IpcResult<LotGroup>` trở thành vô nghĩa.
     const groupRow = db.prepare('SELECT * FROM lot_groups WHERE id=?').get(groupId) as Omit<LotGroup, 'lotIds' | 'inUse'>;
     return { ok: true, data: { ...groupRow, lotIds: validLotIds, inUse: lotGroupInUse(validLotIds) } };
-  }
+  });
 
   // ---- Chuyển tiếp lô ----
   function listLotTransitions() {
@@ -293,11 +291,8 @@ export function createLotConfigHandlers(db: Db) {
   };
 
 
-  function createLotTransition(
-    input: { id?: string; data: LotTransitionInput & { criteria?: { testId: string; level: number; mean: number; sd: number; low?: number | null; high?: number | null }[] } },
-    actor: Actor,
-  ): IpcResult<LotTransition> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const createLotTransition = writeCommand(db, 'createLotTransition', 'admin', (w, input: { id?: string; data: LotTransitionInput & { criteria?: { testId: string; level: number; mean: number; sd: number; low?: number | null; high?: number | null }[] } }): IpcResult<LotTransition> => {
+    const actor = w.actor;
     const result = validateLotTransition(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { panelId, fromLotId, toLotId, startDate, note } = result.data;
@@ -403,7 +398,7 @@ export function createLotConfigHandlers(db: Db) {
     // nhật ký ghi sau COMMIT: lỗi ở bước đó để lại chuyển lô đã áp dụng mà
     // không có dấu vết, rồi ROLLBACK chạy khi không còn transaction.
     const cascade = status === 'accepted' && finalChanged;
-    const id = withTransaction(db, () => {
+    const id = w.commit((tx) => {
       let savedId = input.id || '';
       if (existing) {
         db.prepare('UPDATE lot_transitions SET panel_id=?, from_lot_id=?, to_lot_id=?, start_date=?, status=?, note=?, criteria_json=?, approved_at=?, approved_by=? WHERE id=?')
@@ -415,21 +410,20 @@ export function createLotConfigHandlers(db: Db) {
       }
       if (cascade) applyCascade();
       const detail = `${panel.name}: ${fromLot.lot_no} → ${toLot.lot_no} · ${LOT_TRANSITION_STATUS_TEXT[status]}`;
-      writeAudit(db, actor, existing ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', detail, panel.name);
-      if (cascade) writeAudit(db, actor, 'Áp dụng chuyển tiếp lô', `${panel.name} · ${fromLot.lot_no} → ${toLot.lot_no} · ${criteria.length} xét nghiệm`, panel.name);
+      tx.audit(existing ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', detail, panel.name);
+      if (cascade) tx.audit('Áp dụng chuyển tiếp lô', `${panel.name} · ${fromLot.lot_no} → ${toLot.lot_no} · ${criteria.length} xét nghiệm`, panel.name);
+      tx.changed(cascade ? ['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests'] : ['lot_transitions']);
       return savedId;
     });
-    notifyChanged(cascade ? ['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests'] : ['lot_transitions']);
     return { ok: true, data: db.prepare('SELECT * FROM lot_transitions WHERE id=?').get(id) };
-  }
+  });
 
   /** Chặn xoá lô đang được gán Mean/SD cho một mức QC, hoặc lô đã đi qua một
    * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (hệ thống: "đã CHẤP NHẬN", tức đã áp vào
    * cấu hình/Mean-SD) — xoá thẳng sẽ để lại mức QC trỏ vào lô không còn tồn
    * tại. Xoá được thì dọn luôn các hồ sơ chuyển lô còn dở dang trỏ tới nó,
    * đúng như `removeLot()` hệ thống làm. */
-  function removeLot(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeLot = writeCommand(db, 'removeLot', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, lot_no FROM qc_lots WHERE id=?').get(id) as { id: string; lot_no: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy lô QC.' } };
@@ -442,23 +436,22 @@ export function createLotConfigHandlers(db: Db) {
       return { ok: false, error: { code: 'used-by-accepted-transition', message: 'Lô QC này có hồ sơ chuyển tiếp đã kết luận (đã áp vào cấu hình/Mean-SD). Không thể xoá lô trực tiếp — nếu thực sự cần, hãy xử lý hồ sơ chuyển tiếp đó trước.' } };
     }
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         db.prepare('DELETE FROM lot_transitions WHERE from_lot_id=? OR to_lot_id=?').run(id, id);
         db.prepare('DELETE FROM qc_lots WHERE id=?').run(id);
-        writeAudit(db, actor, 'Xoá lô QC', `Xoá lô "${existing.lot_no}"`, existing.lot_no);
+        tx.audit('Xoá lô QC', `Xoá lô "${existing.lot_no}"`, existing.lot_no);
+        tx.changed(['qc_lots', 'lot_groups', 'lot_transitions']);
       });
     } catch (e) {
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá lô QC thất bại.' } };
     }
-    notifyChanged(['qc_lots', 'lot_groups', 'lot_transitions']);
     return { ok: true, data: { id } };
-  }
+  });
 
   /** Xoá NHÓM lô nhưng GIỮ NGUYÊN các lô bên trong (chỉ gỡ `group_id`) —
    * đúng chi tiết hệ thống hiện trong hộp xác nhận: "Các lô QC bên trong vẫn
    * được giữ nguyên." */
-  function removeLotGroup(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeLotGroup = writeCommand(db, 'removeLotGroup', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name FROM lot_groups WHERE id=?').get(id) as { id: string; name: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy nhóm lô QC.' } };
@@ -467,17 +460,17 @@ export function createLotConfigHandlers(db: Db) {
       return { ok: false, error: { code: 'used-by-assay', message: 'Nhóm lô này đang được gán Mean/SD cho xét nghiệm. Hãy đổi nhóm/lô ở thẻ Mean/SD trước khi xoá nhóm.' } };
     }
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         db.prepare('UPDATE qc_lots SET group_id=NULL WHERE group_id=?').run(id);
         db.prepare('DELETE FROM lot_groups WHERE id=?').run(id);
-        writeAudit(db, actor, 'Xoá nhóm lô QC', `Xoá nhóm "${existing.name}" (các lô bên trong được giữ lại)`, existing.name);
+        tx.audit('Xoá nhóm lô QC', `Xoá nhóm "${existing.name}" (các lô bên trong được giữ lại)`, existing.name);
+        tx.changed(['qc_lots', 'lot_groups']);
       });
     } catch (e) {
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá nhóm lô thất bại.' } };
     }
-    notifyChanged(['qc_lots', 'lot_groups']);
     return { ok: true, data: { id } };
-  }
+  });
 
   /** Dừng một nhóm lô đang chạy. CHỈ đổi trạng thái; chiều ngược lại nằm ở
    * `activateLotGroup()` bên dưới và áp lại Mean/SD đã lưu của nhóm. */
@@ -510,8 +503,7 @@ export function createLotConfigHandlers(db: Db) {
   }
 
 
-  function activateLotGroup(input: { id: unknown }, actor: Actor): IpcResult<{ status: 'applied' | 'already-active' | 'unready'; applied: number; stoppedGroups: string[] }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const activateLotGroup = writeCommand(db, 'activateLotGroup', 'admin', (w, input: { id: unknown }): IpcResult<{ status: 'applied' | 'already-active' | 'unready'; applied: number; stoppedGroups: string[] }> => {
     const id = String(input.id || '');
     const group = db.prepare('SELECT id, name FROM lot_groups WHERE id=?').get(id) as { id: string; name: string } | undefined;
     if (!group) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy nhóm lô QC.' } };
@@ -555,11 +547,11 @@ export function createLotConfigHandlers(db: Db) {
       if (!lotGroupInUse(lots.map(lot => lot.id))) {
         return { ok: false, error: { code: 'unready', message: 'Chưa mức QC nào có Mean/SD đã lưu cho lô của nhóm này. Hãy nhập Mean/SD cho lô mới trước khi kích hoạt.' } };
       }
-      inTransaction(() => {
+      w.commit((tx) => {
         db.prepare("UPDATE lot_groups SET status='', stopped_at='' WHERE id=?").run(id);
-        writeAudit(db, actor, 'Kích hoạt nhóm lô QC', `Nhóm "${group.name}" đã đang được dùng, không có mức nào cần áp thêm`, group.name);
+        tx.audit('Kích hoạt nhóm lô QC', `Nhóm "${group.name}" đã đang được dùng, không có mức nào cần áp thêm`, group.name);
+        tx.changed(['lot_groups']);
       });
-      notifyChanged(['lot_groups']);
       return { ok: true, data: { status: 'already-active', applied: 0, stoppedGroups: [] } };
     }
 
@@ -579,7 +571,7 @@ export function createLotConfigHandlers(db: Db) {
     }
     const stoppedIds = new Set<string>();
     const at = nowIso();
-    inTransaction(() => {
+    w.commit((tx) => {
       for (const candidate of candidates) {
         const oldLot = candidate.prevLotId ? db.prepare('SELECT lot_no, opened FROM qc_lots WHERE id=?').get(candidate.prevLotId) as
           { lot_no: string; opened: string } | undefined : undefined;
@@ -611,13 +603,13 @@ export function createLotConfigHandlers(db: Db) {
         stoppedIds.add(groupId);
       }
       db.prepare("UPDATE lot_groups SET status='', stopped_at='' WHERE id=?").run(id);
-      writeAudit(db, actor, 'Kích hoạt nhóm lô QC',
+      tx.audit('Kích hoạt nhóm lô QC',
         `Nhóm "${group.name}": áp Mean/SD cho ${candidates.length} mức QC`
         + (stoppedIds.size ? `, dừng ${stoppedIds.size} nhóm lô bị thay thế` : ''), group.name);
+      tx.changed(['lot_groups', 'qc_lots', 'test_levels', 'tests', 'planned_targets']);
     });
-    notifyChanged(['lot_groups', 'qc_lots', 'test_levels', 'tests', 'planned_targets']);
     return { ok: true, data: { status: 'applied', applied: candidates.length, stoppedGroups: [...stoppedIds] } };
-  }
+  });
 
   /** Xoá hồ sơ chuyển lô. Hồ sơ ĐÃ KẾT LUẬN không xoá được: kết luận là bản
    * ghi đã áp vào cấu hình, xoá đi thì mất dấu vết vì sao Mean/SD đổi. */
