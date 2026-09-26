@@ -41,6 +41,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | F.1, F.2, F.4 (nhánh `fix/business-boundaries`) | F.1: gợi ý TEa khi thêm xét nghiệm lấy mặc định của danh mục khi ô ghi đè trống, như `resolveTea()` của main (trước đây chỉ ghi đè Ricos là mất CLIA); test đối chiếu trên toàn danh mục. F.2: quy tắc NCE quá hạn chuyển sang `domain/nce-overdue.ts`, `listNceRecords` trả `overdue_days`, Tổng quan chỉ hiển thị. F.4: `sigmaDesignEligible` đọc `qualityDesign` của main thay vì dò lại điều kiện; fixture SG08 sửa cho khớp đầu ra thật của main (quyết định SG08 không đổi) |
 | D.9–D.12 (nhánh `refactor/renderer-shared-bits`) | D.9: mọi CSV tải về đi qua `downloadCsv()` có BOM (Nhật ký hoạt động và Khắc phục sự cố trước đây thiếu). D.10 phần sửa lỗi: tự hỏi hàng chờ LIS theo cấu hình đã lưu, không theo ô tick đang sửa. D.11: chi tiết lô ở Lịch sử dữ liệu phân trang 100 điểm; thanh phân trang thành lớp dùng chung `.table-pagination`. D.12: luật ESLint canh ranh giới thay cho việc chuyển tệp sang `shared/domain` (renderer chỉ import `main/domain`; `main/domain` không import handler, CSDL, Electron hay I/O) |
 | D.8 phần bộ chọn (nhánh `refactor/test-picker`) | `lib/useTestSelection.ts` + `components/TestPicker.tsx` cho Báo cáo và Westgard: tìm không dấu (Westgard trước đây chỉ hạ chữ thường, gõ "dien giai" không ra "Điện giải"), lựa chọn luôn nằm trong danh sách lọc; mỗi trang giữ nhãn, id, chữ gợi ý. Sigma giữ bộ chọn riêng (dùng danh sách `tests`, xoá ô tìm sau khi chọn, có test thiết kế khoá). e2e `test-picker.e2e.mjs` |
+| D.2 (nhánh `perf/store-selectors`) | 43 chỗ đọc cả store (`useXStore()`) ở 22 tệp chuyển sang `useShallow` với đúng các trường dùng, nên component không vẽ lại khi trường không liên quan của store đổi. Luật ESLint `no-restricted-syntax` chặn gọi `useXStore()` không có selector |
 
 ## Thứ tự đề xuất
 
@@ -198,9 +199,7 @@ tách (tách thuần, không đổi hành vi).
    `notifyChanged` làm `useStoreInvalidation` nạp thêm lần nữa. Bỏ phần tự
    nạp trong store; giữ dữ liệu cũ trong lúc nạp (cờ `refreshing`) thay vì
    xoá mảng — hiện Westgard, Sigma, Nhập QC chớp trống sau mỗi lần ghi.
-2. **Selector zustand:** hầu hết trang lấy cả store (`useManageStore()`), nên
-   bất kỳ trường nào đổi cũng render lại cả trang. Dùng selector hoặc
-   `useShallow`.
+2. ~~**Selector zustand**~~ — đã xong, xem bảng "Đã xong".
 3. **`catalog-store`:** tách danh mục chung (xét nghiệm, máy, lô, tóm tắt) khỏi
    `manage-store` và `westgard-store`; hook `useCatalog()` tự nạp và tự đăng ký
    làm mới, thay cho danh sách bảng chép lại ở từng trang.

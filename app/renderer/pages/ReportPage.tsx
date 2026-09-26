@@ -2,6 +2,7 @@
 // Bộ lọc, tuỳ chọn xuất và thao tác được gom thành các vùng rõ ràng; khóa kỳ
 // giữ dạng điều khiển theo tháng/năm và danh sách kỳ, không dùng bảng dữ liệu.
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Link } from 'react-router-dom';
 import { useWestgardStore } from '../store/westgard-store';
 import { useReportStore } from '../store/report-store';
@@ -107,8 +108,8 @@ function buildPrintHtml(label: string, from: string, to: string, points: ReportP
 }
 
 export function ReportPage() {
-  const { summaries, loadSummaries } = useWestgardStore();
-  const { locks, template, loadLocks, loadTemplate, saveTemplate, lock, unlock } = useReportStore();
+  const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
+  const { locks, template, loadLocks, loadTemplate, saveTemplate, lock, unlock } = useReportStore(useShallow((s) => ({ locks: s.locks, template: s.template, loadLocks: s.loadLocks, loadTemplate: s.loadTemplate, saveTemplate: s.saveTemplate, lock: s.lock, unlock: s.unlock })));
   const admin = isAdmin(useAuthStore((s) => s.user)?.role);
 
   const [start, setStart] = useState(`${isoMonth()}-01`);

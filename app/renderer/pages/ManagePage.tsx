@@ -2,6 +2,7 @@
 // trong ./manage (tách 2026-09-03; trước đó 6 tab nằm chung file này, 1121
 // dòng). Phần dùng chung giữa các tab ở ./manage/shared.
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -26,7 +27,7 @@ export function ManagePage() {
   const navState = useLocation().state as { tab?: TabId; editTestId?: string } | null;
   const [tab, setTab] = useState<TabId>(navState?.tab || 'instruments');
   const [instrumentCreateRequest, setInstrumentCreateRequest] = useState(0);
-  const store = useManageStore();
+  const store = useManageStore(useShallow((s) => ({ instruments: s.instruments, levelsByTestId: s.levelsByTestId, loadInstruments: s.loadInstruments, loadLotGroups: s.loadLotGroups, loadLotTransitions: s.loadLotTransitions, loadLots: s.loadLots, loadPanels: s.loadPanels, loadPlannedTargets: s.loadPlannedTargets, loadTeaRefs: s.loadTeaRefs, loadTests: s.loadTests, lotGroups: s.lotGroups, lotTransitions: s.lotTransitions, lots: s.lots, panels: s.panels, teaRefs: s.teaRefs, tests: s.tests })));
   const { loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs, loadPlannedTargets } = store;
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export function ManagePage() {
 
   // Đúng `counts` của hệ thống (manage-page-controller.ts): tab Lô hiện
   // "số lô / số nhóm" dạng chuỗi, không phải 1 con số.
-  const { summaries, loadSummaries } = useWestgardStore();
+  const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
   useEffect(() => { loadSummaries(); }, [loadSummaries]);
   const allLevels = summaries.flatMap((summary) => summary.levels);
   const levelsWithLot = allLevels.filter((level) => level.qcLotId).length;

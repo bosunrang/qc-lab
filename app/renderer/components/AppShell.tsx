@@ -8,6 +8,7 @@
 // router.tsx, chặn ghi thật nằm ở main/ipc/shared.ts. `pagePerms` tuỳ biến
 // theo từng người dùng vẫn chưa làm (Giai đoạn A2/D3.1).
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageErrorBoundary } from './ErrorBoundary';
 import { useAuthStore } from '../store/auth-store';
@@ -35,8 +36,8 @@ function RuntimeIcon() {
 const RUNTIME_LABEL = `Cổng 3200 · V${import.meta.env.VITE_APP_VERSION}`;
 
 export function AppShell() {
-  const { user } = useAuthStore();
-  const { profile, load } = useSettingsStore();
+  const { user } = useAuthStore(useShallow((s) => ({ user: s.user })));
+  const { profile, load } = useSettingsStore(useShallow((s) => ({ profile: s.profile, load: s.load })));
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } });
 

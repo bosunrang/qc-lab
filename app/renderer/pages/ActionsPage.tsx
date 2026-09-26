@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useNceStore } from '../store/nce-store';
@@ -43,9 +44,9 @@ type NcePrefill = { testId: string; level: number; pointId: string; lot: string;
 
 export function ActionsPage() {
   const location = useLocation();
-  const { tests, loadTests } = useManageStore();
-  const store = useNceStore();
-  const { summaries, loadSummaries } = useWestgardStore();
+  const { tests, loadTests } = useManageStore(useShallow((s) => ({ tests: s.tests, loadTests: s.loadTests })));
+  const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
+  const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
   const [form, setForm] = useState<{ prefill: NcePrefill | null; record: NceRecord | null } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
@@ -313,7 +314,7 @@ function NceSelect({ value, onChange, options, disabled = false }: { value: stri
 /** Form protocol-v3 đặt ngay trong panel như hệ thống. Modal chỉ còn dùng cho
  * xem chi tiết/bằng chứng, tránh một form dài bị bó hẹp trong cửa sổ popup. */
 function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | null; record: NceRecord | null; onClose: () => void }) {
-  const { tests } = useManageStore(); const store = useNceStore();
+  const { tests } = useManageStore(useShallow((s) => ({ tests: s.tests }))); const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
   const latestSigmaBias = useNceStore((state) => state.latestSigmaBias);
   const old = record ? parseDetail(record.detail_json) : {};
   const [protocol, setProtocol] = useState<NceDetail>(() => protocolDefaults(old, record));
@@ -424,7 +425,7 @@ function SectionTitle({ n, title }: { n?: number; title: string }) {
 }
 
 function DetailModal({ record, testName, onClose }: { record: NceRecord; testName: string; onClose: () => void }) {
-  const store = useNceStore();
+  const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
   const detail = parseDetail(record.detail_json);
   const [completedDate, setCompletedDate] = useState('');
   const [returnNote, setReturnNote] = useState('');

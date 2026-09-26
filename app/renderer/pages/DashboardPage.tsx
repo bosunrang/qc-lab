@@ -3,6 +3,7 @@
 // đầu file đó: báo động theo ĐIỂM CUỐI, 1 dòng cho mỗi MỨC, % hoàn tất theo
 // XÉT NGHIỆM) — file này chỉ dựng JSX.
 import { useEffect, useMemo, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDashboardStore, type OverdueAction } from '../store/dashboard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -155,7 +156,7 @@ function TestRow({ test }: { test: DashboardTestItem }) {
 }
 
 function TestsPanel({ model }: { model: Model }) {
-  const { query, status, setQuery, setStatus } = useDashboardStore();
+  const { query, status, setQuery, setStatus } = useDashboardStore(useShallow((s) => ({ query: s.query, status: s.status, setQuery: s.setQuery, setStatus: s.setStatus })));
   const admin = isAdmin(useAuthStore((state) => state.user)?.role);
   const visible = useMemo(() => {
     const normalized = normalizeDashboardSearch(query);
@@ -178,8 +179,8 @@ function LoadingView({ subtitle }: { subtitle: string }) {
 const DASHBOARD_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'actions', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
 
 export function DashboardPage() {
-  const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore();
-  const { profile, load: loadProfile } = useSettingsStore();
+  const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore(useShallow((s) => ({ testSummaries: s.testSummaries, overdueActions: s.overdueActions, lots: s.lots, loading: s.loading, error: s.error, load: s.load })));
+  const { profile, load: loadProfile } = useSettingsStore(useShallow((s) => ({ profile: s.profile, load: s.load })));
   useEffect(() => { load(); loadProfile(); }, [load, loadProfile]);
   // Liệt kê đúng các bảng mà Tổng quan hiển thị hoặc dùng để đánh giá
   // Westgard (Mean/SD, lô, nhóm lô, Panel, luật chung trong `app_meta`, mốc

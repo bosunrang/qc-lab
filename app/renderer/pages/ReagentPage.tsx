@@ -9,6 +9,7 @@
 // Toàn bộ phép tính đến từ `calculateReagentComparison()` ở main (đã có từ
 // Giai đoạn B6) — trang này chỉ trình bày, không tự tính lại thống kê nào.
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useReagentStore } from '../store/reagent-store';
 import { useManageStore } from '../store/manage-store';
 import { useAuthStore } from '../store/auth-store';
@@ -214,7 +215,7 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
   // Danh sách CHUNG toàn app nên giữ ở store (`app_meta`), không phải state
   // cục bộ của modal — nhờ vậy mở lại modal không phải gọi lại IPC, và mọi
   // chỗ khác cần "chọn nhanh" đều đọc chung một nguồn.
-  const { quickValues, loadQuickValues, addQuickValue, removeQuickValue } = useReagentStore();
+  const { quickValues, loadQuickValues, addQuickValue, removeQuickValue } = useReagentStore(useShallow((s) => ({ quickValues: s.quickValues, loadQuickValues: s.loadQuickValues, addQuickValue: s.addQuickValue, removeQuickValue: s.removeQuickValue })));
   const items = quickValues[type];
   const [draft, setDraft] = useState('');
   const label = type === 'operator' ? 'người thực hiện' : 'loại mẫu';
@@ -279,7 +280,7 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
 
 function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, unit: string) => Promise<boolean> }) {
   const [query, setQuery] = useState('');
-  const { teaRefs, loadTeaRefs } = useManageStore();
+  const { teaRefs, loadTeaRefs } = useManageStore(useShallow((s) => ({ teaRefs: s.teaRefs, loadTeaRefs: s.loadTeaRefs })));
   const needle = query.trim().toLocaleLowerCase('vi');
 
   // Bảng TEa tham chiếu do trang Cấu hình chung sở hữu — đọc qua store của
@@ -315,7 +316,7 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
 }
 
 export function ReagentPage() {
-  const store = useReagentStore();
+  const store = useReagentStore(useShallow((s) => ({ comparisons: s.comparisons, create: s.create, load: s.load, remove: s.remove, saveMetadata: s.saveMetadata, saveRows: s.saveRows })));
   const role = useAuthStore((s) => s.user)?.role;
   const writable = canWrite(role);
   const admin = isAdmin(role);

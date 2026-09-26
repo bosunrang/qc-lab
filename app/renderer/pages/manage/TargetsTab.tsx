@@ -1,6 +1,7 @@
 // Tab "TargetsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { confirmDialog, reauthDialog, infoDialog, choiceDialog } from '../../state/dialog-store';
 import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
@@ -9,7 +10,7 @@ import type { QcPanel } from '../../../shared/qc-api';
 
 export function TargetsTab() {
   const { tests, lots, panels, lotGroups: allLotGroups, instruments, levelsByTestId, loadLevels, saveTestLevel,
-    plannedTargets, savePlannedTargets } = useManageStore();
+    plannedTargets, savePlannedTargets } = useManageStore(useShallow((s) => ({ tests: s.tests, lots: s.lots, panels: s.panels, lotGroups: s.lotGroups, instruments: s.instruments, levelsByTestId: s.levelsByTestId, loadLevels: s.loadLevels, saveTestLevel: s.saveTestLevel, plannedTargets: s.plannedTargets, savePlannedTargets: s.savePlannedTargets })));
   // Nhóm lô "Đã lưu trữ" (`active===0`)/"Đã dừng" (`status==='stopped'`)
   // không còn là nơi gán Mean/SD hợp lý — người dùng yêu cầu ẩn khỏi bảng
   // chọn của tab này (khác tab "Lô & Nhóm QC", nơi vẫn cần thấy MỌI nhóm để

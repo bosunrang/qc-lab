@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
@@ -33,7 +34,7 @@ function parseSources(json: string | undefined) {
 }
 
 export function TeaRefsTab() {
-  const { teaRefs, saveTeaRef, removeTeaRef, removeTeaLabProfile, setTeaRefValue, restoreTeaRefDefaults, addTeaAnalyte } = useManageStore();
+  const { teaRefs, saveTeaRef, removeTeaRef, removeTeaLabProfile, setTeaRefValue, restoreTeaRefDefaults, addTeaAnalyte } = useManageStore(useShallow((s) => ({ teaRefs: s.teaRefs, saveTeaRef: s.saveTeaRef, removeTeaRef: s.removeTeaRef, removeTeaLabProfile: s.removeTeaLabProfile, setTeaRefValue: s.setTeaRefValue, restoreTeaRefDefaults: s.restoreTeaRefDefaults, addTeaAnalyte: s.addTeaAnalyte })));
   const role = useAuthStore((s) => s.user?.role);
   const canManage = role === 'admin';
   const [prefill, setPrefill] = useState<{ name: string; unit: string; section: string } | null>(null);

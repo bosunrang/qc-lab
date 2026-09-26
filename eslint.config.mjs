@@ -29,6 +29,13 @@ export default [
       // Effect/memo thiếu phụ thuộc thì trang giữ dữ liệu cũ. Để mức cảnh báo:
       // không phải chỗ nào thiếu cũng là lỗi, cần đọc từng chỗ.
       'react-hooks/exhaustive-deps': 'warn',
+      // Đọc cả store (`useXStore()` không selector) làm component vẽ lại khi
+      // BẤT KỲ trường nào của store đổi (kế hoạch kiến trúc D.2). Chọn đúng
+      // trường cần dùng: `useXStore((s) => s.x)` hoặc `useShallow(...)`.
+      'no-restricted-syntax': ['error', {
+        selector: 'CallExpression[callee.name=/^use[A-Z]\\w*Store$/][arguments.length=0]',
+        message: 'Không đọc cả store; truyền selector hoặc useShallow((s) => ({ ... })).',
+      }],
     },
   },
   // Ranh giới renderer ↔ main (kế hoạch kiến trúc D.12). Renderer chỉ được

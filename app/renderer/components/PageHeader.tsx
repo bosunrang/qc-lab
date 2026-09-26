@@ -2,6 +2,7 @@
 // hành động phiên ở phải. Component nằm trong từng route để sticky theo vùng
 // cuộn nội dung; avatar giữ đủ tương tác chuột và bàn phím.
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
 import { AvatarModal } from './AvatarModal';
 
@@ -12,7 +13,7 @@ function roleLabel(role?: string): string {
 }
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout } = useAuthStore(useShallow((s) => ({ user: s.user, logout: s.logout })));
   const [avatarOpen, setAvatarOpen] = useState(false);
   return (
     <div className="head">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import type { HistoryQcPointView, Test, TestLevel, QcLot } from '../../../shared/qc-api';
@@ -77,7 +78,7 @@ function testSearchValues(test: Test, levels: TestLevel[], lots: QcLot[], instru
 }
 
 export function HistoryTab() {
-  const { tests, instruments, lots, lotGroups, levelsByTestId, loadLevels, loadHistoryPoints } = useManageStore();
+  const { tests, instruments, lots, lotGroups, levelsByTestId, loadLevels, loadHistoryPoints } = useManageStore(useShallow((s) => ({ tests: s.tests, instruments: s.instruments, lots: s.lots, lotGroups: s.lotGroups, levelsByTestId: s.levelsByTestId, loadLevels: s.loadLevels, loadHistoryPoints: s.loadHistoryPoints })));
   const [testId, setTestId] = useState('');
   const [points, setPoints] = useState<HistoryQcPointView[]>([]);
   const [detail, setDetail] = useState<HistoryRow | null>(null);

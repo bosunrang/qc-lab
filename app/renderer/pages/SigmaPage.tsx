@@ -4,6 +4,7 @@
 // thuần nằm ở `pages/sigma/`. Bộ chọn luôn lấy toàn bộ danh mục
 // Cấu hình chung — không tạo hay bật/tắt xét nghiệm riêng trong Sigma.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useSigmaStore, type SigmaLevelSaveInput } from '../store/sigma-store';
@@ -30,8 +31,8 @@ import { SigmaChartsPanel, SigmaMuPanel, SigmaOpspecsPanel, SigmaStatusPanel } f
 import { TEA_SOURCES, editablePercent, isKnownTeaSource, missingSigmaInputs, sigmaZone, vnDate, vnPeriod } from './sigma/shared';
 
 export function SigmaPage() {
-  const { tests, teaRefs, levelsByTestId, loadTests, loadTeaRefs, loadLevels, instruments, loadInstruments} = useManageStore();
-  const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
+  const { tests, teaRefs, levelsByTestId, loadTests, loadTeaRefs, loadLevels, instruments, loadInstruments} = useManageStore(useShallow((s) => ({ tests: s.tests, teaRefs: s.teaRefs, levelsByTestId: s.levelsByTestId, loadTests: s.loadTests, loadTeaRefs: s.loadTeaRefs, loadLevels: s.loadLevels, instruments: s.instruments, loadInstruments: s.loadInstruments })));
+  const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, saveTeaConfig: saveTeaConfigStore } = useSigmaStore(useShallow((s) => ({ periods: s.periods, loading: s.loading, error: s.error, loadPeriods: s.loadPeriods, loadCohorts: s.loadCohorts, savePeriod: s.savePeriod, removePeriod: s.removePeriod, saveTeaConfig: s.saveTeaConfig })));
   // Vai trò chỉ-xem: vẫn đọc được bảng kỳ/Sigma/MU, không sửa được (main
   // chặn bằng requireWrite ở sigma-handlers.savePeriod).
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
