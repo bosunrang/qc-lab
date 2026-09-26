@@ -90,8 +90,12 @@ export function SettingsPage() {
   // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn hệ thống
   // hứa (`LIS_POLL_MS`). Trước Giai đoạn D3.3 app chỉ lấy hàng chờ khi
   // bấm nút, nên nhãn đó là lời hứa suông — nay có bộ đếm thật.
+  // Chạy theo cấu hình ĐÃ LƯU (`lis.enabled`), không theo ô tick đang sửa:
+  // tick mà chưa lưu thì main vẫn coi Gateway là tắt, và trước 2026-09-26 vòng
+  // hỏi chạy ngay rồi báo lỗi "LIS Gateway chưa được bật" (kế hoạch D.10).
+  const lisSavedEnabled = !!lis?.enabled;
   useEffect(() => {
-    if (!lisEnabled) { setLisStatus({ kind: 'off', detail: 'Chưa bật' }); return; }
+    if (!lisSavedEnabled) { setLisStatus({ kind: 'off', detail: 'Chưa bật' }); return; }
     let alive = true;
     const tick = async () => {
       const result = await pullLisQueue();
@@ -102,7 +106,7 @@ export function SettingsPage() {
     tick();
     const timer = setInterval(tick, LIS_POLL_MS);
     return () => { alive = false; clearInterval(timer); };
-  }, [lisEnabled, pullLisQueue]);
+  }, [lisSavedEnabled, pullLisQueue]);
 
   // Nạp giá trị đã lưu vào form đúng 1 lần khi profile về — sau đó form là
   // của người dùng gõ, không bị ghi đè lại mỗi khi store re-render.
