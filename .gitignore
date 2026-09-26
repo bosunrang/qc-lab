@@ -22,3 +22,6 @@ Thumbs.db
 # nhầm, KHÔNG phải nguồn. Xoá được an toàn; bỏ qua để `git add -A` không nuốt
 # nó vào thành submodule.
 /QC Lab/
+
+# Biên bản thẩm định do `npm run validate` sinh ra
+validation-output/
