@@ -29,6 +29,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | E.2 (nhánh `perf/audit-sql-query`) | `audit.query` đếm, lọc ngày, phân trang bằng SQL; tìm chữ so trên vài cột rồi mới nạp đủ cột cho trang. 50.000 dòng: lật trang 351 ms → dưới 1 ms, tìm chữ 4,5 s → 0,6 s. Test đối chiếu với cách cũ trên 546 tổ hợp |
 | Lọc ngày Nhật ký (nhánh `fix/audit-local-date-filter`) | Lọc theo ngày giờ địa phương như bảng hiển thị, không theo ngày UTC (trước đây 00:00–06:59 sáng bị xếp vào hôm trước); ngày không hợp lệ bị bỏ qua |
 | D.4–D.5 (nhánh `feat/error-boundary`) | `PageErrorBoundary` bọc từng trang trong `AppShell` (đổi trang thì tự bỏ lỗi) và bọc cả app; promise bị từ chối và lỗi trong trình xử lý sự kiện được báo bằng hộp thoại, không mở đè hộp thoại đang chờ; Tổng quan hiện lỗi kèm Thử lại thay vì treo ở trạng thái tải |
+| E.3 (nhánh `perf/sqlite-wal`) | CSDL mở ở WAL, giữ `synchronous = FULL`: mỗi thao tác ghi có nhật ký 11 ms → 3 ms. Backup và bản an toàn (`VACUUM INTO`) vẫn là tệp SQLite thường, đọc chỉ đọc không để lại tệp phụ; đóng kết nối khi thoát app để gộp `-wal`; cỡ dữ liệu ở Cài đặt tính cả `-wal`. Test `tests/sqlite-wal.test.mjs` |
 
 ## Thứ tự đề xuất
 
@@ -223,8 +224,7 @@ tách (tách thuần, không đổi hành vi).
 
 1. ~~**Băm mật khẩu đồng bộ**~~ — đã xong, xem bảng "Đã xong".
 2. ~~**Nhật ký lọc bằng JavaScript**~~ — đã xong, xem bảng "Đã xong".
-3. **Chế độ WAL cho SQLite:** ghi nhanh hơn, đọc không bị chặn khi LAN ghi.
-   Cần kiểm tra lại backup (`VACUUM INTO`) và bản an toàn khi bật WAL.
+3. ~~**Chế độ WAL cho SQLite**~~ — đã xong, xem bảng "Đã xong".
 4. **Bài đo sát thực tế:** bài đo hiện dồn 500.000 điểm vào một xét nghiệm
    (Westgard 8,3 s, Nhập QC 8,9 s). Dựng bài đo khoảng 60 xét nghiệm × 5 năm,
    nhiều lô, rồi mới quyết định có tối ưu các màn tổng hợp (Tổng quan,
