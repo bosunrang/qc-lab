@@ -1,4 +1,5 @@
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, shell, Tray, type WebContents } from 'electron';
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, safeStorage, shell, Tray, type WebContents } from 'electron';
+import { writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -21,8 +22,10 @@ import { createBackupHandlers } from './ipc/backup-handlers';
 import { createLisHandlers } from './ipc/lis-handlers';
 import { createFirebaseHandlers } from './ipc/firebase-handlers';
 import { createUtilityPushRunner } from './sync/firebase-push-runner';
-import { lanAddresses } from './lan/addresses';
+import { lanIpv4 } from './lan/addresses';
 import { LanHttpServer } from './lan/http-server';
+import { caCoversIp, caThumbprint, type LanCa } from './lan/tls-certs';
+import { LanTlsIdentity, loadOrCreateCa, sealedKeyProtector } from './lan/tls-store';
 import { classifyNavigation } from './window-guard';
 import { createFileLogger } from './logging/file-logger';
 import { describeError, logEvent, setLogSink } from './logging/log-sink';
@@ -93,24 +96,58 @@ function showMainWindow(): void {
   win.focus();
 }
 
-function showLanAddresses(port: number): void {
-  const addresses = lanAddresses(port, networkInterfaces());
+/**
+ * CA và chứng chỉ HTTPS của máy chủ LAN, lưu ở `userData/lan-tls`. Khoá CA
+ * được `safeStorage` (DPAPI) mã hoá. Tạo CA mới nghĩa là mọi máy nhân viên
+ * phải cài lại chứng chỉ gốc, nên luôn ghi log kèm lý do.
+ */
+function startLanTls(userDataDir: string): LanTlsIdentity {
+  const protector = sealedKeyProtector(safeStorage);
+  if (!protector.sealed) logEvent({ level: 'warn', source: 'lan', message: 'Hệ điều hành không cho mã hoá khoá CA; khoá được lưu không mã hoá.' });
+  const loaded = loadOrCreateCa(path.join(userDataDir, 'lan-tls'), protector);
+  if (loaded.created) logEvent({ level: 'warn', source: 'lan', message: `Tạo CA mới cho HTTPS của LAN (${loaded.reason}); máy nhân viên cần cài chứng chỉ gốc ${caThumbprint(loaded.ca)}` });
+  return new LanTlsIdentity(loaded.ca, lanIpv4(networkInterfaces()));
+}
+
+async function saveCaCertificate(ca: LanCa): Promise<void> {
+  const picked = await dialog.showSaveDialog({
+    title: 'Lưu chứng chỉ gốc cho máy nhân viên',
+    defaultPath: 'QC-Lab-CA.crt',
+    filters: [{ name: 'Chứng chỉ', extensions: ['crt'] }],
+  });
+  if (picked.canceled || !picked.filePath) return;
+  await writeFile(picked.filePath, ca.certDer);
+}
+
+function showLanAddresses(port: number, ca: LanCa): void {
+  const ips = lanIpv4(networkInterfaces());
+  const usable = ips.filter(caCoversIp);
+  const outside = ips.filter((ip) => !caCoversIp(ip));
+  const lines = usable.length
+    ? usable.map((ip) => `https://${ip}:${port}`).join('\n')
+    : `Không tìm thấy địa chỉ IPv4 trong mạng nội bộ. Kiểm tra kết nối mạng của máy chủ rồi thử lại.\n\nCổng cố định: ${port}`;
+  // Địa chỉ ngoài dải nội bộ: CA bị giới hạn ở dải nội bộ (xem tls-certs.ts)
+  // nên trình duyệt sẽ từ chối; nói rõ thay vì phát một địa chỉ không dùng được.
+  const outsideNote = outside.length
+    ? `\n\nKhông dùng được (không thuộc dải mạng nội bộ): ${outside.join(', ')}`
+    : '';
   void dialog.showMessageBox({
     type: 'info',
     title: 'Địa chỉ truy cập',
     message: 'Nhân viên mở trình duyệt và gõ một trong các địa chỉ sau:',
-    detail: (addresses.length
-      ? addresses.join('\n')
-      : `Không tìm thấy địa chỉ IPv4 trong mạng nội bộ. Kiểm tra kết nối mạng của máy chủ rồi thử lại.\n\nCổng cố định: ${port}`)
-      // Máy chủ LAN chạy HTTP thường: mật khẩu và phiên đăng nhập đi qua mạng
-      // không mã hoá. Nói rõ ngay tại chỗ người quản trị phát địa chỉ cho máy trạm.
-      + '\n\nLưu ý bảo mật: kết nối này KHÔNG mã hoá (HTTP). Chỉ dùng trong mạng nội bộ tin cậy của phòng xét nghiệm, '
-      + `không dùng qua Wi-Fi khách hay Wi-Fi công cộng, và không mở cổng ${port} ra Internet.`,
-    buttons: ['Đóng'],
-  });
+    detail: lines + outsideNote
+      + '\n\nLần đầu trên mỗi máy nhân viên: mở địa chỉ trên bằng http:// thay cho https://, làm theo hướng dẫn để tải '
+      + 'và cài chứng chỉ gốc (hoặc chép tệp chứng chỉ bằng nút bên dưới). Khi Windows hỏi xác nhận, Thumbprint phải trùng:\n\n'
+      + `${caThumbprint(ca)}\n\n`
+      + `Không mở cổng ${port} ra Internet.`,
+    buttons: ['Lưu chứng chỉ gốc…', 'Đóng'],
+    defaultId: 1,
+    cancelId: 1,
+  }).then(({ response }) => { if (response === 0) return saveCaCertificate(ca); })
+    .catch((error) => logEvent({ level: 'error', source: 'lan', message: `Không lưu được chứng chỉ gốc: ${describeError(error).message}` }));
 }
 
-function createTray(port: number): void {
+function createTray(port: number, ca: LanCa): void {
   tray?.destroy();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'build', 'icon.png'));
   tray = new Tray(icon);
@@ -118,7 +155,7 @@ function createTray(port: number): void {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Mở QC Lab', click: showMainWindow },
     { label: `Máy chủ LAN · cổng ${port}`, enabled: false },
-    { label: 'Địa chỉ cho máy nhân viên…', click: () => showLanAddresses(port) },
+    { label: 'Địa chỉ cho máy nhân viên…', click: () => showLanAddresses(port, ca) },
     { type: 'separator' },
     { label: 'Thoát QC Lab (máy nhân viên sẽ mất kết nối)', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -219,6 +256,7 @@ async function createWindow(): Promise<void> {
   ];
   registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor));
 
+  const lanTls = startLanTls(userDataDir);
   const lan = new LanHttpServer<PublicUser>({
     login: (input) => auth.login(input as { data: { username: string; password: string } }),
     getLoginBrand: () => settings.getLoginBrand(),
@@ -226,7 +264,15 @@ async function createWindow(): Promise<void> {
     currentUser: (actor) => auth.getUser(actor.userId),
     invoke: createLanInvoker(operationTables),
     staticDir: path.join(__dirname, '..', 'renderer'),
+    tls: { credentials: () => lanTls.credentials, caCertificate: () => lanTls.ca.certDer },
   });
+  // Máy chính đổi IP (DHCP, cắm mạng khác) thì cấp chứng chỉ máy chủ mới cho
+  // địa chỉ mới; máy nhân viên không phải cài lại vì vẫn cùng CA.
+  setInterval(() => {
+    if (!lanTls.refresh(lanIpv4(networkInterfaces()))) return;
+    lan.reloadTls();
+    logEvent({ level: 'info', source: 'lan', message: `Cấp lại chứng chỉ HTTPS cho ${lanTls.credentials.ips.join(', ')}` });
+  }, 60_000).unref();
   mainWindow = win;
   let lanPort: number;
   try {
@@ -238,7 +284,7 @@ async function createWindow(): Promise<void> {
   setLanChangeNotifier((payload) => lan.publishChanged(payload));
   console.log(`QC Lab LAN server is listening on port ${lanPort}`);
 
-  createTray(lanPort);
+  createTray(lanPort, lanTls.ca);
   win.on('close', (event) => {
     if (quitting) return;
     event.preventDefault();

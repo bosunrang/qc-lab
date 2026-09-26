@@ -2,6 +2,7 @@
 // đếm lượt ngay khi bắt đầu để loạt yêu cầu song song không lọt qua.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { trustedTestTls } from './helpers/lan-tls.mjs';
 const require = createRequire(import.meta.url);
 const { LanHttpServer } = require('../../app-dist/main/lan/http-server.js');
 const { LoginThrottle } = require('../../app-dist/main/lan/login-throttle.js');
@@ -48,9 +49,10 @@ const server = new LanHttpServer({
   actorOf: (row) => ({ userId: row.id, username: row.username, name: row.name, role: row.role, clientId: 'lan-web' }),
   currentUser: () => user,
   invoke: async () => ({ ok: true }),
+  tls: trustedTestTls().source,
 }, options);
 const port = await server.start(0, '127.0.0.1');
-const origin = `http://127.0.0.1:${port}`;
+const origin = `https://127.0.0.1:${port}`;
 const attempt = (username, password) => fetch(`${origin}/api/auth/login`, { method: 'POST', body: JSON.stringify({ data: { username, password } }) });
 
 const ok = await attempt('ktv', 'secret');

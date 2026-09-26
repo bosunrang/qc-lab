@@ -44,6 +44,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | D.2 (nhánh `perf/store-selectors`) | 42 chỗ đọc cả store (`useXStore()`) ở 22 tệp chuyển sang `useShallow` với đúng các trường dùng, nên component không vẽ lại khi trường không liên quan của store đổi. Luật ESLint `no-restricted-syntax` chặn gọi `useXStore()` không có selector |
 | D.3 (nhánh `perf/store-selectors`) | `lib/useCatalog.ts`: danh mục dùng chung (máy, xét nghiệm, lô, nhóm lô, Panel, TEa, tóm tắt) tự nạp khi trang mở và tự nạp lại theo MỘT bảng phụ thuộc khai tại hook; `SUMMARY_TABLES` dùng chung với Tổng quan. Áp cho Nhập QC, Westgard, Sigma, Báo cáo, Khắc phục sự cố, So sánh hoá chất, Cấu hình chung. Sửa kèm: Nhập QC chỉ nạp lô/nhóm lô/Panel một lần lúc mở, nên dừng nhóm lô ở nơi khác thì cây và ô nhập vẫn giữ dữ liệu cũ; Báo cáo và Khắc phục sự cố chỉ nạp lại tóm tắt khi `tests`/`qc_points` đổi. State vẫn ở `manage-store`/`westgard-store` (không tách store mới). e2e `catalog-refresh.e2e.mjs` |
 | B.1–B.4 (nhánh `feat/firebase-backup-only`) | Đẩy tự động 15 phút một lần khi có thay đổi (hẹn từ thay đổi ĐẦU TIÊN, không dời theo mỗi thao tác; sau một lần hỏng thì chờ đủ chu kỳ mới thử lại) và đẩy nốt khi đóng app (chờ tối đa 30 giây); nút "Đẩy lên ngay" giữ nguyên. Gói dựng và gửi ở `utilityProcess` (`sync/firebase-push-worker.ts`) với kết nối SQLite chỉ đọc riêng, đọc trong một transaction (bản chụp nhất quán nhờ WAL); main không bị chặn. Đo cỡ trước khi gửi: từ 80% giới hạn 256 MB thì cảnh báo trong trạng thái, vượt giới hạn thì không gửi và hướng dẫn dùng backup .sqlite. `disconnect()` là một transaction. Test `tests/firebase-schedule.test.mjs`, `e2e/firebase-push-worker.e2e.mjs`. Chưa kiểm trên bản đóng gói (`npm run dist`, mã trong `app.asar`) |
+| LAN qua HTTPS (nhánh `feat/lan-https`) | Máy chính tự tạo một CA (`lan/tls-certs.ts`, ECDSA P-256, 10 năm), khoá CA mã hoá bằng `safeStorage`/DPAPI ở `userData/lan-tls` (`lan/tls-store.ts`). Chứng chỉ máy chủ cấp theo IP nội bộ hiện có, 397 ngày, khoá chỉ trong bộ nhớ; IP đổi thì cấp lại trong vòng 1 phút mà không khởi động lại, máy nhân viên không phải cài lại. CA có Name Constraints chỉ cho IPv4 nội bộ (10/8, 172.16/12, 192.168/16, 100.64/10, 169.254/16, 127/8) và EKU serverAuth: khoá CA có lộ cũng không giả được trang Internet trên máy đã cài chứng chỉ gốc. Cổng 3200 nhận cả hai giao thức theo byte đầu: HTTPS phục vụ app; HTTP thường chỉ có trang hướng dẫn cài chứng chỉ (tự chuyển sang https:// khi máy đã tin CA) và tệp `/qclab-ca.crt`, không đăng nhập, không API (403 `https-required`). Cookie phiên thêm `Secure`. Menu khay "Địa chỉ cho máy nhân viên…" hiện địa chỉ https://, Thumbprint để đối chiếu khi cài và nút lưu tệp chứng chỉ. Test `tests/lan-tls.test.mjs` (bắt tay TLS thật, Name Constraints chặn IP/tên miền ngoài dải), `e2e/lan.e2e.mjs` chạy máy trạm qua HTTPS. Chưa kiểm: trình duyệt thật trên máy nhân viên đã cài chứng chỉ vào kho Windows; bản đóng gói |
 
 ## Thứ tự đề xuất
 
@@ -140,9 +141,10 @@ có kết quả E.4.
 khác của LAN; hai lời gọi LAN của hai actor chạy xen nhau, mỗi lời gọi ghi
 nhật ký đúng actor của mình và phiên desktop không đổi.
 
-**Quyết định còn chờ:** có chuyển LAN sang HTTPS không. Mạng bệnh viện dùng
-chung nên nên làm; cách đề xuất là chứng chỉ tự ký do app tạo, cho phép nạp
-chứng chỉ của CA nội bộ. Việc này tách riêng, làm sau bước 1–5.
+**HTTPS cho LAN:** đã làm 2026-09-26 theo cách app tự tạo CA (người dùng
+chốt), xem bảng "Đã xong". Chưa làm: tuỳ chọn nạp chứng chỉ của CA nội bộ
+bệnh viện thay cho CA của app — chỉ cần khi phòng IT có CA và muốn máy nhân
+viên khỏi phải cài chứng chỉ gốc.
 
 ## B. Firebase chỉ để sao lưu
 
@@ -352,7 +354,7 @@ trong console của máy đang chạy.
 
 | Quyết định | Đề xuất |
 | --- | --- |
-| LAN có chuyển sang HTTPS | Có, sau giai đoạn A; chứng chỉ tự ký + tuỳ chọn CA nội bộ |
+| ~~LAN có chuyển sang HTTPS~~ | Đã chốt và làm 2026-09-26: app tự tạo CA; tuỳ chọn CA nội bộ để sau |
 | ~~Chu kỳ đẩy Firebase~~ | Đã chốt 2026-09-26: 15 phút và khi đóng app |
 | Bật/tắt luật Westgard chung cần quyền gì | Tra SOP; nếu là cấu hình chung của phòng thì nên là admin |
 | Log và báo crash có gửi ra ngoài không (G.2) | Không: chỉ lưu tại máy, người dùng tự xuất gói log khi cần báo lỗi |
