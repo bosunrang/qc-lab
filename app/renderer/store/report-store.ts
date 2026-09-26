@@ -22,14 +22,15 @@ export const useReportStore = create<ReportState>((set, get) => ({
     if (result.ok) set({ template: result.data });
     return result;
   },
+  // Không tự nạp lại sau khi ghi (kế hoạch kiến trúc D.1): main báo `period_locks`
+  // sau commit và trang Báo cáo nạp lại qua `useStoreInvalidation` — tự nạp ở đây làm
+  // danh sách nạp HAI lần. Không chỗ gọi nào đọc danh sách ngay sau `await`.
   lock: async (ym, note) => {
     const result = await window.qcApi.lockPeriod({ data: { ym, note } });
-    if (result.ok) await get().loadLocks();
     return result;
   },
   unlock: async (ym, note) => {
     const result = await window.qcApi.unlockPeriod({ data: { ym, note } });
-    if (result.ok) await get().loadLocks();
     return result;
   },
 }));

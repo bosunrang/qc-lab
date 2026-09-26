@@ -14,6 +14,7 @@ import { listTableNames, restoreAllTables, restoreAllTablesFromFile, vacuumInto,
 import { BACKUP_FILE_FORMAT, BACKUP_FILE_FORMAT_VERSION, validateBackupEnvelope, type BackupEnvelope } from '../domain/backup';
 import { type Actor, type IpcResult, nowIso, requireAdmin } from './shared';
 import { writeCommand } from './write-command';
+import { quoteIdent } from '../db/sql-ident';
 
 /** Ngưỡng chỉ còn áp cho tệp backup JSON cũ: phải đọc cả tệp thành chuỗi. */
 const LEGACY_JSON_MAX_BYTES = 128 * 1024 * 1024;
@@ -94,7 +95,7 @@ function inspectSqliteBackup(filePath: string, bytes: number): Inspected {
     }
     const tables = (source.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name<>'backup_info'").all() as { name: string }[]).map((r) => r.name);
     let rows = 0;
-    for (const table of tables) rows += Number((source.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n);
+    for (const table of tables) rows += Number((source.prepare(`SELECT COUNT(*) AS n FROM ${quoteIdent(table)}`).get() as { n: number }).n);
     const points = tables.includes('qc_points') ? Number((source.prepare('SELECT COUNT(*) AS n FROM qc_points').get() as { n: number }).n) : 0;
     return { ok: true, kind: 'sqlite', summary: { tables: tables.length, rows, points, schemaVersion, createdAt: info.get('createdAt') ?? '', bytes, legacy: false } };
   } catch {
@@ -250,7 +251,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
       w.commit((tx) => {
         // Xoá theo thứ tự NGƯỢC danh sách bảng để bảng con đi trước bảng cha,
         // cùng lý do với restoreAllTables() trong db/table-io.ts.
-        for (const table of [...cleared].reverse()) db.prepare(`DELETE FROM ${table}`).run();
+        for (const table of [...cleared].reverse()) db.prepare(`DELETE FROM ${quoteIdent(table)}`).run();
         db.prepare("UPDATE lab SET name='', dept='', address='', brand_title='QC Lab', brand_sub='Nội kiểm xét nghiệm', logo_text='QC', logo_data='' WHERE id=1").run();
         seedInitialRows(db);
         // Nhật ký nay nằm CÙNG transaction với phần xoá (trước đây ghi sau).

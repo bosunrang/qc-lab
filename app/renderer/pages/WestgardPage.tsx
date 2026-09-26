@@ -24,6 +24,7 @@ import { ArchivedGroupPicker, ArchivedGroupResults } from './westgard/ArchivedGr
 import { TestPicker } from '../components/TestPicker';
 import { useTestSelection } from '../lib/useTestSelection';
 import { isLanStation } from '../lib/runtime';
+import { lotNoOfLevel } from '../lib/lot-label';
 
 export function WestgardPage() {
   const { tests, instruments, lots, levelsByTestId, loadLevels, lotGroups } = useManageStore(useShallow((s) => ({
@@ -100,11 +101,7 @@ export function WestgardPage() {
     const label = lots.length ? `${s.testName} · LOT ${lots.join('/')}` : s.testName;
     return s.instrumentName ? `${label} · ${s.instrumentName}` : label;
   };
-  const lotLabelFor = useCallback((level: number) => {
-    const lv = levels.find((l) => l.level === level);
-    const lot = lv?.qc_lot_id ? lots.find((l) => l.id === lv.qc_lot_id) : null;
-    return lot?.lot_no || '—';
-  }, [levels, lots]);
+  const lotLabelFor = useCallback((level: number) => lotNoOfLevel(levels, lots, level), [levels, lots]);
   const navigate = useNavigate();
   // Vẫn là MỘT biểu đồ tổng hợp hai mức: dữ liệu quy đổi về Z-score chung,
   // chỉ đồng bộ kích thước/co giãn với biểu đồ ở trang Nhập QC.

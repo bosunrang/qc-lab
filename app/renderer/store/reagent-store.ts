@@ -50,19 +50,20 @@ export const useReagentStore = create<ReagentState>((set, get) => ({
     if (result.ok) await get().load();
     return result;
   },
+  // Không tự nạp lại sau khi ghi (kế hoạch kiến trúc D.1): main báo `reagent_tests`
+  // sau commit và trang So sánh hoá chất nạp lại qua `useStoreInvalidation` — tự nạp ở đây làm
+  // danh sách nạp HAI lần. Không chỗ gọi nào đọc danh sách ngay sau `await`.
+  // Riêng `create` vẫn tự nạp: trang chọn ngay phép so sánh mới theo id.
   saveMetadata: async (id, data) => {
     const result = await window.qcApi.saveReagentMetadata({ id, data });
-    if (result.ok) await get().load();
     return result;
   },
   saveRows: async (id, rows) => {
     const result = await window.qcApi.saveReagentRows({ id, rows });
-    if (result.ok) await get().load();
     return result;
   },
   remove: async (id) => {
     const result = await window.qcApi.removeReagentComparison({ id });
-    if (result.ok) await get().load();
     return result;
   },
 }));

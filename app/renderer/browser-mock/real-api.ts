@@ -180,6 +180,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     // Bản xem trước không có tệp log: lỗi đã nằm trong console của trình duyệt.
     reportClientError: async () => ({ ok: true as const, data: null }),
     openLogFolder: async () => notAvailable(),
+    exportLogBundle: async () => notAvailable(),
     pullLisQueue: async () => ({
       ok: false as const,
       error: {

@@ -56,12 +56,12 @@ test('PageErrorBoundary: đổi trang thì bỏ trạng thái lỗi, ở lại t
   assert.deepEqual(updates, [{ error: null }]);
 });
 
-test('khung app bọc từng trang, và lớp ngoài cùng bọc cả app', () => {
-  const shell = readFileSync(new URL('../renderer/components/AppShell.tsx', import.meta.url), 'utf8');
-  assert.match(shell, /<PageErrorBoundary resetKey=\{pathname\}>\s*<Outlet \/>\s*<\/PageErrorBoundary>/);
+// Bọc từng trang trong `AppShell` và báo lỗi không được bắt được kiểm trên app
+// thật ở `e2e/window-shell.e2e.mjs`. Lớp ngoài cùng chỉ bắt lỗi của chính
+// khung app, không dựng được lỗi đó từ ngoài nên vẫn kiểm theo mã.
+test('lớp ngoài cùng bọc cả app', () => {
   const entry = readFileSync(new URL('../renderer/main.tsx', import.meta.url), 'utf8');
   assert.match(entry, /render\(<PageErrorBoundary><AppRouter \/><\/PageErrorBoundary>\)/);
-  assert.match(entry, /installUnhandledErrorReporting\(\);/);
 });
 
 test('lỗi không được bắt: báo người dùng, không mở đè hộp thoại đang chờ, bỏ qua lỗi vô hại', async () => {

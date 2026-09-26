@@ -29,6 +29,7 @@ import { EntryRangePanel } from './entry/EntryRangePanel';
 import { VoidPointModal } from './entry/VoidPointModal';
 import { RangeWorkflowModal, type RangeMode } from './entry/RangeWorkflowModal';
 import { formatQcValue, pad2, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
+import { lotNoOfLevel } from '../lib/lot-label';
 
 const EMPTY_LEVELS: TestLevel[] = [];
 const ENTRY_TREE_COLLAPSE_KEY = 'qclab-entry-tree-collapsed';
@@ -165,11 +166,7 @@ export function EntryPage() {
    * sau nó. Lô song song dùng Mean/SD của hồ sơ chuyển lô và chuỗi Westgard
    * riêng do main process trả về; renderer chỉ dựng hình từ kết quả đó. */
   const entryColumns: EntryColumn[] = useMemo(() => {
-    const lotLabelFor = (level: number) => {
-      const lv = levels.find((l) => l.level === level);
-      const lot = lv?.qc_lot_id ? lots.find((l) => l.id === lv.qc_lot_id) : null;
-      return lot?.lot_no || '—';
-    };
+    const lotLabelFor = (level: number) => lotNoOfLevel(levels, lots, level);
     return levels.flatMap((level) => {
       const analysis = analysisByLevel[level.level];
       const rows = pointsByLevel[level.level] || [];

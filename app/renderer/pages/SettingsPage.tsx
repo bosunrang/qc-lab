@@ -179,6 +179,13 @@ export function SettingsPage() {
     if (!result.ok) await showError(result.error.message);
   }
 
+  async function exportLogs() {
+    const result = await window.qcApi.exportLogBundle();
+    if (!result.ok) { await showError(result.error.message); return; }
+    if (!result.data) return;
+    await infoDialog(`Đã xuất gói log (${result.data.files} tệp, ${formatMb(result.data.bytes)}) tại:\n${result.data.path}`, { type: 'success' });
+  }
+
   async function pickBackupFile() {
     const verified = await chooseBackupFile();
     if (!verified.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`, { type: 'warn' }); return; }
@@ -363,8 +370,11 @@ export function SettingsPage() {
           </div>
           <div className="admin-tool">
             <b>Nhật ký lỗi của ứng dụng</b>
-            <span>Lỗi và tệp crash chỉ lưu trên máy này, không gửi đi đâu. Mở thư mục để gửi kèm khi báo lỗi; tệp log không chứa mật khẩu hay token.</span>
-            <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
+            <span>Lỗi và tệp crash chỉ lưu trên máy này, không gửi đi đâu. Xuất gói log (một tệp .zip) để gửi kèm khi báo lỗi; tệp log không chứa mật khẩu, token hay dữ liệu QC.</span>
+            <div className="admin-tool-actions">
+              <button className="btn ghost" onClick={exportLogs}>Xuất gói log…</button>
+              <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
+            </div>
           </div>
         </div>
       </div>

@@ -116,6 +116,8 @@
 .admin-tool b{font-size:var(--text-sm)}
 .admin-tool span{color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body)}
 .admin-tool .btn{width:100%;align-self:end}
+/* Hai nút cùng một công cụ (Xuất gói log / Mở thư mục log) chia đôi hàng. */
+.admin-tool-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-self:end}
 
 /* Header dùng `.panel-title` chuẩn (nền, đường kẻ đáy, cỡ chữ); lớp này chỉ
    thêm khoảng cách giữa icon và chữ. */

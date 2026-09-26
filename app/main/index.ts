@@ -252,6 +252,17 @@ async function createWindow(): Promise<void> {
       basename: (filePath) => path.basename(filePath),
       logDir: LOG_DIR,
       openFolder: (folder) => shell.openPath(folder),
+      pickLogBundleSavePath: async (defaultName) => {
+        const picked = await dialog.showSaveDialog(win, {
+          title: 'Xuất gói log để gửi khi báo lỗi',
+          defaultPath: defaultName,
+          filters: [{ name: 'Tệp nén', extensions: ['zip'] }],
+        });
+        return picked.canceled || !picked.filePath ? null : picked.filePath;
+      },
+      writeFile: (filePath, data) => writeFile(filePath, data),
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron,
     }),
   ];
   registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor));

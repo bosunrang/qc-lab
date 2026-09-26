@@ -121,6 +121,7 @@ const api = {
   exportBackup: () => ipcRenderer.invoke('backup:export'),
   reportClientError: (input: unknown) => ipcRenderer.invoke('log:clientError', input),
   openLogFolder: () => ipcRenderer.invoke('log:openFolder'),
+  exportLogBundle: () => ipcRenderer.invoke('log:exportBundle'),
   chooseBackupFile: () => ipcRenderer.invoke('backup:chooseFile'),
   importBackup: () => ipcRenderer.invoke('backup:import'),
   backupStatus: () => ipcRenderer.invoke('backup:status'),

@@ -10,6 +10,7 @@ import { cleanId, cleanText, uid } from '../domain/text-utils';
 import { validateTeaRef, TEA_LAB_SOURCE_LABELS, type TeaRefInput } from '../domain/tea-ref-validation';
 import { type IpcResult } from './shared';
 import { writeCommand } from './write-command';
+import { quoteIdent } from '../db/sql-ident';
 
 export function createTeaRefHandlers(db: Db) {
 
@@ -82,13 +83,13 @@ export function createTeaRefHandlers(db: Db) {
     const label = field === 'clia' ? 'CLIA' : 'Ricos';
     w.commit((tx) => {
       if (existing) {
-        db.prepare(`UPDATE tea_refs SET ${field}=? WHERE id=?`).run(value, existing.id);
+        db.prepare(`UPDATE tea_refs SET ${quoteIdent(field)}=? WHERE id=?`).run(value, existing.id);
         const after = db.prepare('SELECT clia, ricos, lab, clia_absolute FROM tea_refs WHERE id=?').get(existing.id) as
           { clia: number | null; ricos: number | null; lab: number | null; clia_absolute: number | null };
         if (after.clia == null && after.ricos == null && after.lab == null && after.clia_absolute == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
       } else {
         const newId = cleanId(uid());
-        db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,${field}) VALUES (?,?,?,?,?,?)`)
+        db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,${quoteIdent(field)}) VALUES (?,?,?,?,?,?)`)
           .run(newId, analyteId, name, String(input.unit || ''), String(input.section || ''), value);
       }
       tx.audit('Sửa bảng TEa tham chiếu',

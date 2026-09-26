@@ -71,63 +71,59 @@ const BANDS: { low: number; high: number; color: keyof typeof LJ }[] = [
 
 const CUSUM_COLORS = { pos: '#0b747d', neg: '#4f789d', warn: '#dd8b1f', rej: '#c5221f' };
 
-export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, height = 220, responsiveHeight = false, className }: {
-  mode: 'lj' | 'cusum'; points: QcChartPoint[]; cusum?: QcChartCusum;
-  /** Mean/SD đích của mức, dùng để in giá trị thật ở trục Y bên phải. */
-  mean?: number | null; sd?: number | null; lot?: string; decimals?: number;
-  height?: number; responsiveHeight?: boolean; className?: string;
-}) {
+/** Chiều cao vẽ: mốc `height`; bật `responsiveHeight` thì giữ cùng tỷ lệ hình
+ * học so với mốc 1180px, nhưng chỉ cho tăng tối đa 20% — ở trang Nhập QC, ẩn
+ * sidebar/cây danh mục làm chiều rộng tăng hơn 40%, biểu đồ không được đẩy
+ * các bảng phía dưới xuống quá xa. */
+function renderHeightFor(width: number, height: number, responsiveHeight: boolean): number {
+  return responsiveHeight ? Math.round(Math.max(height, Math.min(height * 1.2, (width / 1180) * height))) : height;
+}
+
+/**
+ * Khung vẽ canvas dùng chung cho ba biểu đồ (kế hoạch kiến trúc D.8): đặt độ
+ * phân giải bitmap theo `devicePixelRatio`, vẽ lại khi dữ liệu đổi và khi
+ * khung chứa đổi kích thước. `paint` chỉ lo phần hình.
+ *
+ * - `draw` giữ MỘT tham chiếu suốt vòng đời (đọc props mới nhất qua ref):
+ *   nếu `draw` đổi mỗi lần cha render (mảng `points`/`series` thường là tham
+ *   chiếu mới dù nội dung không đổi), effect gắn `ResizeObserver` sẽ gỡ và
+ *   gắn lại observer liên tục, có khoảng hở giữa hai lần.
+ * - CHỈ đặt thuộc tính `width`/`height` của canvas (độ phân giải bitmap), không
+ *   gán `style.width`: kích thước hiển thị do CSS `width:100%` quyết định nên
+ *   canvas vẫn co giãn theo khung chứa.
+ * - Vẽ lại theo CẢ `ResizeObserver` (khung chứa đổi vì layout xung quanh, vd
+ *   thu/mở thanh điều hướng) LẪN `resize` của `window` (đổi cỡ cửa sổ thật):
+ *   hai nguồn khác nhau; lỡ một nguồn không kích hoạt thì ô vẽ vẫn co giãn
+ *   đúng, chỉ tạm kém sắc nét.
+ */
+function useCanvasDraw(
+  height: number, responsiveHeight: boolean,
+  paint: (ctx: CanvasRenderingContext2D, width: number, height: number) => void,
+  dataDeps: readonly unknown[],
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [ljHover, setLjHover] = useState<LjHover | null>(null);
-  // Giữ props MỚI NHẤT trong 1 ref để `draw` có THỂ GIỮ NGUYÊN 1 THAM CHIẾU
-  // (deps rỗng) suốt vòng đời component — nếu để `draw` đổi tham chiếu mỗi
-  // khi 1 prop đổi (như bản trước), effect gắn `ResizeObserver` bên dưới sẽ
-  // gỡ+gắn lại observer trên MỖI LẦN component cha render lại (rất thường
-  // xuyên — `points`/`cusum` cha truyền vào thường là mảng/obj MỚI mỗi lần
-  // render dù nội dung không đổi), có khoảng hở dù nhỏ giữa gỡ và gắn lại.
-  const argsRef = useRef({ mode, points, cusum, mean, sd, lot, decimals, height, responsiveHeight });
-  argsRef.current = { mode, points, cusum, mean, sd, lot, decimals, height, responsiveHeight };
-
+  const latest = useRef({ height, responsiveHeight, paint });
+  latest.current = { height, responsiveHeight, paint };
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
     if (!canvas || !wrap) return;
-    const { mode, points, cusum, mean, sd, decimals, height, responsiveHeight } = argsRef.current;
+    const { height, responsiveHeight, paint } = latest.current;
     const width = wrap.clientWidth || 600;
-    // Ở trang Nhập QC, khi ẩn sidebar/cây danh mục thì chiều rộng có thể tăng
-    // hơn 40%. Giữ cùng tỷ lệ hình học so với mốc 1180px, nhưng chỉ cho tăng
-    // tối đa 20% để biểu đồ không đẩy các bảng phía dưới xuống quá xa.
-    const renderHeight = responsiveHeight
-      ? Math.round(Math.max(height, Math.min(height * 1.2, (width / 1180) * height)))
-      : height;
+    const renderHeight = renderHeightFor(width, height, responsiveHeight);
     const dpr = window.devicePixelRatio || 1;
-    // CHỈ đặt độ phân giải bitmap (thuộc tính `width`/`height`, không phải
-    // CSS `style.width/height`) — kích thước hiển thị do CSS `width:100%`
-    // dưới JSX quyết định. Không gán `canvas.style.width` tại đây để canvas
-    // vẫn co giãn theo khung chứa khi kích thước thay đổi.
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(renderHeight * dpr);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, renderHeight);
-
-    if (mode === 'lj') drawLJ(ctx, width, renderHeight, points, mean, sd, decimals);
-    else drawCusum(ctx, width, renderHeight, cusum || { cPos: [], cNeg: [], flags: [] });
+    paint(ctx, width, renderHeight);
   }, []);
-
-  useEffect(() => { draw(); }, [mode, points, cusum, mean, sd, decimals, height, responsiveHeight, draw]);
-  // `draw()` ở effect trên chỉ chạy lại khi các PROP DỮ LIỆU đổi — nếu người
-  // dùng đơn thuần thu/mở thanh điều hướng hay danh mục xét nghiệm (không
-  // đổi điểm/Mean/SD gì), effect đó không tự chạy lại — vẽ lại độ phân giải
-  // BITMAP mỗi khi khung chứa thật sự đổi kích thước, độc lập với prop dữ
-  // liệu. Gắn CẢ `ResizeObserver` (khung chứa đổi vì layout xung quanh đổi)
-  // LẪN `resize` của `window` (đổi kích thước cửa sổ thật) — 2 nguồn kích
-  // hoạt khác nhau, không thừa nhau; nhờ safety-net CSS ở trên, dù 1 trong 2
-  // (hoặc cả 2) lỡ không kích hoạt được ở môi trường nào đó thì ô vẽ vẫn co
-  // giãn đúng kích thước hiển thị, chỉ mất độ sắc nét tạm thời chứ không kẹt
-  // nhỏ hẳn.
+  // Vẽ lại khi DỮ LIỆU đổi; mỗi biểu đồ khai đúng các prop dữ liệu của nó.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { draw(); }, [...dataDeps, height, responsiveHeight, draw]);
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -136,6 +132,23 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
     window.addEventListener('resize', draw);
     return () => { observer.disconnect(); window.removeEventListener('resize', draw); };
   }, [draw]);
+  return { canvasRef, wrapRef };
+}
+
+export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, height = 220, responsiveHeight = false, className }: {
+  mode: 'lj' | 'cusum'; points: QcChartPoint[]; cusum?: QcChartCusum;
+  /** Mean/SD đích của mức, dùng để in giá trị thật ở trục Y bên phải. */
+  mean?: number | null; sd?: number | null; lot?: string; decimals?: number;
+  height?: number; responsiveHeight?: boolean; className?: string;
+}) {
+  const [ljHover, setLjHover] = useState<LjHover | null>(null);
+  const { canvasRef, wrapRef } = useCanvasDraw(height, responsiveHeight, (ctx, width, renderHeight) => {
+    if (mode === 'lj') drawLJ(ctx, width, renderHeight, points, mean, sd, decimals);
+    else drawCusum(ctx, width, renderHeight, cusum || { cPos: [], cNeg: [], flags: [] });
+  }, [mode, points, cusum, mean, sd, decimals]);
+  // Tooltip đọc props mới nhất qua ref để hàm xử lý giữ một tham chiếu.
+  const argsRef = useRef({ mode, points, cusum, mean, sd, lot });
+  argsRef.current = { mode, points, cusum, mean, sd, lot };
 
   /** CUSUM là canvas nên không có từng điểm DOM để browser tự hiện title.
    * Tìm điểm gần con trỏ theo cùng hình học x của hàm vẽ, sau đó đặt native
@@ -151,7 +164,7 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
     const index = Math.max(0, Math.min(points.length - 1, rawIndex));
     const number = (value: number | undefined) => Number.isFinite(value) ? (value as number).toFixed(2) : '—';
     canvas.title = `${vnDate(points[index].date, points[index].date)}\nCUSUM+: ${number(cusum.cPos[index])}\nCUSUM−: ${number(cusum.cNeg[index])}\nMA(5): ${number(cusum.ma?.[index])}${cusum.flags[index] === 'rej' ? '\nVượt ngưỡng h' : '\nTrong tầm kiểm soát'}`;
-  }, []);
+  }, [canvasRef]);
 
   const updateLjTooltip = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -176,7 +189,7 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
     const left = Math.min(window.innerWidth - 248, event.clientX + 14);
     const top = Math.min(window.innerHeight - 142, event.clientY + 14);
     setLjHover({ left: Math.max(12, left), top: Math.max(12, top), lot, point: hit });
-  }, []);
+  }, [canvasRef]);
 
   const chartAriaLabel = mode === 'lj'
     ? `Biểu đồ Levey-Jennings${lot ? ` lô ${lot}` : ''}, ${points.length} điểm QC trong khoảng xem.`
@@ -346,49 +359,10 @@ export interface QcMultiLevelSeries { level: number; lot?: string; label?: strin
  * trên cùng trục, mỗi mức một màu. Trục X dùng ngày chung của mọi mức.
  * Chỉ hiện khi có ≥2 mức (trang gọi component này có điều kiện đó). */
 export function QcMultiChart({ series, height = 220, responsiveHeight = false, className, decimals = 2 }: { series: QcMultiLevelSeries[]; height?: number; responsiveHeight?: boolean; className?: string; decimals?: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
   const [ljHover, setLjHover] = useState<LjHover | null>(null);
-  // Xem chú thích `argsRef` cùng loại ở `QcChart` phía trên — giữ `draw` một
-  // tham chiếu DUY NHẤT suốt vòng đời component, tránh gỡ+gắn lại observer
-  // mỗi khi component cha render lại (đưa `series` mới object reference).
-  const argsRef = useRef({ series, height, responsiveHeight });
-  argsRef.current = { series, height, responsiveHeight };
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const wrap = wrapRef.current;
-    if (!canvas || !wrap) return;
-    const { series, height, responsiveHeight } = argsRef.current;
-    const width = wrap.clientWidth || 600;
-    // Cùng quy tắc với `QcChart` ở trang Nhập QC: mốc 300px, tăng tối đa
-    // 20% theo chiều rộng để biểu đồ không quá thấp ở màn hình lớn.
-    const renderHeight = responsiveHeight
-      ? Math.round(Math.max(height, Math.min(height * 1.2, (width / 1180) * height)))
-      : height;
-    const dpr = window.devicePixelRatio || 1;
-    // Chỉ đặt độ phân giải bitmap — xem chú thích cùng loại ở `QcChart`.
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(renderHeight * dpr);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, renderHeight);
-    drawMulti(ctx, width, renderHeight, series);
-  }, []);
-
-  useEffect(() => { draw(); }, [series, height, responsiveHeight, draw]);
-  // Vẽ lại khi khung chứa thật sự đổi kích thước (kéo giãn cửa sổ / thu-mở
-  // thanh điều hướng đổi layout xung quanh) — xem chú thích cùng loại ở
-  // `QcChart` phía trên.
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const observer = new ResizeObserver(() => draw());
-    observer.observe(wrap);
-    window.addEventListener('resize', draw);
-    return () => { observer.disconnect(); window.removeEventListener('resize', draw); };
-  }, [draw]);
+  const { canvasRef, wrapRef } = useCanvasDraw(height, responsiveHeight, (ctx, width, renderHeight) => drawMulti(ctx, width, renderHeight, series), [series]);
+  const argsRef = useRef({ series });
+  argsRef.current = { series };
 
   const updateLjTooltip = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -413,7 +387,7 @@ export function QcMultiChart({ series, height = 220, responsiveHeight = false, c
     const left = Math.min(window.innerWidth - 248, event.clientX + 14);
     const top = Math.min(window.innerHeight - 142, event.clientY + 14);
     setLjHover({ left: Math.max(12, left), top: Math.max(12, top), level: hit.level, lot: hit.lot, point: hit.point });
-  }, []);
+  }, [canvasRef]);
 
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>
@@ -593,29 +567,7 @@ export interface QcMultiCusumSeries { level: number; points: QcChartPoint[]; cus
  * đó; biểu đồ này chỉ dùng chung trục thời gian/giá trị để đối chiếu, tuyệt
  * đối không gộp hai chuỗi vào cùng một phép tính CUSUM. */
 export function QcMultiCusumChart({ series, height = 300, responsiveHeight = false, className }: { series: QcMultiCusumSeries[]; height?: number; responsiveHeight?: boolean; className?: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const argsRef = useRef({ series, height, responsiveHeight });
-  argsRef.current = { series, height, responsiveHeight };
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current, wrap = wrapRef.current;
-    if (!canvas || !wrap) return;
-    const { series, height, responsiveHeight } = argsRef.current;
-    const width = wrap.clientWidth || 600;
-    const renderHeight = responsiveHeight ? Math.round(Math.max(height, Math.min(height * 1.2, (width / 1180) * height))) : height;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(width * dpr); canvas.height = Math.round(renderHeight * dpr);
-    const ctx = canvas.getContext('2d'); if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, width, renderHeight);
-    drawMultiCusum(ctx, width, renderHeight, series);
-  }, []);
-  useEffect(() => { draw(); }, [series, height, responsiveHeight, draw]);
-  useEffect(() => {
-    const wrap = wrapRef.current; if (!wrap) return;
-    const observer = new ResizeObserver(draw); observer.observe(wrap);
-    window.addEventListener('resize', draw);
-    return () => { observer.disconnect(); window.removeEventListener('resize', draw); };
-  }, [draw]);
+  const { canvasRef, wrapRef } = useCanvasDraw(height, responsiveHeight, (ctx, width, renderHeight) => drawMultiCusum(ctx, width, renderHeight, series), [series]);
   return <div ref={wrapRef} style={{ width: '100%' }}><canvas ref={canvasRef} className={className} style={{ width: '100%', height: responsiveHeight ? 'auto' : height, display: 'block' }} /></div>;
 }
 

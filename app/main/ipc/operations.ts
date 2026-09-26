@@ -64,7 +64,7 @@ export type HostApiName =
   | 'getFirebaseSettings' | 'connectFirebase' | 'syncFirebase' | 'disconnectFirebase'
   | 'exportTableXlsx' | 'printHtmlToPdf'
   | 'exportBackup' | 'chooseBackupFile' | 'importBackup' | 'backupStatus' | 'resetOperationalData'
-  | 'reportClientError' | 'openLogFolder';
+  | 'reportClientError' | 'openLogFolder' | 'exportLogBundle';
 export type BusinessApiName = Exclude<ApiName, HostApiName>;
 
 export interface BusinessHandlers {

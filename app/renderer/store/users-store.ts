@@ -22,19 +22,19 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     const result = await window.qcApi.listUsers();
     if (result.ok) set({ users: result.data });
   },
+  // Không tự nạp lại sau khi ghi (kế hoạch kiến trúc D.1): main báo `users`
+  // sau commit và trang Người dùng nạp lại qua `useStoreInvalidation` — tự nạp ở đây làm
+  // danh sách nạp HAI lần. Không chỗ gọi nào đọc danh sách ngay sau `await`.
   create: async (input) => {
     const result = await window.qcApi.createUser({ data: input });
-    if (result.ok) await get().load();
     return result;
   },
   update: async (id, input) => {
     const result = await window.qcApi.updateUser({ id, data: input });
-    if (result.ok) await get().load();
     return result;
   },
   remove: async (id) => {
     const result = await window.qcApi.deleteUser({ id });
-    if (result.ok) await get().load();
     return result;
   },
   resetPassword: async (id, newPassword) => {
