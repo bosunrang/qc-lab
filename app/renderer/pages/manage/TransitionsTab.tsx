@@ -1,12 +1,10 @@
 // Tab "TransitionsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 //
-// Viết lại 2026-09-03 (lần 2) để khớp ĐÚNG mô hình hệ thống
-// (`LotTransitionModal.tsx`/`saveLotTransitionV2`): modal có 1 ô "Trạng
-// thái" chọn được cả 4 giá trị + 1 nút Lưu DUY NHẤT — không phải các nút
-// hành động tách rời (Kích hoạt/Chấp nhận/Không chấp nhận) như bản trước
-// trong phiên này, một thiết kế app tự nghĩ ra khác hẳn hệ thống mà người
-// dùng đã yêu cầu sửa lại cho giống. Xem CLAUDE.md mục "chuyển tiếp lô".
+// Viết lại 2026-09-03 (lần 2): modal có 1 ô "Trạng thái" chọn được cả 4 giá
+// trị + 1 nút Lưu DUY NHẤT — không phải các nút hành động tách rời (Kích
+// hoạt/Chấp nhận/Không chấp nhận) như bản trước, thiết kế mà người dùng đã
+// yêu cầu bỏ.
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
@@ -20,7 +18,7 @@ import { todayIso } from '../../state/date-picker-store';
 import { EmptyState } from './shared';
 import type { LotTransition } from '../../../shared/qc-api';
 
-/** `formatDateTimeVN()` hệ thống. */
+/** Giờ:phút + ngày dạng Việt Nam; giá trị không hợp lệ thì trả rỗng. */
 function formatDateTimeVN(value: string): string {
   const date = new Date(value);
   return isNaN(+date) ? '' : date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString('vi-VN');
@@ -56,10 +54,10 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
     const result = await removeLotTransition(tr.id);
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
-  // `'new'` = thêm mới, một hồ sơ = đang SỬA hồ sơ đó (hệ thống có cả 2 chiều
-  // trên cùng modal). Hồ sơ đã 'accepted' vẫn mở "Sửa" được (đúng hệ thống:
-  // TransitionRow luôn hiện nút Sửa) nhưng đổi status khác 'accepted' sẽ bị
-  // main chặn (`accepted-immutable`).
+  // `'new'` = thêm mới, một hồ sơ = đang SỬA hồ sơ đó (cả 2 chiều trên cùng
+  // modal). Hồ sơ đã 'accepted' vẫn mở "Sửa" được (mọi dòng luôn hiện nút
+  // Sửa) nhưng đổi status khác 'accepted' sẽ bị main chặn
+  // (`accepted-immutable` — không đổi được kết luận đã chấp nhận).
   const [creating, setCreating] = useState<'new' | LotTransition | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [draftPanelId, setDraftPanelId] = useState('');
@@ -67,7 +65,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   const [draftToLotId, setDraftToLotId] = useState('');
   const draftPanel = panels.find((panel) => panel.id === draftPanelId);
   // Chỉ xét nghiệm thuộc Panel và ĐANG dùng lô cũ mới là đối tượng của một
-  // hồ sơ chuyển lô. Đây là điều kiện của hệ thống: khi không có dòng nào thì
+  // hồ sơ chuyển lô. Khi không có dòng nào thì
   // không thể chuyển tiếp (hay thay lô) cho Panel đó.
   const draftTests = tests
     .filter((test) => draftPanel?.testIds.includes(test.id))
@@ -95,13 +93,12 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
     setErr(null); setDraftPanelId(panels[0]?.id || ''); setDraftFromLotId(''); setDraftToLotId(''); setCreating('new');
   }
 
-  /** Lưu hồ sơ — MỘT hành động duy nhất, đúng `saveLotTransitionV2()` app
-   * cũ: gửi kèm status + Mean/SD ứng viên (`criteria`) trong CÙNG 1 lần
-   * gọi. Đổi status sang 'accepted'/'rejected' lần đầu (`finalChanged`) thì
-   * xác thực lại mật khẩu TRƯỚC khi gọi API — cùng 1 câu hỏi cho cả 2
-   * trường hợp, đúng `reauthenticateCurrentUser()` hệ thống (không tách
-   * riêng "Xác thực chấp nhận"/"Xác thực từ chối"). KHÔNG có confirmDialog
-   * trước reauth — hệ thống đi thẳng từ nút Lưu sang ô nhập mật khẩu. */
+  /** Lưu hồ sơ — MỘT hành động duy nhất: gửi kèm status + Mean/SD ứng viên
+   * (`criteria`) trong CÙNG 1 lần gọi. Đổi status sang 'accepted'/'rejected'
+   * lần đầu (`finalChanged`) thì xác thực lại mật khẩu TRƯỚC khi gọi API —
+   * cùng 1 câu hỏi cho cả 2 trường hợp (không tách riêng "Xác thực chấp
+   * nhận"/"Xác thực từ chối"). KHÔNG có confirmDialog trước reauth — đi
+   * thẳng từ nút Lưu sang ô nhập mật khẩu. */
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
     const status = String(fd.get('status') || 'planned') as LotTransition['status'];
@@ -193,7 +190,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                 </div>
               </div>
               <section className="lot-transition-targets" aria-label="Mean SD cho lô mới">
-                {/* Đúng cấu trúc hệ thống: `.lot-trans-target-head-row` +
+                {/* Cấu trúc: `.lot-trans-target-head-row` +
                     `.target-table.lot-trans-target-table` dùng lại `.target-head`/
                     `.target-row` của bảng Mean/SD (cùng CSS, cùng `syncTargetRange`). */}
                 <div className="lot-trans-target-head-row">
@@ -225,8 +222,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                       return <div className="target-row" key={`${test.id}:${levelNo}:${saved ? '1' : '0'}`} data-test={test.id} data-level={levelNo} data-decimals={decimals} data-k={k}>
                         {/* checkbox chỉ trang trí, luôn đã chọn — mọi xét nghiệm
                             đang dùng lô cũ đều là ứng viên, không có nút bỏ
-                            chọn từng dòng (khớp `checked disabled readOnly`
-                            của hệ thống). */}
+                            chọn từng dòng (`checked disabled readOnly`). */}
                         <label className="lot-assay-check"><input type="checkbox" checked disabled readOnly /><span></span></label>
                         <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
                         <input className="tm-mean" type="number" step="any" defaultValue={mean ?? ''} placeholder="Trung bình" onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />

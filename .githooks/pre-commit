@@ -1,3 +1,3 @@
 #!/bin/sh
-# Chặn commit khi bộ kiểm thử app-v2 thất bại.
+# Chặn commit khi bộ kiểm thử của app thất bại.
 npm test

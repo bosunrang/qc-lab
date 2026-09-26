@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-// Cùng hợp đồng `queryFocusable()`/`createFocusTrapKeydown()` của hệ thống
-// (`src/presentation/modal/modal-focus-trap.ts`) — loại `[disabled]` NGAY
-// TRONG selector (không phải lọc sau, tránh sót ở lượt tìm phần tử focus
-// đầu tiên khi mở) và loại phần tử đang ẩn (`offsetParent!==null`, vd nằm
-// trong 1 nhánh `display:none` của form).
+// `queryFocusable()` loại `[disabled]` NGAY TRONG selector (không phải lọc
+// sau, tránh sót ở lượt tìm phần tử focus đầu tiên khi mở) và loại phần tử
+// đang ẩn (`offsetParent!==null`, vd nằm trong 1 nhánh `display:none`
+// của form).
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function queryFocusable(box: HTMLElement): HTMLElement[] {
@@ -25,8 +24,7 @@ export function useFocusTrap(active: boolean, onClose: () => void, boxRef: React
     returnFocusRef.current = document.activeElement !== document.body ? (document.activeElement as HTMLElement) : null;
     const box = boxRef.current;
     // Ưu tiên phần tử mang `autoFocus` (vd ô nhập chính của form) trước khi
-    // rơi về phần tử focusable đầu tiên trong DOM — khớp `ModalOverlay.tsx`
-    // hệ thống (`container.querySelector('[autofocus]')`).
+    // rơi về phần tử focusable đầu tiên trong DOM.
     const preferred = box?.querySelector<HTMLElement>('[autofocus]');
     (preferred || (box && queryFocusable(box)[0]))?.focus();
 

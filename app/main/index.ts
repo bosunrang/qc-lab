@@ -63,7 +63,7 @@ app.on('child-process-gone', (_event, details) => {
 let tray: Tray | null = null;
 let quitting = false;
 let mainWindow: BrowserWindow | null = null;
-const DEV_SERVER_URL = process.env.APP_V2_DEV_SERVER_URL;
+const DEV_SERVER_URL = process.env.QCLAB_DEV_SERVER_URL;
 const INDEX_HTML = path.join(__dirname, '..', 'renderer', 'index.html');
 /** URL trang chính — mốc để quyết định điều hướng, xem `window-guard.ts`. */
 const APP_ENTRY_URL = DEV_SERVER_URL || pathToFileURL(INDEX_HTML).href;

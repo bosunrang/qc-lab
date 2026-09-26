@@ -69,14 +69,14 @@ export function LotsTab() {
   const [groupErr, setGroupErr] = useState<string | null>(null);
   const [groupChecked, setGroupChecked] = useState<Set<string>>(new Set());
 
-  // Lọc theo cùng bộ field mà `manageMatch()` hệ thống dùng cho tab này (số
-  // lô, mô tả, nhà cung cấp, chương trình, tên nhóm lô, mức, hạn dùng).
+  // Lọc theo bộ field của tab này (số lô, mô tả, nhà cung cấp, chương trình,
+  // tên nhóm lô, mức, hạn dùng).
   const q = query.trim().toLowerCase();
   const groupNameOfLot = (id: string) => allGroups.find((g) => g.lotIds.includes(id))?.name || '';
   const match = (values: unknown[]) => !q || values.some((v) => String(v ?? '').toLowerCase().includes(q));
   const lots = allLots.filter((l) => match([l.lot_no, l.description, l.supplier, l.program, groupNameOfLot(l.id), l.level, l.exp]));
-  // hệ thống đặt class `levels-1|2|3plus` lên chính modal nhóm lô (bề rộng +
-  // số cột lưới chọn lô thay đổi theo SỐ MỨC đang có lô), không dùng
+  // Class `levels-1|2|3plus` đặt lên chính modal nhóm lô (bề rộng + số cột
+  // lưới chọn lô thay đổi theo SỐ MỨC đang có lô).
   const groupLevelCount = new Set(allLots.map((l) => l.level)).size;
   const lotGroups = allGroups.filter((g) => match([g.name, g.note, ...g.lotIds.map((id) => allLots.find((l) => l.id === id)?.lot_no)]));
   const lotPageCount = Math.max(1, Math.ceil(lots.length / LOTS_PAGE_SIZE));
@@ -102,7 +102,7 @@ export function LotsTab() {
   /** Kích hoạt nhóm lô — áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
    * mức QC tương ứng và dừng nhóm bị thay thế. Đây là thao tác ghi vào cấu
    * hình QC đang vận hành nên đi qua `reauthDialog` như mọi thao tác Mean/SD
-   * khác (cùng danh sách thao tác nhạy cảm của hệ thống). */
+   * khác (cùng danh sách thao tác nhạy cảm). */
   async function activateGroup(group: LotGroup) {
     if (!(await confirmDialog(
       `Áp dụng Mean/SD của nhóm lô ${group.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`

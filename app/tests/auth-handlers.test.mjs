@@ -54,7 +54,7 @@ const selfLock = auth.updateUser({ id: adminActor.userId, data: { name: 'Quan tr
 assert.equal(selfLock.ok, false);
 assert.equal(selfLock.error.code, 'last-admin');
 
-// 11) Tu sua quyen CHINH MINH bi chan (Giai doan D3.1) — hệ thống khong co
+// 11) Tự sửa quyền của CHÍNH MÌNH bị chặn
 const secondAdmin = await auth.createUser({ data: { username: 'admin2', name: 'Quan tri vien 2', role: 'admin', password: 'admin2-pass-123' } }, adminActor);
 assert.equal(secondAdmin.ok, true);
 const secondAdminActor = { userId: secondAdmin.data.id, username: secondAdmin.data.username, name: secondAdmin.data.name, role: 'admin', clientId: 'test-client' };

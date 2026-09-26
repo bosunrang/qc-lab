@@ -20,9 +20,9 @@ import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
 import type { NceBiasSuggestion } from '../../main/domain/nce-bias-suggestion';
 import { errorClass, normalizeErrorClass } from '../../main/domain/westgard-rules';
 
-/** Nhãn trạng thái NGẮN của hệ thống (`reportLabels.stateName`). */
+/** Nhãn trạng thái NGẮN cho cây sự cố. */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
-/** `vnDate()` hệ thống. */
+/** Ngày dạng Việt Nam; trống thì hiện "—". */
 const vnDate = (iso: string) => formatVnDate(iso, '—');
 
 const GUIDE_STEPS = [
@@ -53,7 +53,7 @@ export function ActionsPage() {
   const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
 
-  /** Hủy hồ sơ ngay từ bảng nhật ký — hệ thống có nút này trên từng dòng. Hủy
+  /** Hủy hồ sơ ngay từ bảng nhật ký — nút này có trên từng dòng. Hủy
    * CÓ LƯU VẾT (soft-delete + lý do), không xoá dữ liệu. */
   async function cancelRecord(id: string) {
     const note = 'Hủy từ bảng nhật ký';
@@ -94,7 +94,7 @@ export function ActionsPage() {
       const items = s.levels
         .filter((lv) => (lv.latestVerdict === 'warn' || lv.latestVerdict === 'rej') && lv.latest)
         .map((lv) => {
-          // hệ thống gắn hồ sơ với dòng sự cố theo ĐIỂM QC (`pointId`), không
+          // Hồ sơ gắn với dòng sự cố theo ĐIỂM QC (`pointId`), không
           // theo test+mức: một hồ sơ chưa gắn điểm nào thì dòng vi phạm vẫn
           // hiện "Chưa ghi khắc phục" và nút "Lập hồ sơ".
           const open = lv.latest
@@ -312,7 +312,7 @@ function NceSelect({ value, onChange, options, disabled = false }: { value: stri
   return <select disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>;
 }
 
-/** Form protocol-v3 đặt ngay trong panel như hệ thống. Modal chỉ còn dùng cho
+/** Form protocol-v3 đặt ngay trong panel. Modal chỉ còn dùng cho
  * xem chi tiết/bằng chứng, tránh một form dài bị bó hẹp trong cửa sổ popup. */
 function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | null; record: NceRecord | null; onClose: () => void }) {
   const { tests } = useManageStore(useShallow((s) => ({ tests: s.tests }))); const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));

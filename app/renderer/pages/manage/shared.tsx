@@ -37,7 +37,7 @@ export function lotStatus(lot: { depleted?: 0 | 1; exp?: string }, toLotNo?: str
   return { text: 'Đang hoạt động', cls: 'ok' };
 }
 
-/** Hàng 2 ô trong modal — hệ thống dùng `.grid2` dùng chung (gap 10px, 1 cột ở
+/** Hàng 2 ô trong modal — dùng `.grid2` dùng chung (gap 10px, 1 cột ở
  * ≤760px), không phải lưới riêng từng modal. */
 export function FieldRow({ children }: { children: ReactNode }) { return <div className="grid2">{children}</div>; }
 

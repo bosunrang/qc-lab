@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ReagentComparisonResult } from '../../shared/qc-api';
 
-// Footprint gọn như app ban đầu, nhưng giữ đầy đủ trục/lưới của hệ thống.
+// Footprint gọn nhưng vẫn giữ đầy đủ trục/lưới.
 // Ở desktop, mỗi biểu đồ rộng gần bằng một cột và cao xấp xỉ 280px.
 const SIZE = { width: 760, height: 280 };
 // Chừa đủ lề cho nhãn trục dọc và các tick có nhiều chữ số (vd. 143.17).
@@ -50,8 +50,8 @@ export function ReagentChart({
 }
 
 function chartRange(minimum: number, maximum: number): Range {
-  // Khớp reagentChartRange() của hệ thống: 8% dải dữ liệu, kể cả khi mọi điểm
-  // bằng nhau thì vẫn có một dải để trục và đường tham chiếu đọc được.
+  // Lề 8% dải dữ liệu; kể cả khi mọi điểm bằng nhau thì vẫn có một dải để
+  // trục và đường tham chiếu đọc được.
   const spread = (maximum - minimum) || Math.abs(maximum) || 1;
   const padding = spread * 0.08;
   return [minimum - padding, maximum + padding];

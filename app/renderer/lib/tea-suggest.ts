@@ -16,15 +16,14 @@ export interface TeaSuggestion {
   hint: string;
 }
 
-/** Chuẩn hoá để so khớp: bỏ dấu, hạ chữ thường, gộp khoảng trắng — cùng vai
- * trò `searchText()` của hệ thống (accent-insensitive). */
+/** Chuẩn hoá để so khớp: bỏ dấu, hạ chữ thường, gộp khoảng trắng. */
 export function normalizeName(value: unknown): string {
   return String(value ?? '')
     .normalize('NFD').replace(new RegExp('[\u0300-\u036f]', 'g'), '')
     .toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-/** hệ thống chỉ ghép viết tắt khi nó KHÁC tên (bỏ khác biệt hoa/thường):
+/** Chỉ ghép viết tắt khi nó KHÁC tên (bỏ khác biệt hoa/thường):
  * "Sodium (Na)" nhưng chỉ "Urea", "pH", "D-dimer". */
 export function analyteDisplayName(item: { name: string; abbr: string }): string {
   const same = !item.abbr || normalizeName(item.abbr) === normalizeName(item.name);
@@ -79,8 +78,8 @@ export function teaSuggestions(teaRefs: readonly TeaRef[]): TeaSuggestion[] {
 }
 
 /** Tìm analyte khớp CHÍNH XÁC (sau khi chuẩn hoá) với tên/viết tắt/tên kèm
- * viết tắt người dùng vừa gõ — hệ thống cũng so khớp tuyệt đối sau chuẩn hoá,
- * không so khớp một phần (tránh gõ "Na" mà nhảy sang "Natri niệu"). */
+ * viết tắt người dùng vừa gõ — so khớp tuyệt đối sau chuẩn hoá, không so
+ * khớp một phần (tránh gõ "Na" mà nhảy sang "Natri niệu"). */
 export function findTeaSuggestion(value: unknown, teaRefs: readonly TeaRef[]): TeaSuggestion | null {
   const key = normalizeName(value);
   if (!key) return null;

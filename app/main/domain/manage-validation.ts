@@ -82,10 +82,9 @@ export interface PreparedTest {
 }
 
 /** k/h không hợp lệ (không phải số, hoặc ≤0) rơi về ĐÚNG mặc định lúc tạo
- * xét nghiệm mới (0.5/4 — xem `test-configuration-normalization.ts` hệ thống:
- * `test.cusum={on:false,k:0.5,h:4}`), KHÔNG phải clamp về 0 — clamp về 0 sẽ
- * biến CUSUM thành vô nghĩa (k=0/h=0) mà không báo gì, khác hẳn "âm thầm
- * quay về mặc định hợp lý" của hệ thống. */
+ * xét nghiệm mới (0.5/4, cùng mặc định cột `cusum_k`/`cusum_h`), KHÔNG phải
+ * clamp về 0 — clamp về 0 sẽ biến CUSUM thành vô nghĩa (k=0/h=0) mà không
+ * báo gì. */
 function cusumParam(value: unknown, fallback: number): number {
   const n = finiteNumber(value, NaN);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -98,8 +97,7 @@ export function prepareTest(input: TestInput = {}): PreparedTest {
     unit: cleanText(input.unit).trim(),
     decimalPlaces: Math.min(6, Math.max(0, Math.round(finiteNumber(input.decimalPlaces, 2)))),
     // TEa KHÔNG bị clamp về 0 ở đây — giá trị âm phải rơi qua validateTest()
-    // để báo lỗi rõ ràng ('invalid-tea'), đúng hệ thống (`validateAssay()`:
-    // "TEa không được âm."), thay vì âm thầm ép về 0 như trước.
+    // để báo lỗi rõ ràng ('invalid-tea'), thay vì âm thầm ép về 0 như trước.
     tea: finiteNumber(input.tea, 0),
     section: cleanText(input.section).trim(),
     teaSource: cleanText(input.teaSource, 200).trim(),
@@ -125,10 +123,10 @@ export function validateTest(
     return { ok: false, code: 'missing-instrument', message: 'Chọn máy xét nghiệm.' };
   }
   if (cleaned.tea < 0) return { ok: false, code: 'invalid-tea', message: 'TEa không được âm.' };
-  // hệ thống chặn trùng trên CÙNG máy theo `analyteId` HOẶC tên. V2 dùng
-  // `teaRefKey` làm khoá analyte của danh mục TEa; nhờ đó "Glucose" và
-  // "GLU" không thể thành hai cấu hình của cùng analyte trên một máy, còn
-  // cùng analyte trên hai máy khác nhau vẫn là hai cấu hình QC độc lập.
+  // Chặn trùng trên CÙNG máy theo tên HOẶC `teaRefKey` (khoá analyte của
+  // danh mục TEa); nhờ đó "Glucose" và "GLU" không thể thành hai cấu hình
+  // của cùng analyte trên một máy, còn cùng analyte trên hai máy khác nhau
+  // vẫn là hai cấu hình QC độc lập.
   if (existingNamesOnSameInstrument.some(name => sameText(name, cleaned.name))
     || !!cleaned.teaRefKey && existingTeaRefKeysOnSameInstrument.includes(cleaned.teaRefKey)) {
     return { ok: false, code: 'duplicate-name', message: 'Xét nghiệm này đã tồn tại trên máy đã chọn.' };
@@ -212,7 +210,7 @@ export function validateTestLevel(input: TestLevelInput, _existingLevels: readon
 export interface MeanSdHistoryEntry {
   at: string; mean: number | null; sd: number | null; qcLotId: string;
   /** Ảnh chụp nghiệp vụ của chính mốc cũ. Các trường tùy chọn giữ khả năng
-   * đọc dữ liệu V2 đã tạo trước khi lịch sử được làm đầy đủ. */
+   * đọc dữ liệu đã tạo trước khi lịch sử được làm đầy đủ. */
   lot?: string; low?: number | null; high?: number | null;
   effectiveFrom?: string; effectiveTo?: string; source?: 'mfg' | 'lab';
 }
@@ -295,7 +293,7 @@ export function prepareLotGroup(input: LotGroupInput = {}): PreparedLotGroup {
 export function validateLotGroup(input: LotGroupInput, fallbackName = ''): ValidationResult<PreparedLotGroup> {
   const cleaned = prepareLotGroup(input);
   if (!cleaned.name) cleaned.name = cleanText(fallbackName, 200).trim();
-  // hệ thống kiểm đủ 2 lô trước; tên để trống được tự sinh từ số lô đã chọn.
+  // Kiểm đủ 2 lô trước; tên để trống được tự sinh từ số lô đã chọn.
   if (cleaned.lotIds.length < 2) return { ok: false, code: 'not-enough-lots', message: 'Nhóm lô QC cần ít nhất 2 lô.' };
   if (!cleaned.name) return { ok: false, code: 'missing-name', message: 'Nhập tên nhóm lô.' };
   return { ok: true, data: cleaned };

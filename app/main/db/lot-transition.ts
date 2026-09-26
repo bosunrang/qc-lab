@@ -22,11 +22,11 @@ export function applyLotTransitionCascade(db: Db, input: {
     // Nguồn 'mfg' (NSX) — KHÔNG phải 'lab' (PXN). Mean/SD ứng viên nhập
     // trong modal chuyển lô là số của NHÀ SẢN XUẤT cho lô mới, không đi
     // qua luồng "Xây dựng dải PXN" riêng (`rangeCandidate()`/
-    // `applyNewRange()` ở trang Nhập QC & Biểu đồ) — đúng
-    // `applyPlannedTarget()` hệ thống luôn ghi `source:'mfg'` cho Mean/SD
-    // nhập trong modal chuyển lô. Ghi 'lab' ở đây là bug thật (người
-    // dùng phát hiện qua cột "Nguồn" của tab Lịch sử dữ liệu hiện PXN
-    // cho lô vừa chuyển tiếp, dù chưa hề qua trang Nhập QC).
+    // `applyLabRange()` ở trang Nhập QC & Biểu đồ), nên app luôn ghi
+    // `source:'mfg'` cho Mean/SD nhập trong modal chuyển lô. Ghi 'lab' ở
+    // đây là bug thật (người dùng phát hiện qua cột "Nguồn" của tab Lịch
+    // sử dữ liệu hiện PXN cho lô vừa chuyển tiếp, dù chưa hề qua trang
+    // Nhập QC).
     db.prepare('UPDATE test_levels SET qc_lot_id=?, mean=?, sd=?, low=?, high=?, applied=?, mean_sd_history_json=?, mean_sd_effective_from=? WHERE id=?')
       .run(toLotId, item.mean, item.sd, item.low ?? null, item.high ?? null, 'mfg',
         appendMeanSdHistory(level.mean_sd_history_json, {

@@ -21,10 +21,9 @@ import { TargetsTab } from './manage/TargetsTab';
 import { TransitionsTab } from './manage/TransitionsTab';
 
 export function ManagePage() {
-  // Tổng quan bấm "Gán Mean/SD" thì mở sẵn tab Mean/SD, đúng `goManageTargets()`
-  // của hệ thống (mục còn treo từ Giai đoạn D2). Phân tích Westgard bấm "Mở cấu
-  // hình xét nghiệm" (CUSUM chưa bật) thì mở sẵn tab Danh mục xét nghiệm VÀ
-  // modal sửa đúng xét nghiệm đó, đúng `openConfigAssay(testId)` hệ thống.
+  // Tổng quan bấm "Gán Mean/SD" thì mở sẵn tab Mean/SD. Phân tích Westgard bấm
+  // "Mở cấu hình xét nghiệm" (CUSUM chưa bật) thì mở sẵn tab Danh mục xét
+  // nghiệm VÀ modal sửa đúng xét nghiệm đó.
   const navState = useLocation().state as { tab?: TabId; editTestId?: string } | null;
   const [tab, setTab] = useState<TabId>(navState?.tab || 'instruments');
   const [instrumentCreateRequest, setInstrumentCreateRequest] = useState(0);
@@ -38,8 +37,8 @@ export function ManagePage() {
   useStoreInvalidation(['lot_transitions'], undefined, store.loadLotTransitions);
   useStoreInvalidation(['planned_targets', 'test_levels'], undefined, store.loadPlannedTargets);
 
-  // Đúng `counts` của hệ thống (manage-page-controller.ts): tab Lô hiện
-  // "số lô / số nhóm" dạng chuỗi, không phải 1 con số.
+  // Bộ đếm trên tab: tab Lô hiện "số lô / số nhóm" dạng chuỗi, không phải 1
+  // con số.
   const summaries = useWestgardStore((s) => s.summaries);
   const allLevels = summaries.flatMap((summary) => summary.levels);
   const levelsWithLot = allLevels.filter((level) => level.qcLotId).length;
@@ -47,12 +46,12 @@ export function ManagePage() {
     instruments: store.instruments.length, tests: store.tests.length, panels: store.panels.length,
     lots: `${store.lots.length} / ${store.lotGroups.length}`, targets: levelsWithLot,
     transitions: store.lotTransitions.length,
-    // hệ thống: `tearefs: effectiveTeaRefs().length` — danh mục tích hợp CỘNG
+    // Số TEa hiệu lực = danh mục tích hợp CỘNG
     // các hồ sơ PXN tự thêm ngoài danh mục, KHÔNG cộng hồ sơ ghi đè lên một
     // analyte đã có trong danh mục (nếu không sẽ đếm trùng).
     tearefs: TEA_CATALOG.length + store.teaRefs.filter((ref) => !ref.analyte_id
       && !TEA_CATALOG.some((item) => item.name.trim().toLocaleLowerCase('vi') === ref.name.trim().toLocaleLowerCase('vi'))).length,
-    // hệ thống: mỗi mức góp `max(1, số mốc lịch sử)` — mức chưa có lịch sử vẫn
+    // Mỗi mức góp `max(1, số mốc lịch sử)` — mức chưa có lịch sử vẫn
     // là 1 dòng "đang hiệu lực" trong bảng.
     history: store.tests.reduce((sum, test) => sum + (store.levelsByTestId[test.id] || []).reduce((inner, level) => {
       let past = 0;

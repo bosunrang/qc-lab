@@ -38,7 +38,7 @@ export async function launchApp() {
   const port = await freePort();
   const env = { ...process.env, QCLAB_USER_DATA_DIR: userDataDir, QCLAB_LAN_PORT: String(port) };
   // Bản build phải nạp tệp trong `app-dist/renderer`, không trỏ sang Vite.
-  delete env.APP_V2_DEV_SERVER_URL;
+  delete env.QCLAB_DEV_SERVER_URL;
   const app = await _electron.launch({ args: ['.'], cwd: REPO_ROOT, env });
   const page = await app.firstWindow();
   page.setDefaultTimeout(20_000);

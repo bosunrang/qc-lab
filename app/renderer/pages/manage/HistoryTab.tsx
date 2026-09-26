@@ -54,7 +54,7 @@ function parseHistory(json: string): HistoryEntry[] {
 
 
 
-/** `historyPeriodLabel()` hệ thống — hai đầu để trống thì ghi "Không giới hạn". */
+/** Nhãn khoảng hiệu lực — hai đầu để trống thì ghi "Không giới hạn". */
 function periodLabel(from: string, to: string): string {
   return `${from ? vnDate(from) : 'Không giới hạn'} → ${to ? vnDate(to) : 'Không giới hạn'}`;
 }
@@ -127,7 +127,7 @@ export function HistoryTab() {
         group: groupLabel(entry.qcLotId),
         mean: entry.mean,
         sd: entry.sd,
-        // hệ thống in giới hạn dưới/trên ĐÚNG như đã lưu ở mức (`level.low`/
+        // In giới hạn dưới/trên ĐÚNG như đã lưu ở mức (`level.low`/
         // `level.high`), để trống thì "—" — KHÔNG suy từ Mean ± k·SD, vì đó là
         // dải hiển thị chứ không phải giới hạn đã được phê duyệt.
         low: entry.low ?? null,

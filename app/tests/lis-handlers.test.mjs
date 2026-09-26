@@ -1,6 +1,5 @@
-// Giai đoạn C5: kiểm chứng END-TO-END lis-handlers.ts — mock `fetch` toàn
-// cục (không cần chạy gateway thật ở đây, gateway thật đã có bộ test riêng
-// của nó ở lis-gateway/tests). Trọng tâm: thứ tự "ghi trước, báo sau" —
+// Kiểm chứng END-TO-END lis-handlers.ts — mock `fetch` toàn cục (không cần
+// chạy gateway thật). Trọng tâm: thứ tự "ghi trước, báo sau" —
 // TUYỆT ĐỐI không gọi gateway nếu ghi điểm QC cục bộ thất bại.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';

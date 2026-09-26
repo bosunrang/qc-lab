@@ -131,7 +131,7 @@ assert.equal(backup.exportBackupTo(backupFile, admin).ok, true, 'admin phai xuat
 
 // ── 6) Đọc KHÔNG bị chặn: chỉ-xem vẫn xem được dữ liệu QC ────────────────
 // Cố ý: 6 trang (Tổng quan/Nhập QC/Westgard/Sigma/Hoá chất/Báo cáo) mở cho
-// mọi vai trò ở CẢ hệ thống lẫn app — chặn ghi, không chặn đọc.
+// mọi vai trò — chặn ghi, không chặn đọc.
 assert.ok(entry.queryPoints(test.id, 1).length > 0, 'doc diem QC khong bi chan');
 assert.ok(report.queryReport({ testId: test.id }).length > 0, 'doc bao cao khong bi chan');
 assert.ok(westgard.listTestSummaries().length > 0, 'doc tong quan Westgard khong bi chan');

@@ -26,10 +26,9 @@ export function listOperationalLevels(db: Db, testId: string): OperationalLevel[
 }
 
 /** Xét nghiệm có nằm trong ít nhất một Panel QC đang hoạt động không.
- * hệ thống KHÔNG loại mức khỏi danh sách khi Panel tắt — nó trả VỀ RỖNG điểm
- * (`qcOperationalAccess.lotPoints()` thoát sớm), nên giữ đúng sự phân biệt đó
- * thay vì gộp hai cổng làm một: danh sách mức vẫn hiện, chỉ không điểm nào
- * được đánh giá. */
+ * Panel tắt KHÔNG loại mức khỏi danh sách — chỉ làm danh sách điểm trả VỀ
+ * RỖNG, nên giữ riêng hai cổng thay vì gộp làm một: danh sách mức vẫn hiện,
+ * chỉ không điểm nào được đánh giá. */
 export function isTestInActivePanel(db: Db, testId: string): boolean {
   return !!db.prepare(`SELECT 1 FROM qc_panel_tests pt JOIN qc_panels p ON p.id=pt.panel_id
     WHERE pt.test_id=? AND p.active<>0 LIMIT 1`).get(testId);

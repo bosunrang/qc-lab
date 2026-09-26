@@ -165,7 +165,7 @@ assert.equal(activityAfter.length, activityBefore + 1, 'giữ nhật ký cũ + g
 assert.equal(activityAfter[0].type, 'Xoá sạch dữ liệu');
 const chain = verifyAuditChain(activityAfter.slice().reverse(), '');
 assert.equal(chain.ok, true, 'chuỗi hash audit phải còn hợp lệ sau khi xoá sạch: ' + JSON.stringify(chain));
-// Hồ sơ đơn vị trở về mặc định của schema (khớp blankAppState() hệ thống)
+// Hồ sơ đơn vị trở về mặc định của schema
 const { createSettingsHandlers } = require('../../app-dist/main/ipc/settings-handlers.js');
 const resetSettings = createSettingsHandlers(resetDb, ':memory:');
 assert.equal(resetSettings.getLabProfile().name, '', 'tên đơn vị trở về rỗng');

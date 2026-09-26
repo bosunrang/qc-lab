@@ -95,7 +95,7 @@ export function DatePickerPopup() {
   const selected = state.input ? parseFlexibleDate(state.input.value) : '';
   const today = todayIso();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  // Tuần bắt đầu THỨ HAI (đúng hệ thống): getDay() trả 0=CN nên +6 rồi %7.
+  // Tuần bắt đầu THỨ HAI: getDay() trả 0=CN nên +6 rồi %7.
   const offset = (new Date(year, month, 1).getDay() + 6) % 7;
   const cells: Array<{ key: string; day: number | null; iso: string }> = [];
   for (let index = 0; index < offset; index += 1) cells.push({ key: `blank-${index}`, day: null, iso: '' });

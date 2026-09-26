@@ -109,7 +109,7 @@ assert.equal(allOldArchived.ok, true);
 assert.equal(allOldArchived.data.retainedCount, 0);
 assert.equal(verifyChainNow().ok, true, 'cat het log phai khoi dau chuoi hash moi hop le');
 
-// 10) Phòng khi người dùng quên lưu trữ thủ công: đúng giới hạn hệ thống,
+// 10) Phòng khi người dùng quên lưu trữ thủ công: giới hạn cứng AUDIT_HARD_CAP,
 // vượt 50.000 dòng tự giữ 40.000 dòng mới nhất + 1 dòng giải thích; anchor
 // phải nối đúng vào dòng đầu còn lại để verifier không báo sai.
 db.exec("DELETE FROM activity; DELETE FROM app_meta WHERE key='activityAnchor'");

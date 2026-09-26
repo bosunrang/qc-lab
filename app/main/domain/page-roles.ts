@@ -7,19 +7,17 @@
 //
 // File này KHÔNG import gì để test được thẳng trên `.ts` qua ESM
 // (app/tests/page-roles.test.mjs) — thêm import vào đây sẽ phá bài test đó.
-//
-// Đối chiếu hệ thống: `ROUTER_PAGE_DEFS` + `rolePageIds`/`userPageIds`/
 
 export type Role = 'admin' | 'technician' | 'viewer';
 
-/** Thứ tự hiện trong mọi ô chọn vai trò — khớp `ROUTER_ROLE_LIST` hệ thống. */
+/** Thứ tự hiện trong mọi ô chọn vai trò. */
 export const ROLE_LIST: readonly Role[] = ['admin', 'technician', 'viewer'];
 
 export interface PageDef {
-  /** Khớp id trang của hệ thống (`dash`, `entry`...) — cũng là id icon sidebar
+  /** Id trang (`dash`, `entry`...) — cũng là id icon sidebar
    * và là giá trị lưu trong `users.page_perms_json`. */
   id: string;
-  /** Route của app (HashRouter) — hệ thống không có path nên field này là mới. */
+  /** Route của app (HashRouter). */
   path: string;
   label: string;
   roles: readonly Role[];
@@ -45,13 +43,13 @@ export const PAGE_DEFS: readonly PageDef[] = [
 ];
 
 /** Vai trò khi chưa biết gì (chưa nạp xong phiên, dữ liệu hỏng, vai trò lạ)
- * là vai trò HẸP NHẤT — khớp `role()` hệ thống trả 'viewer' khi `currentUser`
- * rỗng. Không mặc định mở. */
+ * là vai trò HẸP NHẤT — kể cả khi chưa có người dùng hiện tại vẫn trả
+ * 'viewer'. Không mặc định mở. */
 export function roleOf(role: string | null | undefined): Role {
   return role === 'admin' || role === 'technician' ? role : 'viewer';
 }
 
-/** admin + KTV. Khớp `canWrite()` hệ thống. */
+/** Quản trị viên và KTV được ghi. */
 export function canWriteRole(role: string | null | undefined): boolean {
   const r = roleOf(role);
   return r === 'admin' || r === 'technician';

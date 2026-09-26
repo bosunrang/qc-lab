@@ -40,7 +40,7 @@ let broadcastWindow: BroadcastTarget | null = null;
 let cloudChangeNotifier: (() => void) | null = null;
 let lanChangeNotifier: ((payload: StoreChangedPayload) => void) | null = null;
 
-/** Cùng giới hạn vận hành hệ thống: không để bảng nhật ký sống phình vô hạn.
+/** Giới hạn vận hành: không để bảng nhật ký sống phình vô hạn.
  * Người dùng vẫn có đường lưu trữ thủ công có CSV; xoay vòng chỉ là phao an
  * toàn khi thao tác đó bị bỏ quên. */
 export const AUDIT_HARD_CAP = 50_000;
@@ -145,7 +145,7 @@ function insertAudit(db: Db, actor: Actor, type: string, detail: string, target 
 
 /** Cắt mềm nhật ký vượt ngưỡng, giữ anchor ở hash cuối của phần bị gỡ. Hàm
  * này không gọi `writeAudit()` để tránh đệ quy; thay vào đó ghi đúng một dòng
- * giải thích sau khi cắt, như hệ thống. */
+ * giải thích sau khi cắt. */
 function rotateAuditOverflow(db: Db, actor: Actor): void {
   const count = Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n);
   if (count <= AUDIT_HARD_CAP) return;

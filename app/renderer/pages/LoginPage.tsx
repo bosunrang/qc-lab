@@ -3,10 +3,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
 import type { LoginBrand } from '../../shared/qc-api';
 
-// Bố cục giống hệt màn hình đăng nhập của hệ thống (nền gradient xanh đậm +
-// card trắng nổi giữa, brand-mark "QC" teal, tiêu đề/phụ đề) — xem
-// trang này chưa từng được style (chỉ `sans-serif`/input trần) vì nằm
-// ngoài luồng AppRouter/AppShell bình thường (render TRƯỚC khi đăng nhập).
+// Bố cục màn hình đăng nhập: nền gradient xanh đậm + card trắng nổi giữa,
+// brand-mark "QC" teal, tiêu đề/phụ đề. Trước đây trang này chưa từng được
+// style (chỉ `sans-serif`/input trần) vì nằm ngoài luồng AppRouter/AppShell
+// bình thường (render TRƯỚC khi đăng nhập).
 function AuthBrand({ brand }: { brand: LoginBrand | null }) {
   const title = brand?.brand_title || 'QC Lab';
   const sub = brand?.brand_sub || 'Nội kiểm xét nghiệm';

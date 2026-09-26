@@ -84,9 +84,8 @@ CREATE TABLE IF NOT EXISTS lot_groups (
   active INTEGER NOT NULL DEFAULT 1,
   -- '' = KHÔNG có trạng thái tự đặt (mặc định) — "Đang hoạt động"/"Chưa
   -- dùng" được SUY từ việc lô của nhóm có đang gán vào xét nghiệm nào không
-  -- (inUse, tính ở listLotGroups()), không phải giá trị lưu cứng. Chỉ
-  -- qcLotGroupOperational() hệ thống (status field vắng mặt = "hoạt động
-  -- bình thường", không có literal 'active' nào từng được lưu).
+  -- (inUse, tính ở listLotGroups()), không phải giá trị lưu cứng. '' nghĩa
+  -- là "hoạt động bình thường"; không có literal 'active' nào được lưu.
   status TEXT NOT NULL DEFAULT '',
   stopped_at TEXT NOT NULL DEFAULT '',
   -- Ảnh chụp thành viên NGUYÊN VẸN tại thời điểm lưu trữ (JSON mảng id lô,
@@ -95,10 +94,10 @@ CREATE TABLE IF NOT EXISTS lot_groups (
   -- Chỉ nhóm "Đã lưu trữ" (do CHẤP NHẬN chuyển tiếp lô tạo ra) mới có giá
   -- trữ giữ NGUYÊN mọi lô cũ (kể cả lô KHÔNG chuyển tiếp, vd lô B khi A→C)
   -- làm thành viên, dù lô đó (B) đã thật sự chuyển sang thuộc nhóm ĐANG
-  -- hoạt động qua group_id (1 lô chỉ có 1 group_id tại 1 thời điểm — khác
-  -- hệ thống dùng mảng lotIds không loại trừ lẫn nhau nên 1 lô lưu được trong
-  -- CẢ HAI nhóm cùng lúc). Không có cột này thì card "Đã lưu trữ" chỉ hiện
-  -- đúng lô đã chuyển tiếp, thiếu hẳn lô B dù tên nhóm "A/B" vẫn ngụ ý đủ 2.
+  -- hoạt động qua group_id (1 lô chỉ có 1 group_id tại 1 thời điểm nên
+  -- không thể thuộc CẢ HAI nhóm cùng lúc). Không có cột này thì card "Đã
+  -- lưu trữ" chỉ hiện đúng lô đã chuyển tiếp, thiếu hẳn lô B dù tên nhóm
+  -- "A/B" vẫn ngụ ý đủ 2.
   archived_lot_ids_json TEXT NOT NULL DEFAULT ''
 );
 
@@ -171,18 +170,18 @@ CREATE TABLE IF NOT EXISTS test_levels (
   mfg_mean REAL, mfg_sd REAL,
   applied TEXT NOT NULL DEFAULT 'mfg',
   mean_sd_history_json TEXT NOT NULL DEFAULT '[]',
-  -- Ngày cấu hình Mean/SD ĐANG HOẠT ĐỘNG bắt đầu có hiệu lực — port
-  -- effectiveFrom:isoToday() hệ thống (commitTargetMatrix()/
-  -- applyLotGroupActivation()): mọi lần lưu qua Bảng Mean/SD đều đóng dấu
-  -- NGÀY LƯU, không chỉ khi giá trị đổi. '' = chưa từng lưu qua các luồng
-  -- này (vd Mức 1 tự tạo lúc thêm xét nghiệm, chưa ai gán Mean/SD).
+  -- Ngày cấu hình Mean/SD ĐANG HOẠT ĐỘNG bắt đầu có hiệu lực (ghi khi lưu
+  -- Bảng Mean/SD và ở applyLotGroupActivation()): mọi lần lưu qua Bảng
+  -- Mean/SD đều đóng dấu NGÀY LƯU, không chỉ khi giá trị đổi. '' = chưa
+  -- từng lưu qua các luồng này (vd Mức 1 tự tạo lúc thêm xét nghiệm, chưa
+  -- ai gán Mean/SD).
   mean_sd_effective_from TEXT NOT NULL DEFAULT '',
   UNIQUE (test_id, level)
 );
 
 -- Mean/SD "Dự kiến": số đã nhập sẵn cho lô của một nhóm lô CHƯA dùng đến,
 -- chờ tới khi bấm "Kích hoạt nhóm lô" mới áp vào test_levels. Bảng RIÊNG,
--- KHÔNG nhét cờ planned vào mean_sd_history_json như hệ thống: lịch sử là
+-- KHÔNG nhét cờ planned vào mean_sd_history_json: lịch sử là
 -- những giai đoạn ĐÃ có hiệu lực (trang Lịch sử dữ liệu, cảnh báo điểm QC và
 -- lotTargetSnapshot() đều đọc nó), trộn số chưa từng áp vào đó là mời gọi
 -- đúng lớp lỗi "áp nhầm số chưa duyệt". Xoá lô/xét nghiệm thì hàng dự kiến

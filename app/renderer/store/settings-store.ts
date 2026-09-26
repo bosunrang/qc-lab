@@ -109,8 +109,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   importLisResult: async (record) => {
     const result = await window.qcApi.importLisResult({ data: { record } });
-    // Làm mới hàng chờ TỪ NGUỒN THẬT thay vì tự suy đoán trạng thái mới —
-    // cùng nguyên tắc hệ thống dùng (xem CLAUDE.md, Giai đoạn C5).
+    // Làm mới hàng chờ TỪ NGUỒN THẬT thay vì tự suy đoán trạng thái mới.
     if (result.ok) await get().pullLisQueue();
     return result;
   },

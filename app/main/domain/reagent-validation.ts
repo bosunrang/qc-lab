@@ -68,8 +68,8 @@ export function cleanQuickValueType(value: unknown): QuickValueType | null {
 }
 
 /** Thêm giá trị mới vào danh sách — không thêm trùng (so khớp không phân
- * biệt hoa/thường/dấu, khớp `searchKey()` hệ thống), trả lại giá trị đã có
- * nếu trùng thay vì tạo thêm 1 dòng giống nhau. */
+ * biệt hoa/thường/dấu qua `searchKey()`), trả lại giá trị đã có nếu trùng
+ * thay vì tạo thêm 1 dòng giống nhau. */
 export function addQuickValue(list: readonly string[], value: unknown): { items: string[]; value: string; added: boolean } | { error: 'empty-value' } {
   const clean = cleanText(value, 120).trim();
   if (!clean) return { error: 'empty-value' };

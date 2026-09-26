@@ -6,8 +6,8 @@
 // (`rc-stats-panel`) → "Tiêu chí chấp nhận & kết luận" (`rc-crit-panel`) →
 // "Biểu đồ" (`rc-chart-panel`).
 //
-// Toàn bộ phép tính đến từ `calculateReagentComparison()` ở main (đã có từ
-// Giai đoạn B6) — trang này chỉ trình bày, không tự tính lại thống kê nào.
+// Toàn bộ phép tính đến từ `calculateReagentComparison()` ở main — trang
+// này chỉ trình bày, không tự tính lại thống kê nào.
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalog } from '../lib/useCatalog';
@@ -29,11 +29,10 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { TEA_CATALOG } from '../../main/domain/tea-catalog';
 import type { ReagentComparisonResult, ReagentComparisonView, TeaRef } from '../../shared/qc-api';
 
-// hệ thống dùng ĐÚNG HAI formatter khác nhau trên trang này, đối chiếu trực
-// tiếp kết quả hiển thị:
-//   • phần THỐNG KÊ/tiêu chí (`rcFmt` → `pres.report.formatNumber`) bỏ số 0
-//     dư: "R² = 1", "6%", "139.2 / 140.592";
-//   • cột tính sẵn của hàng cặp mẫu (`deps.fmt(c.avg, 3)`) giữ nguyên số 0:
+// Trang này dùng ĐÚNG HAI formatter khác nhau:
+//   • phần THỐNG KÊ/tiêu chí (`fmt`) bỏ số 0 dư: "R² = 1", "6%",
+//     "139.2 / 140.592";
+//   • cột tính sẵn của hàng cặp mẫu (`fmtFixed`) giữ nguyên số 0:
 //     "130.650", "-1.300".
 // Trộn 2 chỗ này là lệch hàng loạt dòng chữ, nên giữ riêng.
 const fmt = (value: unknown, decimals = 2): string => {
@@ -53,7 +52,7 @@ const fmtT = (value: unknown): string => {
 const equation = (slope: number, intercept: number) =>
   `y = ${fmt(slope, 4)}x ${intercept >= 0 ? '+' : '−'} ${fmt(Math.abs(intercept), 4)}`;
 
-/** Nhãn 1 phép so sánh trong ô chọn — đúng dạng hệ thống: "<hóa chất> — <lô
+/** Nhãn 1 phép so sánh trong ô chọn, dạng "<hóa chất> — <lô
  * cũ>→<lô mới>". */
 function comparisonLabel(row: ReagentComparisonView): string {
   const lots = [row.lot_old, row.lot_new].filter(Boolean).join('→');
@@ -165,7 +164,7 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
       </EmptyState>
     </div>
   );
-  // 6 tiêu chí, đúng thứ tự + câu chữ hệ thống. `decision` = tiêu chí QUYẾT
+  // 6 tiêu chí theo thứ tự cố định. `decision` = tiêu chí QUYẾT
   // ĐỊNH (ĐẠT/KHÔNG ĐẠT), còn lại chỉ mô tả (TỐT/LƯU Ý).
   const criteria: [boolean, boolean, string, string][] = [
     [result.passBias, true, 'Độ chệch trong giới hạn cho phép (tiêu chí quyết định)',
@@ -388,7 +387,7 @@ export function ReagentPage() {
   }
 
   /** In 1 phép so sánh hoặc báo cáo tổng hợp — dùng chung cơ chế
-   * `printHtmlToPdf` của Giai đoạn C1. */
+   * `printHtmlToPdf` của main. */
   async function printComparison(summary: boolean) {
     const rows = summary ? store.comparisons : [current];
     const body = rows.map((c) => {

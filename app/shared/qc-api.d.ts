@@ -237,7 +237,7 @@ export interface QcPointView {
   /** `entry:queryPoints` trả nguyên hàng `qc_points` (`{...p}`) nên các cột
    * đã chốt lúc nhập cũng có sẵn — khai đủ ở đây thay vì để trang phải ép
    * kiểu: `lot`/`qc_mean`/`qc_sd` là số lô + Mean/SD ĐANG dùng tại thời
-   * điểm nhập (Giai đoạn B2), tab "Lịch sử dữ liệu" đọc chúng để tính lại Z
+   * điểm nhập, tab "Lịch sử dữ liệu" đọc chúng để tính lại Z
    * theo đúng mốc Mean/SD của lô đó. */
   lot?: string; qc_mean?: number | null; qc_sd?: number | null;
   operator_id?: string; operator_username?: string; operator_code?: string; created_at?: string;
@@ -251,16 +251,15 @@ export interface TestSummary {
      * trang Phân tích Westgard. */
     worstVerdict: 'ok' | 'warn' | 'rej';
     /** Kết luận + luật của ĐIỂM CUỐI CÙNG. Trang Tổng quan báo động theo
-     * đây, KHÔNG theo `worstVerdict` — khớp `summarizeTestStatus()` của app
-     * cũ (chỉ đọc điểm cuối), nên mức từng vi phạm hôm trước mà điểm mới
-     * nhất đã đạt thì không còn nằm trong "Cần xử lý". */
+     * đây, KHÔNG theo `worstVerdict` (chỉ đọc điểm cuối), nên mức từng vi
+     * phạm hôm trước mà điểm mới nhất đã đạt thì không còn nằm trong "Cần xử lý". */
     latestVerdict: 'ok' | 'warn' | 'rej'; latestRules: string[];
     pointCount: number; todayPointCount: number;
     /** CV QUAN SÁT ĐƯỢC của các điểm QC (SD mẫu n-1 chia |mean| thực tế),
      * không phải CV suy từ Mean/SD đích. `null` khi mức chưa có điểm nào. */
     cv: number | null;
-    // `id` cần cho trang Khắc phục sự cố: hệ thống gắn dòng sự cố với hồ sơ
-    // NCE theo ĐIỂM QC, không theo test+mức (xem D3.8).
+    // `id` cần cho trang Khắc phục sự cố: trang gắn dòng sự cố với hồ sơ
+    // NCE theo ĐIỂM QC, không theo test+mức.
     latest: { id: string; date: string; runId: string; val: number } | null;
   }[];
 }
@@ -437,7 +436,7 @@ export interface ReagentComparisonView {
 
 export interface PublicUser {
   id: string; username: string; name: string; initials: string; role: 'admin' | 'technician' | 'viewer';
-  /** Quyền theo từng trang (Giai đoạn D3.1). `null` = KHÔNG thu hẹp, tài
+  /** Quyền theo từng trang. `null` = KHÔNG thu hẹp, tài
    * khoản xem đủ các thẻ của vai trò. Mảng rỗng không bao giờ được lưu —
    * validate ở main chặn, vì nó sẽ khoá tài khoản khỏi mọi trang. */
   pagePerms: string[] | null;
@@ -496,8 +495,8 @@ export interface QcApi {
   resetUserPassword(input: { id: string; data: { newPassword: string } }): Promise<IpcResult<{ id: string }>>;
   changeOwnPassword(input: { data: { oldPassword: string; newPassword: string } }): Promise<IpcResult<{ id: string }>>;
   verifyOwnPassword(input: { data: { password: string } }): Promise<IpcResult<{ ok: true }>>;
-  /** Chỉ tự phục vụ (không nhận id người khác) — khớp hệ thống, đổi ảnh đại
-   * diện không phải thao tác quản trị. */
+  /** Chỉ tự phục vụ (không nhận id người khác) — đổi ảnh đại diện không phải
+   * thao tác quản trị. */
   setAvatar(input: { data: { dataUrl: string } }): Promise<IpcResult<{ avatar: string }>>;
   clearAvatar(): Promise<IpcResult<{ avatar: string }>>;
   listInstruments(): Promise<Instrument[]>;
@@ -522,7 +521,7 @@ export interface QcApi {
    * gì. Renderer hỏi người dùng bằng đúng con số này TRƯỚC khi gọi `saveLot`
    * (số lô là nhãn tĩnh trên từng điểm QC, xem config-handlers.ts). */
   previewLotRename(input: { id: string; lotNo: string }): Promise<IpcResult<{ rename: null } | { rename: { oldLotNo: string; newLotNo: string; affected: number; lockedCount: number; lockedPeriods: string[] } }>>;
-  /** Thao tác hệ thống có cổng chặn ở main khi lô/nhóm đang gán Mean/SD
+  /** Thao tác có cổng chặn ở main khi lô/nhóm đang gán Mean/SD
    * hoặc hồ sơ đã kết luận. */
   setTeaRefValue(input: { analyteId: string; field: 'clia' | 'ricos'; value: string; name?: string; unit?: string; section?: string }): Promise<IpcResult<{ analyteId: string }>>;
   restoreTeaRefDefaults(input: { analyteId: string }): Promise<IpcResult<{ analyteId: string }>>;
@@ -536,7 +535,7 @@ export interface QcApi {
   removeLotGroup(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   stopLotGroup(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   /** Kích hoạt nhóm lô: áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
-   * mức QC tương ứng và dừng nhóm bị thay thế. 3 trạng thái như hệ thống:
+   * mức QC tương ứng và dừng nhóm bị thay thế. 3 trạng thái:
    * `applied` / `already-active` / `unready` (chưa mức nào có Mean/SD hợp lệ
    * cho lô của nhóm — KHÔNG đụng gì tới cấu hình). `unready` là một nhánh
    * THÀNH CÔNG trả về, không phải mã lỗi: hợp đồng thiếu nó tới 2026-09-10
@@ -547,9 +546,9 @@ export interface QcApi {
   listPanels(): Promise<QcPanel[]>;
   savePanel(input: { id?: string; data: QcPanelDraft }): Promise<IpcResult<QcPanel>>;
   listLotTransitions(): Promise<LotTransition[]>;
-  /** Một hàm lưu duy nhất cho hồ sơ chuyển lô — đúng mô hình hệ thống
-   * (`saveLotTransitionV2`): modal có 1 ô "Trạng thái" chọn được cả 4 giá
-   * trị (`data.status`) + 1 nút Lưu, không phải các nút hành động tách rời.
+  /** Một hàm lưu duy nhất cho hồ sơ chuyển lô: modal có 1 ô "Trạng thái"
+   * chọn được cả 4 giá trị (`data.status`) + 1 nút Lưu, không phải các nút
+   * hành động tách rời.
    * `id` có → SỬA hồ sơ (nút "Sửa"). Hồ sơ đã 'accepted' thì khoá vĩnh viễn
    * (`accepted-immutable` nếu đổi status khác 'accepted'); 'rejected'
    * KHÔNG khoá, vẫn sửa/đổi status lại được. Chuyển SANG 'accepted'/
@@ -648,7 +647,7 @@ export interface QcApi {
   lockPeriod(input: { data: { ym: string; note?: string } }): Promise<IpcResult<PeriodLockRow>>;
   unlockPeriod(input: { data: { ym: string; note: string } }): Promise<IpcResult<{ ym: string }>>;
   queryReport(input: { testId: string; from?: string; to?: string }): Promise<ReportPointRow[]>;
-  /** Giai đoạn C1 — Excel thật qua `exceljs` (main process), trả base64 để
+  /** Excel thật qua `exceljs` (main process), trả base64 để
    * renderer tự tạo Blob + tải về, không cần hộp thoại lưu file native (nhẹ
    * hơn, khớp cơ chế `downloadCsv` đã dùng ở Audit/Report). */
   exportTableXlsx(input: { sheetName: string; headers: string[]; rows: (string | number | null)[][] }): Promise<IpcResult<string>>;

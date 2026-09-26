@@ -10,7 +10,7 @@
 // handler, và làm vậy nhiều lần thì bản xem trước lặng lẽ quay về chỗ cũ.
 //
 // Đây là SOURCE SCANNER (đọc mã nguồn như văn bản), cùng kiểu với
-// tests/global-name-uniqueness.test.js của hệ thống — không phải test hành vi.
+// design-system.test.mjs — không phải test hành vi.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';

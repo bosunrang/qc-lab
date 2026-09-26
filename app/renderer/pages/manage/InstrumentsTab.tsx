@@ -25,7 +25,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
     const fd = new FormData(form);
     const data = {
       name: String(fd.get('name') || ''), manufacturer: String(fd.get('manufacturer') || ''),
-      // hệ thống không hiển thị trường Model trong popup này. Giữ lại giá trị
+      // Popup này không hiển thị trường Model. Giữ lại giá trị
       // đã lưu khi sửa để không làm mất dữ liệu cũ chỉ vì form không có ô đó.
       model: editing !== 'new' && editing ? editing.model : '', serial: String(fd.get('serial') || ''),
       section: String(fd.get('section') || ''), active: fd.get('active') === 'on',
