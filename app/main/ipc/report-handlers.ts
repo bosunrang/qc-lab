@@ -6,7 +6,7 @@ import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
 import { isPeriodLocked as isLocked } from '../db/period-locks';
 import { DEFAULT_SIGMA_REPORT_TEMPLATE, validateReportTemplate, type ReportTemplateInput } from '../domain/report-template-validation';
-import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
 // Kiểu hàng báo cáo lấy từ HỢP ĐỒNG dùng chung thay vì khai lại ở đây — bản
 // trước có hai khai báo song song cùng tên và bản ở đây thiếu cột `lot`.
@@ -33,22 +33,21 @@ export function createReportHandlers(db: Db) {
     }
   }
 
-  function saveReportTemplateSettings(input: { data: ReportTemplateInput }, actor: Actor): IpcResult<ReportTemplateSettings> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveReportTemplateSettings = writeCommand(db, 'saveReportTemplateSettings', 'admin', (w, input: { data: ReportTemplateInput }): IpcResult<ReportTemplateSettings> => {
     const result = validateReportTemplate(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     try {
-      withTransaction(db, () => {
+      w.commit((tx) => {
         db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
           .run(REPORT_TEMPLATE_META_KEY, JSON.stringify(result.data));
-        writeAudit(db, actor, 'Sửa biểu mẫu báo cáo Six Sigma', `Mã ${result.data.formCode} · phiên bản ${result.data.version}`, result.data.formCode);
+        tx.audit('Sửa biểu mẫu báo cáo Six Sigma', `Mã ${result.data.formCode} · phiên bản ${result.data.version}`, result.data.formCode);
+        tx.changed(['report_templates']);
       });
     } catch (error) {
       return { ok: false, error: { code: 'save-report-template-failed', message: error instanceof Error ? error.message : 'Không lưu được biểu mẫu báo cáo.' } };
     }
-    notifyChanged(['report_templates']);
     return { ok: true, data: result.data };
-  }
+  });
 
   function listPeriodLocks(): PeriodLockRow[] {
     return db.prepare('SELECT * FROM period_locks ORDER BY ym DESC').all() as unknown as PeriodLockRow[];

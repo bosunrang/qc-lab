@@ -4,7 +4,8 @@ import {
   DEFAULT_LIS_GATEWAY_SETTINGS, normalizeGatewayUrl, resultToPointInput,
   type LisGatewaySettings, type LisQueueRecord,
 } from '../domain/lis-client';
-import { type Actor, type IpcResult, writeAudit, requireWrite, withTransaction } from './shared';
+import { type Actor, type IpcResult } from './shared';
+import { writeCommand, writeCommandAsync } from './write-command';
 
 const APP_META_KEY = 'lisGatewaySettings';
 const FETCH_TIMEOUT_MS = 8000;
@@ -58,19 +59,21 @@ export function createLisHandlers(db: Db) {
     return actor.role === 'admin' ? settings : { ...settings, token: '' };
   }
 
-  function saveSettings(input: { data: { enabled: boolean; url: string; token: string } }, actor: Actor): IpcResult<LisGatewaySettings> {
-    if (actor.role !== 'admin') return { ok: false, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được cấu hình LIS Gateway.' } };
+  const adminOnly = (actor: Actor) => (actor.role === 'admin' ? null : { ok: false as const, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được cấu hình LIS Gateway.' } });
+  const saveSettings = writeCommand(db, 'saveSettings', adminOnly, (w, input: { data: { enabled: boolean; url: string; token: string } }): IpcResult<LisGatewaySettings> => {
     const url = normalizeGatewayUrl(input.data.url);
     if (input.data.enabled && !url) {
       return { ok: false, error: { code: 'invalid-url', message: 'Địa chỉ Gateway không hợp lệ — chỉ chấp nhận http://127.0.0.1:8787 hoặc http://localhost:8787.' } };
     }
     const settings: LisGatewaySettings = { enabled: input.data.enabled === true, url: url || DEFAULT_LIS_GATEWAY_SETTINGS.url, token: String(input.data.token || '') };
-    withTransaction(db, () => {
+    w.commit((tx) => {
       db.prepare("INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(APP_META_KEY, JSON.stringify(settings));
-      writeAudit(db, actor, 'Cấu hình LIS Gateway', settings.enabled ? `Bật, url=${settings.url}` : 'Tắt', '');
+      tx.audit('Cấu hình LIS Gateway', settings.enabled ? `Bật, url=${settings.url}` : 'Tắt', '');
+      // Trước đây thiếu lời báo này: trang đang mở không biết cấu hình LIS đã đổi.
+      tx.changed(['app_meta']);
     });
     return { ok: true, data: settings };
-  }
+  });
 
   async function pullQueue(): Promise<IpcResult<{ pending: LisQueueRecord[]; unresolved: LisQueueRecord[] }>> {
     const settings = readSettings(db);
@@ -119,19 +122,23 @@ export function createLisHandlers(db: Db) {
     return { ok: true, data: { pointId: saved.data.id } };
   }
 
-  async function rejectResult(input: { data: { messageId: string; note?: string } }, actor: Actor): Promise<IpcResult<{ messageId: string }>> {
-    // Bỏ một kết quả là quyết định về dữ liệu QC: cùng mức quyền với nhận kết
-    // quả. Trước đây vai trò chỉ-xem cũng bỏ được.
-    const denied = requireWrite(actor); if (denied) return denied;
+  // Bỏ một kết quả là quyết định về dữ liệu QC: cùng mức quyền với nhận kết
+  // quả. Trước đây vai trò chỉ-xem cũng bỏ được.
+  const rejectResult = writeCommandAsync(db, 'rejectResult', 'write', async (w, input: { data: { messageId: string; note?: string } }): Promise<IpcResult<{ messageId: string }>> => {
+    const actor = w.actor;
     const settings = readSettings(db);
     try {
       await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: input.data.messageId, status: 'rejected', by: actor.name, note: input.data.note || '' } });
     } catch (e) {
       return { ok: false, error: { code: 'gateway-error', message: e instanceof Error ? e.message : 'Không kết nối được LIS Gateway.' } };
     }
-    writeAudit(db, actor, 'Bỏ kết quả QC từ LIS', input.data.note || '', '');
+    // Dữ liệu QC không đổi (kết quả bị bỏ nằm ở Gateway); chỉ nhật ký ghi lại quyết định.
+    w.commit((tx) => {
+      tx.audit('Bỏ kết quả QC từ LIS', input.data.note || '', '');
+      tx.changed(['activity']);
+    });
     return { ok: true, data: { messageId: input.data.messageId } };
-  }
+  });
 
   return { getSettings, saveSettings, pullQueue, importResult, rejectResult };
 }

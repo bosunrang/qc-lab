@@ -24,7 +24,8 @@ export interface WriteTx {
   audit(type: string, detail: string, target?: string): void;
   /** Khai bảng (và xét nghiệm) vừa đổi; mỗi lời khai thành một `notifyChanged`
    * sau khi commit, giữ nguyên thứ tự — không gộp, vì renderer lọc theo
-   * cặp bảng + xét nghiệm của từng lời báo. */
+   * cặp bảng + xét nghiệm của từng lời báo. Thao tác chỉ ghi nhật ký (không
+   * đổi bảng dữ liệu nào) khai `tx.changed(['activity'])`. */
   changed(tables: string[], testIds?: string[]): void;
 }
 
@@ -50,6 +51,45 @@ function guardOf(guard: WriteGuard): (actor: Actor) => PermissionDenied | null {
 export const WRITE_COMMAND = Symbol('write-command');
 
 export type WriteCommand<A extends unknown[], T> = ((...args: [...A, Actor]) => IpcResult<T>) & { [WRITE_COMMAND]: string };
+export type AsyncWriteCommand<A extends unknown[], T> = ((...args: [...A, Actor]) => Promise<IpcResult<T>>) & { [WRITE_COMMAND]: string };
+
+/** Các bước của MỘT lần ghi, cùng hai cờ để kiểm sau khi thân handler xong. */
+function beginWrite(db: Db, name: string, actor: Actor) {
+  const state = { committed: false, declaredNoChange: false };
+  const steps: WriteSteps = {
+    actor,
+    noChange<D>(data: D): IpcResult<D> {
+      state.declaredNoChange = true;
+      return { ok: true, data };
+    },
+    commit<R>(work: (tx: WriteTx) => R): R {
+      if (state.committed) throw new Error(`${name}: commit() chỉ được gọi một lần cho mỗi lần ghi.`);
+      let audited = 0;
+      const pending: Array<[string[], string[]]> = [];
+      const tx: WriteTx = {
+        audit: (type, detail, target = '') => { writeAudit(db, actor, type, detail, target); audited++; },
+        changed: (tables, testIds = []) => { pending.push([tables, testIds]); },
+      };
+      const result = withTransaction(db, () => {
+        const value = work(tx);
+        // Ném TRONG transaction để phần đã ghi bị huỷ theo.
+        if (!audited) throw new Error(`${name}: thao tác ghi thiếu nhật ký (tx.audit).`);
+        if (!pending.length) throw new Error(`${name}: thao tác ghi thiếu khai báo bảng đổi (tx.changed).`);
+        return value;
+      });
+      state.committed = true;
+      // `['activity']` là lời khai "chỉ nhật ký đổi"; `writeAudit()` đã tự báo
+      // bảng này, không báo lặp.
+      for (const [tables, testIds] of pending) if (!(tables.length === 1 && tables[0] === 'activity')) notifyChanged(tables, testIds);
+      return result;
+    },
+  };
+  const finish = <T>(result: IpcResult<T>): IpcResult<T> => {
+    if (result.ok && !state.committed && !state.declaredNoChange) throw new Error(`${name}: trả kết quả thành công mà không ghi gì (thiếu w.commit).`);
+    return result;
+  };
+  return { steps, finish };
+}
 
 export function writeCommand<A extends unknown[], T>(
   db: Db,
@@ -62,37 +102,28 @@ export function writeCommand<A extends unknown[], T>(
     const actor = args[args.length - 1] as Actor;
     const denied = check(actor);
     if (denied) return denied;
-    let committed = false;
-    let declaredNoChange = false;
-    const steps: WriteSteps = {
-      actor,
-      noChange<D>(data: D): IpcResult<D> {
-        declaredNoChange = true;
-        return { ok: true, data };
-      },
-      commit<R>(work: (tx: WriteTx) => R): R {
-        if (committed) throw new Error(`${name}: commit() chỉ được gọi một lần cho mỗi lần ghi.`);
-        let audited = 0;
-        const pending: Array<[string[], string[]]> = [];
-        const tx: WriteTx = {
-          audit: (type, detail, target = '') => { writeAudit(db, actor, type, detail, target); audited++; },
-          changed: (tables, testIds = []) => { pending.push([tables, testIds]); },
-        };
-        const result = withTransaction(db, () => {
-          const value = work(tx);
-          // Ném TRONG transaction để phần đã ghi bị huỷ theo.
-          if (!audited) throw new Error(`${name}: thao tác ghi thiếu nhật ký (tx.audit).`);
-          if (!pending.length) throw new Error(`${name}: thao tác ghi thiếu khai báo bảng đổi (tx.changed).`);
-          return value;
-        });
-        committed = true;
-        for (const [tables, testIds] of pending) notifyChanged(tables, testIds);
-        return result;
-      },
-    };
-    const result = body(steps, ...(args.slice(0, -1) as unknown as A));
-    if (result.ok && !committed && !declaredNoChange) throw new Error(`${name}: trả kết quả thành công mà không ghi gì (thiếu w.commit).`);
-    return result;
+    const { steps, finish } = beginWrite(db, name, actor);
+    return finish(body(steps, ...(args.slice(0, -1) as unknown as A)));
+  };
+  return Object.assign(command, { [WRITE_COMMAND]: name });
+}
+
+/** Như `writeCommand()` cho thân handler bất đồng bộ (băm mật khẩu, gọi LIS
+ * Gateway…). Phần ghi trong `w.commit()` vẫn là một transaction đồng bộ,
+ * chạy SAU các bước chờ, nên không có transaction nào mở qua `await`. */
+export function writeCommandAsync<A extends unknown[], T>(
+  db: Db,
+  name: string,
+  guard: WriteGuard,
+  body: (w: WriteSteps, ...args: A) => Promise<IpcResult<T>>,
+): AsyncWriteCommand<A, T> {
+  const check = guardOf(guard);
+  const command = async (...args: [...A, Actor]): Promise<IpcResult<T>> => {
+    const actor = args[args.length - 1] as Actor;
+    const denied = check(actor);
+    if (denied) return denied;
+    const { steps, finish } = beginWrite(db, name, actor);
+    return finish(await body(steps, ...(args.slice(0, -1) as unknown as A)));
   };
   return Object.assign(command, { [WRITE_COMMAND]: name });
 }
