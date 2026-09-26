@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
-import { readEntryPageSources } from './helpers/entry-page-source.mjs';
+import { readEntryPageSources } from './helpers/page-source.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');

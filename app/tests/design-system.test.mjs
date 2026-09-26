@@ -11,7 +11,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
-import { readEntryPageSources } from './helpers/entry-page-source.mjs';
+import { readEntryPageSources, readSigmaPageSources } from './helpers/page-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STYLE_DIR = join(ROOT, 'renderer/styles');
@@ -186,9 +186,9 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
     'nút cạnh ô CV/Bias cùng dùng token hàng dữ liệu 36px');
   assert.match(sigma, /\.sg-period-history-list\{[^}]*grid-auto-rows:58px[^}]*max-height:244px[^}]*overflow-y:auto/,
     'lịch sử kỳ hiển thị tối đa bốn mục rồi cuộn nội bộ, không kéo dài panel');
-  assert.doesNotMatch(readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8'), /Ngân sách MU/,
+  assert.doesNotMatch(readSigmaPageSources(), /Ngân sách MU/,
     'MU chỉ được đánh giá ở bảng chi tiết bên dưới, không lặp lại trong workspace Sigma');
-  assert.doesNotMatch(readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8'), /<aside className="sg-period-history"/,
+  assert.doesNotMatch(readSigmaPageSources(), /<aside className="sg-period-history"/,
     'lịch sử kỳ không dùng thẻ aside vì selector sidebar toàn cục sẽ biến nó thành nền tối cao toàn viewport');
   // Cohort và cặp mẫu là bảng phụ: cùng chữ 13px/.02em, chỉ header 30px.
   for (const selector of ['\\.sg-cohort-table th']) {
@@ -259,7 +259,7 @@ test('nhãn đứng trên control dùng thang form chung', () => {
 });
 
 test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo dõi riêng', () => {
-  const sigmaPage = readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8');
+  const sigmaPage = readSigmaPageSources();
   const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
 
   assert.match(sigmaPage, /const sigmaTests = tests;/,
@@ -285,7 +285,7 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
 });
 
 test('thao tác xóa kỳ dùng RowActionButton chung', () => {
-  const sigmaPage = readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8');
+  const sigmaPage = readSigmaPageSources();
   assert.match(
     sigmaPage,
     /<RowActionButton kind="delete" label=\{`Xóa kỳ \$\{vnPeriod\(displayPeriod\.period\)\}`\} onClick=\{\(\) => removePeriodRow\(displayPeriod\)\} \/>/,

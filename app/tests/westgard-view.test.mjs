@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import { qcRunKey, compareQcRunKey } from '../main/domain/sort-order.ts';
 import { createRequire } from 'node:module';
 import { displayedWestgardBlocks, statText, westgardExportRows, escapeHtml } from '../renderer/lib/westgard-view.ts';
+import { readWestgardPageSources } from './helpers/page-source.mjs';
 // Công thức thống kê nằm ở main (observed-stats); trang Westgard lọc điểm `accepted` trước khi gọi.
 const { observedStats: statsOf } = createRequire(import.meta.url)('../../app-dist/main/domain/observed-stats.js');
 const observedStats = (points) => statsOf(points.filter((point) => point.accepted));
@@ -73,7 +74,7 @@ test('WG11/12: chart and invalidation wiring use the shared run key and all eval
   assert.match(chart, /dateIndex\.get\(qcRunKey\(p\)\)/);
   assert.match(chart, /map\(keyOf\)\)\)\)\.sort\(compareQcRunKey\)/);
   assert.match(chart, /lot: hit\.lot/);
-  const page = readFileSync(new URL('../renderer/pages/WestgardPage.tsx', import.meta.url), 'utf8');
+  const page = readWestgardPageSources();
   const subscriptions = [...page.matchAll(/useStoreInvalidation\(\[([^\]]+)\]/g)];
   assert.equal(subscriptions.length, 2);
   for (const subscription of subscriptions) for (const table of ['actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions']) assert.ok(subscription[1].includes(`'${table}'`));
@@ -122,9 +123,12 @@ test('WG17: lý do lần chạy bị loại đọc từ main, không tự dò l�
   // Nhãn trên bảng phải ĐỌC `runRejectedBy`, không quét lại `analysisByLevel`:
   // bản dò lại chỉ nêu được một mức, và khi bảng đang mở "Xem lô cũ" thì nó
   // tra nhầm sang chuỗi của lô đang chạy.
-  const page = readFileSync(new URL('../renderer/pages/WestgardPage.tsx', import.meta.url), 'utf8');
+  const page = readWestgardPageSources();
   assert.match(page, /const runExclusionLabel = \(point: \{ runRejectedBy\?: number\[\] \}\)/);
-  assert.equal((page.match(/runExclusionLabel\(p\)/g) || []).length, 2, 'cả bảng lô hiện hành lẫn tab nhóm lô đã dừng đều dùng chung nhãn');
+  // Từ 2026-09-26 hai bảng là MỘT component `WestgardPointTable`, nên nhãn chỉ
+  // được gọi ở một chỗ và bảng đó được dùng cho cả hai nơi.
+  assert.equal((page.match(/runExclusionLabel\(p\)/g) || []).length, 1, 'nhãn chỉ dựng ở bảng dùng chung');
+  assert.equal((page.match(/<WestgardPointTable /g) || []).length, 2, 'cả bảng lô hiện hành lẫn tab nhóm lô đã dừng đều dùng bảng dùng chung');
   assert.doesNotMatch(page, /candidate\.verdict === 'rej'/, 'không còn vòng dò lại ở renderer');
 });
 

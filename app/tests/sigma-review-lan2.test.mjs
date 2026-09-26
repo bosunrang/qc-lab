@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { readSigmaPageSources } from './helpers/page-source.mjs';
 const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
@@ -68,7 +69,7 @@ test('SG13b: một mức QC đang vận hành không được mượn bảng Sig
   const saved = sigma.savePeriod({ testId: assay.id, period: '2026-08', teaSource: 'ricos', tea: 10, levels: reviewedCohortLevels(sigma, assay.id, '2026-08', [1]) }, actor);
   assert.equal(saved.ok, true);
   assert.equal(saved.data.levels[0].qualityDesign, null);
-  const page = readFileSync(new URL('../renderer/pages/SigmaPage.tsx', import.meta.url), 'utf8');
+  const page = readSigmaPageSources();
   assert.match(page, /cần tối thiểu 2 mức QC đang vận hành/i);
 });
 
@@ -94,7 +95,7 @@ test('SG14: listTestLevels trả cờ operational để Sigma đếm đúng thi�
   db.prepare("INSERT INTO qc_lots(id,lot_no,level,group_id,exp) VALUES ('l2s','L2',2,'g2','2027-01-01')").run();
   db.prepare("UPDATE test_levels SET qc_lot_id='l2s' WHERE test_id=? AND level=2").run(assay.id);
   assert.deepEqual(config.listTestLevels(assay.id).map((row) => [row.level, row.operational]), [[1, 1], [2, 0]]);
-  const page = readFileSync(new URL('../renderer/pages/SigmaPage.tsx', import.meta.url), 'utf8');
+  const page = readSigmaPageSources();
   assert.match(page, /operationalLevels = .*filter\(\(l\) => l\.operational !== 0\)/, 'SigmaPage phải lọc theo cờ');
 });
 
@@ -152,7 +153,7 @@ test('SG17: TEa giải từ bậc dự phòng không bị đóng băng thành sn
   const stored = JSON.parse(db.prepare('SELECT lv_json FROM sigma_data WHERE id=?').get(`${assay.id}:2026-07`).lv_json)[0];
   assert.equal(stored.tea ?? null, null, 'không ghi cứng giá trị đã giải');
   assert.equal(stored.teaBasis, undefined, 'và không bịa nguồn gốc cho nó');
-  const page = readFileSync(new URL('../renderer/pages/SigmaPage.tsx', import.meta.url), 'utf8');
+  const page = readSigmaPageSources();
   assert.match(page, /tea: level\.teaSnapshot \?\? undefined/, 'levelPayload phải gửi snapshot, không phải giá trị đã giải');
 });
 

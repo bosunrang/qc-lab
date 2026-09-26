@@ -25,6 +25,13 @@ test('mọi trang ở thanh điều hướng mở được không lỗi', { time
       await page.waitForTimeout(400);
       const crashed = await page.getByText('Trang này gặp lỗi khi hiển thị').count();
       assert.equal(crashed, 0, `trang "${label}" rơi vào PageErrorBoundary`);
+      if (label.trim() === 'Phân tích Westgard') {
+        // Bảng điểm dùng chung (`WestgardPointTable`) hiện đúng điểm vừa nhập.
+        await page.locator('.wg-table tbody tr', { hasText: '5.10' }).first().waitFor();
+      }
+      if (label.trim() === 'Six Sigma & Sai số') {
+        await page.getByRole('heading', { name: 'Tình trạng' }).waitFor();
+      }
     }
     assert.deepEqual(errors, []);
   } finally {

@@ -36,6 +36,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | E.6 bước 1–2, D.1 phần dữ liệu QC (nhánh `perf/fewer-summary-reloads`) | `entry-store` không tự nạp lại sau nhập/huỷ điểm và sửa ghi chú ngày (EntryPage đã nạp lại qua `useStoreInvalidation`); dải QC giữ nguyên trong lúc nạp lại cùng mức, không chớp trống. Tổng quan nghe danh sách bảng tường minh thay cho `activity`. Nhập một điểm: `listTestSummaries` 2 → 1 lần, nạp dữ liệu xét nghiệm 2 → 1 lần; thao tác không liên quan QC không còn làm Tổng quan tính lại. Test `e2e/reload-count.e2e.mjs` đếm lời gọi IPC ở main |
 | D.6 (nhánh `refactor/split-entry-page`) | `EntryPage.tsx` 1.068 → 334 dòng, chỉ điều phối dữ liệu; khối hiển thị ở `pages/entry/`: `EntryTree`, `EntrySheet`, `EntryLjPanel`, `EntryPointsPanel`, `EntryRangePanel` (bọc `memo`), `VoidPointModal`, `RangeWorkflowModal` (tự giữ form), `operational.ts`, `shared.tsx`. Cột dựng bằng `useMemo`, callback bằng `useCallback`, store đọc bằng `useShallow` (D.2 cho trang này). Test đọc mã chuyển sang đọc gộp trang và thư mục con (`tests/helpers/entry-page-source.mjs`). Chưa đo số lần render bằng công cụ; hiệu quả `memo` suy từ cấu trúc props |
 | C.1 phần tách tệp (nhánh `refactor/split-config-handlers`) | `config-handlers.ts` 1.358 → 23 dòng, chỉ ghép ba nhóm: `config-catalog-handlers.ts` (máy, xét nghiệm, mức QC, phạm vi luật, Panel), `config-lot-handlers.ts` (lô, nhóm lô, Mean/SD dự kiến, chuyển tiếp lô), `config-tea-handlers.ts` (TEa). `lotGroupInUse` chuyển xuống `db/lot-groups.ts`. Tách thuần: đối chiếu từng dòng thân hàm với bản gốc, chỉ khác đúng hàm vừa chuyển; 34 hàm xuất ra giữ nguyên |
+| D.7 (nhánh `refactor/split-sigma-westgard-pages`) | `WestgardPage.tsx` 652 → 413 dòng: tab nhóm lô đã dừng ở `westgard/useArchivedWestgard.ts` + `ArchivedGroupView.tsx`; hai bảng điểm gần giống nhau gộp thành `WestgardPointTable` (điểm lịch sử có `cusumSignal: null` nên hiển thị như cũ). `SigmaPage.tsx` 946 → 535 dòng: hàm thuần ở `sigma/shared.ts`, 4 hộp thoại mỗi cái một tệp, 4 khối hiển thị ở `SigmaPanels.tsx`; phần thiết lập và vùng làm việc theo kỳ (các thao tác ghi) giữ ở trang. Trang Westgard đọc store bằng `useShallow`. Test đọc mã dùng `tests/helpers/page-source.mjs`; e2e thêm luồng tab nhóm lô đã dừng |
 
 ## Thứ tự đề xuất
 
@@ -213,8 +214,8 @@ tách (tách thuần, không đổi hành vi).
    `EntrySheet`, `EntryLjPanel`, `VoidPointModal`, `RangeWorkflowModal`, hook
    `useEntryColumns()` có memo. Hiện gõ vào ô lý do huỷ làm render lại cả bảng
    31 ngày và vẽ lại mọi biểu đồ.
-7. `SigmaPage.tsx`, và phần xem lô lưu trữ của `WestgardPage.tsx`
-   (`ArchivedGroupView` + `useArchivedBlocks`).
+7. ~~`SigmaPage.tsx` và phần xem lô lưu trữ của `WestgardPage.tsx`~~ — đã
+   xong, xem bảng "Đã xong".
 
 **Dùng chung:**
 
