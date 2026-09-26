@@ -152,7 +152,10 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .lj-qc-stat.control .v{color:var(--accent-text);}
 .lj-qc-stat:not(.control)+.lj-qc-stat.control{border-left:2px solid var(--accent-border-soft);}
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 24px 14px;color:var(--text-tertiary);font-size:var(--text-xs);}
-.legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin-right:4px;}
+/* Mỗi mục là flex căn giữa: `vertical-align: middle` của chấm tròn căn theo
+   nửa chiều cao chữ thường nên lệch khỏi chữ (tuỳ phông). */
+.legend>span{display:inline-flex;align-items:center;gap:6px;}
+.legend .dot{flex:none;width:9px;height:9px;border-radius:50%;}
 .legend .dot.qc-legend-ok{background:var(--success-accent);}
 .legend .dot.qc-legend-warn{background:var(--warning-accent);}
 .legend .dot.qc-legend-rej{background:var(--danger-accent);}

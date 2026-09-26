@@ -1,36 +1,49 @@
-
+/* Hai panel cùng một hàng: "Thêm người dùng" bên trái, "Danh sách người
+   dùng" bên phải. Dùng flex-wrap thay cho media query: khi vùng nội dung
+   không đủ chỗ cho cả hai, danh sách tự xuống hàng dưới. */
+.users-layout{
+  display:flex; flex-wrap:wrap; gap:var(--space-5); align-items:flex-start;
+}
+.users-layout > .panel{margin-bottom:0;}
+.users-create-panel{flex:0 0 600px; min-width:0;}
+.users-list-panel{flex:1 1 520px; min-width:0;}
 
 .user-table{
   width:100%; min-width:0; table-layout:fixed;
-}
-
-.user-table th, .user-table td{
-  padding-left:14px; padding-right:14px;
 }
 
 .user-table th:not(:first-child), .user-table td:not(:first-child){
   text-align:center;
 }
 
-.user-table th:nth-child(1), .user-table td:nth-child(1){width:24%}
+.user-table th:nth-child(1), .user-table td:nth-child(1){width:28%}
 .user-table th:nth-child(2), .user-table td:nth-child(2),
 .user-table th:nth-child(3), .user-table td:nth-child(3){width:16%}
-.user-table th:nth-child(4), .user-table td:nth-child(4){width:44%}
+.user-table th:nth-child(4), .user-table td:nth-child(4){width:40%}
 
 .user-row-actions{
   display:flex;flex-wrap:nowrap;gap:6px;align-items:center;justify-content:center;white-space:nowrap;
 }
 
-.user-create-card{
-  background:var(--surface); border:1px solid var(--surface-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-control);
-}
-
+/* Bảng lùi vào trong panel như bảng Nhật ký hoạt động (`.audit-table-wrap`):
+   viền bảng không đè lên viền panel, đáy bảng có khoảng thở. */
 .user-table-wrap{
-  min-width:0; overflow-x:auto;
+  min-width:0; overflow-x:auto; margin:0 var(--space-4) var(--space-4);
 }
 
 .user-table-wrap > .user-table{
-  min-width:620px;
+  min-width:560px;
+}
+
+/* Hai thẻ con trong panel "Thêm người dùng": Thông tin tài khoản (co giãn)
+   và Thẻ được phép dùng (hẹp, các ô xếp một cột dọc). align-items:stretch để
+   hai thẻ cao bằng nhau thay vì để lại khoảng trắng. */
+.user-create-layout{
+  display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:var(--space-4); align-items:stretch; margin:0 var(--space-4) var(--space-4); padding:0;
+}
+
+.user-create-card{
+  background:var(--surface); border:1px solid var(--surface-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-control);
 }
 
 .user-create-card-title{
@@ -41,20 +54,26 @@
   display:grid; grid-template-columns:1fr; gap:var(--field-gap); padding:var(--panel-content-gap) 16px 16px;
 }
 
+.user-create-actions{
+  margin-top:2px;
+}
+
 .user-create-actions .btn{
   min-width:88px;
 }
 
 .user-create-hint{
-  margin:0 16px 16px;
+  margin:0 var(--space-4) var(--space-4);
 }
 
 .user-perm-block{
-  margin-top:0; min-width:0; padding:var(--panel-content-gap) 16px 16px;
+  min-width:0; padding:var(--panel-content-gap) 16px 16px;
 }
 
+/* Ô chọn "Thẻ được phép dùng" — ô có viền, ô tick bên trái (kiểu bản cũ),
+   xếp một cột dọc. Hộp thoại "Sửa quyền" dùng cùng lưới này. */
 .user-perm-grid{
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-top:8px;
+  display:grid; grid-template-columns:1fr; gap:8px;
 }
 
 .user-perm-grid label{
@@ -68,19 +87,3 @@
 .user-perm-grid input[type="checkbox"]{
   appearance:auto; -webkit-appearance:checkbox; box-sizing:border-box; width:17px; min-width:17px; max-width:17px; height:17px; min-height:0; flex:0 0 17px; margin:0; padding:0; border:1px solid var(--border); border-radius:var(--radius-xs); background:var(--surface); box-shadow:none; accent-color:var(--accent);
 }
-
-
-.user-create-actions{
-  margin-top:2px;
-}
-
-/* "Danh sách người dùng" sống ở panel riêng bên dưới, nên .user-create-layout
-   chỉ còn 2 thẻ: Thông tin tài khoản (hẹp, vài field ngắn) và Thẻ được phép
-   dùng (rộng hơn, chứa lưới checkbox). align-items:stretch để thẻ phải cao
-   bằng thẻ trái thay vì dừng sớm để lại khoảng trắng — khác với các cặp 2 cột
-   trên trang Cài đặt vốn cố tình dùng align-items:start. */
-.user-create-layout{
-  display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:20px; align-items:stretch; margin:var(--panel-content-gap) 16px 16px; padding:0;
-}
-
-
