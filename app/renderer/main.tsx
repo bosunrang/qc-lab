@@ -14,7 +14,11 @@ import { installUnhandledErrorReporting } from './lib/unhandled-errors';
 const rootEl = document.getElementById('root');
 
 async function start(): Promise<void> {
-  const lan = location.port === '3200' && typeof window.qcApi === 'undefined';
+  // Máy trạm LAN: bản đã build (không phải Vite dev) được phục vụ qua HTTP và
+  // không có preload của Electron. Không dựa vào số cổng: trước 2026-09-26
+  // điều kiện là `location.port === '3200'`, nên máy chủ chạy ở cổng khác
+  // (test end-to-end) mở nhầm bản xem trước sql.js và bị CSP chặn WASM.
+  const lan = !import.meta.env.DEV && location.protocol.startsWith('http') && typeof window.qcApi === 'undefined';
   if (lan) window.qcApi = createLanHttpApi();
   const installed = lan ? false : await installBrowserMockIfNeeded();
   if (!rootEl) return;

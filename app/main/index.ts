@@ -24,7 +24,12 @@ import { lanAddresses } from './lan/addresses';
 import { LanHttpServer } from './lan/http-server';
 import { classifyNavigation } from './window-guard';
 
-const LAN_PORT = 3200;
+// Test end-to-end (`app/e2e/`) chạy app thật trên thư mục dữ liệu tạm và một
+// cổng LAN riêng, để không đụng CSDL của người dùng và chạy được cả khi
+// QC Lab thật đang mở. Khóa một phiên chạy (`requestSingleInstanceLock`) gắn
+// với thư mục dữ liệu, nên phải đặt trước khi xin khóa.
+if (process.env.QCLAB_USER_DATA_DIR) app.setPath('userData', process.env.QCLAB_USER_DATA_DIR);
+const LAN_PORT = Number(process.env.QCLAB_LAN_PORT) || 3200;
 let tray: Tray | null = null;
 let quitting = false;
 let mainWindow: BrowserWindow | null = null;

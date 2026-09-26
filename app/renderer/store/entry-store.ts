@@ -24,7 +24,7 @@ interface EntryState {
   addPoint: (data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string }) => Promise<IpcResult<QcPointView>>;
   setDayNote: (testId: string, date: string, note: string) => Promise<IpcResult<{ note: string; updated: number }>>;
   voidPoint: (
-    pointId: string, reason: string, kind: 'analytical' | 'data-entry' | 'other', openNce: boolean, testId: string, level: number,
+    pointId: string, reason: string, kind: 'analytical' | 'data-entry' | 'other', openNce: boolean,
   ) => Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }>>;
   loadRangeCandidate: (testId: string, level: number) => Promise<void>;
   applyLabRange: (testId: string, level: number, reason: string, causeConfirmed?: boolean, bias?: number, mean?: number, sd?: number) => Promise<IpcResult<RangeCandidateView>>;
@@ -70,46 +70,21 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     });
   },
 
-  /** Ghi chú theo ngày nằm ở trường `note` của MỌI điểm còn hiệu lực trong
-   * ngày (xem entry-handlers). Nạp lại điểm sau khi lưu để bảng nhập hiện
-   * đúng ghi chú vừa đổi. */
-  setDayNote: async (testId, date, note) => {
-    const result = await window.qcApi.setDayNote({ data: { testId, date, note } });
-    // Nạp lại đúng các mức đang mở (lấy từ state thay vì bắt caller truyền
-    // lại) để bảng nhập hiện ngay ghi chú vừa lưu.
-    if (result.ok) await get().loadTestData(testId, Object.keys(get().pointsByLevel).map(Number));
-    return result;
-  },
-
-  addPoint: async (data) => {
-    const result = await window.qcApi.addPoint({ data });
-    if (result.ok) {
-      // Một điểm mới có thể kích hoạt luật CHÉO MỨC (R4s/2-2s...) cho điểm
-      // ở mức khác trong cùng run, nên phải nạp lại toàn bộ mức của xét
-      // nghiệm. Chỉ cập nhật mức vừa nhập sẽ để badge/biểu đồ mức kia bị cũ.
-      const summaries = await window.qcApi.listTestSummaries();
-      const levels = summaries.find((item) => item.testId === data.testId)?.levels.map((item) => item.level) || [data.level];
-      if (get().activeTestId === data.testId) await get().loadTestData(data.testId, levels);
-      const range = await window.qcApi.getRangeCandidate(data.testId, data.level);
-      if (range.ok && get().rangeCandidate?.testId === data.testId && get().rangeCandidate?.level === data.level) set({ rangeCandidate: range.data });
-    }
-    return result;
-  },
-  voidPoint: async (pointId, reason, kind, openNce, testId, level) => {
-    const result = await window.qcApi.voidPoint({ data: { pointId, reason, kind, openNce } });
-    if (result.ok) {
-      // Hủy một điểm cũng có thể gỡ vi phạm chéo khỏi mức còn lại.
-      const summaries = await window.qcApi.listTestSummaries();
-      const levels = summaries.find((item) => item.testId === testId)?.levels.map((item) => item.level) || [level];
-      if (get().activeTestId === testId) await get().loadTestData(testId, levels);
-      const range = await window.qcApi.getRangeCandidate(testId, level);
-      if (range.ok && get().rangeCandidate?.testId === testId && get().rangeCandidate?.level === level) set({ rangeCandidate: range.data });
-    }
-    return result;
-  },
+  // Ba lệnh ghi dưới đây KHÔNG tự nạp lại. Main báo `qc_points` đổi kèm
+  // testId, và EntryPage nạp lại toàn bộ mức của xét nghiệm (một điểm mới có
+  // thể kích hoạt luật chéo mức ở mức kia), dải QC và cây xét nghiệm qua
+  // `useStoreInvalidation`. Trước 2026-09-26 store tự nạp thêm một lượt, kèm
+  // một lần `listTestSummaries()` chỉ để lấy danh sách mức: mỗi điểm nhập vào
+  // làm main tính Westgard cho mọi xét nghiệm hai lần.
+  setDayNote: async (testId, date, note) => window.qcApi.setDayNote({ data: { testId, date, note } }),
+  addPoint: async (data) => window.qcApi.addPoint({ data }),
+  voidPoint: async (pointId, reason, kind, openNce) => window.qcApi.voidPoint({ data: { pointId, reason, kind, openNce } }),
   loadRangeCandidate: async (testId, level) => {
     const request = ++rangeRequestSerial;
-    set({ rangeCandidate: null, rangeError: null });
+    // Nạp lại cùng mức sau một lần ghi thì giữ dải đang hiện tới khi có kết
+    // quả mới, để khung dải QC không chớp trống. Đổi mức thì mới xoá.
+    const current = get().rangeCandidate;
+    if (!current || current.testId !== testId || current.level !== level) set({ rangeCandidate: null, rangeError: null });
     const result = await window.qcApi.getRangeCandidate(testId, level);
     if (request !== rangeRequestSerial) return;
     set(result.ok ? { rangeCandidate: result.data, rangeError: null } : { rangeCandidate: null, rangeError: result.error.message });
