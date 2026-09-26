@@ -1,7 +1,8 @@
 import type { Db } from '../db/sqlite-like';
 // Hình dạng trang nhật ký lấy từ hợp đồng dùng chung (đã có `total`).
 import type { ActivityArchivePreview, ActivityPage } from '../../shared/qc-api';
-import { rowToAuditEntry, setActivityAnchor, type Actor, type IpcResult, writeAudit, requireAdmin, withTransaction } from './shared';
+import { rowToAuditEntry, setActivityAnchor, type Actor, type IpcResult, requireAdmin } from './shared';
+import { writeCommand } from './write-command';
 import { activityPageWindow, activitySearchText, type ActivityLike, type ActivityPageWindow, type ActivitySearchFields } from '../domain/audit-filter';
 import { textKey } from '../domain/text-utils';
 import { localDayStartIso, validLocalDate } from '../domain/local-date';
@@ -144,8 +145,7 @@ export function createAuditHandlers(db: Db) {
    * anchor bằng hash CUỐI CÙNG của phần bị cắt để chuỗi vẫn xác minh được
    * từ điểm cắt trở đi. CSV của chính đoạn cần gỡ được tạo ở `previewArchive`
    * trước bước xác nhận cuối; hàm này chỉ làm thay đổi dữ liệu. */
-  function archive(input: AuditArchiveInput, actor: Actor): IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const archive = writeCommand(db, 'archive', 'admin', (w, input: AuditArchiveInput): IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }> => {
     const window = archiveWindow(input.data?.months);
     if (!window) {
       return { ok: false, error: { code: 'invalid-months', message: INVALID_ARCHIVE_MONTHS } };
@@ -153,14 +153,14 @@ export function createAuditHandlers(db: Db) {
     const all = allChronological();
     const toRemove = archiveSegment(all, window.cutoffIso);
     const retainedCount = all.length - toRemove.length;
-    if (!toRemove.length) return { ok: true, data: { removedCount: 0, retainedCount, cutoffIso: window.cutoffIso } };
+    if (!toRemove.length) return w.noChange({ removedCount: 0, retainedCount, cutoffIso: window.cutoffIso });
     const lastRemovedHash = [...toRemove].reverse().find((a) => a.hash)?.hash || getAnchor(db);
     const ids = toRemove.map((a) => a.id);
     // Xoá dòng, dời anchor và ghi dòng giải thích là MỘT đơn vị: dừng giữa
     // chừng thì chuỗi hash báo sai ngay dòng đầu. Xoá theo từng lô 500 id vì
     // SQLite giới hạn số tham số của một câu lệnh (mặc định 32.766), trong khi
     // phần cần gỡ có thể tới 50.000 dòng.
-    withTransaction(db, () => {
+    w.commit((tx) => {
       for (let start = 0; start < ids.length; start += 500) {
         const chunk = ids.slice(start, start + 500);
         db.prepare(`DELETE FROM activity WHERE id IN (${chunk.map(() => '?').join(',')})`).run(...chunk);
@@ -169,11 +169,12 @@ export function createAuditHandlers(db: Db) {
       // trong trường hợp này sẽ khiến dòng audit ngay sau cắt có prevHash rỗng
       // nhưng verifier lại đòi prevHash=anchor — lỗi từng có ở app.
       setActivityAnchor(db, retainedCount ? lastRemovedHash : '');
-      writeAudit(db, actor, 'Lưu trữ nhật ký hoạt động',
+      tx.audit('Lưu trữ nhật ký hoạt động',
         `Đã xuất CSV và gỡ ${toRemove.length} dòng cũ hơn ${window.months} tháng (mốc ${window.cutoffIso.slice(0, 10)}), còn lại ${retainedCount} dòng. Hash đỉnh phần lưu trữ: ${lastRemovedHash || '—'}.`, 'Nhật ký');
+      tx.changed(['activity']);
     });
     return { ok: true, data: { removedCount: toRemove.length, retainedCount, cutoffIso: window.cutoffIso } };
-  }
+  });
 
   return { query, exportCsv, previewArchive, verifyChainNow, archive };
 }

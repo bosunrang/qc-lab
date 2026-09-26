@@ -15,7 +15,8 @@ import type { PushResponse, PushRunner } from '../sync/firebase-payload';
 import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 import { cleanFirebaseEmail, cleanLabCode, parseFirebaseConfig, type FirebaseConfig } from '../domain/firebase-validation';
 import { createFirebaseClient, type FirebaseSession } from '../domain/firebase-client';
-import { type Actor, type IpcResult, notifyChanged, requireAdmin, writeAudit, withTransaction } from './shared';
+import { type IpcResult } from './shared';
+import { writeCommand, writeCommandAsync, type WriteSteps } from './write-command';
 
 const CONFIG_KEY = 'firebaseConfig';
 const EMAIL_KEY = 'firebaseEmail';
@@ -148,20 +149,30 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     setStatus(`Đã đồng bộ ${new Date(result.ts).toLocaleString('vi-VN')} · ${formatMb(result.bytes)}${warn}`);
     return { ts: result.ts, bytes: result.bytes };
   }
-  async function pullNow(actor: Actor, remote: FirebasePayload): Promise<void> {
-    // Không để cấu hình kết nối bị remote cũ ghi đè, đồng thời luôn tạo đường
-    // lùi vật lý trước khi RESTORE toàn bộ bảng.
+  type Connection = { config: string; email: string; code: string };
+  const savedConnection = (): Connection => ({ config: meta(CONFIG_KEY), email: meta(EMAIL_KEY), code: meta(LAB_CODE_KEY) });
+  const writeConnection = (c: Connection) => { setMeta(CONFIG_KEY, c.config); setMeta(EMAIL_KEY, c.email); setMeta(LAB_CODE_KEY, c.code); };
+
+  /** Tải dữ liệu đám mây về, trong lần ghi `w` của thao tác gọi nó. Cấu hình
+   * kết nối `keep` không bị remote cũ ghi đè; luôn tạo đường lùi vật lý trước
+   * khi RESTORE toàn bộ bảng. `restoreAllTables()` tự chạy transaction riêng
+   * (cần tắt khoá ngoại NGOÀI transaction), `w.commit()` giữ phần còn lại. */
+  async function pullNow(w: WriteSteps, remote: FirebasePayload, keep: Connection): Promise<void> {
     const snapshot = writeSafetySnapshot(db, userDataDir, 'pre-firebase-pull');
-    const saved = { config: meta(CONFIG_KEY), email: meta(EMAIL_KEY), code: meta(LAB_CODE_KEY) };
     restoreAllTables(db, remote.backup.data);
-    setMeta(CONFIG_KEY, saved.config); setMeta(EMAIL_KEY, saved.email); setMeta(LAB_CODE_KEY, saved.code);
-    writeAudit(db, actor, 'Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây; bản an toàn trước đó tại ${snapshot}`, '');
+    w.commit((tx) => {
+      writeConnection(keep);
+      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây; bản an toàn trước đó tại ${snapshot}`, '');
+      tx.changed(listTableNames(db));
+    });
     await pushNow(); // ghi lại audit vừa phát sinh để hai phía thực sự cùng trạng thái.
-    notifyChanged(listTableNames(db));
   }
 
-  async function connect(input: { data: { labCode?: unknown; email?: unknown; password?: unknown; config?: unknown } }, actor: Actor): Promise<IpcResult<FirebaseConnectResult>> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  // Cấu hình kết nối được lưu CÙNG transaction với dòng nhật ký, ở đúng nhánh
+  // kết nối thành công. Trước đây nó được lưu trước khi đọc dữ liệu đám mây,
+  // nên nhánh "cần chọn hướng" và "không tương thích" để lại cấu hình mà
+  // không có dòng nhật ký nào.
+  const connect = writeCommandAsync(db, 'connect', 'admin', async (w, input: { data: { labCode?: unknown; email?: unknown; password?: unknown; config?: unknown } }): Promise<IpcResult<FirebaseConnectResult>> => {
     try {
       const nextConfig = parseFirebaseConfig(input.data.config);
       const nextCode = cleanLabCode(input.data.labCode);
@@ -172,11 +183,16 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
       // Chỉ lưu thông tin cần cho lần kết nối sau. Password và token chỉ sống
       // trong RAM main process, mất khi đóng ứng dụng.
       config = nextConfig; session = nextSession; labCode = nextCode;
-      setMeta(CONFIG_KEY, JSON.stringify(nextConfig)); setMeta(EMAIL_KEY, email); setMeta(LAB_CODE_KEY, nextCode);
+      const connection: Connection = { config: JSON.stringify(nextConfig), email, code: nextCode };
+      const commitConnection = (detail: string) => w.commit((tx) => {
+        writeConnection(connection);
+        tx.audit('Kết nối Firebase', detail, nextCode);
+        tx.changed(['app_meta']);
+      });
       const raw = await client.read(nextConfig, nextCode, nextSession.idToken);
       const parsed = parsePayload(raw);
       if (!raw) {
-        writeAudit(db, actor, 'Kết nối Firebase', `Kết nối ${nextCode} với UID ${nextSession.uid}`, nextCode);
+        commitConnection(`Kết nối ${nextCode} với UID ${nextSession.uid}`);
         const sent = await pushNow();
         return { ok: true, data: { state: 'pushed', remoteUpdatedAt: new Date(sent.ts).toISOString() } };
       }
@@ -184,53 +200,58 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
       const local = await runPush(false);
       if (local.ok && local.checksum === parsed.data.backup.checksum) {
         setStatus('Đã kết nối · dữ liệu đã đồng bộ');
-        writeAudit(db, actor, 'Kết nối Firebase', `Kết nối ${nextCode}; dữ liệu đã khớp`, nextCode);
+        commitConnection(`Kết nối ${nextCode}; dữ liệu đã khớp`);
         return { ok: true, data: { state: 'in-sync', remoteUpdatedAt: new Date(parsed.data._ts).toISOString() } };
       }
       if (localHasOperationalData()) {
         setStatus('Cần chọn hướng đồng bộ');
+        commitConnection(`Kết nối ${nextCode}; dữ liệu cục bộ và đám mây khác nhau, chờ chọn hướng đồng bộ`);
         return { ok: true, data: { state: 'conflict', remoteUpdatedAt: new Date(parsed.data._ts).toISOString() } };
       }
-      await pullNow(actor, parsed.data);
+      await pullNow(w, parsed.data, connection);
       return { ok: true, data: { state: 'in-sync', remoteUpdatedAt: new Date(parsed.data._ts).toISOString() } };
     } catch (error) {
       setStatus('Lỗi kết nối Firebase');
       return { ok: false, error: { code: 'connection-failed', message: error instanceof Error ? error.message : 'Không thể kết nối Firebase.' } };
     }
-  }
+  });
 
-  async function sync(input: { data: { direction: 'push' | 'pull' } }, actor: Actor): Promise<IpcResult<FirebaseSyncResult>> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const sync = writeCommandAsync(db, 'sync', 'admin', async (w, input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>> => {
     if (!session || !config || !labCode) return { ok: false, error: { code: 'not-connected', message: 'Hãy kết nối Firebase trước khi đồng bộ.' } };
     try {
       syncing = true;
       if (input.data.direction === 'push') {
-        writeAudit(db, actor, 'Đẩy dữ liệu lên Firebase', `Đồng bộ lên ${labCode}`, labCode);
+        // Dữ liệu cục bộ không đổi; dòng nhật ký ghi trước để nằm trong gói đẩy lên.
+        const code = labCode;
+        w.commit((tx) => {
+          tx.audit('Đẩy dữ liệu lên Firebase', `Đồng bộ lên ${code}`, code);
+          tx.changed(['activity']);
+        });
         const sent = await pushNow();
         return { ok: true, data: { state: 'pushed', remoteUpdatedAt: new Date(sent.ts).toISOString() } };
       }
       const parsed = parsePayload(await client.read(config, labCode, session.idToken));
       if (!parsed.ok) return { ok: false, error: { code: 'invalid-remote', message: parsed.message === 'empty' ? 'Chưa có dữ liệu trên Firebase để tải về.' : parsed.message } };
-      await pullNow(actor, parsed.data);
+      await pullNow(w, parsed.data, savedConnection());
       return { ok: true, data: { state: 'pulled', remoteUpdatedAt: new Date(parsed.data._ts).toISOString() } };
     } catch (error) {
       setFailureStatus('Lỗi đồng bộ Firebase');
       return { ok: false, error: { code: 'sync-failed', message: error instanceof Error ? error.message : 'Đồng bộ Firebase thất bại.' } };
     } finally { syncing = false; }
-  }
+  });
 
-  function disconnect(actor: Actor): IpcResult<null> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const disconnect = writeCommand(db, 'disconnect', 'admin', (w): IpcResult<null> => {
     // Xoá cấu hình, trạng thái và dòng nhật ký là MỘT đơn vị (kế hoạch B.4).
-    withTransaction(db, () => {
-      setMeta(CONFIG_KEY, ''); setMeta(EMAIL_KEY, ''); setMeta(LAB_CODE_KEY, ''); setStatus('Đã ngắt kết nối');
-      writeAudit(db, actor, 'Ngắt Firebase', 'Ngắt đồng bộ đám mây; dữ liệu cục bộ được giữ nguyên', '');
+    w.commit((tx) => {
+      writeConnection({ config: '', email: '', code: '' }); setStatus('Đã ngắt kết nối');
+      tx.audit('Ngắt Firebase', 'Ngắt đồng bộ đám mây; dữ liệu cục bộ được giữ nguyên', '');
+      tx.changed(['app_meta']);
     });
     session = null; config = null; labCode = '';
     if (timer) { clearTimeout(timer); timer = null; }
     dirtySince = null; nextPushAt = null;
     return { ok: true, data: null };
-  }
+  });
 
   function schedule(): void {
     if (timer || dirtySince == null) return;

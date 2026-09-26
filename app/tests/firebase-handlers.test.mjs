@@ -66,6 +66,25 @@ const invalid = await puller.connect({ data: { labCode: '../bad', email: 'qc@exa
 assert.equal(invalid.ok, false);
 assert.match(invalid.error.message, /Mã phòng/);
 
+// 6) Cấu hình kết nối lưu CÙNG dòng nhật ký, ở đúng nhánh (cổng ghi, 2026-09-26).
+const auditTypes = (database) => database.prepare("SELECT type, detail FROM activity WHERE type='Kết nối Firebase' ORDER BY seq").all().map((r) => ({ ...r }));
+const savedConfig = (database) => database.prepare("SELECT value FROM app_meta WHERE key='firebaseConfig'").get()?.value || '';
+// Nhánh cần chọn hướng đồng bộ: có cấu hình và có dòng nhật ký nói rõ còn chờ.
+assert.ok(savedConfig(conflictDb).includes('test-key'), 'nhánh conflict vẫn lưu cấu hình để chọn hướng sau');
+assert.match(auditTypes(conflictDb).at(-1).detail, /chờ chọn hướng đồng bộ/);
+// Dữ liệu đám mây không tương thích: kết nối coi như không thành, không lưu cấu hình, không nhật ký.
+const badRemoteDb = openDatabase(':memory:');
+const badRemote = createFirebaseHandlers(badRemoteDb, os.tmpdir(), { ...fakeClient, async read() { return { _format: 'khong-phai-qc-lab' }; } });
+const badResult = await badRemote.connect({ data: { labCode: 'khoaXN', email: 'qc@example.test', password: 'secret', config: configText } }, actor);
+assert.equal(badResult.ok, false);
+assert.equal(badResult.error.code, 'invalid-remote');
+assert.equal(savedConfig(badRemoteDb), '', 'không lưu cấu hình của một kết nối không thành');
+assert.deepEqual(auditTypes(badRemoteDb), []);
+// Ngắt kết nối: xoá cấu hình và có nhật ký trong cùng một lần ghi.
+assert.equal(conflict.disconnect(actor).ok, true);
+assert.equal(savedConfig(conflictDb), '');
+assert.equal(conflictDb.prepare("SELECT COUNT(*) AS n FROM activity WHERE type='Ngắt Firebase'").get().n, 1);
+
 console.log('app firebase-handlers end-to-end tests passed');
 
 

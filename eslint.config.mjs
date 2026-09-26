@@ -71,4 +71,18 @@ export default [
       }],
     },
   },
+  // Handler ghi dữ liệu đi qua `writeCommand()` (`app/main/ipc/write-command.ts`):
+  // quyền → kiểm dữ liệu → transaction → nhật ký → báo thay đổi được ép bằng
+  // mã, không còn là quy ước. Gọi thẳng các bước đó trong handler là bỏ qua
+  // cổng. Ngoại lệ duy nhất là thao tác TRƯỚC khi đăng nhập (khởi tạo quản trị,
+  // đăng nhập) — chưa có actor để qua cổng; chỗ đó ghi `eslint-disable` kèm lý do.
+  {
+    files: ['app/main/ipc/*-handlers.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'CallExpression[callee.name=/^(writeAudit|notifyChanged|withTransaction)$/]',
+        message: 'Thao tác ghi đi qua writeCommand(): dùng w.commit(tx => …), tx.audit() và tx.changed().',
+      }],
+    },
+  },
 ];

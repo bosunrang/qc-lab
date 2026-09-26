@@ -14,19 +14,18 @@ import { WG_RULE_REGISTRY, isAllowedRuleScope, type RuleScope } from '../domain/
 import { readGlobalRules } from '../db/rule-settings';
 import { countOperationalLevels, listOperationalLevels } from '../db/operational-levels';
 import { isoLocalDate } from '../domain/local-date';
-import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { type IpcResult, nowIso } from './shared';
+import { writeCommand, type WriteSteps } from './write-command';
 import { isLotGroupInUse } from '../db/lot-groups';
 
 export function createCatalogConfigHandlers(db: Db) {
-  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
   const lotGroupInUse = (lotIds: string[]): boolean => isLotGroupInUse(db, lotIds);
 
   function listInstruments() {
     return db.prepare('SELECT * FROM instruments ORDER BY name').all();
   }
 
-  function saveInstrument(input: { id?: string; data: InstrumentInput }, actor: Actor): IpcResult<Instrument> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveInstrument = writeCommand(db, 'saveInstrument', 'admin', (w, input: { id?: string; data: InstrumentInput }): IpcResult<Instrument> => {
     const id = input.id || '';
     const existingNames = (db.prepare('SELECT name FROM instruments WHERE id != ?').all(id) as { name: string }[]).map(r => r.name);
     const result = validateInstrument(input.data, existingNames);
@@ -35,28 +34,27 @@ export function createCatalogConfigHandlers(db: Db) {
     if (id) {
       const existing = db.prepare('SELECT id FROM instruments WHERE id=?').get(id);
       if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy máy xét nghiệm cần cập nhật.' } };
-      const saved = inTransaction(() => {
+      const saved = w.commit((tx) => {
         db.prepare('UPDATE instruments SET name=?,manufacturer=?,model=?,serial=?,section=?,active=? WHERE id=?')
           .run(name, manufacturer, model, serial, section, active ? 1 : 0, id);
-        writeAudit(db, actor, 'Sửa máy xét nghiệm', `Cập nhật máy "${name}"`, name);
+        tx.audit('Sửa máy xét nghiệm', `Cập nhật máy "${name}"`, name);
+        tx.changed(['instruments']);
         return db.prepare('SELECT * FROM instruments WHERE id=?').get(id);
       });
-      notifyChanged(['instruments']);
       return { ok: true, data: saved };
     }
     const newId = cleanId(uid());
-    const saved = inTransaction(() => {
+    const saved = w.commit((tx) => {
       db.prepare('INSERT INTO instruments(id,name,manufacturer,model,serial,section,active) VALUES (?,?,?,?,?,?,?)')
         .run(newId, name, manufacturer, model, serial, section, active ? 1 : 0);
-      writeAudit(db, actor, 'Thêm máy xét nghiệm', `Tạo máy "${name}"`, name);
+      tx.audit('Thêm máy xét nghiệm', `Tạo máy "${name}"`, name);
+      tx.changed(['instruments']);
       return db.prepare('SELECT * FROM instruments WHERE id=?').get(newId);
     });
-    notifyChanged(['instruments']);
     return { ok: true, data: saved };
-  }
+  });
 
-  function removeInstrument(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeInstrument = writeCommand(db, 'removeInstrument', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name FROM instruments WHERE id=?').get(id) as { id: string; name: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy máy xét nghiệm.' } };
@@ -64,13 +62,13 @@ export function createCatalogConfigHandlers(db: Db) {
     if (testCount > 0) return { ok: false, error: { code: 'in-use', message: `Không thể xoá — máy này đang gắn với ${testCount} xét nghiệm. Xoá/chuyển các xét nghiệm đó trước.` } };
     const panelCount = (db.prepare('SELECT COUNT(*) AS n FROM qc_panels WHERE instrument_id=?').get(id) as { n: number }).n;
     if (panelCount > 0) return { ok: false, error: { code: 'in-use', message: `Không thể xoá — máy này đang gắn với ${panelCount} Panel QC. Xoá/chuyển các Panel QC đó trước.` } };
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('DELETE FROM instruments WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá máy xét nghiệm', `Xoá "${existing.name}"`, existing.name);
+      tx.audit('Xoá máy xét nghiệm', `Xoá "${existing.name}"`, existing.name);
+      tx.changed(['instruments']);
     });
-    notifyChanged(['instruments']);
     return { ok: true, data: { id } };
-  }
+  });
 
   // hệ thống KHÔNG sắp xếp `state.tests` ở đâu cả (`manageAssaysModel()`/
   // `PanelModal.tsx`'s `allTests` chỉ `.filter()`/`.map()` thẳng lên mảng) —
@@ -84,8 +82,9 @@ export function createCatalogConfigHandlers(db: Db) {
 
   /** Form danh mục mới cho phép gán một analyte vào nhiều máy. Mỗi máy vẫn
    * là một hàng `tests` riêng để Mean/SD, lô, điểm QC và Westgard không bị
-   * trộn; `analyte_id` chỉ gom các hàng đó thành một mục ở giao diện. */
-  function saveTestAssignments(input: { id?: string; data: TestInput }, actor: Actor): IpcResult<Test> {
+   * trộn; `analyte_id` chỉ gom các hàng đó thành một mục ở giao diện. Gọi từ
+   * `saveTest` (đã qua cổng quyền), ghi qua đúng lần ghi `w` của nó. */
+  function saveTestAssignments(w: WriteSteps, input: { id?: string; data: TestInput }): IpcResult<Test> {
     const instrumentIds = [...new Set((Array.isArray(input.data.instrumentIds) ? input.data.instrumentIds : [])
       .map(cleanId).filter(Boolean))];
     if (!instrumentIds.length) return { ok: false, error: { code: 'missing-instrument', message: 'Chọn ít nhất một máy xét nghiệm.' } };
@@ -147,7 +146,7 @@ export function createCatalogConfigHandlers(db: Db) {
       || cleanId(uid());
     const savedIds: string[] = [];
     const preserveExisting = input.data.preserveExistingAssignments === true;
-    const saved = inTransaction(() => {
+    const saved = w.commit((tx) => {
       for (const item of prepared) {
         const current = existingAssignments.find(row => row.instrument_id === item.instrumentId);
         const d = item.data;
@@ -174,17 +173,16 @@ export function createCatalogConfigHandlers(db: Db) {
       const detail = preserveExisting
         ? `Gán thêm máy cho xét nghiệm "${prepared[0].data.name}"`
         : `${existingAssignments.length ? 'Cập nhật' : 'Tạo'} xét nghiệm "${prepared[0].data.name}" trên ${savedIds.length} máy`;
-      writeAudit(db, actor, action, detail, prepared[0].data.name);
+      tx.audit(action, detail, prepared[0].data.name);
+      tx.changed(['tests', 'test_levels'], savedIds);
       const representativeId = input.id && savedIds.includes(input.id) ? input.id : savedIds[0];
       return db.prepare('SELECT * FROM tests WHERE id=?').get(representativeId) as Test;
     });
-    notifyChanged(['tests', 'test_levels'], savedIds);
     return { ok: true, data: { ...saved, assignment_ids: savedIds } };
   }
 
-  function saveTest(input: { id?: string; data: TestInput }, actor: Actor): IpcResult<Test> {
-    const denied = requireAdmin(actor); if (denied) return denied;
-    if (Array.isArray(input.data.instrumentIds)) return saveTestAssignments(input, actor);
+  const saveTest = writeCommand(db, 'saveTest', 'admin', (w, input: { id?: string; data: TestInput }): IpcResult<Test> => {
+    if (Array.isArray(input.data.instrumentIds)) return saveTestAssignments(w, input);
     const id = input.id || '';
     const knownInstrumentIds = new Set((db.prepare('SELECT id FROM instruments').all() as { id: string }[]).map(r => r.id));
     const instrumentId = cleanId(input.data.instrumentId);
@@ -200,7 +198,7 @@ export function createCatalogConfigHandlers(db: Db) {
       if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm cần cập nhật.' } };
       let removedPanelMemberships = 0;
       try {
-        inTransaction(() => {
+        w.commit((tx) => {
           db.prepare(`UPDATE tests SET name=?,instrument_id=?,unit=?,decimal_places=?,tea=?,section=?,
             tea_source=?,tea_ref_key=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
             .run(name, result.data.instrumentId, unit, decimalPlaces, tea, section,
@@ -210,29 +208,29 @@ export function createCatalogConfigHandlers(db: Db) {
               WHERE test_id=? AND panel_id IN (SELECT id FROM qc_panels WHERE instrument_id!=?)`)
               .run(id, result.data.instrumentId).changes);
           }
-          writeAudit(db, actor, 'Sửa xét nghiệm', `Cập nhật xét nghiệm "${name}"`, name);
+          tx.audit('Sửa xét nghiệm', `Cập nhật xét nghiệm "${name}"`, name);
+          tx.changed(removedPanelMemberships ? ['tests', 'qc_panels', 'qc_panel_tests'] : ['tests'], [id]);
         });
       } catch (e) {
         return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Cập nhật xét nghiệm thất bại.' } };
       }
-      notifyChanged(removedPanelMemberships ? ['tests', 'qc_panels', 'qc_panel_tests'] : ['tests'], [id]);
       return { ok: true, data: db.prepare('SELECT * FROM tests WHERE id=?').get(id) };
     }
     const newId = cleanId(uid());
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         db.prepare(`INSERT INTO tests(id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,method,reagent,cusum_on,cusum_k,cusum_h,active)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(newId, name, result.data.instrumentId, unit, decimalPlaces, tea, section, teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0);
         db.prepare('INSERT INTO test_levels(id,test_id,level) VALUES (?,?,1)').run(`${newId}:1`, newId);
-        writeAudit(db, actor, 'Thêm xét nghiệm', `Tạo xét nghiệm "${name}"`, name);
+        tx.audit('Thêm xét nghiệm', `Tạo xét nghiệm "${name}"`, name);
+        tx.changed(['tests'], [newId]);
       });
     } catch (e) {
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Tạo xét nghiệm thất bại.' } };
     }
-    notifyChanged(['tests'], [newId]);
     return { ok: true, data: db.prepare('SELECT * FROM tests WHERE id=?').get(newId) };
-  }
+  });
 
   /** Mọi mức đã khai của xét nghiệm, kèm cờ `operational` = mức có thuộc
    * THIẾT KẾ QC ĐANG VẬN HÀNH không (`operational-levels.ts`, nguồn dùng
@@ -262,8 +260,7 @@ export function createCatalogConfigHandlers(db: Db) {
     if (toGroup) db.prepare("UPDATE lot_groups SET status='', stopped_at='' WHERE id=? AND status<>''").run(toGroup);
   }
 
-  function saveTestLevel(input: { testId: string; data: TestLevelInput }, actor: Actor): IpcResult<TestLevel> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveTestLevel = writeCommand(db, 'saveTestLevel', 'admin', (w, input: { testId: string; data: TestLevelInput }): IpcResult<TestLevel> => {
     const testId = cleanId(input.testId);
     const test = db.prepare('SELECT id,name FROM tests WHERE id=?').get(testId) as { id: string; name: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
@@ -289,7 +286,7 @@ export function createCatalogConfigHandlers(db: Db) {
     // Trang "Lịch sử dữ liệu" đọc `mean_sd_history_json` — chốt giá trị CŨ
     // vào lịch sử trước khi ghi đè, không âm thầm mất dấu vết thay đổi target.
     const today = isoLocalDate();
-    const saved = inTransaction(() => {
+    const saved = w.commit((tx) => {
       if (existing) {
         const lotChanged = existing.qc_lot_id !== (qcLotId || null);
         const changed = lotChanged || existing.mean !== mean || existing.sd !== sd || existing.low !== low || existing.high !== high;
@@ -324,12 +321,12 @@ export function createCatalogConfigHandlers(db: Db) {
       if (existing && qcLotId && existing.qc_lot_id && existing.qc_lot_id !== qcLotId) {
         syncLotGroupStatusAfterMove(existing.qc_lot_id, qcLotId, today);
       }
-      writeAudit(db, actor, existing ? 'Sửa mức QC' : 'Thêm mức QC', `Mức ${level} của xét nghiệm "${test.name}": Mean=${mean ?? '—'} SD=${sd ?? '—'}`, test.name);
+      tx.audit(existing ? 'Sửa mức QC' : 'Thêm mức QC', `Mức ${level} của xét nghiệm "${test.name}": Mean=${mean ?? '—'} SD=${sd ?? '—'}`, test.name);
+      tx.changed(['test_levels', 'lot_groups', 'planned_targets'], [testId]);
       return db.prepare('SELECT * FROM test_levels WHERE id=?').get(levelId);
     });
-    notifyChanged(['test_levels', 'lot_groups', 'planned_targets'], [testId]);
     return { ok: true, data: saved };
-  }
+  });
 
   /** Phạm vi áp dụng (within/across) từng luật, theo xét nghiệm — lưu ở
    * `tests.rule_scopes_json` và được Entry/Westgard thực thi. Chuỗi rỗng xoá
@@ -348,21 +345,20 @@ export function createCatalogConfigHandlers(db: Db) {
     );
   }
 
-  function saveRuleScope(testId: string, ruleId: string, scope: RuleScope | '', actor: Actor): IpcResult<{ ruleId: string; scope: RuleScope | '' }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const saveRuleScope = writeCommand(db, 'saveRuleScope', 'admin', (w, testId: string, ruleId: string, scope: RuleScope | ''): IpcResult<{ ruleId: string; scope: RuleScope | '' }> => {
     const test = db.prepare('SELECT id, name, rule_scopes_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_scopes_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (scope !== '' && !isAllowedRuleScope(ruleId, scope)) return { ok: false, error: { code: 'invalid-scope', message: 'Phạm vi này không được hỗ trợ bởi luật Westgard đã chọn.' } };
     const overrides: RuleScopesMap = parseRuleScopes(test.rule_scopes_json);
     if (scope) overrides[ruleId] = scope; else delete overrides[ruleId];
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('UPDATE tests SET rule_scopes_json=? WHERE id=?').run(serializeRuleScopes(overrides), testId);
-      writeAudit(db, actor, 'Sửa phạm vi luật Westgard', `Luật ${ruleId} chuyển thành ${scope ? `phạm vi ${scope}` : 'phạm vi SOP khuyến nghị'}`, test.name);
+      tx.audit('Sửa phạm vi luật Westgard', `Luật ${ruleId} chuyển thành ${scope ? `phạm vi ${scope}` : 'phạm vi SOP khuyến nghị'}`, test.name);
+      tx.changed(['tests'], [testId]);
     });
-    notifyChanged(['tests'], [testId]);
     return { ok: true, data: { ruleId, scope } };
-  }
+  });
 
   function listPanels() {
     const panels = db.prepare('SELECT * FROM qc_panels ORDER BY name').all() as Omit<QcPanel, 'testIds'>[];
@@ -373,8 +369,7 @@ export function createCatalogConfigHandlers(db: Db) {
     return panels.map(p => ({ ...p, testIds: (db.prepare('SELECT test_id FROM qc_panel_tests WHERE panel_id=? ORDER BY position, rowid').all(p.id) as { test_id: string }[]).map(r => r.test_id) }));
   }
 
-  function savePanel(input: { id?: string; data: PanelInput }, actor: Actor): IpcResult<QcPanel> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const savePanel = writeCommand(db, 'savePanel', 'admin', (w, input: { id?: string; data: PanelInput }): IpcResult<QcPanel> => {
     const id = input.id || '';
     const knownInstrumentIds = new Set((db.prepare('SELECT id FROM instruments').all() as { id: string }[]).map(r => r.id));
     const result = validatePanel(input.data, knownInstrumentIds);
@@ -409,7 +404,7 @@ export function createCatalogConfigHandlers(db: Db) {
     // ngăn trạng thái nửa vời nếu một insert bảng nối thất bại sau khi hàng
     // Panel đã cập nhật hoặc sau khi liên kết cũ đã bị xoá.
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         if (id) {
           db.prepare('UPDATE qc_panels SET name=?,instrument_id=?,note=?,active=? WHERE id=?').run(name, instrumentId, note, active ? 1 : 0, id);
         } else {
@@ -421,15 +416,15 @@ export function createCatalogConfigHandlers(db: Db) {
         validTestIds.forEach((testId, position) => {
           db.prepare('INSERT INTO qc_panel_tests(panel_id,test_id,position) VALUES (?,?,?)').run(panelId, testId, position);
         });
-        writeAudit(db, actor, id ? 'Sửa Panel QC' : 'Thêm Panel QC', `Panel "${name}" (${validTestIds.length} xét nghiệm)`, name);
+        tx.audit(id ? 'Sửa Panel QC' : 'Thêm Panel QC', `Panel "${name}" (${validTestIds.length} xét nghiệm)`, name);
+        tx.changed(['qc_panels', 'qc_panel_tests']);
       });
     } catch (e) {
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu Panel QC thất bại.' } };
     }
-    notifyChanged(['qc_panels', 'qc_panel_tests']);
     const panelRow = db.prepare('SELECT * FROM qc_panels WHERE id=?').get(panelId) as Omit<QcPanel, 'testIds'>;
     return { ok: true, data: { ...panelRow, testIds: validTestIds } };
-  }
+  });
 
 
   /** Chỉ xoá cấu hình xét nghiệm hoàn toàn mới, chưa phát sinh dữ liệu.
@@ -437,8 +432,7 @@ export function createCatalogConfigHandlers(db: Db) {
    * hồ sơ NCE đều là hồ sơ chất lượng phải giữ lại. Khi đã có một trong các
    * dấu vết đó, đường đúng là chuyển xét nghiệm sang `active=0`; tuyệt đối
    * không xoá dữ liệu để làm biến mất lịch sử. */
-  function removeTest(input: { id: unknown; ids?: unknown }, actor: Actor): IpcResult<{ id: string; pointsCount: number }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removeTest = writeCommand(db, 'removeTest', 'admin', (w, input: { id: unknown; ids?: unknown }): IpcResult<{ id: string; pointsCount: number }> => {
     const id = String(input.id || '');
     const ids = [...new Set([id, ...(Array.isArray(input.ids) ? input.ids.map(String) : [])].filter(Boolean))];
     const placeholders = ids.map(() => '?').join(',');
@@ -465,22 +459,21 @@ export function createCatalogConfigHandlers(db: Db) {
       };
     }
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         db.prepare(`DELETE FROM test_levels WHERE test_id IN (${existingPlaceholders})`).run(...existingIds);
         db.prepare(`DELETE FROM qc_panel_tests WHERE test_id IN (${existingPlaceholders})`).run(...existingIds);
         db.prepare(`DELETE FROM tests WHERE id IN (${existingPlaceholders})`).run(...existingIds);
-        writeAudit(db, actor, 'Xoá xét nghiệm', `Xoá cấu hình chưa phát sinh dữ liệu "${existing.name}" trên ${existingIds.length} máy`, existing.name);
+        tx.audit('Xoá xét nghiệm', `Xoá cấu hình chưa phát sinh dữ liệu "${existing.name}" trên ${existingIds.length} máy`, existing.name);
+        tx.changed(['tests', 'test_levels', 'qc_panels'], existingIds);
       });
     } catch (e) {
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá xét nghiệm thất bại.' } };
     }
-    notifyChanged(['tests', 'test_levels', 'qc_panels'], existingIds);
     return { ok: true, data: { id, pointsCount: 0 } };
-  }
+  });
 
 
-  function removePanel(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const removePanel = writeCommand(db, 'removePanel', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name FROM qc_panels WHERE id=?').get(id) as { id: string; name: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy Panel QC.' } };
@@ -492,17 +485,17 @@ export function createCatalogConfigHandlers(db: Db) {
       };
     }
     try {
-      inTransaction(() => {
+      w.commit((tx) => {
         db.prepare('DELETE FROM qc_panel_tests WHERE panel_id=?').run(id);
         db.prepare('DELETE FROM qc_panels WHERE id=?').run(id);
-        writeAudit(db, actor, 'Xoá Panel QC', `Xoá Panel QC "${existing.name}"`, existing.name);
+        tx.audit('Xoá Panel QC', `Xoá Panel QC "${existing.name}"`, existing.name);
+        tx.changed(['qc_panels']);
       });
     } catch (e) {
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá Panel QC thất bại.' } };
     }
-    notifyChanged(['qc_panels']);
     return { ok: true, data: { id } };
-  }
+  });
 
   return { listInstruments, saveInstrument, removeInstrument, listTests, saveTest, listTestLevels, saveTestLevel, listRuleScopes, saveRuleScope, listPanels, savePanel, removeTest, removePanel };
 }

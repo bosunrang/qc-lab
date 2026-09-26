@@ -12,7 +12,8 @@ import { SCHEMA_VERSION, seedInitialRows } from '../db/schema';
 import { openExistingDatabase } from '../db/open-database';
 import { listTableNames, restoreAllTables, restoreAllTablesFromFile, vacuumInto, writeSafetySnapshot } from '../db/table-io';
 import { BACKUP_FILE_FORMAT, BACKUP_FILE_FORMAT_VERSION, validateBackupEnvelope, type BackupEnvelope } from '../domain/backup';
-import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { type Actor, type IpcResult, nowIso, requireAdmin } from './shared';
+import { writeCommand } from './write-command';
 
 /** Ngưỡng chỉ còn áp cho tệp backup JSON cũ: phải đọc cả tệp thành chuỗi. */
 const LEGACY_JSON_MAX_BYTES = 128 * 1024 * 1024;
@@ -138,8 +139,9 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
    *
    * Ghi ra tệp tạm cạnh đích rồi mới đổi tên, để một lần xuất hỏng giữa chừng
    * không để lại tệp dở dang mang đúng tên người dùng đã chọn. */
-  function exportBackupTo(filePath: string, actor: Actor): IpcResult<{ path: string; bytes: number; points: number }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  // VACUUM INTO không chạy được trong transaction: tệp được chép TRƯỚC,
+  // `w.commit()` chỉ ghi mốc sao lưu và nhật ký.
+  const exportBackupTo = writeCommand(db, 'exportBackupTo', 'admin', (w, filePath: string): IpcResult<{ path: string; bytes: number; points: number }> => {
     const partial = `${filePath}.partial-${Date.now()}`;
     try {
       vacuumInto(db, partial);
@@ -163,13 +165,15 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     const points = Number((db.prepare('SELECT COUNT(*) AS n FROM qc_points').get() as { n: number }).n);
     // Mốc sao lưu gần nhất + kích thước để trang Cài đặt nhắc "Chưa sao lưu
     // trên máy này." / "Sao lưu gần nhất: N ngày trước."
-    withTransaction(db, () => {
+    w.commit((tx) => {
       setMeta('lastBackupAt', nowIso());
       setMeta('lastBackupBytes', String(bytes));
-      writeAudit(db, actor, 'Xuất backup', `Xuất backup ${(bytes / 1024 / 1024).toFixed(1)} MB, ${points} điểm QC`, '');
+      tx.audit('Xuất backup', `Xuất backup ${(bytes / 1024 / 1024).toFixed(1)} MB, ${points} điểm QC`, '');
+      // Trước đây thiếu: trang Cài đặt đang mở không biết mốc sao lưu đã đổi.
+      tx.changed(['app_meta']);
     });
     return { ok: true, data: { path: filePath, bytes, points } };
-  }
+  });
 
   /** Trạng thái sao lưu cho panel "Quản trị dữ liệu" — đọc, không ghi. */
   function backupStatus(): { lastBackupAt: string | null; lastBackupBytes: number } {
@@ -193,8 +197,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
   /** Phục hồi TOÀN BỘ dữ liệu từ tệp backup. Kiểm tra lại tệp ngay trước khi
    * ghi (tệp có thể đã đổi từ lúc người dùng xác nhận) và luôn chốt một bản
    * an toàn của dữ liệu hiện tại trước. */
-  function importBackupFrom(filePath: string, actor: Actor): IpcResult<{ preRestoreSnapshotPath: string }> {
-    if (actor.role !== 'admin') return fail('forbidden', 'Chỉ quản trị viên mới được phục hồi từ backup.');
+  const importBackupFrom = writeCommand(db, 'importBackupFrom', (actor) => (actor.role === 'admin' ? null : { ok: false as const, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được phục hồi từ backup.' } }), (w, filePath: string): IpcResult<{ preRestoreSnapshotPath: string }> => {
     const inspected = inspectBackupFile(filePath);
     if (!inspected.ok) return fail(inspected.code, inspected.message);
 
@@ -211,13 +214,17 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     } catch (e) {
       return fail('restore-failed', e instanceof Error ? e.message : 'Phục hồi thất bại.');
     }
-    writeAudit(db, actor, 'Phục hồi từ backup', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
-    // Phục hồi thay đổi GẦN NHƯ MỌI bảng cùng lúc — báo rộng hơn thường lệ
-    // (writeAudit() chỉ tự báo 'activity') để mọi trang đang mở refetch lại
-    // đúng, không cần khởi động lại app mới thấy dữ liệu đã phục hồi.
-    notifyChanged(listTableNames(db));
+    // Phần phục hồi đã tự chạy trong transaction của tầng CSDL (bản SQLite dùng
+    // ATTACH, không mở được bên trong transaction khác); lần ghi này chỉ còn
+    // nhật ký và lời báo. Phục hồi thay đổi GẦN NHƯ MỌI bảng cùng lúc — báo
+    // rộng hơn thường lệ để mọi trang đang mở refetch lại đúng, không cần khởi
+    // động lại app mới thấy dữ liệu đã phục hồi.
+    w.commit((tx) => {
+      tx.audit('Phục hồi từ backup', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
+      tx.changed(listTableNames(db));
+    });
     return { ok: true, data: { preRestoreSnapshotPath: snapshotPath } };
-  }
+  });
 
   /** "Xóa sạch dữ liệu test" — xoá dữ liệu VẬN HÀNH, giữ lại tài khoản và
    * nhật ký hoạt động. Ánh xạ đúng `ResetOperationalDataCommand` hệ thống: mặc
@@ -228,8 +235,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
    * GIỮ `activity` + `app_meta` (gồm `activityAnchor`) là điều kiện để chuỗi
    * hash tamper-evident không bị phá: xoá nhật ký mà giữ anchor, hoặc ngược
    * lại, sẽ làm `verifyAuditChain()` báo sai ngay dòng đầu. */
-  function resetOperationalData(actor: Actor): IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }> {
-    const denied = requireAdmin(actor); if (denied) return denied;
+  const resetOperationalData = writeCommand(db, 'resetOperationalData', 'admin', (w): IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }> => {
     let snapshotPath: string;
     try {
       snapshotPath = writeSafetySnapshot(db, userDataDir, 'pre-reset-backup');
@@ -239,23 +245,25 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     const keep = new Set(['users', 'activity', 'app_meta', 'lab']);
     const cleared = listTableNames(db).filter((name) => !keep.has(name));
     try {
+      // PRAGMA foreign_keys không đổi được trong transaction nên bật/tắt ở ngoài.
       db.exec('PRAGMA foreign_keys=OFF');
-      withTransaction(db, () => {
+      w.commit((tx) => {
         // Xoá theo thứ tự NGƯỢC danh sách bảng để bảng con đi trước bảng cha,
         // cùng lý do với restoreAllTables() trong db/table-io.ts.
         for (const table of [...cleared].reverse()) db.prepare(`DELETE FROM ${table}`).run();
         db.prepare("UPDATE lab SET name='', dept='', address='', brand_title='QC Lab', brand_sub='Nội kiểm xét nghiệm', logo_text='QC', logo_data='' WHERE id=1").run();
         seedInitialRows(db);
+        // Nhật ký nay nằm CÙNG transaction với phần xoá (trước đây ghi sau).
+        tx.audit('Xoá sạch dữ liệu', `Xoá ${cleared.length} bảng dữ liệu vận hành (giữ tài khoản + nhật ký), bản an toàn tại ${snapshotPath}`, '');
+        tx.changed(listTableNames(db));
       });
     } catch (e) {
       return fail('reset-failed', e instanceof Error ? e.message : 'Xoá dữ liệu thất bại.');
     } finally {
       db.exec('PRAGMA foreign_keys=ON');
     }
-    writeAudit(db, actor, 'Xoá sạch dữ liệu', `Xoá ${cleared.length} bảng dữ liệu vận hành (giữ tài khoản + nhật ký), bản an toàn tại ${snapshotPath}`, '');
-    notifyChanged(listTableNames(db));
     return { ok: true, data: { preResetSnapshotPath: snapshotPath, clearedTables: cleared } };
-  }
+  });
 
   return { exportBackupTo, backupStatus, verifyBackupFile, importBackupFrom, resetOperationalData };
 }
