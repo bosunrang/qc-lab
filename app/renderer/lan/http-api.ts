@@ -1,4 +1,5 @@
 import type { QcApi } from '../../shared/qc-api';
+import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from '../lib/browser-export';
 
 async function request(path: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(path, { credentials: 'same-origin', headers: { 'content-type': 'application/json', ...(init?.headers || {}) }, ...init });
@@ -16,6 +17,10 @@ export function createLanHttpApi(): QcApi {
         const result = await request('/api/session') as { ok: boolean; data?: unknown };
         return result.ok ? result.data ?? null : null;
       };
+      // Xuất Excel/in PDF trên máy chính mở hộp thoại lưu tệp CỦA MÁY CHÍNH nên
+      // không mở qua LAN (`lan: false`); máy trạm tự làm bằng trình duyệt của nó.
+      if (property === 'exportTableXlsx') return exportTableXlsxInBrowser;
+      if (property === 'printHtmlToPdf') return ({ html }: { html: string }) => printHtmlToPdfInBrowser(html);
       if (property === 'getLoginBrand') return async () => request('/api/brand') as ReturnType<QcApi['getLoginBrand']>;
       return async (...args: unknown[]) => request('/api/rpc', { method: 'POST', body: JSON.stringify({ method: property, args }) });
     },
