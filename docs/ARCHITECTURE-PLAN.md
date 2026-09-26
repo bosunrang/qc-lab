@@ -35,6 +35,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | G.1 (nhánh `test/e2e-electron`) | `npm run test:e2e`: Playwright (`playwright-core`, không tải trình duyệt) chạy app Electron đã build trên thư mục dữ liệu tạm và cổng LAN trống (`QCLAB_USER_DATA_DIR`, `QCLAB_LAN_PORT`). 5 luồng ở `app/e2e/`: tài khoản; nhập điểm → vi phạm 1-3s → lập NCE → huỷ điểm; mở mọi trang không lỗi; máy trạm LAN nhập điểm, thao tác quản trị bị từ chối; liên kết TEa ra ngoài không mở cửa sổ app. Chạy trong `verify-release`. Kèm sửa: renderer nhận biết máy trạm LAN theo cổng 3200 gắn cứng, nay theo cách được phục vụ (bản build qua HTTP, không có preload) |
 | E.6 bước 1–2, D.1 phần dữ liệu QC (nhánh `perf/fewer-summary-reloads`) | `entry-store` không tự nạp lại sau nhập/huỷ điểm và sửa ghi chú ngày (EntryPage đã nạp lại qua `useStoreInvalidation`); dải QC giữ nguyên trong lúc nạp lại cùng mức, không chớp trống. Tổng quan nghe danh sách bảng tường minh thay cho `activity`. Nhập một điểm: `listTestSummaries` 2 → 1 lần, nạp dữ liệu xét nghiệm 2 → 1 lần; thao tác không liên quan QC không còn làm Tổng quan tính lại. Test `e2e/reload-count.e2e.mjs` đếm lời gọi IPC ở main |
 | D.6 (nhánh `refactor/split-entry-page`) | `EntryPage.tsx` 1.068 → 334 dòng, chỉ điều phối dữ liệu; khối hiển thị ở `pages/entry/`: `EntryTree`, `EntrySheet`, `EntryLjPanel`, `EntryPointsPanel`, `EntryRangePanel` (bọc `memo`), `VoidPointModal`, `RangeWorkflowModal` (tự giữ form), `operational.ts`, `shared.tsx`. Cột dựng bằng `useMemo`, callback bằng `useCallback`, store đọc bằng `useShallow` (D.2 cho trang này). Test đọc mã chuyển sang đọc gộp trang và thư mục con (`tests/helpers/entry-page-source.mjs`). Chưa đo số lần render bằng công cụ; hiệu quả `memo` suy từ cấu trúc props |
+| C.1 phần tách tệp (nhánh `refactor/split-config-handlers`) | `config-handlers.ts` 1.358 → 23 dòng, chỉ ghép ba nhóm: `config-catalog-handlers.ts` (máy, xét nghiệm, mức QC, phạm vi luật, Panel), `config-lot-handlers.ts` (lô, nhóm lô, Mean/SD dự kiến, chuyển tiếp lô), `config-tea-handlers.ts` (TEa). `lotGroupInUse` chuyển xuống `db/lot-groups.ts`. Tách thuần: đối chiếu từng dòng thân hàm với bản gốc, chỉ khác đúng hàm vừa chuyển; 34 hàm xuất ra giữ nguyên |
 
 ## Thứ tự đề xuất
 
@@ -159,10 +160,11 @@ app chỉ báo "Lỗi đồng bộ tự động".
 
 ## C. Tái cấu trúc main process
 
-1. **Tách `ipc/config-handlers.ts` (1.370 dòng, khoảng 8 miền)** thành
-   máy/xét nghiệm, lô/nhóm lô/chuyển lô, TEa tham chiếu. Logic kích hoạt nhóm
-   lô (khoảng 110 dòng) và cascade chuyển lô (khoảng 130 dòng) chuyển xuống
-   `domain/` hoặc `db/`.
+1. **Tách `ipc/config-handlers.ts`** — phần tách tệp đã xong, xem bảng "Đã
+   xong". Còn lại: logic kích hoạt nhóm lô (`activateLotGroup`, khoảng 110
+   dòng) và cascade chuyển lô (`createLotTransition`, khoảng 130 dòng) vẫn
+   nằm trong `config-lot-handlers.ts`, chưa chuyển xuống `domain/` hoặc `db/`;
+   và thống nhất kiểu báo lỗi transaction (xem C.3).
 2. ~~**`isPeriodLocked` có 3 bản**~~ — đã xong, xem bảng "Đã xong".
 3. ~~**Khối BEGIN/COMMIT viết tay**~~ — đã xong, xem bảng "Đã xong". Còn lại
    hai kiểu báo lỗi: phần lớn handler cấu hình bắt lỗi transaction thành
