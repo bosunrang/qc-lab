@@ -5,12 +5,10 @@
 export interface LanNetworkAddress { family: string; address: string; internal: boolean }
 export type LanNetworkInterfaces = Record<string, readonly LanNetworkAddress[] | undefined>;
 
-export function lanAddresses(port: number, interfaces: LanNetworkInterfaces): string[] {
+export function lanIpv4(interfaces: LanNetworkInterfaces): string[] {
   const addresses = Object.values(interfaces)
     .flatMap((items) => items || [])
     .filter((item) => item.family === 'IPv4' && !item.internal && item.address)
-    .map((item) => `http://${item.address}:${port}`);
+    .map((item) => item.address);
   return [...new Set(addresses)];
 }
-
-

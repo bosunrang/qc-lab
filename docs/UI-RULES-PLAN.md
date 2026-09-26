@@ -43,7 +43,7 @@ Người dùng tự kiểm tra giao diện; không dùng bản xem trước tron
 
 ## Việc ngoài giao diện đang chờ
 
-- LAN vẫn chạy HTTP thường: cần quyết định có dùng HTTPS (chứng chỉ tự ký
-  hoặc CA nội bộ) hay không.
+- ~~LAN vẫn chạy HTTP thường~~ — đã chuyển sang HTTPS bằng CA do app tạo
+  (2026-09-26), xem `docs/ARCHITECTURE-PLAN.md`.
 - Một số câu thông báo trong test cũ còn viết không dấu (ví dụ
   `auth-handlers.test.mjs`); có thể thêm dấu nếu muốn.
