@@ -423,7 +423,9 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-form-section { margin-bottom: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .tea-form-section-last { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .tea-form-section > b { display: block; margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--text-base); }
-.tea-form-primary { display: grid; grid-template-columns: minmax(160px,1fr) 72px 88px minmax(185px,1.15fr); gap: var(--field-gap); }
+.tea-form-label-note { color: var(--text-tertiary); font-weight: var(--weight-normal); }
+.tea-form-primary { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,.7fr) minmax(0,.9fr); gap: var(--field-gap); }
+.tea-form-source { grid-column: 1 / -1; }
 .tea-form-primary .field, .tea-form-dates .field, .tea-form-people .field { margin: 0; }
 .tea-form-section > .field + .field { margin-top: var(--field-gap); }
 .tea-form-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
