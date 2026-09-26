@@ -90,10 +90,12 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
 // Xuất CSV phải có BOM UTF-8. Blob `type: text/csv;charset=utf-8` KHÔNG đủ:
 // Excel trên Windows đoán mã hoá theo codepage hệ thống khi mở tệp cục bộ,
 // thiếu BOM thì toàn bộ tiếng Việt trong báo cáo mở ra là ký tự rác.
+// Từ 2026-09-26 mọi trang đi qua `downloadCsv()`; BOM được kiểm bằng hành vi ở
+// `csv-download.test.mjs`, ở đây chỉ còn kiểm Báo cáo dùng đúng hàm đó.
 {
   const { readFileSync } = await import('node:fs');
   const page = readFileSync(new URL('../renderer/pages/ReportPage.tsx', import.meta.url), 'utf8');
-  assert.match(page, /new Blob\(\['\ufeff', content\], \{ type \}\)/, 'CSV phải ghi kèm BOM UTF-8');
+  assert.ok(page.includes("downloadCsv(lines.join('\\n'), `bao-cao-${stamp()}.csv`)"), 'CSV phải xuất qua downloadCsv() để có BOM');
   // Tên tệp theo tên xét nghiệm, không phải uid — đây là hồ sơ đem lưu.
   assert.match(page, /selected\?\.testName \|\| 'xet-nghiem'/);
   assert.doesNotMatch(page, /`\$\{selectedId\}-\$\{isoToday\(\)\}`/, 'không đặt tên tệp bằng testId');

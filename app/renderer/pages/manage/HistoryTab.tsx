@@ -7,6 +7,11 @@ import { EmptyState } from './shared';
 import { observedStats } from '../../../main/domain/observed-stats';
 import { pointTarget } from '../../../main/domain/westgard-engine';
 
+/** Số điểm mỗi trang trong hộp thoại chi tiết lô. Một lô chạy 2 lần/ngày
+ * trong 6 tháng có khoảng 360 điểm mỗi mức; vẽ hết một lần làm hộp thoại mở
+ * chậm và khó dò (kế hoạch kiến trúc D.11). */
+const HISTORY_POINT_PAGE = 100;
+
 type HistoryEntry = {
   at?: string; mean: number | null; sd: number | null; qcLotId: string | null;
   lot?: string; low?: number | null; high?: number | null;
@@ -76,6 +81,9 @@ export function HistoryTab() {
   const [testId, setTestId] = useState('');
   const [points, setPoints] = useState<HistoryQcPointView[]>([]);
   const [detail, setDetail] = useState<HistoryRow | null>(null);
+  const [detailPage, setDetailPage] = useState(1);
+  // Mở một lô khác thì về trang đầu của lô đó.
+  useEffect(() => { setDetailPage(1); }, [detail?.key]);
   const [query, setQuery] = useState('');
 
   useEffect(() => { if (!testId && tests.length) setTestId(tests[0].id); }, [testId, tests]);
@@ -198,6 +206,8 @@ export function HistoryTab() {
       {detail && (() => {
         const historyEntries = rows.filter((row) => row.level === detail.level && row.lotId === detail.lotId);
         const detailPoints = pointsOf(detail);
+        const detailPageCount = Math.max(1, Math.ceil(detailPoints.length / HISTORY_POINT_PAGE));
+        const detailPageClamped = Math.min(Math.max(1, detailPage), detailPageCount);
         return (
           <Modal
             title={`${selectedTest?.name || ''}${selectedInstrument?.name ? ` · ${selectedInstrument.name}` : ''} · Mức ${detail.level}${detail.lotNo ? ` · Lô ${detail.lotNo}` : ''}`}
@@ -226,10 +236,11 @@ export function HistoryTab() {
               </table>
             ) : <EmptyState title="Chưa có mốc Mean/SD">Không tìm thấy lịch sử Mean/SD cho lô này.</EmptyState>}
             <h4 className="flow-panel space-after-section">Điểm QC đã nhập ({detailPoints.length})</h4>
-            {detailPoints.length ? (
+            {detailPoints.length ? (<>
               <table className="history-detail-table hist-points-table">
                 <thead><tr><th>Ngày</th><th>Lần chạy</th><th className="num">Giá trị</th><th className="num">Z</th><th className="num">Mean lúc nhập</th><th className="num">SD lúc nhập</th><th>Phân loại Z-score</th><th>Người thực hiện</th></tr></thead>
-                <tbody>{detailPoints.slice().sort((a, b) => a.date.localeCompare(b.date) || String(a.run_id).localeCompare(String(b.run_id), 'vi', { numeric: true })).map((point) => {
+                <tbody>{detailPoints.slice().sort((a, b) => a.date.localeCompare(b.date) || String(a.run_id).localeCompare(String(b.run_id), 'vi', { numeric: true }))
+                  .slice((detailPageClamped - 1) * HISTORY_POINT_PAGE, detailPageClamped * HISTORY_POINT_PAGE).map((point) => {
                   // Cùng quy tắc với kết luận Westgard: Mean/SD chốt lúc nhập chỉ
                   // dùng khi có đủ cả cặp. Trước đây lấy `qc_mean` và `qc_sd`
                   // độc lập, nên cùng một điểm có thể ra Z khác trang Nhập QC.
@@ -255,7 +266,17 @@ export function HistoryTab() {
                   );
                 })}</tbody>
               </table>
-            ) : <EmptyState title="Chưa có điểm QC">Không có điểm QC nào khớp với lô/mức này.</EmptyState>}
+              {detailPageCount > 1 && (
+                <div className="table-pagination">
+                  <span className="hint">Hiển thị {(detailPageClamped - 1) * HISTORY_POINT_PAGE + 1}–{Math.min(detailPageClamped * HISTORY_POINT_PAGE, detailPoints.length)} / {detailPoints.length} điểm</span>
+                  <div>
+                    <button type="button" className="btn ghost sm" disabled={detailPageClamped <= 1} onClick={() => setDetailPage(detailPageClamped - 1)}>‹ Trước</button>
+                    <b>Trang {detailPageClamped}/{detailPageCount}</b>
+                    <button type="button" className="btn ghost sm" disabled={detailPageClamped >= detailPageCount} onClick={() => setDetailPage(detailPageClamped + 1)}>Sau ›</button>
+                  </div>
+                </div>
+              )}
+            </>) : <EmptyState title="Chưa có điểm QC">Không có điểm QC nào khớp với lô/mức này.</EmptyState>}
           </Modal>
         );
       })()}

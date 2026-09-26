@@ -31,4 +31,37 @@ export default [
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  // Ranh giới renderer ↔ main (kế hoạch kiến trúc D.12). Renderer chỉ được
+  // dùng hàm thuần của `main/domain`, không import handler, CSDL, Electron hay
+  // builtin của Node. Riêng bản xem trước (`browser-mock/`) cố ý chạy handler
+  // thật trên sql.js nên được miễn.
+  {
+    files: ['app/renderer/**/*.{ts,tsx}'],
+    ignores: ['app/renderer/browser-mock/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{ name: 'electron', message: 'Renderer không dùng Electron trực tiếp; gọi qua window.qcApi.' }],
+        patterns: [
+          { group: ['**/main/ipc/**', '**/main/db/**', '**/main/lan/**', '**/main/logging/**', '**/main/index', '**/main/preload'], message: 'Renderer chỉ được import hàm thuần của main/domain; dữ liệu đi qua window.qcApi.' },
+          { group: ['node:*'], message: 'Renderer chạy trong trình duyệt/sandbox, không có builtin của Node.' },
+        ],
+      }],
+    },
+  },
+  // `main/domain` là hàm thuần dùng chung với renderer và bản xem trước:
+  // không phụ thuộc handler, CSDL, Electron hay I/O. `node:crypto`/`node:util`
+  // được phép vì đã có bản thay thế cho trình duyệt (`*-browser.ts`, alias ở
+  // vite.app-renderer.config.mjs).
+  {
+    files: ['app/main/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{ name: 'electron', message: 'main/domain phải là hàm thuần, không dùng Electron.' }],
+        patterns: [
+          { group: ['../ipc/**', '../db/**', '../lan/**', '../logging/**', '../index', '../preload'], message: 'main/domain không được phụ thuộc handler, CSDL hay tầng vận hành.' },
+          { group: ['node:*', '!node:crypto', '!node:util'], message: 'main/domain không làm I/O; chỉ node:crypto/node:util có bản thay thế cho trình duyệt.' },
+        ],
+      }],
+    },
+  },
 ];

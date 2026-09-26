@@ -239,6 +239,11 @@ tbody tr{height:var(--table-row-h);background:var(--surface);transition:backgrou
 tbody tr:hover{background:var(--accent-surface-tint);}
 tbody tr:last-child td{border-bottom:none;}
 td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700;}
+/* Thanh phân trang dưới bảng dài (Nhật ký hoạt động, điểm QC của lô trong
+   Lịch sử dữ liệu): số dòng bên trái, nút Trước/Sau và số trang bên phải. */
+.table-pagination{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin:var(--space-3) var(--space-4) var(--space-4);}
+.table-pagination > div{display:flex;align-items:center;gap:var(--space-2);}
+.table-pagination b{min-width:82px;color:var(--text-tertiary);font-size:var(--text-sm);font-weight:var(--weight-bold);text-align:center;}
 
 
 
