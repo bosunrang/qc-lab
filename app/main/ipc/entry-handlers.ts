@@ -27,7 +27,8 @@ import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDateAfter } from '../domain/local-date';
 import { initialsFromName } from '../domain/name-initials';
 import { nextNceId } from '../db/nce-ids';
-import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
+import { type Actor, type IpcResult, nowIso } from './shared';
+import { writeCommand } from './write-command';
 
 interface QcPointRow {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
@@ -51,7 +52,6 @@ export interface RangeCandidateView {
 
 
 export function createEntryHandlers(db: Db) {
-  const inTransaction = <T>(work: () => T): T => withTransaction(db, work);
 
 
   /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
@@ -292,8 +292,8 @@ export function createEntryHandlers(db: Db) {
       .run(id, now.slice(0, 10), now, now, actor.userId, actor.username, testId, level, lot, rule, '', nceId, JSON.stringify({ correction: reason, rangeWorkflow: true, ...detail }));
   }
 
-  function applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }, actor: Actor): IpcResult<RangeCandidateView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const applyLabRange = writeCommand(db, 'applyLabRange', 'write', (w, input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): IpcResult<RangeCandidateView> => {
+    const actor = w.actor;
     const reason = validateRangeReason(input.data?.reason, 10);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do thiết lập dải tối thiểu 10 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
@@ -324,21 +324,21 @@ export function createEntryHandlers(db: Db) {
       effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
     }, changedAt);
     const mfgMean = row.mfg_mean ?? row.mean, mfgSd = row.mfg_sd ?? row.sd;
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
       const selection = manual ? 'chỉnh thủ công' : 'dải đề xuất';
       createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Thiết lập dải QC mới', reason, actor, {
         selection, proposed: fresh.data.proposed, applied: p,
       });
-      writeAudit(db, actor, 'Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
+      tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
+      tx.changed(['test_levels', 'actions'], [fresh.data.testId]);
     });
-    notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
     return rangeCandidate(fresh.data.testId, fresh.data.level);
-  }
+  });
 
-  function revertManufacturerRange(input: { data: { testId: string; level: number; reason: string } }, actor: Actor): IpcResult<RangeCandidateView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const revertManufacturerRange = writeCommand(db, 'revertManufacturerRange', 'write', (w, input: { data: { testId: string; level: number; reason: string } }): IpcResult<RangeCandidateView> => {
+    const actor = w.actor;
     const reason = validateRangeReason(input.data?.reason, 5);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do hoàn dải tối thiểu 5 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
@@ -353,18 +353,18 @@ export function createEntryHandlers(db: Db) {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
       effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
     }, changedAt);
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
       createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor, { selection: 'nhà sản xuất', applied: { mean: m, sd } });
-      writeAudit(db, actor, 'Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
+      tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
+      tx.changed(['test_levels', 'actions'], [fresh.data.testId]);
     });
-    notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
     return rangeCandidate(fresh.data.testId, fresh.data.level);
-  }
+  });
 
-  function addPoint(input: { data: QcPointInput }, actor: Actor): IpcResult<QcPointView> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const addPoint = writeCommand(db, 'addPoint', 'write', (w, input: { data: QcPointInput }): IpcResult<QcPointView> => {
+    const actor = w.actor;
     const knownLevels = (db.prepare('SELECT level FROM test_levels WHERE test_id=?').all(String(input.data.testId || '')) as { level: number }[]).map(r => r.level);
     const result = validateQcPointInput(input.data, knownLevels);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
@@ -408,13 +408,14 @@ export function createEntryHandlers(db: Db) {
     const id = uid();
     let view: QcPointView | undefined;
     try {
-      view = inTransaction(() => {
+      view = w.commit((tx) => {
         const savedInitials = (db.prepare('SELECT initials FROM users WHERE id=?').get(actor.userId) as { initials: string } | undefined)?.initials || '';
         const operatorCode = operatorName || savedInitials || initialsFromName(actor.name);
         db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,lot,val,value_decimals,qc_mean,qc_sd,note,operator_id,operator_username,operator_name,operator_code)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(id, testId, level, date, runId, targetLot, val, test.decimal_places ?? 2, targetMean, targetSd, note || dayNoteRow?.note || '', actor.userId, actor.username, operatorName || actor.name, operatorCode);
-        writeAudit(db, actor, 'Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}`, test.name);
+        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}`, test.name);
+        tx.changed(['qc_points'], [testId]);
         const pointView = parallel
           ? listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id)
           : queryPoints(testId, level).find((point) => point.id === id);
@@ -427,14 +428,13 @@ export function createEntryHandlers(db: Db) {
       }
       throw error;
     }
-    notifyChanged(['qc_points'], [testId]);
     return { ok: true, data: view };
-  }
+  });
 
   /** Hủy điểm QC. "kind" (nguyên nhân hủy) quyết định có tự mở/dùng lại hồ
    * sơ NCE hay không (`voidNceChoice()`). */
-  function voidPoint(input: { data: VoidPointInput }, actor: Actor): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }> => {
+    const actor = w.actor;
     const result = validateVoidInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { pointId, reason, kind, openNce } = result.data;
@@ -463,10 +463,10 @@ export function createEntryHandlers(db: Db) {
     const qcVerdict = view && (view.verdict === 'warn' || view.verdict === 'rej') ? view.verdict : 'invalid';
     const kindLabel = kind === 'analytical' ? 'Kết quả QC thực tế không hợp lệ' : kind === 'data-entry' ? 'Nhập sai dữ liệu' : '';
     const composedReason = kindLabel ? (reason ? `${kindLabel} — ${reason}` : kindLabel) : reason;
-    const mutation = inTransaction(() => {
+    const mutation = w.commit((tx) => {
       db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=? WHERE id=?')
         .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, pointId);
-      writeAudit(db, actor, 'Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}`, test ? test.name : '');
+      tx.audit('Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}`, test ? test.name : '');
       let nceId: string | null = null, reusedAction = false, createdAction = false;
       if (openNce) {
         // Dùng lại hồ sơ NCE ĐANG MỞ của CHÍNH điểm này nếu có (chưa huỷ,
@@ -484,21 +484,20 @@ export function createEntryHandlers(db: Db) {
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,3,'pending','pending','active',?,?)`)
       .run(id, point.date, now, now, actor.userId, actor.username, point.test_id, point.level, point.lot, pointId, rule, errorClass(rules), qcVerdict, nceId, dueDate,
               JSON.stringify({ correction, openedFromVoid: true }));
-          writeAudit(db, actor, 'Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ hủy điểm QC`, test ? test.name : '');
+          tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ hủy điểm QC`, test ? test.name : '');
           createdAction = true;
         }
       }
-      return { nceId, reusedAction, createdAction };
+      tx.changed(createdAction ? ['qc_points', 'actions'] : ['qc_points'], [point.test_id]);
+      return { nceId, reusedAction };
     });
-    notifyChanged(mutation.createdAction ? ['qc_points', 'actions'] : ['qc_points'], [point.test_id]);
     return { ok: true, data: { id: pointId, nceId: mutation.nceId, reusedAction: mutation.reusedAction } };
-  }
+  });
 
   /** Ghi chú theo ngày (cột "Ghi chú" của bảng nhập QC). Không có bảng riêng;
    * ghi chú nằm ở trường `note` của mọi điểm QC còn hiệu lực trong ngày, nên
    * ngày chưa có điểm nào thì không lưu được (`no-points`). */
-  function setDayNote(input: { data: { testId: string; date: string; note: string } }, actor: Actor): IpcResult<{ note: string; updated: number }> {
-    const denied = requireWrite(actor); if (denied) return denied;
+  const setDayNote = writeCommand(db, 'setDayNote', 'write', (w, input: { data: { testId: string; date: string; note: string } }): IpcResult<{ note: string; updated: number }> => {
     const testId = String(input.data?.testId || '').trim();
     const date = String(input.data?.date || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: { code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' } };
@@ -508,13 +507,13 @@ export function createEntryHandlers(db: Db) {
     const note = String(input.data?.note ?? '').slice(0, 1000).trim();
     const rows = db.prepare('SELECT id FROM qc_points WHERE test_id=? AND date=? AND voided=0').all(testId, date) as { id: string }[];
     if (!rows.length) return { ok: false, error: { code: 'no-points', message: 'Ngày này chưa có điểm QC nào để gắn ghi chú.' } };
-    inTransaction(() => {
+    w.commit((tx) => {
       db.prepare('UPDATE qc_points SET note=? WHERE test_id=? AND date=? AND voided=0').run(note, testId, date);
-      writeAudit(db, actor, 'Ghi chú QC', `Ngày ${date}${note ? ' · ' + note : ' · xoá ghi chú'}`, test.name);
+      tx.audit('Ghi chú QC', `Ngày ${date}${note ? ' · ' + note : ' · xoá ghi chú'}`, test.name);
+      tx.changed(['qc_points'], [testId]);
     });
-    notifyChanged(['qc_points'], [testId]);
     return { ok: true, data: { note, updated: rows.length } };
-  }
+  });
 
   return { queryPoints, listHistoryPoints, listVoidedPoints, listParallelColumns, listPreviousLotSeries, rangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote };
 }

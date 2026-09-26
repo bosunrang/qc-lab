@@ -71,4 +71,25 @@ export default [
       }],
     },
   },
+  // Handler ghi dữ liệu đi qua `writeCommand()` (`app/main/ipc/write-command.ts`):
+  // quyền → kiểm dữ liệu → transaction → nhật ký → báo thay đổi được ép bằng
+  // mã, không còn là quy ước. Gọi thẳng các bước đó trong handler là bỏ qua
+  // cổng. Danh sách `ignores` là các tệp CHƯA chuyển; chuyển xong tệp nào thì
+  // gỡ tệp đó khỏi danh sách.
+  {
+    files: ['app/main/ipc/*-handlers.ts'],
+    ignores: [
+      'app/main/ipc/audit-handlers.ts', 'app/main/ipc/auth-handlers.ts', 'app/main/ipc/backup-handlers.ts',
+      'app/main/ipc/config-catalog-handlers.ts', 'app/main/ipc/config-lot-handlers.ts', 'app/main/ipc/config-tea-handlers.ts',
+      'app/main/ipc/firebase-handlers.ts', 'app/main/ipc/lis-handlers.ts', 'app/main/ipc/nce-handlers.ts',
+      'app/main/ipc/reagent-handlers.ts', 'app/main/ipc/report-handlers.ts', 'app/main/ipc/settings-handlers.ts',
+      'app/main/ipc/sigma-handlers.ts', 'app/main/ipc/westgard-handlers.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'CallExpression[callee.name=/^(writeAudit|notifyChanged|withTransaction)$/]',
+        message: 'Thao tác ghi đi qua writeCommand(): dùng w.commit(tx => …), tx.audit() và tx.changed().',
+      }],
+    },
+  },
 ];

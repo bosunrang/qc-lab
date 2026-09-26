@@ -1,0 +1,88 @@
+// Cổng ghi dùng chung cho mọi handler (kế hoạch kiến trúc, điểm "quyền →
+// kiểm dữ liệu → transaction → audit → notify"). Trước đây trình tự này chỉ là
+// quy ước viết tay ở từng handler; một handler mới có thể quên ghi nhật ký
+// hoặc quên báo renderer mà không test nào chặn. `writeCommand()` biến quy ước
+// thành ràng buộc:
+//
+// 1. Quyền: kiểm TRƯỚC khi chạy thân handler.
+// 2. Kiểm dữ liệu: thân handler tự làm, trả `{ ok: false }` trước khi ghi.
+// 3. Transaction: phần ghi nằm trong `w.commit(tx => …)`.
+// 4. Nhật ký: trong commit phải gọi `tx.audit()` ít nhất một lần, nếu không
+//    transaction bị huỷ và lỗi lập trình nổi lên (A.5 ghi log `internal-error`).
+// 5. Báo thay đổi: trong commit phải gọi `tx.changed()`; lời báo chỉ gửi SAU
+//    khi commit xong, nên renderer không bao giờ nạp lại dữ liệu chưa ghi.
+//
+// Handler trả `{ ok: true }` mà không commit cũng là lỗi lập trình.
+import type { Db } from '../db/sqlite-like';
+import { type Actor, type IpcResult, type PermissionDenied, notifyChanged, requireAdmin, requireWrite, withTransaction, writeAudit } from './shared';
+
+export type WriteGuard = 'write' | 'admin' | ((actor: Actor) => PermissionDenied | null);
+
+export interface WriteTx {
+  /** Ghi một dòng nhật ký hoạt động (bắt buộc ít nhất một lần mỗi lần ghi). */
+  audit(type: string, detail: string, target?: string): void;
+  /** Khai bảng (và xét nghiệm) vừa đổi; mỗi lời khai thành một `notifyChanged`
+   * sau khi commit, giữ nguyên thứ tự — không gộp, vì renderer lọc theo
+   * cặp bảng + xét nghiệm của từng lời báo. */
+  changed(tables: string[], testIds?: string[]): void;
+}
+
+export interface WriteSteps {
+  /** Người thực hiện, đã qua cổng quyền. */
+  readonly actor: Actor;
+  /** Chạy phần ghi trong MỘT transaction; trả đúng giá trị `work` trả về. Lỗi
+   * ném ra trong `work` huỷ toàn bộ phần ghi (kể cả nhật ký) và không báo gì. */
+  commit<R>(work: (tx: WriteTx) => R): R;
+}
+
+function guardOf(guard: WriteGuard): (actor: Actor) => PermissionDenied | null {
+  if (guard === 'write') return requireWrite;
+  if (guard === 'admin') return requireAdmin;
+  return guard;
+}
+
+/** Dấu nhận biết handler đã đi qua cổng ghi — test đọc để khoá danh sách. */
+export const WRITE_COMMAND = Symbol('write-command');
+
+export type WriteCommand<A extends unknown[], T> = ((...args: [...A, Actor]) => IpcResult<T>) & { [WRITE_COMMAND]: string };
+
+export function writeCommand<A extends unknown[], T>(
+  db: Db,
+  name: string,
+  guard: WriteGuard,
+  body: (w: WriteSteps, ...args: A) => IpcResult<T>,
+): WriteCommand<A, T> {
+  const check = guardOf(guard);
+  const command = (...args: [...A, Actor]): IpcResult<T> => {
+    const actor = args[args.length - 1] as Actor;
+    const denied = check(actor);
+    if (denied) return denied;
+    let committed = false;
+    const steps: WriteSteps = {
+      actor,
+      commit<R>(work: (tx: WriteTx) => R): R {
+        if (committed) throw new Error(`${name}: commit() chỉ được gọi một lần cho mỗi lần ghi.`);
+        let audited = 0;
+        const pending: Array<[string[], string[]]> = [];
+        const tx: WriteTx = {
+          audit: (type, detail, target = '') => { writeAudit(db, actor, type, detail, target); audited++; },
+          changed: (tables, testIds = []) => { pending.push([tables, testIds]); },
+        };
+        const result = withTransaction(db, () => {
+          const value = work(tx);
+          // Ném TRONG transaction để phần đã ghi bị huỷ theo.
+          if (!audited) throw new Error(`${name}: thao tác ghi thiếu nhật ký (tx.audit).`);
+          if (!pending.length) throw new Error(`${name}: thao tác ghi thiếu khai báo bảng đổi (tx.changed).`);
+          return value;
+        });
+        committed = true;
+        for (const [tables, testIds] of pending) notifyChanged(tables, testIds);
+        return result;
+      },
+    };
+    const result = body(steps, ...(args.slice(0, -1) as unknown as A));
+    if (result.ok && !committed) throw new Error(`${name}: trả kết quả thành công mà không ghi gì (thiếu w.commit).`);
+    return result;
+  };
+  return Object.assign(command, { [WRITE_COMMAND]: name });
+}
