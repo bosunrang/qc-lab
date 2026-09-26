@@ -17,6 +17,7 @@ import { cleanFirebaseEmail, cleanLabCode, parseFirebaseConfig, type FirebaseCon
 import { createFirebaseClient, type FirebaseSession } from '../domain/firebase-client';
 import { type IpcResult } from './shared';
 import { writeCommand, writeCommandAsync, type WriteSteps } from './write-command';
+import { quoteIdent } from '../db/sql-ident';
 
 const CONFIG_KEY = 'firebaseConfig';
 const EMAIL_KEY = 'firebaseEmail';
@@ -106,7 +107,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
   }
   function localHasOperationalData(): boolean {
     const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'period_locks'];
-    return tables.some((table) => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n) > 0)
+    return tables.some((table) => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${quoteIdent(table)}`).get() as { n: number }).n) > 0)
       || hasEnteredReagentComparison()
       || !!(db.prepare('SELECT name FROM lab WHERE id=1').get() as { name: string }).name;
   }

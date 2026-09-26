@@ -7,6 +7,7 @@ import type { SqliteLike } from './sqlite-like';
 import { withTransaction } from './transaction';
 import { cleanId, uid } from '../domain/text-utils';
 import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
+import { quoteIdent } from './sql-ident';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
 export const SCHEMA_VERSION = 2;
@@ -366,10 +367,10 @@ CREATE TABLE IF NOT EXISTS tea_refs (
 `;
 
 function hasColumn(db: SqliteLike, table: string, column: string): boolean {
-  return (db.prepare(`PRAGMA table_info('${table}')`).all() as { name: string }[]).some((c) => c.name === column);
+  return (db.prepare(`PRAGMA table_info(${quoteIdent(table)})`).all() as { name: string }[]).some((c) => c.name === column);
 }
 function addColumnIfMissing(db: SqliteLike, table: string, column: string, definition: string): void {
-  if (!hasColumn(db, table, column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+  if (!hasColumn(db, table, column)) db.exec(`ALTER TABLE ${quoteIdent(table)} ADD COLUMN ${quoteIdent(column)} ${definition};`);
 }
 
 interface Migration { version: number; name: string; up(db: SqliteLike): void }
