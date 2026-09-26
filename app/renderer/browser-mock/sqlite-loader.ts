@@ -12,7 +12,7 @@ import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { applySchema, seedInitialRows } from '../../main/db/schema';
 import { createBrowserDatabase, type BrowserDb, type SqlJsStatic } from './sqlite-shim';
 
-const IDB_NAME = 'qclab-v2-preview';
+const IDB_NAME = 'qclab-preview';
 const IDB_STORE = 'sqlite';
 const IDB_KEY = 'snapshot';
 /** Gộp nhiều lần ghi liên tiếp thành một lần xuất ảnh nhị phân. */

@@ -25,7 +25,7 @@ const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Quản trị', ids: ['manage', 'users', 'audit', 'settings'] },
 ];
 
-const COLLAPSE_KEY = 'qclab-v2-nav-collapsed';
+const COLLAPSE_KEY = 'qclab-nav-collapsed';
 
 function RuntimeIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h.01M8 15h.01M12 9h4M12 15h4" /></svg>;

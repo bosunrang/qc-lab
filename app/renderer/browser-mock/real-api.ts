@@ -37,7 +37,7 @@ import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from '../lib/browse
 
 /** Hiện ở thẻ "Dung lượng" trang Cài đặt. Không phải file thật — nói rõ điều
  * đó thay vì bịa một đường dẫn nghe như có thật. */
-const PREVIEW_DB_PATH = 'IndexedDB: qclab-v2-preview (xem trước, không phải file trên đĩa)';
+const PREVIEW_DB_PATH = 'IndexedDB: qclab-preview (xem trước, không phải file trên đĩa)';
 
 function notAvailable(): IpcResult<never> {
   return {
@@ -96,7 +96,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   // màn hình đăng nhập — khác hẳn hành vi thật. Ghi id phiên vào
   // `sessionStorage` (sống qua F5, mất khi đóng tab) để khôi phục đúng như
   // Electron. Chỉ lưu ID, không lưu mật khẩu.
-  const SESSION_KEY = 'qclab-v2-preview-session';
+  const SESSION_KEY = 'qclab-preview-session';
   let sessionActor: Actor | null = null;
 
   function rememberSession(): void {

@@ -30,7 +30,7 @@ const firebase = createFirebaseHandlers(db, os.tmpdir(), fakeClient);
 const connected = await firebase.connect({ data: { labCode: 'khoaXN', email: 'qc@example.test', password: 'secret', config: configText } }, actor);
 assert.equal(connected.ok, true);
 assert.equal(connected.data.state, 'pushed');
-assert.equal(remote._format, 'qclab-v2-firebase');
+assert.equal(remote._format, 'qclab-firebase');
 assert.equal(remote.backup.data.instruments[0].name, 'Máy Firebase');
 assert.equal(firebase.settings().connected, true);
 assert.equal(firebase.settings().email, 'qc@example.test');

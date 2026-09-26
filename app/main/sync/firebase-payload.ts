@@ -7,7 +7,7 @@ import { SCHEMA_VERSION } from '../db/schema';
 import { dumpAllTables } from '../db/table-io';
 import { buildBackupEnvelope, type BackupEnvelope } from '../domain/backup';
 
-export interface FirebasePayload { _format: 'qclab-v2-firebase'; _ts: number; _client: string; backup: BackupEnvelope; }
+export interface FirebasePayload { _format: 'qclab-firebase'; _ts: number; _client: string; backup: BackupEnvelope; }
 
 /** Giới hạn cỡ MỘT lần ghi qua REST của Firebase Realtime Database. */
 export const FIREBASE_MAX_WRITE_BYTES = 256 * 1024 * 1024;
@@ -16,7 +16,7 @@ export const FIREBASE_WARN_RATIO = 0.8;
 
 export function buildFirebasePayload(db: Db, now: Date = new Date()): FirebasePayload {
   return {
-    _format: 'qclab-v2-firebase', _ts: now.getTime(), _client: 'qclab-v2-desktop',
+    _format: 'qclab-firebase', _ts: now.getTime(), _client: 'qclab-desktop',
     backup: buildBackupEnvelope(dumpAllTables(db), SCHEMA_VERSION, 'app', now.toISOString()),
   };
 }
