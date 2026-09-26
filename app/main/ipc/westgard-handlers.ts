@@ -9,7 +9,8 @@ import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { observedStats } from '../domain/observed-stats';
-import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
+import { type Actor, type IpcResult, addChangeListener, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
+import { TestSummaryCache } from './summary-cache';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
 
@@ -105,6 +106,10 @@ export function createWestgardHandlers(db: Db) {
     return { ok: true, data };
   }
 
+  // Phần `levels` đã tính của từng xét nghiệm — xem `summary-cache.ts`.
+  const summaryCache = new TestSummaryCache<TestSummary['levels']>();
+  addChangeListener((payload) => summaryCache.onChanged(payload));
+
   function listTestSummaries(): TestSummary[] {
     // ORDER BY t.rowid (không phải t.name) — cùng quy ước "xét nghiệm thêm
     // trước nằm đầu" đã chốt cho `listTests()` (config-handlers.ts). Trước
@@ -120,53 +125,61 @@ export function createWestgardHandlers(db: Db) {
     // Một mốc `hôm nay` cho cả lượt: theo GIỜ ĐỊA PHƯƠNG (xem local-date.ts)
     // và tính MỘT lần, không dựng lại Date cho từng xét nghiệm.
     const today = isoLocalDate();
-    return tests.map(t => {
-      const active = { levels: activeLevels(t.test_id) };
-      const byPoint = evaluateQcSets(db, t.test_id, active.levels);
-      const levels = active.levels.map(lv => {
-        const points = lv.pts;
-        let worstVerdict: RuleVerdict = 'ok';
-        // `latestVerdict`/`latestRules` là kết luận của ĐIỂM CUỐI CÙNG, KHÁC
-        // `worstVerdict` (xấu nhất trong MỌI điểm) — không phải trùng lặp:
-        // Trang Tổng quan chỉ báo động theo điểm cuối, nên
-        // một mức từng vi phạm hôm trước mà điểm mới nhất đã đạt thì KHÔNG
-        // còn nằm trong "Cần xử lý". Cây điều hướng trang Nhập QC và trang
-        // Phân tích Westgard vẫn dùng `worstVerdict` như trước.
-        let latestVerdict: RuleVerdict = 'ok';
-        let latestRules: string[] = [];
-        if (lv.mean != null && lv.sd != null && points.length) {
-          const result = points.map((point) => byPoint.get(point)!);
-          for (const flag of result) if (VERDICT_RANK[flag.level] > VERDICT_RANK[worstVerdict]) worstVerdict = flag.level;
-          const lastFlag = result.at(-1);
-          if (lastFlag) { latestVerdict = lastFlag.level; latestRules = lastFlag.rules.slice(); }
-          // CUSUM là cảnh báo xu hướng: vào danh sách cần xử lý/NCE, nhưng
-          // không tự biến điểm QC thành reject và không làm bẩn accepted set.
-          if (t.cusum_on) {
-            // CUSUM dùng cùng tập run được chấp nhận và cùng mốc khắc phục.
-            const acceptedIds = acceptedIdsOf(points, byPoint);
-            const cs = cusumForLevel(t.test_id, points, acceptedIds, lv.mean, lv.sd, t.cusum_k, t.cusum_h, 0);
-            for (let i = 0; i < points.length; i++) if (cusumSignalAt(cs, i) && worstVerdict === 'ok') worstVerdict = 'warn';
-            const signal = cusumSignalAt(cs, points.length - 1);
-            if (signal) {
-              if (latestVerdict === 'ok') latestVerdict = 'warn';
-              latestRules = [...new Set([...latestRules, signal])];
-            }
+    summaryCache.retain(tests.map(t => t.test_id));
+    // Tên, đơn vị, máy luôn đọc mới từ câu SQL trên; chỉ phần tính Westgard
+    // theo mức là lấy từ bộ nhớ đệm.
+    return tests.map(t => ({
+      testId: t.test_id, testName: t.test_name, instrumentName: t.instrument_name || '', unit: t.unit || '', decimalPlaces: t.decimal_places ?? 2,
+      levels: summaryCache.get(t.test_id, today, () => summarizeLevels(t, today)),
+    }));
+  }
+
+  function summarizeLevels(t: { test_id: string; cusum_on: number; cusum_k: number; cusum_h: number }, today: string): TestSummary['levels'] {
+    const active = { levels: activeLevels(t.test_id) };
+    const byPoint = evaluateQcSets(db, t.test_id, active.levels);
+    const levels = active.levels.map(lv => {
+      const points = lv.pts;
+      let worstVerdict: RuleVerdict = 'ok';
+      // `latestVerdict`/`latestRules` là kết luận của ĐIỂM CUỐI CÙNG, KHÁC
+      // `worstVerdict` (xấu nhất trong MỌI điểm) — không phải trùng lặp:
+      // Trang Tổng quan chỉ báo động theo điểm cuối, nên
+      // một mức từng vi phạm hôm trước mà điểm mới nhất đã đạt thì KHÔNG
+      // còn nằm trong "Cần xử lý". Cây điều hướng trang Nhập QC và trang
+      // Phân tích Westgard vẫn dùng `worstVerdict` như trước.
+      let latestVerdict: RuleVerdict = 'ok';
+      let latestRules: string[] = [];
+      if (lv.mean != null && lv.sd != null && points.length) {
+        const result = points.map((point) => byPoint.get(point)!);
+        for (const flag of result) if (VERDICT_RANK[flag.level] > VERDICT_RANK[worstVerdict]) worstVerdict = flag.level;
+        const lastFlag = result.at(-1);
+        if (lastFlag) { latestVerdict = lastFlag.level; latestRules = lastFlag.rules.slice(); }
+        // CUSUM là cảnh báo xu hướng: vào danh sách cần xử lý/NCE, nhưng
+        // không tự biến điểm QC thành reject và không làm bẩn accepted set.
+        if (t.cusum_on) {
+          // CUSUM dùng cùng tập run được chấp nhận và cùng mốc khắc phục.
+          const acceptedIds = acceptedIdsOf(points, byPoint);
+          const cs = cusumForLevel(t.test_id, points, acceptedIds, lv.mean, lv.sd, t.cusum_k, t.cusum_h, 0);
+          for (let i = 0; i < points.length; i++) if (cusumSignalAt(cs, i) && worstVerdict === 'ok') worstVerdict = 'warn';
+          const signal = cusumSignalAt(cs, points.length - 1);
+          if (signal) {
+            if (latestVerdict === 'ok') latestVerdict = 'warn';
+            latestRules = [...new Set([...latestRules, signal])];
           }
         }
-        const last = points.at(-1);
-        // CV mẫu của các run được chấp nhận; n < 2 chưa đủ tính SD mẫu.
-        const accepted = acceptedIdsOf(points, byPoint);
-        const observed = observedStats(points.filter(p => accepted.has(p.id)));
-        return {
-          level: lv.level, mean: lv.mean, sd: lv.sd, qcLotId: lv.qc_lot_id, lot: lv.lot_no, exp: lv.exp,
-          worstVerdict, latestVerdict, latestRules,
-          pointCount: points.length, todayPointCount: points.filter(p => p.date === today).length,
-          cv: observed.cv,
-          latest: last ? { id: last.id, date: last.date, runId: last.run_id, val: last.val } : null,
-        };
-      });
-      return { testId: t.test_id, testName: t.test_name, instrumentName: t.instrument_name || '', unit: t.unit || '', decimalPlaces: t.decimal_places ?? 2, levels };
+      }
+      const last = points.at(-1);
+      // CV mẫu của các run được chấp nhận; n < 2 chưa đủ tính SD mẫu.
+      const accepted = acceptedIdsOf(points, byPoint);
+      const observed = observedStats(points.filter(p => accepted.has(p.id)));
+      return {
+        level: lv.level, mean: lv.mean, sd: lv.sd, qcLotId: lv.qc_lot_id, lot: lv.lot_no, exp: lv.exp,
+        worstVerdict, latestVerdict, latestRules,
+        pointCount: points.length, todayPointCount: points.filter(p => p.date === today).length,
+        cv: observed.cv,
+        latest: last ? { id: last.id, date: last.date, runId: last.run_id, val: last.val } : null,
+      };
     });
+    return levels;
   }
 
   /** CUSUM dùng các run được chấp nhận; bắt đầu lại sau khắc phục hiệu quả.

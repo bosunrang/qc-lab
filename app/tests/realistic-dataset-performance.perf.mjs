@@ -66,14 +66,21 @@ test('hiệu năng với dữ liệu 60 xét nghiệm × 5 năm', { timeout: 600
     const perLevel = summaries[1].levels[0].pointCount;
     assert.ok(perLevel > 0 && perLevel <= (DAYS / LOT_PERIODS + 1) * RUNS_PER_DAY, 'chỉ đếm điểm của lô đang vận hành');
     measure('tongQuanLan2', () => westgard.listTestSummaries());
+    // Nhập một điểm rồi mở lại Tổng quan: chỉ xét nghiệm vừa nhập được tính
+    // lại (E.6 bước 3); các xét nghiệm khác lấy kết quả đã giữ.
+    const today = db.prepare("SELECT date('now','localtime') AS d").get().d;
+    const added = entry.addPoint({ data: { testId: heavy, level: 1, date: today, runId: `${today}-9`, val: summaries[0].levels[0].mean } }, { userId: 'perf', username: 'perf', name: 'Perf', role: 'admin', clientId: 'perf' });
+    assert.equal(added.ok, true, JSON.stringify(added.error));
+    const afterEntry = measure('tongQuanSauNhap', () => westgard.listTestSummaries());
+    assert.deepEqual(afterEntry, createWestgardHandlers(db).listTestSummaries(), 'kết quả giữ lại trùng lượt tính mới');
 
     const analysis = measure('westgardMuc', () => westgard.analyzeLevel(heavy, 1));
-    assert.equal(analysis.points.length, summaries[0].levels[0].pointCount);
+    assert.equal(analysis.points.length, afterEntry[0].levels[0].pointCount);
     const lotBlocks = measure('westgardLoCu', () => westgard.listPreviousLotBlocks(heavy));
     assert.equal(new Set(lotBlocks.map((b) => b.lotId)).size, (LOT_PERIODS - 1) * 3, 'đủ mọi lô cũ của 3 mức');
 
     const points = measure('nhapQcMuc', () => entry.queryPoints(heavy, 1));
-    assert.equal(points.length, summaries[0].levels[0].pointCount);
+    assert.equal(points.length, afterEntry[0].levels[0].pointCount);
     measure('nhapQcLoCu', () => entry.listPreviousLotSeries(heavy));
 
     const period = db.prepare("SELECT strftime('%Y-%m', date('now','localtime','start of month','-1 month')) AS p").get().p;
@@ -84,7 +91,7 @@ test('hiệu năng với dữ liệu 60 xét nghiệm × 5 năm', { timeout: 600
     const fmt = (ms) => `${ms.toFixed(0)} ms`;
     console.log([
       `PERF-REAL | ${TESTS} XN × ${DAYS} ngày × ${RUNS_PER_DAY} lần/ngày, ${LOT_PERIODS} kỳ lô | ${totalPoints} điểm | tệp ${(bytes / 1024 / 1024).toFixed(0)} MB | tạo dữ liệu ${fmt(seed.ms)}`,
-      `  Tổng quan/Westgard (listTestSummaries): ${fmt(results.tongQuan)} (lần 2: ${fmt(results.tongQuanLan2)})`,
+      `  Tổng quan/Westgard (listTestSummaries): ${fmt(results.tongQuan)} (lần 2: ${fmt(results.tongQuanLan2)}; sau khi nhập 1 điểm: ${fmt(results.tongQuanSauNhap)})`,
       `  Westgard một mức (analyzeLevel): ${fmt(results.westgardMuc)} | lô cũ: ${fmt(results.westgardLoCu)}`,
       `  Nhập QC một mức (queryPoints): ${fmt(results.nhapQcMuc)} | lô cũ: ${fmt(results.nhapQcLoCu)}`,
       `  Sigma một tháng (listCohorts): ${fmt(results.sigmaThang)}`,
