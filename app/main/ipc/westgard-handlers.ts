@@ -9,7 +9,7 @@ import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { observedStats } from '../domain/observed-stats';
-import { type Actor, type IpcResult, addChangeListener, writeAudit, notifyChanged, requireWrite, withTransaction } from './shared';
+import { type Actor, type IpcResult, addChangeListener, writeAudit, notifyChanged, requireAdmin, requireWrite, withTransaction } from './shared';
 import { TestSummaryCache } from './summary-cache';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
@@ -74,9 +74,11 @@ export function createWestgardHandlers(db: Db) {
   }
 
   /** Bật/tắt một luật ở tầng chung: đổi mặc định cho mọi xét nghiệm, không
-   * chỉ xét nghiệm đang xem. */
+   * chỉ xét nghiệm đang xem. Là cấu hình chung của phòng xét nghiệm nên chỉ
+   * quản trị viên được đổi, và chỉ trên máy chính (`lan: false`) — người dùng
+   * chốt 2026-09-26. */
   function saveRuleSetting(ruleId: string, on: boolean, actor: Actor): IpcResult<{ ruleId: string; on: boolean }> {
-    const denied = requireWrite(actor); if (denied) return denied;
+    const denied = requireAdmin(actor); if (denied) return denied;
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (typeof on !== 'boolean') return { ok: false, error: { code: 'invalid-value', message: 'Trạng thái luật không hợp lệ.' } };
     inTransaction(() => {
@@ -91,7 +93,7 @@ export function createWestgardHandlers(db: Db) {
   /** Khôi phục toàn bộ cấu hình mặc định của `WG_RULE_REGISTRY`, không phải
    * bật tất cả luật. */
   function resetRuleSettings(actor: Actor): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> {
-    const denied = requireWrite(actor); if (denied) return denied;
+    const denied = requireAdmin(actor); if (denied) return denied;
     const defaults: RuleActionsMap = {};
     for (const rule of WG_RULE_REGISTRY) defaults[rule.id] = rule.defaultOn;
     inTransaction(() => {

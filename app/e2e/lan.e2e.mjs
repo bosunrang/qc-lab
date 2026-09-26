@@ -63,12 +63,40 @@ test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao t
     assert.equal(saved[0].val, 4.95);
     assert.equal(saved[0].operator_username, TECH.username);
 
+    // Cấu hình luật Westgard chung chỉ đổi trên máy chính: máy trạm thấy trạng
+    // thái từng luật nhưng ô tick bị khoá, không có nút Khôi phục; máy chính
+    // (cùng quyền ghi) vẫn đổi được.
+    const stationRules = station.locator('.wg-rules input[type="checkbox"]');
+    await openPage(station, 'Phân tích Westgard');
+    await stationRules.first().waitFor();
+    assert.ok(await stationRules.count() > 0);
+    for (const box of await stationRules.all()) assert.equal(await box.isDisabled(), true, 'máy trạm không đổi được luật chung');
+    assert.equal(await station.getByRole('button', { name: 'Khôi phục mặc định' }).count(), 0);
+    await station.locator('.wg-rules', { hasText: 'Chỉ đổi được trên máy chính.' }).waitFor();
+    const ruleDenied = await station.evaluate(() => window.qcApi.saveRuleSetting('1-2s', false));
+    assert.equal(ruleDenied.ok, false, 'gọi thẳng API từ máy trạm vẫn bị máy chủ từ chối');
+    await openPage(page, 'Phân tích Westgard');
+    const mainRules = page.locator('.wg-rules input[type="checkbox"]');
+    await mainRules.first().waitFor();
+    assert.equal(await mainRules.first().isDisabled(), false, 'máy chính đổi được luật chung');
+    assert.equal(await page.getByRole('button', { name: 'Khôi phục mặc định' }).count(), 1);
+    assert.equal(await page.locator('.wg-rules', { hasText: 'Chỉ đổi được trên máy chính.' }).count(), 0);
+
     // Thao tác quản trị gọi thẳng qua API của máy trạm vẫn bị máy chủ từ chối.
     const denied = await station.evaluate(() => window.qcApi.saveInstrument({ data: { name: 'Máy lạ từ LAN' } }));
     assert.equal(denied.ok, false);
     assert.equal(denied.error.code, 'unknown-operation');
     const instruments = await page.evaluate(() => window.qcApi.listInstruments());
     assert.deepEqual(instruments.map((i) => i.name), ['Máy E2E'], 'máy chính không nhận thao tác quản trị từ LAN');
+
+    // Ngay trên máy chính, KTV cũng không đổi được luật chung: chỉ quản trị viên.
+    await page.getByRole('button', { name: 'Đăng xuất' }).first().click();
+    await login(page, TECH);
+    await openPage(page, 'Phân tích Westgard');
+    await mainRules.first().waitFor();
+    assert.equal(await mainRules.first().isDisabled(), true, 'KTV trên máy chính không đổi được luật chung');
+    assert.equal(await page.getByRole('button', { name: 'Khôi phục mặc định' }).count(), 0);
+    await page.locator('.wg-rules', { hasText: 'Chỉ quản trị viên đổi được.' }).waitFor();
 
     assert.deepEqual(stationErrors, []);
     assert.deepEqual(errors, []);

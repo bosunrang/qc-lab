@@ -186,8 +186,13 @@ app chỉ báo "Lỗi đồng bộ tự động".
 5. ~~**API chết `config:listActivity`**~~ — đã xong, xem bảng "Đã xong".
 6. **Tên bảng/cột trong SQL:** hiện chỉ lấy từ `sqlite_master` hoặc hằng số
    nên an toàn; thêm dấu nháy định danh để phòng xa.
-7. **Cần xác nhận nghiệp vụ:** bật/tắt luật Westgard chung chỉ cần quyền ghi
-   (`westgard-handlers.ts`), trong khi đổi phạm vi luật cần admin.
+7. ~~**Cần xác nhận nghiệp vụ:** bật/tắt luật Westgard chung chỉ cần quyền
+   ghi~~ — người dùng chốt 2026-09-26: chỉ làm trên máy chính. Main đã chặn từ
+   giai đoạn A (`saveRuleSetting`, `resetRuleSettings` là `lan: false`); nay
+   trang Westgard ở máy trạm khoá ô tick, ẩn nút Khôi phục và ghi "Chỉ đổi
+   được trên máy chính." (`renderer/lib/runtime.ts`, e2e `lan.e2e.mjs`). Trên
+   máy chính chỉ quản trị viên đổi được (`requireAdmin`); KTV thấy "Chỉ quản
+   trị viên đổi được." Luật riêng từng xét nghiệm vẫn để KTV sửa.
 
 **Test:** các test end-to-end hiện có của config phải qua nguyên vẹn sau khi
 tách (tách thuần, không đổi hành vi).
@@ -357,5 +362,5 @@ trong console của máy đang chạy.
 | --- | --- |
 | ~~LAN có chuyển sang HTTPS~~ | Đã chốt và làm 2026-09-26: app tự tạo CA; tuỳ chọn CA nội bộ để sau |
 | ~~Chu kỳ đẩy Firebase~~ | Đã chốt 2026-09-26: 15 phút và khi đóng app |
-| Bật/tắt luật Westgard chung cần quyền gì | Tra SOP; nếu là cấu hình chung của phòng thì nên là admin |
+| ~~Bật/tắt luật Westgard chung cần quyền gì~~ | Đã chốt 2026-09-26: chỉ quản trị viên, chỉ trên máy chính |
 | Log và báo crash có gửi ra ngoài không (G.2) | Không: chỉ lưu tại máy, người dùng tự xuất gói log khi cần báo lỗi |

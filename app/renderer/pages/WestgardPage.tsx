@@ -23,6 +23,7 @@ import { useArchivedWestgard } from './westgard/useArchivedWestgard';
 import { ArchivedGroupPicker, ArchivedGroupResults } from './westgard/ArchivedGroupView';
 import { TestPicker } from '../components/TestPicker';
 import { useTestSelection } from '../lib/useTestSelection';
+import { isLanStation } from '../lib/runtime';
 
 export function WestgardPage() {
   const { tests, instruments, lots, levelsByTestId, loadLevels, lotGroups } = useManageStore(useShallow((s) => ({
@@ -33,11 +34,14 @@ export function WestgardPage() {
     saveRuleSetting: s.saveRuleSetting, resetRuleSettings: s.resetRuleSettings, analysisByLevel: s.analysisByLevel, loadAnalysis: s.loadAnalysis,
     previousLotBlocks: s.previousLotBlocks, analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
   })));
-  // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`) — vai trò
-  // chỉ-xem thấy đúng trạng thái luật nhưng không thay đổi được.
   const role = useAuthStore((s) => s.user)?.role;
   const writable = canWrite(role);
   const admin = isAdmin(role);
+  // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`): chỉ quản
+  // trị viên, chỉ trên máy chính (main dùng `requireAdmin` và `lan: false`).
+  // Người khác vẫn thấy trạng thái từng luật.
+  const lanStation = isLanStation();
+  const ruleSettingsEditable = admin && !lanStation;
   const [view, setView] = useState<'current' | 'archived'>('current');
   // Tìm nhanh theo tên xét nghiệm, LOT hoặc máy (không dấu); tự chọn xét
   // nghiệm đầu tiên khi lựa chọn hiện tại không còn trong danh sách. Không còn
@@ -232,10 +236,11 @@ export function WestgardPage() {
                   <div className="flow-note">
                     {ruleSettings.map((r) => (
                       <span className="wg-rule-item" key={r.id}>
-                        <label><input type="checkbox" checked={r.on} disabled={!writable} onChange={(e) => onToggleRule(r.id, e.target.checked)} /><span className="pill">{r.id}</span></label>
+                        <label><input type="checkbox" checked={r.on} disabled={!ruleSettingsEditable} onChange={(e) => onToggleRule(r.id, e.target.checked)} /><span className="pill">{r.id}</span></label>
                       </span>
                     ))}
-                    {writable && <span className="wg-rule-reset"><button className="btn ghost sm" title="Khôi phục mặc định" aria-label="Khôi phục mặc định" onClick={resetRules}><RestoreIcon />Khôi phục</button></span>}
+                    {!ruleSettingsEditable && <span className="hint-inline">{lanStation ? 'Chỉ đổi được trên máy chính.' : 'Chỉ quản trị viên đổi được.'}</span>}
+                    {ruleSettingsEditable && <span className="wg-rule-reset"><button className="btn ghost sm" title="Khôi phục mặc định" aria-label="Khôi phục mặc định" onClick={resetRules}><RestoreIcon />Khôi phục</button></span>}
                   </div>
                 </div>
 

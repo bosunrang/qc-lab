@@ -4,6 +4,7 @@ import { installBrowserMockIfNeeded } from './browser-mock/install';
 import { createLanHttpApi } from './lan/http-api';
 import { PageErrorBoundary } from './components/ErrorBoundary';
 import { installUnhandledErrorReporting } from './lib/unhandled-errors';
+import { setLanStation } from './lib/runtime';
 
 // Chỉ cài khi không chạy trong Electron thật, ví dụ `vite dev` mở qua
 // localhost. Ở Electron, hàm này trả `false` ngay lập tức (không nạp WASM,
@@ -20,6 +21,7 @@ async function start(): Promise<void> {
   // (test end-to-end) mở nhầm bản xem trước sql.js và bị CSP chặn WASM.
   const lan = !import.meta.env.DEV && location.protocol.startsWith('http') && typeof window.qcApi === 'undefined';
   if (lan) window.qcApi = createLanHttpApi();
+  setLanStation(lan);
   const installed = lan ? false : await installBrowserMockIfNeeded();
   if (!rootEl) return;
   if (installed) rootEl.textContent = '';
