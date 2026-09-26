@@ -31,6 +31,7 @@ Mỗi hạng mục làm theo cùng một cách đã dùng cho quy tắc giao di�
 | D.4–D.5 (nhánh `feat/error-boundary`) | `PageErrorBoundary` bọc từng trang trong `AppShell` (đổi trang thì tự bỏ lỗi) và bọc cả app; promise bị từ chối và lỗi trong trình xử lý sự kiện được báo bằng hộp thoại, không mở đè hộp thoại đang chờ; Tổng quan hiện lỗi kèm Thử lại thay vì treo ở trạng thái tải |
 | E.3 (nhánh `perf/sqlite-wal`) | CSDL mở ở WAL, giữ `synchronous = FULL`: mỗi thao tác ghi có nhật ký 11 ms → 3 ms. Backup và bản an toàn (`VACUUM INTO`) vẫn là tệp SQLite thường, đọc chỉ đọc không để lại tệp phụ; đóng kết nối khi thoát app để gộp `-wal`; cỡ dữ liệu ở Cài đặt tính cả `-wal`. Test `tests/sqlite-wal.test.mjs` |
 | E.4 (nhánh `perf/realistic-benchmark`) | Bài đo `realistic-dataset-performance.perf.mjs`: 60 xét nghiệm × 5 năm × 2 lần chạy/ngày, lô đổi mỗi 6 tháng (492.750 điểm, tệp WAL thật). Phát hiện câu đọc điểm theo lô không dùng được chỉ mục; thêm `idx_qc_points_lot_active (test_id, level, lot, date) WHERE voided = 0`. Tổng quan/Westgard 3,8 s → 0,59 s; một mức Westgard 75 → 11 ms, Nhập QC 86 → 20 ms; lô cũ Westgard 1,4 s → 0,30 s, Nhập QC 2,0 s → 0,45 s. Tệp lớn thêm khoảng 15%. Test `tests/qc-points-index.test.mjs` kiểm kế hoạch truy vấn của mọi câu đọc theo lô |
+| C.2–C.5 (nhánh `refactor/main-process-small`) | `db/period-locks.ts` thay 3 bản `isPeriodLocked`; 15 khối BEGIN/COMMIT viết tay (config, entry, report, sigma, phục hồi, xoá sạch) chuyển sang `withTransaction()`, không còn khối nào trong `app/main`; `listComparisons` chỉ đọc, dòng so sánh trống do `seedInitialRows()` tạo khi mở CSDL và sau phục hồi/xoá sạch; xoá kênh `config:listActivity`. Kèm sửa: Firebase không còn coi phép so sánh trống là dữ liệu cục bộ (trước đây chỉ cần mở trang So sánh hoá chất là máy mới không tải được từ đám mây) |
 
 ## Thứ tự đề xuất
 
@@ -159,14 +160,14 @@ app chỉ báo "Lỗi đồng bộ tự động".
    máy/xét nghiệm, lô/nhóm lô/chuyển lô, TEa tham chiếu. Logic kích hoạt nhóm
    lô (khoảng 110 dòng) và cascade chuyển lô (khoảng 130 dòng) chuyển xuống
    `domain/` hoặc `db/`.
-2. **`isPeriodLocked` có 3 bản** (config, entry, report): gom vào
-   `db/period-locks.ts` theo mẫu `db/operational-levels.ts`.
-3. **Khoảng 12 khối BEGIN/COMMIT viết tay** còn lại chuyển sang
-   `withTransaction()`; bỏ ba kiểu xử lý lỗi khác nhau.
-4. **Đọc mà ghi:** `reagent.listComparisons` chèn dòng mẫu khi bảng rỗng;
-   chuyển việc tạo dòng mẫu vào migration hoặc lúc khởi tạo.
-5. **API chết:** `config:listActivity` không còn ai gọi nhưng đọc được nhật
-   ký mà không cần quyền admin; xoá.
+2. ~~**`isPeriodLocked` có 3 bản**~~ — đã xong, xem bảng "Đã xong".
+3. ~~**Khối BEGIN/COMMIT viết tay**~~ — đã xong, xem bảng "Đã xong". Còn lại
+   hai kiểu báo lỗi: phần lớn handler cấu hình bắt lỗi transaction thành
+   `{ ok: false, code: 'save-failed' | 'delete-failed' }`, một số để lỗi ném
+   lên thành `internal-error` (A.5). Giữ nguyên để không đổi thông báo mà
+   renderer đang hiện; thống nhất khi tách `config-handlers.ts` (C.1).
+4. ~~**Đọc mà ghi**~~ — đã xong, xem bảng "Đã xong".
+5. ~~**API chết `config:listActivity`**~~ — đã xong, xem bảng "Đã xong".
 6. **Tên bảng/cột trong SQL:** hiện chỉ lấy từ `sqlite_master` hoặc hằng số
    nên an toàn; thêm dấu nháy định danh để phòng xa.
 7. **Cần xác nhận nghiệp vụ:** bật/tắt luật Westgard chung chỉ cần quyền ghi

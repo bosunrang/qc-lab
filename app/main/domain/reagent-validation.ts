@@ -23,7 +23,7 @@ export function prepareReagentMetadata(input: ReagentMetadataInput, existing?: P
   const text = (field: 'reagent' | 'lotOld' | 'lotNew' | 'date' | 'operator' | 'sampleType' | 'unit', max: number, fallback = '') =>
     has(field) ? cleanText(input[field], max).trim() : String(existing?.[field] ?? fallback);
   return {
-    reagent: text('reagent', 120) || existing?.reagent || 'Hóa chất mới',
+    reagent: text('reagent', 120) || existing?.reagent || DEFAULT_REAGENT_NAME,
     lotOld: text('lotOld', 80),
     lotNew: text('lotNew', 80),
     date: text('date', 20),
@@ -79,6 +79,9 @@ export function addQuickValue(list: readonly string[], value: unknown): { items:
 }
 
 export type ReagentRow = [string, string];
+
+/** Tên của phép so sánh mới tạo, khi người dùng chưa đặt tên. */
+export const DEFAULT_REAGENT_NAME = 'Hóa chất mới';
 
 export function prepareReagentRows(rows: unknown): ReagentRow[] {
   if (!Array.isArray(rows) || !rows.length) return [['', ''], ['', ''], ['', ''], ['', ''], ['', '']];

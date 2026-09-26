@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { listActivity } from './helpers/activity.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -33,7 +34,7 @@ assert.equal(fallback.ok, true);
 assert.equal(fallback.data.brand_title, 'QC Lab');
 assert.equal(fallback.data.brand_sub, 'Nội kiểm xét nghiệm');
 
-const activity = config.listActivity();
+const activity = listActivity(db);
 assert.equal(activity.length, 2);
 assert.deepEqual(activity.map(a => a.type), ['Sửa thông tin phòng xét nghiệm', 'Sửa thông tin phòng xét nghiệm']);
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { listActivity } from './helpers/activity.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -140,7 +141,7 @@ assert.equal((await auth.changeOwnPassword({ data: { oldPassword: 'mat-khau-kts2
 const deleteOk = auth.deleteUser({ id: withPerms.data.id }, secondAdminActor);
 assert.equal(deleteOk.ok, true);
 assert.equal(auth.listUsers(secondAdminActor).data.some(u => u.id === withPerms.data.id), false, 'da xoa that khoi bang users');
-const activityRows = require('../../app-dist/main/ipc/config-handlers.js').createConfigHandlers(db).listActivity(1000);
+const activityRows = listActivity(db, 1000);
 assert.ok(activityRows.some(row => row.username === 'kts2'), 'thao tac DO kts2 thuc hien phai con trong nhat ky');
 assert.ok(activityRows.some(row => row.target === 'kts2' && row.type === 'Xoá người dùng'), 'phai co dong audit ghi lai viec xoa');
 
@@ -156,8 +157,7 @@ const clearOk = auth.clearAvatar(secondAdminActor);
 assert.equal(clearOk.ok, true);
 assert.equal(auth.getUser(secondAdminActor.userId).avatar, '', 'xoa anh phai tro ve rong, khong con anh cu');
 
-const chronological = require('../../app-dist/main/ipc/config-handlers.js')
-  .createConfigHandlers(db).listActivity(1000).slice().reverse();
+const chronological = listActivity(db, 1000).slice().reverse();
 const verify = verifyAuditChain(chronological, '');
 assert.equal(verify.ok, true, 'chuoi audit phai hop le: ' + JSON.stringify(verify));
 

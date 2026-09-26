@@ -512,7 +512,6 @@ export interface QcApi {
     items?: { testId: string; level: number; qcLotId: string; mean: number | null; sd: number | null; low: number | null; high: number | null }[];
     remove?: { testId: string; level: number; qcLotId: string }[];
   }): Promise<IpcResult<{ saved: number; removed: number }>>;
-  listActivity(limit?: number): Promise<ActivityEntry[]>;
   listRuleScopes(testId: string): Promise<RuleScopeItem[]>;
   saveRuleScope(testId: string, ruleId: string, scope: 'within' | 'across' | 'both' | ''): Promise<IpcResult<{ ruleId: string; scope: string }>>;
   listLots(): Promise<QcLot[]>;

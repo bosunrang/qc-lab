@@ -22,6 +22,7 @@ import { errorClass, WG_RULE_REGISTRY } from '../domain/westgard-rules';
 import { evaluateRangeCandidate, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
+import { isDateInLockedPeriod } from '../db/period-locks';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDateAfter } from '../domain/local-date';
 import { initialsFromName } from '../domain/name-initials';
@@ -54,13 +55,8 @@ export function createEntryHandlers(db: Db) {
 
 
   /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
-   * đó — trên tất cả xét nghiệm, không phải theo từng xét nghiệm riêng.
-   * Đọc trực tiếp `period_locks` ở đây thay vì gọi qua report-handlers.ts để
-   * 2 module không phụ thuộc lẫn nhau — mỗi handler tự SQL, khớp quy ước
-   * chung của toàn bộ main/ipc/*. */
-  function isPeriodLocked(date: string): boolean {
-    return !!db.prepare('SELECT id FROM period_locks WHERE ym=?').get(ymOfDate(date));
-  }
+   * đó — trên tất cả xét nghiệm, không phải theo từng xét nghiệm riêng. */
+  const isPeriodLocked = (date: string): boolean => isDateInLockedPeriod(db, date);
 
   /** Cổng nhập QC: xét nghiệm còn hoạt động, thuộc một Panel QC đang hoạt động,
    * và chính mức đang nhập phải gắn với lô thuộc
@@ -328,8 +324,7 @@ export function createEntryHandlers(db: Db) {
       effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
     }, changedAt);
     const mfgMean = row.mfg_mean ?? row.mean, mfgSd = row.mfg_sd ?? row.sd;
-    db.exec('BEGIN');
-    try {
+    inTransaction(() => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
       const selection = manual ? 'chỉnh thủ công' : 'dải đề xuất';
@@ -337,8 +332,7 @@ export function createEntryHandlers(db: Db) {
         selection, proposed: fresh.data.proposed, applied: p,
       });
       writeAudit(db, actor, 'Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
-      db.exec('COMMIT');
-    } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
+    });
     notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   }
@@ -359,14 +353,12 @@ export function createEntryHandlers(db: Db) {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
       effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
     }, changedAt);
-    db.exec('BEGIN');
-    try {
+    inTransaction(() => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
       createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor, { selection: 'nhà sản xuất', applied: { mean: m, sd } });
       writeAudit(db, actor, 'Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
-      db.exec('COMMIT');
-    } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
+    });
     notifyChanged(['test_levels', 'actions'], [fresh.data.testId]);
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   }

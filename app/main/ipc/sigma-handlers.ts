@@ -444,16 +444,11 @@ export function createSigmaHandlers(db: Db) {
     if (readStoredLevels(row.lv_json).some(level => level.cvSource === 'iqc-cohort')) return { ok: false, error: { code: 'cohort-period-fixed', message: 'Kỳ có snapshot IQC không được đổi tháng. Hãy tạo kỳ mới và nạp lại dữ liệu đúng kỳ.' } };
     const nextId = `${row.test_id}:${period}`;
     if (db.prepare('SELECT 1 FROM sigma_data WHERE id=?').get(nextId)) return { ok: false, error: { code: 'duplicate-period', message: `Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.` } };
-    db.exec('BEGIN');
-    try {
+    inTransaction(() => {
       db.prepare('UPDATE sigma_data SET id=?, period=? WHERE id=?').run(nextId, period, row.id);
       const test = db.prepare('SELECT name FROM tests WHERE id=?').get(row.test_id) as { name: string } | undefined;
       writeAudit(db, actor, 'Đổi kỳ Six Sigma', `Đổi kỳ ${row.period} thành ${period} của xét nghiệm "${test?.name || ''}"`, test?.name || '');
-      db.exec('COMMIT');
-    } catch (error) {
-      try { db.exec('ROLLBACK'); } catch { /* giao dịch đã đóng */ }
-      throw error;
-    }
+    });
     notifyChanged(['sigma_data'], [row.test_id]);
     const stored = readStoredLevels(row.lv_json);
     const renamedChain = teaChain(makeLevelTeaResolver(row.test_id), row.tea_source);

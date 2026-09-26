@@ -108,7 +108,7 @@ export function sessionContext(current: () => Actor | null): CallContext {
 type DataApiName = { [K in ApiName]: Result<K> extends { ok: boolean } ? never : K }[ApiName];
 const DATA_API_NAMES = [
   'hasAnyUsers', 'currentUser', 'listInstruments', 'listTests', 'listTestLevels', 'listPlannedTargets',
-  'listActivity', 'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
+  'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNceRecords',
@@ -165,9 +165,6 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     saveTestLevel: { channel: 'config:saveTestLevel', lan: false, run: (ctx, input) => config.saveTestLevel(input, ctx.actor()) },
     listPlannedTargets: { channel: 'config:listPlannedTargets', lan: true, run: () => config.listPlannedTargets() },
     savePlannedTargets: { channel: 'config:savePlannedTargets', lan: false, run: (ctx, input) => config.savePlannedTargets(input, ctx.actor()) },
-    // Không còn màn hình nào gọi, và đọc nhật ký mà không kiểm quyền admin:
-    // không mở qua LAN. Xoá hẳn ở giai đoạn C.
-    listActivity: { channel: 'config:listActivity', lan: false, run: (_ctx, limit) => config.listActivity(limit) },
     listRuleScopes: { channel: 'config:listRuleScopes', lan: true, run: (_ctx, testId) => config.listRuleScopes(testId) },
     saveRuleScope: { channel: 'config:saveRuleScope', lan: false, run: (ctx, testId, ruleId, scope) => config.saveRuleScope(testId, ruleId, scope, ctx.actor()) },
     listLots: { channel: 'config:listLots', lan: true, run: () => config.listLots() },

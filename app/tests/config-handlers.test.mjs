@@ -3,6 +3,7 @@
 // hoạt động đúng cùng nhau (không phải unit test cô lập).
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { listActivity } from './helpers/activity.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -60,12 +61,12 @@ assert.equal(handlers.listTests().length, 1);
 // 8) Audit log: mỗi thao tác GHI THÀNH CÔNG phải có đúng 1 dòng (4 thao tác
 // thành công: thêm máy, thêm xét nghiệm, thêm mức 2, sửa lại mức 2 — các
 // thao tác BỊ CHẶN không ghi audit).
-const activity = handlers.listActivity();
+const activity = listActivity(db);
 assert.equal(activity.length, 4, 'chỉ thao tác thành công mới ghi audit');
 assert.deepEqual(activity.map(a => a.type).sort(), ['Sửa mức QC', 'Thêm mức QC', 'Thêm máy xét nghiệm', 'Thêm xét nghiệm'].sort());
 
 // 9) Chuỗi hash-chain phải verify OK (đọc lại theo đúng thứ tự seq tăng dần).
-const chronological = handlers.listActivity().slice().reverse();
+const chronological = listActivity(db).slice().reverse();
 const verify = verifyAuditChain(chronological, '');
 assert.equal(verify.ok, true, 'chuỗi audit phải hợp lệ: ' + JSON.stringify(verify));
 assert.equal(verify.checked, 4);

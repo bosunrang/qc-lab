@@ -27,7 +27,6 @@ const api = {
   saveTestLevel: (input: unknown) => ipcRenderer.invoke('config:saveTestLevel', input),
   listPlannedTargets: () => ipcRenderer.invoke('config:listPlannedTargets'),
   savePlannedTargets: (input: unknown) => ipcRenderer.invoke('config:savePlannedTargets', input),
-  listActivity: (limit?: number) => ipcRenderer.invoke('config:listActivity', limit),
   listRuleScopes: (testId: string) => ipcRenderer.invoke('config:listRuleScopes', testId),
   saveRuleScope: (testId: string, ruleId: string, scope: string) => ipcRenderer.invoke('config:saveRuleScope', testId, ruleId, scope),
   listLots: () => ipcRenderer.invoke('config:listLots'),

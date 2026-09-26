@@ -5,6 +5,8 @@
 // trúc luôn đọc/ghi nguyên khối theo cha, không filter xuyên hàng.
 import type { SqliteLike } from './sqlite-like';
 import { withTransaction } from './transaction';
+import { cleanId, uid } from '../domain/text-utils';
+import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
 export const SCHEMA_VERSION = 2;
@@ -464,8 +466,13 @@ export function applySchema(db: SqliteLike): void {
 }
 
 /** Chèn các dòng khởi tạo bắt buộc: dòng `lab` id=1 (hồ sơ phòng xét nghiệm,
- * mọi trang Cài đặt đều đọc/ghi đúng dòng này). Còn số phiên bản schema thì
- * do bước migration trong `applySchema()` ghi.
+ * mọi trang Cài đặt đều đọc/ghi đúng dòng này) và một phép so sánh hoá chất
+ * trống (trang So sánh hoá chất luôn giữ ít nhất một phép so sánh, xem
+ * `removeComparison()`). Còn số phiên bản schema thì do bước migration trong
+ * `applySchema()` ghi. Gọi khi mở CSDL và sau mỗi lần thay toàn bộ dữ liệu
+ * (phục hồi, xoá sạch), vì đó là lúc các bảng này có thể trở về rỗng.
+ * Trước 2026-09-26 dòng so sánh trống do `listComparisons()` chèn ngay trong
+ * một lệnh đọc.
  *
  * Tách ra khỏi `openDatabase()` (2026-09-09) vì bản xem trước qua trình duyệt
  * mở SQLite bằng sql.js/WASM chứ không qua `node:sqlite`, nên không gọi được
@@ -474,6 +481,11 @@ export function applySchema(db: SqliteLike): void {
  */
 export function seedInitialRows(db: SqliteLike): void {
   db.prepare('INSERT OR IGNORE INTO lab(id) VALUES (1)').run();
+  if (!db.prepare('SELECT 1 FROM reagent_tests LIMIT 1').get()) {
+    db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
+      .run(cleanId(uid()), DEFAULT_REAGENT_NAME, '', '', '', '', 'Mẫu bệnh nhân', '', 6, 0.05, JSON.stringify(prepareReagentRows(null)));
+  }
 }
 
 

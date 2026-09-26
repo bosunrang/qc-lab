@@ -5,6 +5,7 @@ import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
 import { dumpAllTables, listTableNames, restoreAllTables, writeSafetySnapshot } from '../db/table-io';
 import { buildBackupEnvelope, validateBackupEnvelope, type BackupEnvelope } from '../domain/backup';
+import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 import { cleanFirebaseEmail, cleanLabCode, parseFirebaseConfig, type FirebaseConfig } from '../domain/firebase-validation';
 import { createFirebaseClient, type FirebaseSession } from '../domain/firebase-client';
 import { type Actor, type IpcResult, nowIso, notifyChanged, requireAdmin, writeAudit } from './shared';
@@ -62,9 +63,18 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     return checked.ok ? { ok: true, data: row as FirebasePayload } : { ok: false, message: checked.message };
   }
   function localHasOperationalData(): boolean {
-    const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'reagent_tests', 'period_locks'];
+    const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'period_locks'];
     return tables.some((table) => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n) > 0)
+      || hasEnteredReagentComparison()
       || !!(db.prepare('SELECT name FROM lab WHERE id=1').get() as { name: string }).name;
+  }
+  /** Phép so sánh hoá chất trống do `seedInitialRows()` tạo sẵn ở mọi CSDL
+   * mới không phải dữ liệu của người dùng: đếm nó thì máy mới cài luôn bị coi
+   * là có dữ liệu và không tải được từ Firebase. */
+  function hasEnteredReagentComparison(): boolean {
+    return !!db.prepare(`SELECT 1 FROM reagent_tests
+      WHERE reagent<>? OR lot_old<>'' OR lot_new<>'' OR date<>'' OR operator<>'' OR unit<>''
+        OR coverage_confirmed<>0 OR rows_json<>? LIMIT 1`).get(DEFAULT_REAGENT_NAME, JSON.stringify(prepareReagentRows(null)));
   }
   async function pushNow(): Promise<FirebasePayload> {
     if (!session || !config || !labCode) throw new Error('Chưa kết nối Firebase.');
