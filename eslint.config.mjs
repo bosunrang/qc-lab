@@ -74,14 +74,10 @@ export default [
   // Handler ghi dữ liệu đi qua `writeCommand()` (`app/main/ipc/write-command.ts`):
   // quyền → kiểm dữ liệu → transaction → nhật ký → báo thay đổi được ép bằng
   // mã, không còn là quy ước. Gọi thẳng các bước đó trong handler là bỏ qua
-  // cổng. Danh sách `ignores` là các tệp CHƯA chuyển; chuyển xong tệp nào thì
-  // gỡ tệp đó khỏi danh sách.
+  // cổng. Ngoại lệ duy nhất là thao tác TRƯỚC khi đăng nhập (khởi tạo quản trị,
+  // đăng nhập) — chưa có actor để qua cổng; chỗ đó ghi `eslint-disable` kèm lý do.
   {
     files: ['app/main/ipc/*-handlers.ts'],
-    ignores: [
-      'app/main/ipc/audit-handlers.ts', 'app/main/ipc/auth-handlers.ts', 'app/main/ipc/backup-handlers.ts',
-      'app/main/ipc/firebase-handlers.ts',
-    ],
     rules: {
       'no-restricted-syntax': ['error', {
         selector: 'CallExpression[callee.name=/^(writeAudit|notifyChanged|withTransaction)$/]',

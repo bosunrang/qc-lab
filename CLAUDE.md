@@ -37,8 +37,11 @@ biên bản Excel vào `validation-output/`; bộ ca cũng chạy trong `npm tes
   định danh, trường giao thức, SQL và chuỗi máy đọc; chỉ dùng tiếng Anh khi đó
   là thuật ngữ kỹ thuật bắt buộc.
 - Dòng IPC đọc từ SQLite giữ `snake_case`; dữ liệu nháp biểu mẫu dùng `camelCase`.
-- Mỗi handler ghi dữ liệu phải lần lượt kiểm tra quyền, kiểm tra dữ liệu thuần,
-  transaction, `writeAudit()` và `notifyChanged()`.
+- Mỗi handler ghi dữ liệu dựng bằng `writeCommand()` / `writeCommandAsync()`
+  (`app/main/ipc/write-command.ts`): cổng quyền, kiểm tra dữ liệu thuần, rồi
+  `w.commit(tx => …)` với `tx.audit()` và `tx.changed()`; lưu lại đúng giá trị
+  cũ thì trả `w.noChange(data)`. ESLint cấm gọi thẳng `writeAudit`,
+  `notifyChanged`, `withTransaction` trong tệp `*-handlers.ts`.
 - Không xoá cứng điểm QC; dùng quy trình huỷ điểm hiện có.
 - Chạy `npm test`, `npm run typecheck`, `npm run lint` và `npm run build` khi
   sửa mã nguồn. Gói `typescript` là bí danh của `@typescript/typescript6` chỉ
