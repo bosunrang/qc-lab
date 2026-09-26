@@ -37,15 +37,17 @@ export function createFirebaseClient(fetchImpl: FetchLike = fetch as unknown as 
     try { return JSON.parse(text); } catch { throw new Error('Firebase trả về JSON không hợp lệ.'); }
   }
 
-  async function write(config: FirebaseConfig, labCode: string, token: string, value: unknown): Promise<void> {
+  /** Ghi một chuỗi JSON đã dựng sẵn (đã đo cỡ trước khi gửi, xem
+   * `sync/firebase-payload.ts`), không stringify lại lần nữa. */
+  async function writeJson(config: FirebaseConfig, labCode: string, token: string, json: string): Promise<void> {
     const response = await fetchImpl(urlOf(config, labCode, token), {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(value),
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: json,
     });
     const text = await response.text();
     if (!response.ok) throw errorMessage('Không thể ghi Firebase Realtime Database', text, response.status);
   }
 
-  return { signIn, read, write };
+  return { signIn, read, writeJson, uploadUrl: urlOf };
 }
 
 
