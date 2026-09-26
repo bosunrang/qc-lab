@@ -8,7 +8,7 @@
 // chọn tệp do main process mở (index.ts), renderer không truyền nội dung tệp.
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import type { Db } from '../db/sqlite-like';
-import { SCHEMA_VERSION } from '../db/schema';
+import { SCHEMA_VERSION, seedInitialRows } from '../db/schema';
 import { openExistingDatabase } from '../db/open-database';
 import { listTableNames, restoreAllTables, restoreAllTablesFromFile, vacuumInto, writeSafetySnapshot } from '../db/table-io';
 import { BACKUP_FILE_FORMAT, BACKUP_FILE_FORMAT_VERSION, validateBackupEnvelope, type BackupEnvelope } from '../domain/backup';
@@ -240,14 +240,14 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     const cleared = listTableNames(db).filter((name) => !keep.has(name));
     try {
       db.exec('PRAGMA foreign_keys=OFF');
-      db.exec('BEGIN');
-      // Xoá theo thứ tự NGƯỢC danh sách bảng để bảng con đi trước bảng cha,
-      // cùng lý do với restoreAllTables() trong db/table-io.ts.
-      for (const table of [...cleared].reverse()) db.prepare(`DELETE FROM ${table}`).run();
-      db.prepare("UPDATE lab SET name='', dept='', address='', brand_title='QC Lab', brand_sub='Nội kiểm xét nghiệm', logo_text='QC', logo_data='' WHERE id=1").run();
-      db.exec('COMMIT');
+      withTransaction(db, () => {
+        // Xoá theo thứ tự NGƯỢC danh sách bảng để bảng con đi trước bảng cha,
+        // cùng lý do với restoreAllTables() trong db/table-io.ts.
+        for (const table of [...cleared].reverse()) db.prepare(`DELETE FROM ${table}`).run();
+        db.prepare("UPDATE lab SET name='', dept='', address='', brand_title='QC Lab', brand_sub='Nội kiểm xét nghiệm', logo_text='QC', logo_data='' WHERE id=1").run();
+        seedInitialRows(db);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã tự đóng */ }
       return fail('reset-failed', e instanceof Error ? e.message : 'Xoá dữ liệu thất bại.');
     } finally {
       db.exec('PRAGMA foreign_keys=ON');

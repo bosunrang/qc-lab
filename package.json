@@ -11,7 +11,7 @@
     "dev": "npm run app:dev",
     "build": "npm run app:build",
     "test": "npm run app:test",
-    "test:performance": "npm run app:build:main && node --test app/tests/large-dataset-performance.perf.mjs",
+    "test:performance": "npm run app:build:main && node --test app/tests/large-dataset-performance.perf.mjs app/tests/realistic-dataset-performance.perf.mjs",
     "typecheck": "npm run app:typecheck",
     "lint": "eslint app",
     "app:typecheck": "tsc -p tsconfig.app-main.json --noEmit && tsc -p tsconfig.app-renderer.json",

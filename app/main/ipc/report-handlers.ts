@@ -4,6 +4,7 @@
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
+import { isPeriodLocked as isLocked } from '../db/period-locks';
 import { DEFAULT_SIGMA_REPORT_TEMPLATE, validateReportTemplate, type ReportTemplateInput } from '../domain/report-template-validation';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
 // Kiểu hàng báo cáo lấy từ HỢP ĐỒNG dùng chung thay vì khai lại ở đây — bản
@@ -36,13 +37,12 @@ export function createReportHandlers(db: Db) {
     const result = validateReportTemplate(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     try {
-      db.exec('BEGIN');
-      db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
-        .run(REPORT_TEMPLATE_META_KEY, JSON.stringify(result.data));
-      writeAudit(db, actor, 'Sửa biểu mẫu báo cáo Six Sigma', `Mã ${result.data.formCode} · phiên bản ${result.data.version}`, result.data.formCode);
-      db.exec('COMMIT');
+      withTransaction(db, () => {
+        db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
+          .run(REPORT_TEMPLATE_META_KEY, JSON.stringify(result.data));
+        writeAudit(db, actor, 'Sửa biểu mẫu báo cáo Six Sigma', `Mã ${result.data.formCode} · phiên bản ${result.data.version}`, result.data.formCode);
+      });
     } catch (error) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction chưa mở hoặc đã rollback */ }
       return { ok: false, error: { code: 'save-report-template-failed', message: error instanceof Error ? error.message : 'Không lưu được biểu mẫu báo cáo.' } };
     }
     notifyChanged(['report_templates']);
@@ -53,9 +53,7 @@ export function createReportHandlers(db: Db) {
     return db.prepare('SELECT * FROM period_locks ORDER BY ym DESC').all() as unknown as PeriodLockRow[];
   }
 
-  function isPeriodLocked(ym: string): boolean {
-    return !!db.prepare('SELECT id FROM period_locks WHERE ym=?').get(ym);
-  }
+  const isPeriodLocked = (ym: string): boolean => isLocked(db, ym);
 
   function lockPeriod(input: { data: LockPeriodInput }, actor: Actor): IpcResult<PeriodLockRow> {
     const denied = requireAdmin(actor); if (denied) return denied;

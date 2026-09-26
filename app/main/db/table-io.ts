@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { Db } from './sqlite-like';
-import { applySchema } from './schema';
+import { applySchema, seedInitialRows } from './schema';
+import { withTransaction } from './transaction';
 
 export function listTableNames(db: Db): string[] {
   return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[])
@@ -36,38 +37,37 @@ export function writeSafetySnapshot(db: Db, userDataDir: string, filePrefix: str
 
 /** Thay thế toàn bộ bảng bằng dữ liệu đã kiểm tra trong một transaction. */
 export function restoreAllTables(db: Db, dataByTable: Record<string, Record<string, unknown>[] | undefined>): void {
+  // PRAGMA foreign_keys chỉ có tác dụng NGOÀI transaction, nên đặt trước.
   db.exec('PRAGMA foreign_keys = OFF');
-  db.exec('BEGIN');
   try {
-    const tables = listTableNames(db);
-    // Xoá theo thứ tự NGƯỢC LIỆT KÊ để giảm khả năng đụng ràng buộc dù đã
-    // tắt foreign_keys (phòng thủ 2 lớp, không phụ thuộc mỗi PRAGMA).
-    for (const table of [...tables].reverse()) db.exec(`DELETE FROM ${table}`);
-    for (const table of tables) {
-      const rows = dataByTable[table];
-      if (!rows || !rows.length) continue;
-      // Chỉ chèn cột có trong dữ liệu: backup cũ chưa có các cột thêm sau, gán
-      // NULL tường minh sẽ vỡ ràng buộc NOT NULL (ví dụ `users.avatar`), còn bỏ
-      // qua thì cột nhận giá trị mặc định của schema hiện tại.
-      const cols = columnsOf(db, table).filter((c) => c in rows[0]);
-      if (!cols.length) continue;
-      const placeholders = cols.map(() => '?').join(',');
-      const stmt = db.prepare(`INSERT INTO ${table}(${cols.join(',')}) VALUES (${placeholders})`);
-      for (const row of rows) {
-        const values = cols.map((c) => (row[c] === undefined ? null : row[c])) as (string | number | bigint | null)[];
-        stmt.run(...values);
+    withTransaction(db, () => {
+      const tables = listTableNames(db);
+      // Xoá theo thứ tự NGƯỢC LIỆT KÊ để giảm khả năng đụng ràng buộc dù đã
+      // tắt foreign_keys (phòng thủ 2 lớp, không phụ thuộc mỗi PRAGMA).
+      for (const table of [...tables].reverse()) db.exec(`DELETE FROM ${table}`);
+      for (const table of tables) {
+        const rows = dataByTable[table];
+        if (!rows || !rows.length) continue;
+        // Chỉ chèn cột có trong dữ liệu: backup cũ chưa có các cột thêm sau, gán
+        // NULL tường minh sẽ vỡ ràng buộc NOT NULL (ví dụ `users.avatar`), còn bỏ
+        // qua thì cột nhận giá trị mặc định của schema hiện tại.
+        const cols = columnsOf(db, table).filter((c) => c in rows[0]);
+        if (!cols.length) continue;
+        const placeholders = cols.map(() => '?').join(',');
+        const stmt = db.prepare(`INSERT INTO ${table}(${cols.join(',')}) VALUES (${placeholders})`);
+        for (const row of rows) {
+          const values = cols.map((c) => (row[c] === undefined ? null : row[c])) as (string | number | bigint | null)[];
+          stmt.run(...values);
+        }
       }
-    }
-    // Dữ liệu phục hồi mang số phiên bản schema của lúc xuất: chạy các bước
-    // migration còn thiếu ngay trong transaction này, để dữ liệu cũ được chuẩn
-    // hoá luôn và một bản không nâng cấp được thì huỷ cả lần phục hồi.
-    applySchema(db);
-    const violations = db.prepare('PRAGMA foreign_key_check').all();
-    if (violations.length) throw new Error(`Dữ liệu vi phạm ràng buộc khoá ngoại (${violations.length} dòng) — huỷ thao tác.`);
-    db.exec('COMMIT');
-  } catch (e) {
-    try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ }
-    throw e;
+      // Dữ liệu phục hồi mang số phiên bản schema của lúc xuất: chạy các bước
+      // migration còn thiếu ngay trong transaction này, để dữ liệu cũ được chuẩn
+      // hoá luôn và một bản không nâng cấp được thì huỷ cả lần phục hồi.
+      applySchema(db);
+      seedInitialRows(db);
+      const violations = db.prepare('PRAGMA foreign_key_check').all();
+      if (violations.length) throw new Error(`Dữ liệu vi phạm ràng buộc khoá ngoại (${violations.length} dòng) — huỷ thao tác.`);
+    });
   } finally {
     db.exec('PRAGMA foreign_keys = ON');
   }
@@ -82,8 +82,7 @@ export function restoreAllTablesFromFile(db: Db, filePath: string): void {
   db.exec('PRAGMA foreign_keys = OFF');
   db.prepare('ATTACH DATABASE ? AS backup_src').run(filePath);
   try {
-    db.exec('BEGIN');
-    try {
+    withTransaction(db, () => {
       const tables = listTableNames(db);
       const sourceTables = new Set((db.prepare("SELECT name FROM backup_src.sqlite_master WHERE type='table'").all() as { name: string }[]).map((r) => r.name));
       for (const table of [...tables].reverse()) db.exec(`DELETE FROM main.${table}`);
@@ -97,13 +96,10 @@ export function restoreAllTablesFromFile(db: Db, filePath: string): void {
       // Cùng lý do với restoreAllTables(): nâng dữ liệu phục hồi lên schema
       // hiện tại ngay trong transaction này.
       applySchema(db);
+      seedInitialRows(db);
       const violations = db.prepare('PRAGMA main.foreign_key_check').all();
       if (violations.length) throw new Error(`Dữ liệu vi phạm ràng buộc khoá ngoại (${violations.length} dòng) — huỷ thao tác.`);
-      db.exec('COMMIT');
-    } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ }
-      throw e;
-    }
+    });
   } finally {
     db.exec('DETACH DATABASE backup_src');
     db.exec('PRAGMA foreign_keys = ON');

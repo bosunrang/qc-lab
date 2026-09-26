@@ -1,7 +1,7 @@
 import type { Db } from '../db/sqlite-like';
 import { cleanId, cleanText, uid } from '../domain/text-utils';
 import {
-  validateReagentMetadata, prepareReagentRows, cleanQuickValueType, addQuickValue, DEFAULT_SAMPLE_TYPES,
+  validateReagentMetadata, prepareReagentRows, DEFAULT_REAGENT_NAME, cleanQuickValueType, addQuickValue, DEFAULT_SAMPLE_TYPES,
   type ReagentMetadataInput, type QuickValueType,
 } from '../domain/reagent-validation';
 import { calculateReagentComparison, RC_MIN_PAIRS, type ReagentComparisonResult } from '../domain/reagent-stats';
@@ -36,15 +36,8 @@ function toView(row: ReagentComparisonRow): ReagentComparisonView {
 }
 
 export function createReagentHandlers(db: Db) {
-  function blankRow(id: string, name = 'Hóa chất mới'): void {
-    db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
-      .run(id, name, '', '', '', '', 'Mẫu bệnh nhân', '', 6, 0.05, JSON.stringify(prepareReagentRows(null)));
-  }
-
+  /** Chỉ đọc. Dòng so sánh trống cho CSDL mới do `seedInitialRows()` tạo. */
   function listComparisons(): ReagentComparisonView[] {
-    const count = (db.prepare('SELECT COUNT(*) as c FROM reagent_tests').get() as { c: number }).c;
-    if (count === 0) blankRow(cleanId(uid()));
     const rows = db.prepare('SELECT * FROM reagent_tests ORDER BY reagent').all() as unknown as ReagentComparisonRow[];
     return rows.map(toView);
   }
@@ -53,7 +46,7 @@ export function createReagentHandlers(db: Db) {
     const denied = requireWrite(actor); if (denied) return denied;
     const id = cleanId(uid());
     const data = objectInput(objectInput(input).data);
-    const name = cleanText(data.name, 120).trim() || 'Hóa chất mới';
+    const name = cleanText(data.name, 120).trim() || DEFAULT_REAGENT_NAME;
     const unit = cleanText(data.unit, 40).trim();
     withTransaction(db, () => {
       db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)

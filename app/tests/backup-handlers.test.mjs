@@ -5,6 +5,7 @@
 // xuất trước 2026-09-25 vẫn phải phục hồi được.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { listActivity } from './helpers/activity.mjs';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import os from 'node:os';
@@ -144,7 +145,7 @@ const resetActor = { ...actor, userId: resetAuth.listUsers(actor).data[0].id, us
 const resetInstrument = resetConfig.saveInstrument({ data: { name: 'Máy sẽ bị xoá' } }, resetActor).data;
 resetConfig.saveTest({ data: { name: 'Test sẽ bị xoá', instrumentId: resetInstrument.id } }, resetActor);
 const usersBefore = resetAuth.listUsers(resetActor).data.length;
-const activityBefore = resetConfig.listActivity(1000).length;
+const activityBefore = listActivity(resetDb, 1000).length;
 assert.ok(activityBefore > 0);
 
 assert.equal(resetBackup.resetOperationalData(viewer).error.code, 'forbidden', 'chỉ admin được xoá sạch');
@@ -154,8 +155,12 @@ assert.ok(reset.data.preResetSnapshotPath.endsWith('.sqlite') && existsSync(rese
 assert.ok(reset.data.clearedTables.includes('instruments') && reset.data.clearedTables.includes('qc_points'), 'phải xoá bảng dữ liệu vận hành');
 assert.ok(!reset.data.clearedTables.includes('users') && !reset.data.clearedTables.includes('activity'), 'KHÔNG được xoá users/activity');
 assert.equal(resetConfig.listInstruments().length, 0, 'dữ liệu vận hành phải sạch');
+const { createReagentHandlers } = require('../../app-dist/main/ipc/reagent-handlers.js');
+const resetComparisons = createReagentHandlers(resetDb).listComparisons();
+assert.equal(resetComparisons.length, 1, 'sau khi xoá sạch vẫn có một phép so sánh hoá chất trống để nhập');
+assert.equal(resetComparisons[0].reagent, 'Hóa chất mới');
 assert.equal(resetAuth.listUsers(resetActor).data.length, usersBefore, 'tài khoản phải còn nguyên');
-const activityAfter = resetConfig.listActivity(1000);
+const activityAfter = listActivity(resetDb, 1000);
 assert.equal(activityAfter.length, activityBefore + 1, 'giữ nhật ký cũ + ghi thêm 1 dòng xoá sạch');
 assert.equal(activityAfter[0].type, 'Xoá sạch dữ liệu');
 const chain = verifyAuditChain(activityAfter.slice().reverse(), '');

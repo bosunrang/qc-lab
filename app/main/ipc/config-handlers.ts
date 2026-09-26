@@ -20,8 +20,9 @@ import { parseRuleScopes, serializeRuleScopes, parseRuleActions, effectiveRuleCo
 import { WG_RULE_REGISTRY, isAllowedRuleScope, type RuleScope } from '../domain/westgard-rules';
 import { readGlobalRules } from '../db/rule-settings';
 import { countOperationalLevels, listOperationalLevels } from '../db/operational-levels';
+import { isPeriodLocked } from '../db/period-locks';
 import { isoLocalDate } from '../domain/local-date';
-import { type Actor, type IpcResult, nowIso, writeAudit, rowToAuditEntry, notifyChanged, requireAdmin, withTransaction } from './shared';
+import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin, withTransaction } from './shared';
 import { ymOfDate } from '../domain/period-lock-validation';
 
 export function createConfigHandlers(db: Db) {
@@ -205,37 +206,35 @@ export function createConfigHandlers(db: Db) {
         { id: string; instrument_id: string } | undefined;
       if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm cần cập nhật.' } };
       let removedPanelMemberships = 0;
-      db.exec('BEGIN');
       try {
-        db.prepare(`UPDATE tests SET name=?,instrument_id=?,unit=?,decimal_places=?,tea=?,section=?,
-          tea_source=?,tea_ref_key=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
-          .run(name, result.data.instrumentId, unit, decimalPlaces, tea, section,
-            teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0, id);
-        if (existing.instrument_id !== result.data.instrumentId) {
-          removedPanelMemberships = Number(db.prepare(`DELETE FROM qc_panel_tests
-            WHERE test_id=? AND panel_id IN (SELECT id FROM qc_panels WHERE instrument_id!=?)`)
-            .run(id, result.data.instrumentId).changes);
-        }
-        writeAudit(db, actor, 'Sửa xét nghiệm', `Cập nhật xét nghiệm "${name}"`, name);
-        db.exec('COMMIT');
+        inTransaction(() => {
+          db.prepare(`UPDATE tests SET name=?,instrument_id=?,unit=?,decimal_places=?,tea=?,section=?,
+            tea_source=?,tea_ref_key=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
+            .run(name, result.data.instrumentId, unit, decimalPlaces, tea, section,
+              teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0, id);
+          if (existing.instrument_id !== result.data.instrumentId) {
+            removedPanelMemberships = Number(db.prepare(`DELETE FROM qc_panel_tests
+              WHERE test_id=? AND panel_id IN (SELECT id FROM qc_panels WHERE instrument_id!=?)`)
+              .run(id, result.data.instrumentId).changes);
+          }
+          writeAudit(db, actor, 'Sửa xét nghiệm', `Cập nhật xét nghiệm "${name}"`, name);
+        });
       } catch (e) {
-        try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
         return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Cập nhật xét nghiệm thất bại.' } };
       }
       notifyChanged(removedPanelMemberships ? ['tests', 'qc_panels', 'qc_panel_tests'] : ['tests'], [id]);
       return { ok: true, data: db.prepare('SELECT * FROM tests WHERE id=?').get(id) };
     }
     const newId = cleanId(uid());
-    db.exec('BEGIN');
     try {
-      db.prepare(`INSERT INTO tests(id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,method,reagent,cusum_on,cusum_k,cusum_h,active)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(newId, name, result.data.instrumentId, unit, decimalPlaces, tea, section, teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0);
-      db.prepare('INSERT INTO test_levels(id,test_id,level) VALUES (?,?,1)').run(`${newId}:1`, newId);
-      writeAudit(db, actor, 'Thêm xét nghiệm', `Tạo xét nghiệm "${name}"`, name);
-      db.exec('COMMIT');
+      inTransaction(() => {
+        db.prepare(`INSERT INTO tests(id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,method,reagent,cusum_on,cusum_k,cusum_h,active)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(newId, name, result.data.instrumentId, unit, decimalPlaces, tea, section, teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0);
+        db.prepare('INSERT INTO test_levels(id,test_id,level) VALUES (?,?,1)').run(`${newId}:1`, newId);
+        writeAudit(db, actor, 'Thêm xét nghiệm', `Tạo xét nghiệm "${name}"`, name);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Tạo xét nghiệm thất bại.' } };
     }
     notifyChanged(['tests'], [newId]);
@@ -428,11 +427,6 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { saved: prepared.length, removed } };
   }
 
-  function listActivity(limit = 200) {
-    const rows = db.prepare('SELECT * FROM activity ORDER BY seq DESC LIMIT ?').all(limit) as Record<string, unknown>[];
-    return rows.map(rowToAuditEntry);
-  }
-
   /** Phạm vi áp dụng (within/across) từng luật, theo xét nghiệm — lưu ở
    * `tests.rule_scopes_json` và được Entry/Westgard thực thi. Chuỗi rỗng xoá
    * ghi đè để quay lại phạm vi SOP khuyến nghị. */
@@ -492,7 +486,7 @@ export function createConfigHandlers(db: Db) {
     // còn nằm trong lịch sử của xét nghiệm giờ đã gắn lô khác.
     const rows = db.prepare('SELECT date FROM qc_points WHERE level=? AND lot=?')
       .all(existing.level, existing.lot_no) as { date: string }[];
-    const lockedPeriods = [...new Set(rows.map(row => ymOfDate(row.date)))].filter(ym => isPeriodLocked(ym)).sort();
+    const lockedPeriods = [...new Set(rows.map(row => ymOfDate(row.date)))].filter(ym => isPeriodLocked(db, ym)).sort();
     const lockedCount = rows.filter(row => lockedPeriods.includes(ymOfDate(row.date))).length;
     return { ok: true, data: { rename: { oldLotNo: existing.lot_no, newLotNo, affected: rows.length, lockedCount, lockedPeriods } } };
   }
@@ -523,8 +517,7 @@ export function createConfigHandlers(db: Db) {
       // không đổi điểm, hoặc ngược lại) là trạng thái không thể tự phục hồi.
       const renaming = !!before?.lot_no && before.lot_no !== lotNo;
       let renamed = 0;
-      db.exec('BEGIN');
-      try {
+      inTransaction(() => {
         // KHÔNG gửi `groupId` nghĩa là "giữ nguyên nhóm", không phải "gỡ khỏi
         // nhóm" — cùng ngữ nghĩa `prepareLabProfile(existing)` dùng cho logo.
         // Form "Sửa lô QC" không có ô chọn nhóm (membership do modal Nhóm lô
@@ -543,8 +536,7 @@ export function createConfigHandlers(db: Db) {
         writeAudit(db, actor, 'Sửa lô QC',
           renaming ? `Đổi số lô "${before!.lot_no}" → "${lotNo}" mức ${level}, cập nhật ${renamed} điểm QC`
             : `Cập nhật lô "${lotNo}" mức ${level}`, lotNo);
-        db.exec('COMMIT');
-      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
+      });
       notifyChanged(renaming ? ['qc_lots', 'qc_points'] : ['qc_lots']);
       return { ok: true, data: db.prepare('SELECT * FROM qc_lots WHERE id=?').get(id) };
     }
@@ -623,24 +615,23 @@ export function createConfigHandlers(db: Db) {
     // Hàng nhóm và việc gỡ/gán lại TẤT CẢ lô là một lần lưu nghiệp vụ. Nếu
     // lỗi ở giữa, rollback nguyên khối để không còn nhóm có danh sách thành
     // viên dở dang hoặc lô bị gỡ khỏi nhóm cũ mà chưa vào nhóm mới.
-    db.exec('BEGIN');
     try {
-      if (id) {
-        db.prepare('UPDATE lot_groups SET name=?,manufacturer=?,material=?,catalog=?,note=?,active=?,status=? WHERE id=?')
-          .run(name, manufacturer, material, catalog, note, active ? 1 : 0, status, id);
-      } else {
-        db.prepare('INSERT INTO lot_groups(id,name,manufacturer,material,catalog,note,active,status) VALUES (?,?,?,?,?,?,?,?)')
-          .run(groupId, name, manufacturer, material, catalog, note, active ? 1 : 0, status);
-      }
-      // Gỡ các lô KHÔNG còn thuộc nhóm này nữa, rồi gán lại đúng danh sách mới —
-      // 1 lô chỉ thuộc 1 nhóm tại 1 thời điểm (qc_lots.group_id, không phải bảng
-      // junction nhiều-nhiều).
-      db.prepare('UPDATE qc_lots SET group_id=NULL WHERE group_id=?').run(groupId);
-      for (const lotId of validLotIds) db.prepare('UPDATE qc_lots SET group_id=? WHERE id=?').run(groupId, lotId);
-      writeAudit(db, actor, id ? 'Sửa nhóm lô QC' : 'Thêm nhóm lô QC', `Nhóm "${name}" (${validLotIds.length} lô)`, name);
-      db.exec('COMMIT');
+      inTransaction(() => {
+        if (id) {
+          db.prepare('UPDATE lot_groups SET name=?,manufacturer=?,material=?,catalog=?,note=?,active=?,status=? WHERE id=?')
+            .run(name, manufacturer, material, catalog, note, active ? 1 : 0, status, id);
+        } else {
+          db.prepare('INSERT INTO lot_groups(id,name,manufacturer,material,catalog,note,active,status) VALUES (?,?,?,?,?,?,?,?)')
+            .run(groupId, name, manufacturer, material, catalog, note, active ? 1 : 0, status);
+        }
+        // Gỡ các lô KHÔNG còn thuộc nhóm này nữa, rồi gán lại đúng danh sách mới —
+        // 1 lô chỉ thuộc 1 nhóm tại 1 thời điểm (qc_lots.group_id, không phải bảng
+        // junction nhiều-nhiều).
+        db.prepare('UPDATE qc_lots SET group_id=NULL WHERE group_id=?').run(groupId);
+        for (const lotId of validLotIds) db.prepare('UPDATE qc_lots SET group_id=? WHERE id=?').run(groupId, lotId);
+        writeAudit(db, actor, id ? 'Sửa nhóm lô QC' : 'Thêm nhóm lô QC', `Nhóm "${name}" (${validLotIds.length} lô)`, name);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu nhóm lô QC thất bại.' } };
     }
     notifyChanged(['lot_groups', 'qc_lots']);
@@ -695,23 +686,22 @@ export function createConfigHandlers(db: Db) {
     // Hàng Panel và toàn bộ bảng nối là MỘT lần lưu nghiệp vụ. Transaction
     // ngăn trạng thái nửa vời nếu một insert bảng nối thất bại sau khi hàng
     // Panel đã cập nhật hoặc sau khi liên kết cũ đã bị xoá.
-    db.exec('BEGIN');
     try {
-      if (id) {
-        db.prepare('UPDATE qc_panels SET name=?,instrument_id=?,note=?,active=? WHERE id=?').run(name, instrumentId, note, active ? 1 : 0, id);
-      } else {
-        db.prepare('INSERT INTO qc_panels(id,name,instrument_id,note,active) VALUES (?,?,?,?,?)').run(panelId, name, instrumentId, note, active ? 1 : 0);
-      }
-      db.prepare('DELETE FROM qc_panel_tests WHERE panel_id=?').run(panelId);
-      // Vị trí ghi TƯỜNG MINH theo thứ tự `validTestIds` — thứ tự người dùng
-      // tick trong modal. Đừng sắp lại theo tên ở bất kỳ tầng nào.
-      validTestIds.forEach((testId, position) => {
-        db.prepare('INSERT INTO qc_panel_tests(panel_id,test_id,position) VALUES (?,?,?)').run(panelId, testId, position);
+      inTransaction(() => {
+        if (id) {
+          db.prepare('UPDATE qc_panels SET name=?,instrument_id=?,note=?,active=? WHERE id=?').run(name, instrumentId, note, active ? 1 : 0, id);
+        } else {
+          db.prepare('INSERT INTO qc_panels(id,name,instrument_id,note,active) VALUES (?,?,?,?,?)').run(panelId, name, instrumentId, note, active ? 1 : 0);
+        }
+        db.prepare('DELETE FROM qc_panel_tests WHERE panel_id=?').run(panelId);
+        // Vị trí ghi TƯỜNG MINH theo thứ tự `validTestIds` — thứ tự người dùng
+        // tick trong modal. Đừng sắp lại theo tên ở bất kỳ tầng nào.
+        validTestIds.forEach((testId, position) => {
+          db.prepare('INSERT INTO qc_panel_tests(panel_id,test_id,position) VALUES (?,?,?)').run(panelId, testId, position);
+        });
+        writeAudit(db, actor, id ? 'Sửa Panel QC' : 'Thêm Panel QC', `Panel "${name}" (${validTestIds.length} xét nghiệm)`, name);
       });
-      writeAudit(db, actor, id ? 'Sửa Panel QC' : 'Thêm Panel QC', `Panel "${name}" (${validTestIds.length} xét nghiệm)`, name);
-      db.exec('COMMIT');
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu Panel QC thất bại.' } };
     }
     notifyChanged(['qc_panels', 'qc_panel_tests']);
@@ -1034,19 +1024,6 @@ export function createConfigHandlers(db: Db) {
   }
 
 
-  /** Chặn xoá lô đang được gán Mean/SD cho một mức QC, hoặc lô đã đi qua một
-   * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (hệ thống: "đã CHẤP NHẬN", tức đã áp vào
-   * cấu hình/Mean-SD) — xoá thẳng sẽ để lại mức QC trỏ vào lô không còn tồn
-   * tại. Xoá được thì dọn luôn các hồ sơ chuyển lô còn dở dang trỏ tới nó,
-   * đúng như `removeLot()` hệ thống làm. */
-  /** Kỳ báo cáo đã khoá hay chưa — đọc thẳng `period_locks` bằng SQL RIÊNG
-   * của handler này, chỉ dùng chung hàm thuần `ymOfDate()` với
-   * entry-handlers (quy ước "handler không import handler khác", xem
-   * CLAUDE.md mục Giai đoạn B11). */
-  function isPeriodLocked(ym: string): boolean {
-    return !!db.prepare('SELECT id FROM period_locks WHERE ym=?').get(ym);
-  }
-
   /** Chỉ xoá cấu hình xét nghiệm hoàn toàn mới, chưa phát sinh dữ liệu.
    * Điểm QC (kể cả đã huỷ), Mean/SD, lô đang gán, lịch sử Mean/SD, Sigma hay
    * hồ sơ NCE đều là hồ sơ chất lượng phải giữ lại. Khi đã có một trong các
@@ -1079,15 +1056,14 @@ export function createConfigHandlers(db: Db) {
         },
       };
     }
-    db.exec('BEGIN');
     try {
-      db.prepare(`DELETE FROM test_levels WHERE test_id IN (${existingPlaceholders})`).run(...existingIds);
-      db.prepare(`DELETE FROM qc_panel_tests WHERE test_id IN (${existingPlaceholders})`).run(...existingIds);
-      db.prepare(`DELETE FROM tests WHERE id IN (${existingPlaceholders})`).run(...existingIds);
-      writeAudit(db, actor, 'Xoá xét nghiệm', `Xoá cấu hình chưa phát sinh dữ liệu "${existing.name}" trên ${existingIds.length} máy`, existing.name);
-      db.exec('COMMIT');
+      inTransaction(() => {
+        db.prepare(`DELETE FROM test_levels WHERE test_id IN (${existingPlaceholders})`).run(...existingIds);
+        db.prepare(`DELETE FROM qc_panel_tests WHERE test_id IN (${existingPlaceholders})`).run(...existingIds);
+        db.prepare(`DELETE FROM tests WHERE id IN (${existingPlaceholders})`).run(...existingIds);
+        writeAudit(db, actor, 'Xoá xét nghiệm', `Xoá cấu hình chưa phát sinh dữ liệu "${existing.name}" trên ${existingIds.length} máy`, existing.name);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá xét nghiệm thất bại.' } };
     }
     notifyChanged(['tests', 'test_levels', 'qc_panels'], existingIds);
@@ -1107,20 +1083,24 @@ export function createConfigHandlers(db: Db) {
         error: { code: 'used-by-transition', message: 'Panel này đang có lịch sử chuyển tiếp lô. Hãy xóa/chuyển các dòng chuyển tiếp trước.' },
       };
     }
-    db.exec('BEGIN');
     try {
-      db.prepare('DELETE FROM qc_panel_tests WHERE panel_id=?').run(id);
-      db.prepare('DELETE FROM qc_panels WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá Panel QC', `Xoá Panel QC "${existing.name}"`, existing.name);
-      db.exec('COMMIT');
+      inTransaction(() => {
+        db.prepare('DELETE FROM qc_panel_tests WHERE panel_id=?').run(id);
+        db.prepare('DELETE FROM qc_panels WHERE id=?').run(id);
+        writeAudit(db, actor, 'Xoá Panel QC', `Xoá Panel QC "${existing.name}"`, existing.name);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá Panel QC thất bại.' } };
     }
     notifyChanged(['qc_panels']);
     return { ok: true, data: { id } };
   }
 
+  /** Chặn xoá lô đang được gán Mean/SD cho một mức QC, hoặc lô đã đi qua một
+   * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (hệ thống: "đã CHẤP NHẬN", tức đã áp vào
+   * cấu hình/Mean-SD) — xoá thẳng sẽ để lại mức QC trỏ vào lô không còn tồn
+   * tại. Xoá được thì dọn luôn các hồ sơ chuyển lô còn dở dang trỏ tới nó,
+   * đúng như `removeLot()` hệ thống làm. */
   function removeLot(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = String(input.id || '');
@@ -1134,14 +1114,13 @@ export function createConfigHandlers(db: Db) {
     if (accepted) {
       return { ok: false, error: { code: 'used-by-accepted-transition', message: 'Lô QC này có hồ sơ chuyển tiếp đã kết luận (đã áp vào cấu hình/Mean-SD). Không thể xoá lô trực tiếp — nếu thực sự cần, hãy xử lý hồ sơ chuyển tiếp đó trước.' } };
     }
-    db.exec('BEGIN');
     try {
-      db.prepare('DELETE FROM lot_transitions WHERE from_lot_id=? OR to_lot_id=?').run(id, id);
-      db.prepare('DELETE FROM qc_lots WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá lô QC', `Xoá lô "${existing.lot_no}"`, existing.lot_no);
-      db.exec('COMMIT');
+      inTransaction(() => {
+        db.prepare('DELETE FROM lot_transitions WHERE from_lot_id=? OR to_lot_id=?').run(id, id);
+        db.prepare('DELETE FROM qc_lots WHERE id=?').run(id);
+        writeAudit(db, actor, 'Xoá lô QC', `Xoá lô "${existing.lot_no}"`, existing.lot_no);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá lô QC thất bại.' } };
     }
     notifyChanged(['qc_lots', 'lot_groups', 'lot_transitions']);
@@ -1160,14 +1139,13 @@ export function createConfigHandlers(db: Db) {
     if (usedByLevel) {
       return { ok: false, error: { code: 'used-by-assay', message: 'Nhóm lô này đang được gán Mean/SD cho xét nghiệm. Hãy đổi nhóm/lô ở thẻ Mean/SD trước khi xoá nhóm.' } };
     }
-    db.exec('BEGIN');
     try {
-      db.prepare('UPDATE qc_lots SET group_id=NULL WHERE group_id=?').run(id);
-      db.prepare('DELETE FROM lot_groups WHERE id=?').run(id);
-      writeAudit(db, actor, 'Xoá nhóm lô QC', `Xoá nhóm "${existing.name}" (các lô bên trong được giữ lại)`, existing.name);
-      db.exec('COMMIT');
+      inTransaction(() => {
+        db.prepare('UPDATE qc_lots SET group_id=NULL WHERE group_id=?').run(id);
+        db.prepare('DELETE FROM lot_groups WHERE id=?').run(id);
+        writeAudit(db, actor, 'Xoá nhóm lô QC', `Xoá nhóm "${existing.name}" (các lô bên trong được giữ lại)`, existing.name);
+      });
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch { /* transaction đã đóng */ }
       return { ok: false, error: { code: 'delete-failed', message: e instanceof Error ? e.message : 'Xoá nhóm lô thất bại.' } };
     }
     notifyChanged(['qc_lots', 'lot_groups']);
@@ -1275,8 +1253,7 @@ export function createConfigHandlers(db: Db) {
     }
     const stoppedIds = new Set<string>();
     const at = nowIso();
-    db.exec('BEGIN');
-    try {
+    inTransaction(() => {
       for (const candidate of candidates) {
         const oldLot = candidate.prevLotId ? db.prepare('SELECT lot_no, opened FROM qc_lots WHERE id=?').get(candidate.prevLotId) as
           { lot_no: string; opened: string } | undefined : undefined;
@@ -1311,8 +1288,7 @@ export function createConfigHandlers(db: Db) {
       writeAudit(db, actor, 'Kích hoạt nhóm lô QC',
         `Nhóm "${group.name}": áp Mean/SD cho ${candidates.length} mức QC`
         + (stoppedIds.size ? `, dừng ${stoppedIds.size} nhóm lô bị thay thế` : ''), group.name);
-      db.exec('COMMIT');
-    } catch (error) { try { db.exec('ROLLBACK'); } catch { /* giữ lỗi gốc */ } throw error; }
+    });
     notifyChanged(['lot_groups', 'qc_lots', 'test_levels', 'tests', 'planned_targets']);
     return { ok: true, data: { status: 'applied', applied: candidates.length, stoppedGroups: [...stoppedIds] } };
   }
@@ -1344,7 +1320,7 @@ export function createConfigHandlers(db: Db) {
   }
 
   return {
-    listInstruments, saveInstrument, removeInstrument, listTests, saveTest, listTestLevels, saveTestLevel, listActivity,
+    listInstruments, saveInstrument, removeInstrument, listTests, saveTest, listTestLevels, saveTestLevel,
     listRuleScopes, saveRuleScope,
     setTeaRefValue, restoreTeaRefDefaults, addTeaAnalyte, removeTest, removePanel, listLots, saveLot, previewLotRename, removeLot, listLotGroups, saveLotGroup, removeLotGroup, stopLotGroup, activateLotGroup, listPanels, savePanel,
     listLotTransitions, createLotTransition, removeLotTransition,

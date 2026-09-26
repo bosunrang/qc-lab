@@ -10,8 +10,16 @@ const reagent = createReagentHandlers(db);
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'admin', clientId: 'test-client' };
 
 const initial = reagent.listComparisons();
-assert.equal(initial.length, 1);
+assert.equal(initial.length, 1, 'CSDL moi da co san 1 phep so sanh trong');
 assert.equal(initial[0].result, null, 'chua nhap so lieu thi ket qua phai la null');
+
+// Lệnh đọc không được ghi: bảng rỗng thì trả rỗng, không tự chèn dòng mẫu.
+{
+  const readOnlyDb = openDatabase(':memory:');
+  readOnlyDb.exec('DELETE FROM reagent_tests');
+  assert.deepEqual(createReagentHandlers(readOnlyDb).listComparisons(), []);
+  assert.equal(readOnlyDb.prepare('SELECT COUNT(*) AS n FROM reagent_tests').get().n, 0, 'listComparisons khong ghi vao CSDL');
+}
 
 const firstId = initial[0].id;
 

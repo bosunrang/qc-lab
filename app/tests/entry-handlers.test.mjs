@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { listActivity } from './helpers/activity.mjs';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 const require = createRequire(import.meta.url);
 
@@ -80,7 +81,7 @@ const rerunAfterVoid = entry.addPoint({ data: { testId: test.id, level: 1, date:
 assert.equal(rerunAfterVoid.ok, true, 'điểm đã hủy không được chặn lần chạy thay thế cùng run ID');
 
 // 8) Audit: 3 lần thêm điểm thành công + 1 lần hủy thành công = 4 dòng (không
-const activity = config.listActivity();
+const activity = listActivity(db);
 const entryRelated = activity.filter(a => a.type === 'Nhập QC' || a.type === 'Hủy điểm QC');
 assert.equal(entryRelated.length, 4, 'chi thao tac thanh cong moi ghi audit');
 

@@ -9,10 +9,16 @@
 // Bản trình duyệt: `db-file-size-browser.ts`, thay vào bởi plugin
 import { statSync } from 'node:fs';
 
+/** Cỡ dữ liệu trên đĩa: tệp chính cộng tệp `-wal` (chế độ WAL, xem
+ * `open-database.ts`), vì các thay đổi chưa gộp vẫn nằm trong tệp `-wal`. */
 export function dbFileBytes(dbPath: string): number {
   if (dbPath === ':memory:') return 0;
+  return sizeOf(dbPath) + sizeOf(`${dbPath}-wal`);
+}
+
+function sizeOf(filePath: string): number {
   try {
-    return statSync(dbPath).size;
+    return statSync(filePath).size;
   } catch {
     return 0;
   }

@@ -97,6 +97,11 @@ async function createWindow(): Promise<void> {
   const userDataDir = app.getPath('userData');
   const dbPath = path.join(userDataDir, 'qclab.sqlite');
   const db = openDatabase(dbPath);
+  // Đóng kết nối khi thoát để SQLite gộp tệp `-wal` vào `qclab.sqlite`: người
+  // dùng chép tay riêng tệp chính sau khi tắt app vẫn có đủ dữ liệu.
+  app.once('will-quit', () => {
+    try { db.close(); } catch { /* đã đóng */ }
+  });
   const config = createConfigHandlers(db);
   const entry = createEntryHandlers(db);
   const westgard = createWestgardHandlers(db);
