@@ -224,6 +224,11 @@ CREATE TABLE IF NOT EXISTS qc_points (
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_level_date ON qc_points(test_id, level, date);
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_run ON qc_points(test_id, run_id);
 CREATE INDEX IF NOT EXISTS idx_qc_points_active ON qc_points(test_id, level, date) WHERE voided = 0;
+-- Chuỗi điểm của MỘT lô (lô đang vận hành, lô cũ, lô song song) lọc theo
+-- (test_id, level, lot). Thiếu cột lot, SQLite phải đọc mọi điểm của mức qua
+-- nhiều năm rồi mới lọc: bài đo 60 xét nghiệm × 5 năm (2026-09-26) mở Tổng
+-- quan mất 3,2 s, có chỉ mục này còn 0,6 s.
+CREATE INDEX IF NOT EXISTS idx_qc_points_lot_active ON qc_points(test_id, level, lot, date) WHERE voided = 0;
 
 CREATE TABLE IF NOT EXISTS sigma_data (
   id TEXT PRIMARY KEY,
