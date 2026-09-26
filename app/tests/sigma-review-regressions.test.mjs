@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createRequire, stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { readSigmaPageSources } from './helpers/page-source.mjs';
 const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { applySchema } = require('../../app-dist/main/db/schema.js');
@@ -11,7 +12,9 @@ const { createSigmaHandlers } = require('../../app-dist/main/ipc/sigma-handlers.
 const { uncertaintyBudget } = require('../../app-dist/main/domain/sigma-metrics.js');
 const { resolveTea } = require('../../app-dist/main/domain/sigma-tea-core.js');
 const actor = { userId: 'reviewer', username: 'reviewer', name: 'Reviewer', role: 'admin', clientId: 'test' };
-const page = readFileSync(new URL('../renderer/pages/SigmaPage.tsx', import.meta.url), 'utf8');
+const page = readSigmaPageSources();
+// Hộp thoại MU nằm riêng ở `pages/sigma/MuModal.tsx`; test dựng lại đúng tệp đó.
+const muModalSource = readFileSync(new URL('../renderer/pages/sigma/MuModal.tsx', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../renderer/lib/sigma-workflow.ts', import.meta.url), 'utf8');
 function evaluate(source, context = {}) { return vm.runInNewContext(stripTypeScriptTypes(source.replace(/^import .*;\r?$/gm, '').replace(/export /g, '')), context); }
 const helpers = evaluate(workflow + '\n({parseEqaDraft, mdcRatios, governingSigmaLevel, sigmaMuExport})');
@@ -321,7 +324,7 @@ test('actual MU modal renders the edited draft, not stored MU, and marks incompl
   const { transformWithOxc } = await import('vite');
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
-  const transformed = await transformWithOxc(page.slice(page.indexOf('function MuModal(')), 'MuModal.tsx', { jsx: { runtime: 'classic' } });
+  const transformed = await transformWithOxc(muModalSource.slice(muModalSource.indexOf('function MuModal(')), 'MuModal.tsx', { jsx: { runtime: 'classic' } });
   function render(drafts) {
     const MuModal = vm.runInNewContext(transformed.code + '\nMuModal', {
       React, uncertaintyBudget, useState: () => [drafts.shift(), () => {}],

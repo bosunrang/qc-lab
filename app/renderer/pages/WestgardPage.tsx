@@ -1,7 +1,9 @@
 // Phân tích Westgard theo xét nghiệm và từng mức QC, gồm cấu hình luật,
-// hướng dẫn, biểu đồ Levey-Jennings/CUSUM và lịch sử nhóm lô.
+// hướng dẫn, biểu đồ Levey-Jennings/CUSUM và lịch sử nhóm lô. Tab nhóm lô đã
+// dừng/lưu trữ và bảng điểm dùng chung nằm ở `pages/westgard/`.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -13,26 +15,22 @@ import { EmptyState } from '../components/EmptyState';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { infoDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
-import { vnDate as formatVnDate } from '../lib/format';
 import { observedStats } from '../../main/domain/observed-stats';
 import { displayedWestgardBlocks, statText, westgardExportRows, WESTGARD_EXPORT_HEADERS, escapeHtml } from '../lib/westgard-view';
-import type { ArchivedBlock } from '../../shared/qc-api';
+import { WestgardPointTable } from './westgard/shared';
+import { useArchivedWestgard } from './westgard/useArchivedWestgard';
+import { ArchivedGroupPicker, ArchivedGroupResults } from './westgard/ArchivedGroupView';
 
-const VERDICT_LABEL: Record<string, string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
-/** Định dạng ngày ISO theo cách hiển thị tiếng Việt. */
-const vnDate = (iso: string) => formatVnDate(iso, '—');
-/** Mã chạy tự sinh có dạng YYYY-MM-DD-1; trong bảng chỉ cần số lần chạy.
- * Mã nguyên vẹn vẫn có ở tooltip để truy vết và với mã LIS tự do. */
-const runLabel = (runId: string) => {
-  const generated = /^(?:\d{4}-\d{2}-\d{2})-(\d+)$/.exec(runId);
-  return generated ? `Lần ${generated[1]}` : `Lần chạy: ${runId}`;
-};
-/** `none` không có Mean/SD nên z-score là NaN: tuyệt đối không đưa chuỗi
- * "NaNs" vào bảng, Excel hoặc PDF vì dễ bị hiểu là một kết quả xét nghiệm. */
-const zText = (z: number) => Number.isFinite(z) ? `${z >= 0 ? '+' : ''}${z.toFixed(2)}s` : '—';
 export function WestgardPage() {
-  const { tests, instruments, lots, levelsByTestId, loadTests, loadInstruments, loadLevels, loadLots, lotGroups, loadLotGroups } = useManageStore();
-  const { summaries, loadSummaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, previousLotBlocks: loadedPrevious, analysisTestId, analysisLoading, analysisError } = useWestgardStore();
+  const { tests, instruments, lots, levelsByTestId, loadTests, loadInstruments, loadLevels, loadLots, lotGroups, loadLotGroups } = useManageStore(useShallow((s) => ({
+    tests: s.tests, instruments: s.instruments, lots: s.lots, levelsByTestId: s.levelsByTestId, lotGroups: s.lotGroups,
+    loadTests: s.loadTests, loadInstruments: s.loadInstruments, loadLevels: s.loadLevels, loadLots: s.loadLots, loadLotGroups: s.loadLotGroups,
+  })));
+  const { summaries, loadSummaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, previousLotBlocks: loadedPrevious, analysisTestId, analysisLoading, analysisError } = useWestgardStore(useShallow((s) => ({
+    summaries: s.summaries, loadSummaries: s.loadSummaries, ruleSettings: s.ruleSettings, loadRuleSettings: s.loadRuleSettings,
+    saveRuleSetting: s.saveRuleSetting, resetRuleSettings: s.resetRuleSettings, analysisByLevel: s.analysisByLevel, loadAnalysis: s.loadAnalysis,
+    previousLotBlocks: s.previousLotBlocks, analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
+  })));
   // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`) — vai trò
   // chỉ-xem thấy đúng trạng thái luật nhưng không thay đổi được.
   const role = useAuthStore((s) => s.user)?.role;
@@ -50,15 +48,6 @@ export function WestgardPage() {
   // Khi có từ hai mức, CUSUM có thể xem chung để so sánh hoặc tách theo mức
   // để rà soát. Dù ở cách xem nào, chuỗi CUSUM luôn được tính độc lập ở main.
   const [cusumView, setCusumView] = useState<'summary' | 'levels'>('summary');
-  const [archivedGroupId, setArchivedGroupId] = useState('');
-  const [archivedTestId, setArchivedTestId] = useState('');
-  const [archivedQuery, setArchivedQuery] = useState('');
-  const [archivedTests, setArchivedTests] = useState<{ id: string; label: string }[]>([]);
-  const [archivedBlocks, setArchivedBlocks] = useState<ArchivedBlock[]>([]);
-  const [archivedTestsLoading, setArchivedTestsLoading] = useState(false);
-  const [archivedBlocksLoading, setArchivedBlocksLoading] = useState(false);
-  const [archivedRefresh, setArchivedRefresh] = useState(0);
-  const loadedArchivedGroupRef = useRef('');
 
   useEffect(() => { loadTests(); loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadRuleSettings(); }, [loadTests, loadInstruments, loadLots, loadLotGroups, loadSummaries, loadRuleSettings]);
   // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ; để rỗng
@@ -76,21 +65,6 @@ export function WestgardPage() {
   const analysisByLevel = useMemo(() => (analysisTestId === testId ? loadedAnalysis : {}), [analysisTestId, testId, loadedAnalysis]);
   const previousLotBlocks = useMemo(() => (analysisTestId === testId ? loadedPrevious : []), [analysisTestId, testId, loadedPrevious]);
   const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError;
-  /** Nhãn cho điểm tự nó đạt nhưng cả lần chạy bị loại. Nêu rõ MỨC nguồn để
-   * không bị hiểu nhầm là chính điểm đang xem sai.
-   *
-   * Đọc thẳng `runRejectedBy` do main trả (`rejectedLevelsByRun()`), KHÔNG tự
-   * dò lại. Bản trước quét `analysisByLevel` tìm mức khác có điểm cùng
-   * ngày + mã run mang verdict 'rej' — một bản sao thứ hai của cùng một phép
-   * tính, và sai ở hai chỗ: chỉ nêu được MỘT mức dù nhiều mức cùng hỏng, và
-   * khi bảng đang mở "Xem lô cũ" thì điểm hiển thị là của lô đã chuyển tiếp
-   * trong khi vòng dò vẫn đọc điểm của LÔ ĐANG CHẠY — tra nhầm chuỗi, nên
-   * gần như luôn rơi về nhãn chung chung. Tab "Nhóm lô đã dừng" thậm chí
-   * không gọi nó, chỉ in cứng nhãn chung. */
-  const runExclusionLabel = (point: { runRejectedBy?: number[] }) => {
-    const by = point.runRejectedBy || [];
-    return by.length ? `Lần chạy bị loại ở ${by.map((level) => `Mức ${level}`).join(', ')}` : 'Lần chạy bị loại ở mức khác';
-  };
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   useEffect(() => { loadAnalysis(testId, levelNums); }, [testId, levelNums.join(','), loadAnalysis]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -115,113 +89,14 @@ export function WestgardPage() {
     });
   });
 
-  const archivedGroups = useMemo(
-    () => lotGroups.filter((g) => g.active === 0 || g.status === 'stopped'),
-    [lotGroups],
-  );
-  const archivedNeedle = archivedQuery.trim().toLocaleLowerCase('vi');
-  // Tìm nhóm theo tên nhóm hoặc số lô. Nếu không khớp nhóm nào (ví dụ
-  // người dùng đang tìm tên xét nghiệm), vẫn giữ toàn bộ danh sách để ô chọn
-  // xét nghiệm tự xử lý phần lọc thay vì biến màn hình thành "không có dữ liệu".
-  const archivedGroupOptions = useMemo(() => {
-    if (!archivedNeedle) return archivedGroups;
-    const matched = archivedGroups.filter((group) => [
-      group.name,
-      ...group.lotIds.map((id) => lots.find((lot) => lot.id === id)?.lot_no || ''),
-    ].join(' ').toLocaleLowerCase('vi').includes(archivedNeedle));
-    return matched.length ? matched : archivedGroups;
-  }, [archivedGroups, archivedNeedle, lots]);
-
-  // Cùng quy ước thứ tự với danh mục/Mean-SD: listTests() đã giữ thứ tự tạo
-  // xét nghiệm (Na/K/Cl), còn IPC archived chỉ có nhiệm vụ lọc tập hợp hợp lệ.
-  const archivedOrderedTests = useMemo(() => {
-    const position = new Map(tests.map((test, index) => [test.id, index]));
-    return [...archivedTests].sort((a, b) =>
-      (position.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (position.get(b.id) ?? Number.MAX_SAFE_INTEGER)
-      || a.label.localeCompare(b.label, 'vi'),
-    );
-  }, [archivedTests, tests]);
-  const archivedMatchedTests = useMemo(() => {
-    if (!archivedNeedle) return archivedOrderedTests;
-    return archivedOrderedTests.filter((item) => {
-      const test = tests.find((candidate) => candidate.id === item.id);
-      const instrument = test ? instruments.find((item) => item.id === test.instrument_id)?.name || '' : '';
-      // Không dùng lô hiện hành ở đây vì tab này phải chỉ dựa vào lô lịch sử
-      // của nhóm đang chọn.
-      return `${item.label} ${instrument}`.toLocaleLowerCase('vi').includes(archivedNeedle);
-    });
-  }, [archivedNeedle, archivedOrderedTests, tests, instruments]);
-  const archivedTestOptions = archivedMatchedTests.length ? archivedMatchedTests : archivedOrderedTests;
-  const archivedGroup = archivedGroups.find((group) => group.id === archivedGroupId);
-  const archivedStatusLabel = archivedGroup?.active === 0 ? 'Đã lưu trữ' : 'Đã dừng';
-
-  // Tab lịch sử phải có một lựa chọn dùng được ngay khi mở.
-  // Không ràng buộc theo chuỗi tìm kiếm rỗng để người dùng vẫn tự đổi nhóm.
-  useEffect(() => {
-    if (view !== 'archived' || !archivedGroupOptions.length) return;
-    if (archivedGroupOptions.some((group) => group.id === archivedGroupId)) return;
-    setArchivedGroupId(archivedGroupOptions[0].id);
-  }, [view, archivedGroupId, archivedGroupOptions]);
-
-  // Nhóm lô đã dừng/lưu trữ: nạp danh sách xét nghiệm THẬT SỰ có lô của
-  // nhóm này (không phải mọi xét nghiệm trong hệ thống), rồi phân tích
-  // Phân tích Westgard cho xét nghiệm và nhóm đang chọn.
-  useEffect(() => {
-    setArchivedBlocks([]);
-    const groupChanged = loadedArchivedGroupRef.current !== archivedGroupId;
-    loadedArchivedGroupRef.current = archivedGroupId;
-    if (groupChanged) {
-      setArchivedTests([]);
-      setArchivedTestId('');
-    }
-    if (!archivedGroupId) { setArchivedTests([]); return; }
-    let active = true;
-    setArchivedTestsLoading(true);
-    // Dữ liệu CHỈ ĐỌC của nhóm lô đã lưu trữ: không đổi trong lúc xem, và
-    // có vòng đời gắn với lựa chọn trong tab này (kèm cờ huỷ) — giữ ở
-    // component thay vì store.
-    window.qcApi.listArchivedGroupTests(archivedGroupId).then((items) => {
-      if (!active) return;
-      setArchivedTests(items);
-    }).catch(() => {
-      if (active) setArchivedTests([]);
-    }).finally(() => { if (active) setArchivedTestsLoading(false); });
-    return () => { active = false; };
-  }, [archivedGroupId, archivedRefresh]);
-  // Khi đổi nhóm/lọc, giữ lựa chọn đang hợp lệ; nếu không còn phù hợp thì
-  // chọn ngay xét nghiệm đầu tiên. Đây là điểm bản mới từng thiếu nên thẻ
-  // lịch sử chỉ hiện hai combobox rỗng như ảnh người dùng gửi.
-  useEffect(() => {
-    if (!archivedOrderedTests.length) {
-      if (archivedTestId) setArchivedTestId('');
-      return;
-    }
-    const selectable = archivedMatchedTests.length ? archivedMatchedTests : archivedOrderedTests;
-    if (!selectable.some((test) => test.id === archivedTestId)) setArchivedTestId(selectable[0].id);
-  }, [archivedOrderedTests, archivedMatchedTests, archivedTestId]);
-  useEffect(() => {
-    if (!archivedGroupId || !archivedTestId) { setArchivedBlocks([]); return; }
-    let active = true;
-    setArchivedBlocksLoading(true);
-    window.qcApi.listArchivedBlocks(archivedTestId, archivedGroupId).then((blocks) => {
-      if (active) setArchivedBlocks(blocks);
-    }).catch(() => {
-      if (active) setArchivedBlocks([]);
-    }).finally(() => { if (active) setArchivedBlocksLoading(false); });
-    return () => { active = false; };
-  }, [archivedGroupId, archivedTestId, archivedRefresh]);
-  const archivedDecimals = tests.find((t) => t.id === archivedTestId)?.decimal_places ?? 2;
+  const archived = useArchivedWestgard({ active: view === 'archived', lotGroups, lots, tests, instruments });
+  const { archivedGroups } = archived;
   /** Nhãn xét nghiệm trong ô chọn: LOT phân biệt dải QC, còn tên máy phân biệt
    * cùng một xét nghiệm được gán cho nhiều máy. */
   const testPickerLabel = (s: typeof summaries[number]) => {
     const lots = Array.from(new Set(s.levels.map((lv) => lv.lot).filter(Boolean)));
     const label = lots.length ? `${s.testName} · LOT ${lots.join('/')}` : s.testName;
     return s.instrumentName ? `${label} · ${s.instrumentName}` : label;
-  };
-  const archivedTestPickerLabel = (item: typeof archivedTestOptions[number]) => {
-    const instrumentName = tests.find((test) => test.id === item.id)?.instrument_id;
-    const instrument = instruments.find((candidate) => candidate.id === instrumentName)?.name;
-    return instrument ? `${item.label} · ${instrument}` : item.label;
   };
   /** Lọc theo ô "Tìm nhanh": tên xét nghiệm, LOT hoặc máy. */
   const matchedTests = useMemo(() => {
@@ -237,12 +112,6 @@ export function WestgardPage() {
     if (!matchedTests.length || matchedTests.some((summary) => summary.testId === testId)) return;
     setTestId(matchedTests[0].testId);
   }, [matchedTests, testId]);
-
-  // Tab lưu trữ không dùng `analysisByLevel`, nên phải có nhịp nạp lại riêng
-  // khi điểm QC, lô hoặc Mean/SD của xét nghiệm đang xem vừa thay đổi.
-  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], archivedTestId || undefined, () => {
-    if (view === 'archived' && archivedGroupId) setArchivedRefresh((revision) => revision + 1);
-  });
 
   const lotLabelFor = useCallback((level: number) => {
     const lv = levels.find((l) => l.level === level);
@@ -424,28 +293,7 @@ export function WestgardPage() {
           </>
         )}
 
-        {view === 'archived' && (
-          <>
-            <div className="wg-test-picker wg-test-picker-3">
-              <div className="field">
-                <label>Tìm nhanh</label>
-                <input type="search" placeholder="Tên xét nghiệm hoặc số lô..." value={archivedQuery} onChange={(e) => setArchivedQuery(e.target.value)} />
-              </div>
-              <div className="field"><label>Chọn xét nghiệm <span className="hint">({archivedMatchedTests.length || archivedOrderedTests.length}/{archivedOrderedTests.length})</span></label>
-                <select value={archivedTestId} disabled={archivedTestsLoading || !archivedTestOptions.length} onChange={(e) => setArchivedTestId(e.target.value)}>
-                  {!archivedTestOptions.length && <option value="">{archivedTestsLoading ? 'Đang nạp xét nghiệm...' : 'Nhóm lô này chưa dùng cho xét nghiệm nào'}</option>}
-                  {archivedTestOptions.map((t) => <option key={t.id} value={t.id}>{archivedTestPickerLabel(t)}</option>)}
-                </select>
-              </div>
-              <div className="field"><label>Nhóm lô đã dừng/lưu trữ <span className="hint">({archivedGroupOptions.length}/{archivedGroups.length})</span></label>
-                <select value={archivedGroupId} onChange={(e) => setArchivedGroupId(e.target.value)}>
-                  {archivedGroupOptions.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.active === 0 ? 'đã lưu trữ' : 'đã dừng'}{g.stopped_at ? ` ${vnDate(g.stopped_at)}` : ''}</option>)}
-                </select>
-              </div>
-            </div>
-            <p className="hint wg-archive-note">Ưu tiên Mean/SD lưu tại từng điểm QC, dùng dải lịch sử của lô khi điểm cũ chưa có snapshot; kết luận được đánh giá lại theo bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô còn hoạt động.</p>
-          </>
-        )}
+        {view === 'archived' && <ArchivedGroupPicker state={archived} />}
       </div>
 
       {view === 'current' && !testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở panel phía trên.</EmptyState></div>}
@@ -550,101 +398,14 @@ export function WestgardPage() {
               <>
                 {analysis?.evaluationNote && <div className="alert warn wg-target-warning">{analysis.evaluationNote}</div>}
                 {noTarget && <div className="alert warn wg-target-warning"><b>Mức {l.level} chưa có Mean/SD hợp lệ</b> — điểm QC mức này không được đánh giá Westgard.</div>}
-                <div className="chart-scroll">
-                  <table className="wg-table">
-                    <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th className="wg-verdict-head">Kết luận</th><th className="wg-evidence-head">Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
-                    <tbody>
-                      {(analysis?.points || []).map((p, i) => (
-                        <tr key={p.id}>
-                          <td title={`Mã lần chạy: ${p.runId}`}>{i + 1}</td><td title={`Mã lần chạy: ${p.runId}`}>{vnDate(p.date)}<small className="hint" style={{ display: 'block' }}>{runLabel(p.runId)}</small></td>
-                          <td className="num">{p.val.toFixed(currentSummary?.decimalPlaces ?? 2)}</td>
-                          <td className="num">{zText(p.z)}</td>
-                          <td className="wg-verdict-cell">
-                            <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag none" title="Điểm này đạt riêng lẻ nhưng không được dùng cho thống kê vì một mức khác trong cùng run bị loại">{runExclusionLabel(p)}</span>}
-                            {p.cusumSignal && <span className="tag warn" title="Tín hiệu xu hướng CUSUM; không tự loại điểm QC">Cảnh báo CUSUM</span>}
-                          </td>
-                          <td className="wg-evidence-cell">
-                            <div className="wg-rule-chips">
-                            {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}
-                            {p.cusumSignal && <span className="pill warn" title="CUSUM vượt ngưỡng h; cần rà soát xu hướng">{p.cusumSignal}</span>}
-                            {p.supportRules.map((r) => <span className="pill hint wg-support-rule" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng" aria-label={`Bằng chứng lịch sử cho luật ${r}`}><span aria-hidden="true">↩</span><span>{r}</span></span>)}
-                            {!p.rules.length && !p.cusumSignal && !p.supportRules.length && '—'}
-                            </div>
-                          </td>
-                          <td className="hint">{p.errorType !== '—' ? <div className="wg-error-type"><b>{p.errorType}</b><small>{p.errorDesc}</small></div> : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <WestgardPointTable points={analysis?.points || []} decimals={currentSummary?.decimalPlaces ?? 2} />
               </>
             )}
           </div>
         );
       })}
 
-      {view === 'archived' && archivedGroupId && archivedTestsLoading && (
-        <div className="panel"><EmptyState>Đang nạp xét nghiệm và dữ liệu lịch sử của nhóm lô…</EmptyState></div>
-      )}
-
-      {view === 'archived' && archivedGroupId && !archivedTestsLoading && !archivedTestId && !archivedTests.length && (
-        <div className="panel"><EmptyState title="Không tìm thấy xét nghiệm nào">Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD lịch sử hợp lệ.</EmptyState></div>
-      )}
-
-      {view === 'archived' && archivedTestId && archivedBlocksLoading && (
-        <div className="panel"><EmptyState>Đang đánh giá Westgard cho dữ liệu lịch sử…</EmptyState></div>
-      )}
-
-      {view === 'archived' && archivedTestId && !archivedBlocksLoading && !archivedBlocks.length && (
-        <div className="panel"><EmptyState title="Chưa có dữ liệu phân tích">Không có lô nào của nhóm này có Mean/SD lịch sử hợp lệ cho xét nghiệm đã chọn.</EmptyState></div>
-      )}
-
-      {view === 'archived' && archivedTestId && archivedBlocks.length >= 2 && (
-        <div className="panel wg-multi-panel">
-          <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
-          <div className="hint wg-panel-intro">Biểu đồ quy đổi từng mức về Z-score theo Mean/SD đã chốt của chính lô để so sánh trên cùng trục; kết luận được đánh giá lại theo bộ luật Westgard đang bật.</div>
-          <div className="chart-scroll"><QcMultiChart className="wgLJMultiArchived" height={300} responsiveHeight decimals={archivedDecimals}
-            series={archivedBlocks.map((b) => ({ level: b.level, lot: b.lotNo, points: b.analysis.points }))} /></div>
-        </div>
-      )}
-
-      {view === 'archived' && archivedTestId && archivedBlocks.map((b) => (
-        <div className={`panel wg-level-panel${b.analysis.points.length ? ' wg-prev-lot' : ''}`} key={`${b.level}-${b.lotId}`}>
-          <h3>
-            <div className="wg-level-title"><span>Mức {b.level}</span><span className="wg-lot-name">Lô {b.lotNo}</span></div>
-            <div className="wg-level-meta"><span className="tag rej">{archivedStatusLabel}</span><span>Mean {b.mean.toFixed(archivedDecimals)}</span><span>SD {b.sd.toFixed(archivedDecimals)}</span><span>{b.analysis.points.length} điểm</span></div>
-          </h3>
-          {!b.analysis.points.length ? (
-            <EmptyState title="Chưa có dữ liệu">Không tìm thấy điểm QC nào cho lô này.</EmptyState>
-          ) : (
-            <>
-              <div className="chart-scroll">
-                <table className="wg-table">
-                <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th className="wg-verdict-head">Kết luận</th><th className="wg-evidence-head">Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
-                <tbody>
-                  {b.analysis.points.map((p, i) => (
-                    <tr key={p.id}>
-                      <td title={`Mã lần chạy: ${p.runId}`}>{i + 1}</td><td title={`Mã lần chạy: ${p.runId}`}>{vnDate(p.date)}<small className="hint" style={{ display: 'block' }}>{runLabel(p.runId)}</small></td>
-                      <td className="num">{p.val.toFixed(archivedDecimals)}</td>
-                      <td className="num">{zText(p.z)}</td>
-                      <td className="wg-verdict-cell"><span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag none" title="Điểm này đạt riêng lẻ nhưng không được dùng cho thống kê vì một mức khác trong cùng run bị loại">{runExclusionLabel(p)}</span>}</td>
-                      <td className="wg-evidence-cell">
-                        <div className="wg-rule-chips">
-                        {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}
-                        {p.supportRules.map((r) => <span className="pill hint wg-support-rule" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng" aria-label={`Bằng chứng lịch sử cho luật ${r}`}><span aria-hidden="true">↩</span><span>{r}</span></span>)}
-                        {!p.rules.length && !p.supportRules.length && '—'}
-                        </div>
-                      </td>
-                      <td className="hint">{p.errorType !== '—' ? <div className="wg-error-type"><b>{p.errorType}</b><small>{p.errorDesc}</small></div> : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      ))}
+      {view === 'archived' && <ArchivedGroupResults state={archived} />}
     </div>
   );
 }
