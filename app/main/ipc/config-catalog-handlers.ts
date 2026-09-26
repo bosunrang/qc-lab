@@ -70,12 +70,10 @@ export function createCatalogConfigHandlers(db: Db) {
     return { ok: true, data: { id } };
   });
 
-  // hệ thống KHÔNG sắp xếp `state.tests` ở đâu cả (`manageAssaysModel()`/
-  // `PanelModal.tsx`'s `allTests` chỉ `.filter()`/`.map()` thẳng lên mảng) —
-  // thứ tự hiển thị (danh mục xét nghiệm, danh sách chọn trong Panel QC...)
-  // LÀ thứ tự tạo (xét nghiệm thêm trước nằm trước). `ORDER BY name` trước
-  // đây tự sắp lại theo alphabet, sai với hành vi hệ thống. `rowid` (ngầm định
-  // của SQLite cho bảng có PK dạng TEXT) chính là thứ tự chèn.
+  // Thứ tự hiển thị xét nghiệm (danh mục xét nghiệm, danh sách chọn trong
+  // Panel QC...) LÀ thứ tự tạo (xét nghiệm thêm trước nằm trước). `ORDER BY
+  // name` trước đây tự sắp lại theo alphabet, làm mất thứ tự đó. `rowid`
+  // (ngầm định của SQLite cho bảng có PK dạng TEXT) chính là thứ tự chèn.
   function listTests() {
     return db.prepare('SELECT * FROM tests ORDER BY rowid').all();
   }
@@ -274,7 +272,7 @@ export function createCatalogConfigHandlers(db: Db) {
       if (selectedLot.level !== level) {
         return { ok: false, error: { code: 'wrong-lot-level', message: `Lô QC đã chọn thuộc Mức ${selectedLot.level}, không thể gán cho Mức ${level}.` } };
       }
-      // `targetRowState()` hệ thống khoá toàn bộ hàng của lô đã hết dùng.
+      // Lô đã hết dùng bị khoá toàn bộ hàng, không gán Mean/SD mới.
       if (selectedLot.depleted) return { ok: false, error: { code: 'depleted-lot', message: 'Lô QC đã hết dùng, không thể gán Mean/SD mới.' } };
     }
     const levelId = `${testId}:${level}`;
@@ -382,7 +380,7 @@ export function createCatalogConfigHandlers(db: Db) {
     const knownTests = new Set(testRows.map((t) => t.id));
     const validTestIds = testIds.filter((t) => knownTests.has(t));
     if (!validTestIds.length) return { ok: false, error: { code: 'missing-tests', message: 'Chọn ít nhất một xét nghiệm hợp lệ.' } };
-    // hệ thống coi MỌI id không tồn tại như một xét nghiệm không thuộc máy đã
+    // MỌI id không tồn tại được coi như một xét nghiệm không thuộc máy đã
     // chọn và từ chối TOÀN BỘ lần lưu. Không được âm thầm bỏ id hỏng rồi lưu
     // phần còn lại: kết quả sẽ khác với lựa chọn mà người dùng vừa xác nhận.
     if (validTestIds.length !== testIds.length) {

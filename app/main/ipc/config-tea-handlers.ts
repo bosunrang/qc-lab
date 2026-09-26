@@ -109,8 +109,8 @@ export function createTeaRefHandlers(db: Db) {
       const parsed = Number(raw);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
     };
-    // Khoá analyte suy từ tên (bỏ dấu, gạch nối) — cùng quy ước
-    // `teaAnalyteKey()` hệ thống để hồ sơ PXN và ghi đè CLIA/Ricos khớp nhau.
+    // Khoá analyte suy từ tên (bỏ dấu, gạch nối) — dùng chung một quy ước để
+    // hồ sơ PXN và ghi đè CLIA/Ricos khớp nhau.
     const analyteId = cleanId(name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || uid());
     const existing = db.prepare('SELECT id FROM tea_refs WHERE analyte_id=?').get(analyteId) as { id: string } | undefined;
     if (existing) return { ok: false, error: { code: 'duplicate', message: `Đã có xét nghiệm tham chiếu "${name}".` } };
@@ -130,7 +130,7 @@ export function createTeaRefHandlers(db: Db) {
     return { ok: true, data: { analyteId } };
   });
 
-  /** Bỏ MỌI ghi đè CLIA/Ricos của 1 analyte (nút "Khôi phục" hệ thống) — giữ
+  /** Bỏ MỌI ghi đè CLIA/Ricos của 1 analyte (nút "Khôi phục") — giữ
    * lại hồ sơ TEa PXN nếu có, chỉ trả 2 giá trị tham chiếu về mặc định. */
   const restoreTeaRefDefaults = writeCommand(db, 'restoreTeaRefDefaults', 'admin', (w, input: { analyteId: unknown }): IpcResult<{ analyteId: string }> => {
     const analyteId = cleanId(String(input.analyteId || ''));

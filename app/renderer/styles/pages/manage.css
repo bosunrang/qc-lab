@@ -27,11 +27,11 @@ main:has(.config-shell){padding-bottom:16px;}
    cuộn nên mọi thứ phía trên bảng (tiêu đề thẻ, ô tìm kiếm, 3 thẻ nguồn TEa)
    đều trôi mất khi cuộn tới dòng thứ 77. */
 .config-shell-main{flex:1 1 auto;display:flex;flex-direction:column;background:transparent;min-width:0;max-width:100%;min-height:0;overflow:hidden;}
-/* hệ thống: toolbar là dải riêng của vùng nội dung, còn panel bên dưới GIỮ
+/* Toolbar là dải riêng của vùng nội dung, còn panel bên dưới GIỮ
    viền 1px + bo góc + nền trắng (đo được: panel 874px, bảng bên trong 872px).
    Rule cũ ở đây gỡ hết viền/nền vì thời điểm đó toolbar nằm trong panel nên
    panel bị coi là lớp bọc dư. */
-/* hệ thống KHÔNG zero padding cho mọi panel trong vùng nội dung — chỉ cho
+/* KHÔNG zero padding cho mọi panel trong vùng nội dung — chỉ cho
    panel bọc bảng (`.rcfg-list:has(> table)`, khai ở trên). Rule rộng ở
    đây đè mất `padding-bottom:14px` của panel Mean/SD. */
 .config-shell-main>.panel{margin:0;overflow:visible;}
@@ -298,8 +298,7 @@ main:has(.config-shell){padding-bottom:16px;}
 
 /* Trạng thái trống của Mean/SD nằm thẳng trong panel (không qua `.rcfg-list`)
    nên phải gọi tên riêng để dùng chung một khuôn với 6 thẻ kia. */
-/* Huy hiệu trạng thái ở cột cuối được canh giữa ô (hệ thống:
-   `.target-row .tag{margin-left:auto;margin-right:auto}`). */
+/* Huy hiệu trạng thái ở cột cuối được canh giữa ô. */
 .target-row .tag{margin-left:auto;margin-right:auto;text-align:center;}
 
 /* Dải chọn Panel/nhóm lô/xét nghiệm là hàng đầu tiên BÊN TRONG khối trắng —
@@ -315,10 +314,10 @@ main:has(.config-shell){padding-bottom:16px;}
 .target-config-panel-field{flex:0 1 380px;min-width:240px;}
 .target-config-group-field{flex:0 1 320px;min-width:240px;}
 .target-config-selector .field{margin:0;}
-/* Bảng Mean/SD của hệ thống KHÔNG phải <table>: `.target-table` là hộp cuộn,
-   còn `.target-head`/`.target-row` là LƯỚI 7 cột (professional-config.css).
-   app từng dùng <table> ở bản thí điểm nên CSS cũ ở đây style theo bảng;
-   lưới hiện tại không kế thừa các selector đó. */
+/* Bảng Mean/SD KHÔNG phải <table>: `.target-table` là hộp cuộn, còn
+   `.target-head`/`.target-row` là LƯỚI 7 cột. App từng dùng <table> ở bản
+   thí điểm nên CSS cũ ở đây style theo bảng; lưới hiện tại không kế thừa
+   các selector đó. */
 /* Lưới Mean/SD nằm TRONG khối trắng `.target-matrix-panel`, nên tự nó không
    mang viền/bo góc/lề nữa — điểm (2) của khối chuẩn (một bề mặt trắng, không
    lồng khung trong khung). */
@@ -355,16 +354,15 @@ main:has(.config-shell){padding-bottom:16px;}
 .transition-table .hint{line-height:var(--leading-snug);}
 .transition-table td:last-child,.tea-ref-table td:last-child{white-space:nowrap;}
 
-/* Hộp thoại chuyển tiếp lô: giữ cấu trúc 3 + 2 trường và vùng Mean/SD
-   bên trong như hệ thống. Các ô Mean/SD hiện là giao diện đối chiếu; luồng
-   lưu tiêu chí chuyển lô sẽ được nối riêng khi triển khai nghiệp vụ. */
+/* Hộp thoại chuyển tiếp lô: cấu trúc 3 + 2 trường và vùng Mean/SD bên
+   trong. */
 
 .lot-trans-row3{display:grid;grid-template-columns:300px 1fr 1fr;gap:var(--field-gap);}
 .lot-trans-row2{display:flex;gap:var(--field-gap);margin-top:0;}
 .lot-trans-row2>div{flex:0 0 auto;width:200px;}
 .lot-trans-row3 .field,.lot-trans-row2 .field{margin:0;}
 .lot-trans-modal .lot-trans-row2+.field{margin-top:var(--space-4);}
-/* Dòng nhắc chọn Panel/lô dùng `.hint.flow-section` dùng chung như hệ thống. */
+/* Dòng nhắc chọn Panel/lô dùng `.hint.flow-section` dùng chung. */
 
 .history-selector .field{margin:0;}
 .history-table th,.history-table td{text-align:center;vertical-align:middle;}
@@ -423,7 +421,9 @@ main:has(.config-shell){padding-bottom:16px;}
 .tea-form-section { margin-bottom: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .tea-form-section-last { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .tea-form-section > b { display: block; margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--text-base); }
-.tea-form-primary { display: grid; grid-template-columns: minmax(160px,1fr) 72px 88px minmax(185px,1.15fr); gap: var(--field-gap); }
+.tea-form-label-note { color: var(--text-tertiary); font-weight: var(--weight-normal); }
+.tea-form-primary { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,.7fr) minmax(0,.9fr); gap: var(--field-gap); }
+.tea-form-source { grid-column: 1 / -1; }
 .tea-form-primary .field, .tea-form-dates .field, .tea-form-people .field { margin: 0; }
 .tea-form-section > .field + .field { margin-top: var(--field-gap); }
 .tea-form-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
@@ -498,11 +498,9 @@ main:has(.config-shell){padding-bottom:16px;}
 .panel-qc-main-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap);}
 .panel-qc-main-grid .field{margin:0;}
 .panel-test-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);}
-/* Thiếu `grid-template-columns` — hệ thống (`professional-config.css`'s
-   `.group-lot-picker,.lot-level-picker{grid-template-columns:repeat(auto-fit,
-   minmax(min(180px,100%),1fr));}`) xếp checkbox NHIỀU CỘT theo hàng ngang;
-   app chỉ có base `display:grid` không khai cột nên mặc định 1 cột, xếp
-   dọc từng dòng — đúng lỗi người dùng chỉ ra qua ảnh chụp. */
+/* Phải khai `grid-template-columns` để checkbox xếp NHIỀU CỘT theo hàng
+   ngang: chỉ có base `display:grid` thì mặc định 1 cột, xếp dọc từng dòng
+   — đúng lỗi người dùng chỉ ra qua ảnh chụp. */
 .panel-test-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:6px;max-height:280px;overflow:auto;padding:0;border:0;border-radius:0;background:transparent;}
 .panel-test-picker label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;}
 .panel-test-picker label:hover{border-color:var(--accent-border-strong);}
@@ -519,14 +517,13 @@ main:has(.config-shell){padding-bottom:16px;}
 .rcfg-modal .panel-test-picker+.field{margin-top:var(--space-4);}
 .panel-active{margin:0;}
 
-/* Popup lô QC và nhóm lô QC: chia trường/lô đúng hai modal của hệ thống. */
 /* Popup lô QC nhỏ hơn modal cấu hình chung vì chỉ có các trường một lô.
    Các hàng `grid2` nhận nhịp 12px từ `#lot-form`, không mang margin cục bộ. */
 
 .lot-group-picker-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);}
 .lot-level-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:300px;overflow:auto;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
-/* hệ thống chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/`levels-3plus`
-   trên chính modal), không phải auto-fit. */
+/* Popup nhóm lô chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/
+   `levels-3plus` trên chính modal), không phải auto-fit. */
 .rcfg-group-modal .lot-level-picker{grid-template-columns:1fr;gap:10px;max-height:none;overflow:visible;padding:10px;}
 .rcfg-group-modal.levels-2 .lot-level-picker{grid-template-columns:repeat(2,minmax(0,1fr));}
 .rcfg-group-modal.levels-3plus .lot-level-picker{grid-template-columns:repeat(3,minmax(0,1fr));}
@@ -640,7 +637,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 /* .hist-meansd-table ("Mean/SD đã dùng") và .hist-points-table ("Điểm QC đã
    nhập") — 2 class riêng cho 2 bảng trong modal "Chi tiết", mỗi bảng khai
    đủ 8 cột, không dùng chung rule nth-child với các bảng khác của trang
-   Cấu hình chung (đúng lý do hệ thống đã tách class từ 2026-08-05). */
+   Cấu hình chung (tách class từ 2026-08-05). */
 .hist-meansd-table th:nth-child(1),.hist-meansd-table td:nth-child(1){width:16%;}
 .hist-meansd-table th:nth-child(2),.hist-meansd-table td:nth-child(2){width:10%;}
 .hist-meansd-table th:nth-child(3),.hist-meansd-table td:nth-child(3){width:8%;}

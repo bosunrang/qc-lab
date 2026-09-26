@@ -6,7 +6,7 @@
 // nay" đếm sai, hạn xử lý NCE +7 ngày lệch một ngày, và mốc cắt kỳ Sigma
 // nhảy về tháng trước vào sáng ngày mùng 1. Đây đúng lớp lỗi đã được chốt
 // cho LIS Gateway (`resultToPointInput()` phải suy ngày theo giờ địa
-// phương, xem CLAUDE.md Giai đoạn C5) — cùng một nguyên tắc, áp cho mọi
+// phương) — cùng một nguyên tắc, áp cho mọi
 // chỗ tính "hôm nay" ở main process.
 export function isoLocalDate(at: Date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0');

@@ -11,7 +11,7 @@
 .sg-data-foot{display:flex;justify-content:flex-start;gap:8px;flex-wrap:wrap;padding:8px 16px;border-top:1px solid var(--border-subtle);}
 /* Trình duyệt mặc định render h2 ở 1.5em (≈21px). Mọi `panel-title` trực
    tiếp trên trang Sigma là dải tiêu đề cấp section nên phải dùng token 14px,
-   giống tiêu đề "Số liệu theo kỳ" và các panel hệ thống khác. */
+   giống tiêu đề "Số liệu theo kỳ" và các panel khác trong app. */
 .sigma-page>.panel>h2.panel-title:first-child{color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
 .sg-setup-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2-5);min-height:var(--panel-header-h);padding:10px 14px;color:var(--text-primary);background:var(--surface-section-header);}
 .sg-setup-heading h2{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
@@ -138,8 +138,8 @@
 .sg-eqa-summary b{color:var(--text-primary);font-size:var(--text-md);}
 .sg-eqa-summary .sg-eqa-average{color:var(--accent-active);}
 .sg-eqa-empty{align-self:center;font-size:var(--text-sm);letter-spacing:0;text-transform:none;}
-/* Đây là hướng dẫn tại chỗ, không phải cảnh báo cấp trang: dùng cùng vạch 3px
-   gọn của hệ thống. Góc của nền và dải nhấn cùng bo 8px để mép trái không
+/* Đây là hướng dẫn tại chỗ, không phải cảnh báo cấp trang: dùng vạch 3px
+   gọn như các ghi chú khác trong app. Góc của nền và dải nhấn cùng bo 8px để mép trái không
    bị cắt vuông; phần mô tả không dùng bold để không tạo cảm giác báo động. */
 .sg-eqa-summary.is-empty{box-sizing:border-box;display:flex;width:fit-content;max-width:100%;min-height:var(--control-h-compact);margin-top:10px;padding:4px 10px;border-left:3px solid var(--warning-accent);border-radius:var(--radius-md);background:var(--warning-surface);color:var(--warning-text);font-size:var(--text-sm);line-height:var(--leading-body);}
 .sg-eqa-summary.is-empty .sg-eqa-empty{color:var(--warning-text);font-weight:var(--weight-normal);}
@@ -172,7 +172,7 @@
 .sg-improvement-card{display:block;margin:0 16px 16px;background:var(--surface);border-left:3px solid var(--sg-color);border-radius:var(--radius-md);color:var(--text-primary);}
 .sg-improvement-card > b{color:var(--sg-color);}
 /* Đặt lại margin/padding mặc định của `ul` để dấu đầu dòng dùng indent 24px,
-   cùng nhịp với nội dung cảnh báo trong hệ thống. */
+   cùng nhịp với nội dung cảnh báo khác trong app. */
 .sg-improvement-card .sg-improvement-list{margin:4px 0 0;padding-left:24px;list-style-position:outside;}
 .sg-governing-rule{display:block;margin:12px 0 0;}
 .sg-governing-rule > div{margin-top:4px;}

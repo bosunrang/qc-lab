@@ -1,4 +1,4 @@
-// Giai đoạn C1: kiểm chứng buildXlsxBase64() tạo ra file .xlsx THẬT (đọc lại
+// Kiểm chứng buildXlsxBase64() tạo ra file .xlsx THẬT (đọc lại
 // bằng chính exceljs để xác nhận header/hàng đúng, không chỉ kiểm tra chuỗi
 // base64 không rỗng). printHtmlToPdf() cần BrowserWindow thật (Electron),
 // không test được ở Node thuần — đã xác nhận qua Playwright `_electron` tạm

@@ -50,7 +50,7 @@ assert.equal(groupTooFew.error.code, 'not-enough-lots');
 
 const group = h.saveLotGroup({ data: { name: '', lotIds: [lot1.data.id, lot2.data.id] } }, actor);
 assert.equal(group.ok, true);
-assert.equal(group.data.name, 'L1/L2', 'bỏ trống tên phải tự ghép từ số lô như hệ thống');
+assert.equal(group.data.name, 'L1/L2', 'bỏ trống tên phải tự ghép từ số lô');
 assert.deepEqual(group.data.lotIds.sort(), [lot1.data.id, lot2.data.id].sort());
 // Cả 2 lô phải thật sự được gán group_id trong bảng qc_lots.
 const lotsAfterGroup = h.listLots();
@@ -93,8 +93,8 @@ const panelUpdated = h.savePanel({ id: panel.data.id, data: { name: 'Panel A', i
 assert.equal(panelUpdated.ok, true);
 assert.deepEqual(panelUpdated.data.testIds, [test1.id]);
 
-// Đổi xét nghiệm sang máy khác phải tự gỡ nó khỏi Panel của máy cũ, đúng
-// `saveAssay()` hệ thống. Nếu không, chính thao tác sửa xét nghiệm sẽ tạo ra
+// Đổi xét nghiệm sang máy khác phải tự gỡ nó khỏi Panel của máy cũ. Nếu
+// không, chính thao tác sửa xét nghiệm sẽ tạo ra
 // Panel chứa xét nghiệm khác máy — trạng thái mà savePanel vốn từ chối.
 const instrumentB = h.saveInstrument({ data: { name: 'Máy B' } }, actor).data;
 const duplicateAnalyte = h.saveTest({ data: { name: 'GLU', instrumentId: instrument.id, teaRefKey: 'qclab-glucose' } }, actor);
@@ -127,7 +127,7 @@ const dup = h.createLotTransition({ data: { panelId: panel.data.id, fromLotId: l
 assert.equal(dup.ok, false);
 assert.equal(dup.error.code, 'duplicate-transition');
 
-// MỘT hàm lưu duy nhất (2026-09-03, khớp hệ thống): status đi kèm cùng lần
+// MỘT hàm lưu duy nhất (2026-09-03): status đi kèm cùng lần
 // gọi createLotTransition, không phải hàm riêng — modal chỉ có 1 nút Lưu.
 const activate = h.createLotTransition({ id: transition.data.id, data: { panelId: panel.data.id, fromLotId: lot1.data.id, toLotId: lot3.id, startDate: '2026-06-01', status: 'active' } }, actor);
 assert.equal(activate.ok, true);

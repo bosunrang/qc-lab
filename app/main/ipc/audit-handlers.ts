@@ -98,14 +98,14 @@ export function createAuditHandlers(db: Db) {
       }
       rows.sort((a, b) => Number(b.seq) - Number(a.seq));
     }
-    // `total` = TOÀN BỘ nhật ký (không phụ thuộc bộ lọc) — trang Nhật ký của
-    // hệ thống hiện cả "N dòng hoạt động đã ghi nhận" và "khớp/tổng".
+    // `total` = TOÀN BỘ nhật ký (không phụ thuộc bộ lọc) — trang Nhật ký hiện
+    // cả "N dòng hoạt động đã ghi nhận" và "khớp/tổng".
     const total = Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n);
     const { page: shownPage, pageCount, offset, resultFrom, resultTo, filteredCount } = pageWindow;
     return { ok: true, data: { page: shownPage, pageCount, offset, resultFrom, resultTo, filteredCount, rows: rows.map(rowToAuditEntry), total } };
   }
 
-  /** hệ thống luôn xuất TOÀN BỘ nhật ký theo thứ tự ghi (cũ đến mới), không
+  /** Luôn xuất TOÀN BỘ nhật ký theo thứ tự ghi (cũ đến mới), không
    * phụ thuộc bộ lọc đang xem. Đây là bản lưu vết để đối chiếu, không phải
    * chức năng xuất kết quả tìm kiếm. Giữ `input` để không phá tương thích IPC
    * với preview/bản đã cài; cố ý không dùng các giá trị trong đó. */

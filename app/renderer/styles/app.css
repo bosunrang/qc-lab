@@ -4,8 +4,8 @@
 body{background:var(--surface-page);color:var(--text-primary);font-size:var(--text-base);line-height:var(--leading-body);}
 
 .app-shell{display:grid;grid-template-columns:var(--sidebar-expanded-width) minmax(0,1fr);height:100vh;min-height:0;width:100%;min-width:0;overflow:hidden;transition:grid-template-columns var(--motion) ease;}
-/* hệ thống thu sidebar còn clamp(196px,18vw,230px) từ 1280px (không thu gọn
-   hẳn về dạng icon) — giữ đúng mốc/giá trị đó trước khi tới ngưỡng thu gọn. */
+/* Từ 1280px sidebar thu hẹp còn clamp(196px,18vw,230px) (chưa thu gọn hẳn
+   về dạng icon) cho tới ngưỡng thu gọn 1050px. */
 @media(max-width:1280px){.app-shell:not(.nav-collapsed){grid-template-columns:clamp(196px,18vw,230px) minmax(0,1fr);}}
 @media(max-width:1050px){.app-shell{grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}}
 .app-shell.nav-collapsed{grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}
@@ -57,15 +57,15 @@ nav a.active .ic{color:var(--sidebar-active-accent);}
   nav a.active{padding-left:0;border-left:0;box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
 }
 
-/* Khớp hệ thống: header sticky bắt đầu sát đỉnh vùng cuộn. Padding dọc phía
+/* Header sticky bắt đầu sát đỉnh vùng cuộn. Padding dọc phía
    trên ở đây sẽ làm lệch vị trí hiển thị của header so với luồng nội dung. */
 main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:0 clamp(20px,2.4vw,36px) 64px;box-sizing:border-box;overscroll-behavior-y:contain;}
 /* Header trang chuẩn 84px ở desktop: đủ cho tên trang, mô tả và cụm tài
    khoản nhưng không chiếm chiều cao của bảng. `min-height` (thay vì height)
    vẫn cho phép nó nới an toàn nếu một tiêu đề/khối tài khoản phải xuống dòng. */
 .head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(12px,1.4vw,20px);position:sticky;top:0;z-index:var(--z-page-head);box-sizing:border-box;min-height:88px;margin:0 calc(-1 * clamp(20px,2.4vw,36px)) var(--page-header-gap);padding:12px clamp(20px,2.4vw,36px);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:var(--shadow-page-head);}
-/* Khoảng hở dưới header nằm trên chính `.head` như hệ thống
-   (`professional-base.css`: `margin:0 calc(...) 22px`). Bản trước dùng
+/* Khoảng hở dưới header nằm trên chính margin dưới của `.head`
+   (`margin:0 calc(...) var(--page-header-gap)`). Bản trước dùng
    `main > .head + *{margin-top:...}` — KHÔNG khớp được, vì mọi trang app
    bọc nội dung trong một <div> vô danh nên `.head` không phải con trực tiếp
    của <main>; hệ quả là mọi trang mất đúng 22px khoảng hở dưới tiêu đề. */
@@ -145,11 +145,11 @@ input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{ba
 input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--surface-page);color:var(--text-disabled);border-color:var(--border-subtle);cursor:not-allowed;}
 label{display:block;font-size:var(--text-sm);color:var(--text-secondary);margin:var(--space-2) 0 var(--field-label-gap);font-weight:var(--weight-semibold);}
 
-/* hệ thống KHÔNG có class `.field` — mỗi ô là một `<div>` thường: nhãn là
-   block có margin `8px 0 4px`, ô nhập `width:100%`. app dựng `.field`
-   thành flex column, nên mọi con của nó bị BLOCKIFY và giãn hết chiều
-   ngang — đó là lý do ô ngày (`.datebox`, khai `inline-flex`) computed ra
-   `flex` và rộng 326px thay vì bó theo nội dung 164px như hệ thống. */
+/* `.field` là block thường, KHÔNG phải flex column: nhãn là block, ô nhập
+   `width:100%`. Trước đây app dựng `.field` thành flex column, nên mọi con
+   của nó bị BLOCKIFY và giãn hết chiều ngang — đó là lý do ô ngày
+   (`.datebox`, khai `inline-flex`) computed ra `flex` và rộng 326px thay
+   vì bó theo nội dung 164px. */
 .field{display:block;}
 /* Form QC Lab dùng `gap` để quyết định nhịp hàng, không cộng margin của nhãn
    vào từng field. `.field` vẫn là block để ô ngày không bị giãn ngang. */
@@ -225,10 +225,9 @@ label.field>span:first-child{display:block;margin-bottom:var(--field-label-gap);
 
 
 table{border:1px solid var(--surface-divider);border-radius:var(--table-radius);border-collapse:separate;border-spacing:0;overflow:hidden;background:var(--surface);font-size:var(--table-body-size);line-height:var(--leading-snug);}
-/* `line-height:1.4` cho ô bảng — hệ thống đặt riêng ở professional-base.css,
-   thấp hơn `table{line-height:1.45}`. Nó quyết định chiều cao MỌI ô bảng
-   và mọi huy hiệu `.tag`/`.pill` bên trong (chúng không tự khai
-   line-height nên thừa hưởng của ô). */
+/* `line-height:1.4` đặt riêng cho ô bảng, thấp hơn `table{line-height:1.45}`.
+   Nó quyết định chiều cao MỌI ô bảng và mọi huy hiệu `.tag`/`.pill` bên
+   trong (chúng không tự khai line-height nên thừa hưởng của ô). */
 th,td{padding:var(--table-cell-py,var(--space-2-5)) var(--table-cell-px,var(--space-3));text-align:left;border-bottom:1px solid var(--surface-divider);font-size:var(--table-body-size);vertical-align:middle;line-height:var(--leading-snug);}
 th{height:var(--table-header-h);background:var(--table-head-bg);color:var(--table-head-ink);border-bottom-color:var(--table-head-border);font-weight:var(--table-head-weight);font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);text-transform:none;position:sticky;top:0;z-index:1;}
 /* Hàng dữ liệu luôn trắng. Không dùng sọc zebra: với bảng
@@ -342,9 +341,9 @@ td .hint{margin-top:2px;color:var(--text-tertiary);}
 .datebox:has(input.date-text:focus-visible){outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:var(--focus-ring-offset);}
 /* Ô ngày là trường thật trong 1 form (`.field` bọc nó, có `label` riêng —
    khác các chỗ dùng compact/trần như dải lọc ngày) — kéo dài bằng các ô
-   input/select khác cùng hàng `.grid2`, thay vì giữ bề rộng cố định hẹp của
-   `.datebox` (đúng hệ thống CŨNG hẹp mặc định, nhưng người dùng chỉ rõ muốn
-   đồng bộ bề rộng trong modal CRUD). */
+   input/select khác cùng hàng `.grid2`, thay vì giữ bề rộng cố định hẹp
+   mặc định của `.datebox` (người dùng chỉ rõ muốn đồng bộ bề rộng trong
+   modal CRUD). */
 .field>.datebox{width:100%;min-height:var(--control-h);}
 .field>.datebox input.date-text{max-width:none;flex:1;}
 /* Viền trái phân tách nút lịch khỏi phần nhập ngày; khung ngoài chịu trách
@@ -354,7 +353,7 @@ td .hint{margin-top:2px;color:var(--text-tertiary);}
 .datepick svg{width:var(--icon);height:var(--icon);stroke:currentColor}
 .btn-ico{width:var(--icon);height:var(--icon);flex:0 0 auto}
 /* Ô `<input type="date">` chỉ là CHỖ CHỨA giá trị ISO (cho FormData ở chế độ
-   không điều khiển) — `display:none` đúng như hệ thống, vì lịch giờ do
+   không điều khiển) — `display:none` vì lịch giờ do
    `components/DatePickerPopup.tsx` tự vẽ, không còn gọi `showPicker()` của ô
    này nữa. Selector phải là `.datebox input.native-date` (0,2,1) để thắng
    rule nền `input:not([type="checkbox"]):not([type="radio"])` (0,2,1, khai
@@ -393,7 +392,7 @@ td .hint{margin-top:2px;color:var(--text-tertiary);}
 /* Tab đoạn (dayseg) + khung cuộn biểu đồ — dùng chung nhiều trang (Nhập QC,
    Westgard, Six Sigma). */
 .dayseg{display:inline-flex;border:1px solid var(--surface-border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);}
-/* hệ thống KHÔNG đặt chiều cao cho `.dayseg button` dùng chung — chiều cao
+/* `.dayseg button` dùng chung KHÔNG đặt chiều cao — chiều cao
    do padding quyết định (29px). Riêng thanh công cụ biểu đồ ở trang Nhập
    QC dùng chiều cao control dữ liệu chuẩn (36px). */
 .dayseg button{background:var(--surface);border:none;border-right:1px solid var(--border-subtle);padding:6px 14px;cursor:pointer;font-size:var(--text-sm);font-family:var(--font-sans);color:var(--text-tertiary);}
@@ -403,17 +402,15 @@ td .hint{margin-top:2px;color:var(--text-tertiary);}
 .dayseg button.on{background:var(--surface-inverse-soft);color:var(--on-accent);}
 .chart-scroll{width:100%;overflow-x:auto;padding:16px 8px 20px 0;}
 .chart-scroll canvas{width:100%;max-width:1320px;min-width:0;margin:0 auto;display:block;height:auto;}
-/* Tooltip điểm QC trên canvas Levey-Jennings — cùng nội dung và tương phản
-   với `.qc-tooltip` của hệ thống, nhưng render bởi React thay vì chèn HTML tay. */
+/* Tooltip điểm QC trên canvas Levey-Jennings — render bởi React thay vì
+   chèn HTML tay. */
 .qc-chart-tooltip{position:fixed;z-index:var(--z-tooltip);pointer-events:none;max-width:236px;padding:8px 10px;border-radius:var(--radius-md);background:var(--surface-inverse);color:var(--on-accent);box-shadow:var(--shadow-tooltip);font-size:var(--text-sm);line-height:var(--leading-snug);}
 .qc-chart-tooltip b{display:block;margin-bottom:2px;font-weight:var(--weight-bold);}
 .qc-chart-tooltip strong{font-weight:var(--weight-bold);}
 .qc-chart-tooltip .muted{color:var(--text-on-dark-muted);}
 
-/* Đăng nhập/Khởi tạo tài khoản quản trị — layout giống hệt bố cục
-   .auth-card/.auth-head/.brand-mark của hệ thống (assets/components.css +
-   professional-base.css + app.css), chỉ đổi tên biến sang token app
-   (giá trị y hệt) — xem LoginPage.tsx. */
+/* Đăng nhập/Khởi tạo tài khoản quản trị — bố cục
+   .auth-card/.auth-head/.brand-mark, xem LoginPage.tsx. */
 .auth-overlay{position:fixed;inset:0;padding:var(--space-6);background:linear-gradient(180deg,var(--auth-overlay-from) 0%,var(--auth-overlay-to) 100%);display:flex;align-items:center;justify-content:center;}
 .auth-card{background:var(--surface);width:min(416px, calc(100vw - var(--space-8)));padding:var(--space-8);border:1px solid var(--surface-divider);border-radius:var(--radius-lg);box-shadow:var(--shadow-floating);}
 .auth-head{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6);}

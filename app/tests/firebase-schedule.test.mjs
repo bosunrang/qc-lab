@@ -144,7 +144,7 @@ test('gói đẩy lên là backup hợp lệ có checksum', () => {
   const db = openDatabase(':memory:');
   createConfigHandlers(db).saveInstrument({ data: { name: 'Máy sao lưu' } }, actor);
   const payload = buildFirebasePayload(db);
-  assert.equal(payload._format, 'qclab-v2-firebase');
+  assert.equal(payload._format, 'qclab-firebase');
   assert.equal(validateBackupEnvelope(payload.backup, SCHEMA_VERSION).ok, true);
   assert.equal(payload.backup.data.instruments[0].name, 'Máy sao lưu');
 });

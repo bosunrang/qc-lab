@@ -116,13 +116,12 @@ export function createLotConfigHandlers(db: Db) {
 
   /** Kế hoạch đổi số lô: ĐẾM điểm QC sẽ bị viết lại + soi kỳ đã khoá, KHÔNG
    * ghi gì. Điểm QC lưu số lô dạng CHUỖI TĨNH chụp lúc nhập (`qc_points.lot`,
-   * xem `entry-handlers.ts` Giai đoạn B2), không tham chiếu `qc_lots.id` —
+   * xem `entry-handlers.ts`), không tham chiếu `qc_lots.id` —
    * nên đổi `lot_no` mà không cập nhật lại điểm cũ sẽ khiến chúng "biến mất"
    * khỏi mọi bộ lọc theo lô (Nhập QC/Westgard/Sigma): không khớp lô hiện tại
    * (chuỗi đã đổi) mà cũng không hiện ở "lô cũ" (không có hồ sơ chuyển tiếp
    * nào giữa 2 TÊN GỌI của cùng một lô). Đây là VIẾT LẠI HÀNG LOẠT bản ghi
-   * lịch sử, nên người dùng phải thấy con số TRƯỚC khi làm — đúng cách hệ thống
-   * hỏi trong `saveConfigLot()`. */
+   * lịch sử, nên người dùng phải thấy con số TRƯỚC khi làm. */
   function previewLotRename(input: { id: string; lotNo: unknown }): IpcResult<
     { rename: null } | { rename: { oldLotNo: string; newLotNo: string; affected: number; lockedCount: number; lockedPeriods: string[] } }
   > {
@@ -230,8 +229,8 @@ export function createLotConfigHandlers(db: Db) {
     const requestedLotIds = Array.isArray(input.data.lotIds)
       ? [...new Set(input.data.lotIds.map(cleanId).filter(Boolean))]
       : [];
-    // `prepareLotGroup()` hệ thống: tên trống tự ghép từ số lô theo đúng thứ
-    // tự người dùng chọn, ví dụ 1101/1102.
+    // Tên trống tự ghép từ số lô theo đúng thứ tự người dùng chọn, ví dụ
+    // 1101/1102.
     const fallbackName = requestedLotIds.map(lotId => lotNoById.get(lotId)).filter(Boolean).join('/');
     const result = validateLotGroup(input.data, fallbackName);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
@@ -334,7 +333,7 @@ export function createLotConfigHandlers(db: Db) {
         .filter((row) => row.level);
       if (!rows.length) return { ok: false, error: { code: 'no-target-tests', message: 'Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.' } };
       // Mean có thể bằng 0 hoặc âm (ví dụ Base excess); chỉ SD bắt buộc >0.
-      // hệ thống kiểm `Number.isFinite(mean)` qua snapshot Mean/SD, không kiểm
+      // Mean chỉ cần là số hữu hạn (`Number.isFinite`), không kiểm
       // `mean > 0`. Điều kiện cũ làm hồ sơ hợp lệ không thể được chấp nhận.
       const missing = rows.filter((row) => !criteria.some((c) => c.testId === row.t.id
         && c.level === row.level!.level && Number.isFinite(Number(c.mean))
@@ -375,10 +374,8 @@ export function createLotConfigHandlers(db: Db) {
   });
 
   /** Chặn xoá lô đang được gán Mean/SD cho một mức QC, hoặc lô đã đi qua một
-   * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (hệ thống: "đã CHẤP NHẬN", tức đã áp vào
-   * cấu hình/Mean-SD) — xoá thẳng sẽ để lại mức QC trỏ vào lô không còn tồn
-   * tại. Xoá được thì dọn luôn các hồ sơ chuyển lô còn dở dang trỏ tới nó,
-   * đúng như `removeLot()` hệ thống làm. */
+   * hồ sơ chuyển tiếp ĐÃ KẾT LUẬN (`accepted`, tức đã áp vào cấu hình/Mean-SD)
+   * — xoá thẳng sẽ để lại mức QC trỏ vào lô không còn tồn tại. Xoá được thì dọn luôn các hồ sơ chuyển lô còn dở dang trỏ tới nó. */
   const removeLot = writeCommand(db, 'removeLot', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, lot_no FROM qc_lots WHERE id=?').get(id) as { id: string; lot_no: string } | undefined;
@@ -405,8 +402,7 @@ export function createLotConfigHandlers(db: Db) {
   });
 
   /** Xoá NHÓM lô nhưng GIỮ NGUYÊN các lô bên trong (chỉ gỡ `group_id`) —
-   * đúng chi tiết hệ thống hiện trong hộp xác nhận: "Các lô QC bên trong vẫn
-   * được giữ nguyên." */
+   * đúng như hộp xác nhận báo: "Các lô QC bên trong vẫn được giữ nguyên." */
   const removeLotGroup = writeCommand(db, 'removeLotGroup', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
     const existing = db.prepare('SELECT id, name FROM lot_groups WHERE id=?').get(id) as { id: string; name: string } | undefined;
@@ -473,7 +469,7 @@ export function createLotConfigHandlers(db: Db) {
 
     // Nhóm lô nào đang giữ các mức bị thay thế thì bị DỪNG — nhưng chỉ khi
     // nó KHÔNG CÒN mức QC nào dùng nữa (kiểm lại SAU khi đã áp, bên trong
-    // transaction). hệ thống dừng ngay không kiểm: nếu chỉ một phần xét nghiệm
+    // transaction). Dừng ngay mà không kiểm thì: nếu chỉ một phần xét nghiệm
     // có Mean/SD cho lô mới thì nhóm cũ vẫn bị gắn "Đã dừng" trong khi những
     // xét nghiệm ở lại vẫn dùng lô của nó — mà nhóm `stopped` bị loại khỏi
     // "mức QC đang vận hành", nên các xét nghiệm đó BIẾN MẤT khỏi thẻ Nhập QC

@@ -1,12 +1,9 @@
-/* Hai panel cùng một hàng: "Thêm người dùng" bên trái, "Danh sách người
-   dùng" bên phải. Dùng flex-wrap thay cho media query: khi vùng nội dung
-   không đủ chỗ cho cả hai, danh sách tự xuống hàng dưới. */
+/* Form tạo tài khoản dùng toàn chiều ngang; danh sách nằm ngay bên dưới. */
 .users-layout{
-  display:flex; flex-wrap:wrap; gap:var(--space-5); align-items:flex-start;
+  display:grid; grid-template-columns:minmax(0,1fr); gap:var(--space-5);
 }
 .users-layout > .panel{margin-bottom:0;}
-.users-create-panel{flex:0 0 600px; min-width:0;}
-.users-list-panel{flex:1 1 520px; min-width:0;}
+.users-create-panel,.users-list-panel{min-width:0;}
 
 .user-table{
   width:100%; min-width:0; table-layout:fixed;
@@ -35,50 +32,42 @@
   min-width:560px;
 }
 
-/* Hai thẻ con trong panel "Thêm người dùng": Thông tin tài khoản (co giãn)
-   và Thẻ được phép dùng (hẹp, các ô xếp một cột dọc). align-items:stretch để
-   hai thẻ cao bằng nhau thay vì để lại khoảng trắng. */
+/* Hai nhóm dùng cùng panel. Cột tự xếp dọc khi vùng nội dung hẹp. Header
+   dùng `.panel-title` chung để giữ đúng chiều cao và nền của toàn hệ thống. */
 .user-create-layout{
-  display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:var(--space-4); align-items:stretch; margin:0 var(--space-4) var(--space-4); padding:0;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));
+  gap:var(--space-6); padding:0 var(--space-5) var(--space-5);
 }
-
-.user-create-card{
-  background:var(--surface); border:1px solid var(--surface-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-control);
-}
-
-.user-create-card-title{
-  margin:0; padding:10px 16px; border-bottom:1px solid var(--border-subtle); background:var(--surface-section-header); color:var(--text-primary); font-size:var(--title-panel); font-weight:var(--weight-semibold); letter-spacing:0; text-transform:none;
-}
-
+.user-create-section{min-width:0;}
+.user-create-section h3{font-size:var(--title-sub);font-weight:var(--title-sub-weight);line-height:var(--leading-heading);}
+.user-create-section > h3{margin-bottom:var(--space-4);}
 .user-create-fields{
-  display:grid; grid-template-columns:1fr; gap:var(--field-gap); padding:var(--panel-content-gap) 16px 16px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--field-gap);
 }
-
-.user-create-actions{
-  margin-top:2px;
+.user-initials-preview{
+  display:flex;align-items:center;align-self:end;gap:var(--space-2);min-height:var(--control-h);
+  color:var(--text-tertiary);font-size:var(--text-sm);
 }
-
-.user-create-actions .btn{
-  min-width:88px;
+.user-create-perms{padding:0;}
+.user-perm-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-4);}
+.user-perm-heading .pill{white-space:nowrap;}
+.user-create-footer{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4);
+  padding:var(--space-3) var(--space-5);border-top:1px solid var(--surface-divider);background:var(--surface-section-header);
 }
+.user-create-footer p{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-body);}
 
-.user-create-hint{
-  margin:0 var(--space-4) var(--space-4);
-}
-
-.user-perm-block{
-  min-width:0; padding:var(--panel-content-gap) 16px 16px;
-}
-
-/* Ô chọn "Thẻ được phép dùng" — ô có viền, ô tick bên trái (kiểu bản cũ),
-   xếp một cột dọc. Hộp thoại "Sửa quyền" dùng cùng lưới này. */
+/* Cùng lưới quyền cho tạo tài khoản và sửa quyền; panel tạo có đủ chiều
+   ngang để trải nhiều cột, còn hộp thoại giữ một cột dễ đọc. */
 .user-perm-grid{
-  display:grid; grid-template-columns:1fr; gap:8px;
+  display:grid; grid-template-columns:1fr; gap:var(--space-2);
 }
+.user-create-perms .user-perm-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));}
 
 .user-perm-grid label{
-  display:flex; align-items:center; gap:8px; min-height:var(--control-h); margin:0; padding:8px 10px; border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface-subtle); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-bold); cursor:pointer; box-shadow:none;
+  display:flex; align-items:center; gap:var(--space-2); min-height:var(--control-h); margin:0; padding:var(--space-2) var(--space-3); border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-medium); cursor:pointer; box-shadow:none;
 }
+.user-perm-grid label.selected{border-color:var(--accent-border);background:var(--accent-surface-tint);color:var(--accent-text);font-weight:var(--weight-semibold);}
 
 .user-perm-grid label.disabled{
   opacity:.46; background:var(--surface-subtle); cursor:not-allowed;

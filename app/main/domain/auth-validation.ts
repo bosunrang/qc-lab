@@ -25,8 +25,7 @@ export interface UserCreateInput { username?: unknown; name?: unknown; initials?
 export interface PreparedUserCreate { username: string; name: string; initials: string; role: Role; password: string; pagePerms: string[] }
 
 /** Thu hẹp danh sách thẻ theo vai trò; KHÔNG gửi gì lên = mặc định toàn bộ
- * thẻ của vai trò đó (khớp `collectUserPerms()` hệ thống khi không tìm thấy
- * hộp checkbox). Chọn rỗng thì báo lỗi đúng câu chữ hệ thống. */
+ * thẻ của vai trò đó. Chọn rỗng thì báo lỗi. */
 function preparePagePerms(value: unknown, role: Role): ValidationResult<string[]> {
   if (value == null) return { ok: true, data: rolePageIds(role) };
   const picked = selectUserPermissions(value, rolePageIds(role));
@@ -85,9 +84,9 @@ export function validateNewPassword(value: unknown): ValidationResult<string> {
 }
 
 // Ảnh đại diện luôn là canvas 160×160 do renderer tự resize trước khi gửi
-// (`AvatarModal.tsx`, cùng cỡ `avatar-modal-controller.ts` hệ thống) nên PNG
-// data URL không bao giờ tới gần mốc này thật — chỉ là chặn an toàn với một
-// request tự dựng gửi thẳng lên IPC, không phải giới hạn nghiệp vụ.
+// (`AvatarModal.tsx`) nên PNG data URL không bao giờ tới gần mốc này thật —
+// chỉ là chặn an toàn với một request tự dựng gửi thẳng lên IPC, không phải
+// giới hạn nghiệp vụ.
 const AVATAR_MAX_LENGTH = 500_000;
 
 export function validateSetAvatar(value: unknown): ValidationResult<string> {

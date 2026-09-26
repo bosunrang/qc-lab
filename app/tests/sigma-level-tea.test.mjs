@@ -3,7 +3,7 @@
 // Vì sao cần test riêng: Sigma = (TEa − |Bias|) / CV, và với tiêu chí CLIA
 // dạng TUYỆT ĐỐI (Sodium ±4,0000 mmol/L) thì TEa% = |giới hạn / Mean| × 100 —
 // tức mỗi mức phải ra một TEa khác nhau. Khi một snapshot theo mức chưa có,
-// hệ thống giải lại từ nguồn đã chốt tại Mean của chính mức đó.
+// app giải lại từ nguồn đã chốt tại Mean của chính mức đó.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);

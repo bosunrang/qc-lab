@@ -31,13 +31,13 @@ function isoToday(): string {
 }
 function isoMonth(): string { return isoToday().slice(0, 7); }
 
-/** `monthVN()` hệ thống: `2026-09` → `09/2026`. */
+/** Tháng dạng Việt Nam: `2026-09` → `09/2026`. */
 function monthVN(ym: string): string {
   const m = /^(\d{4})-(\d{2})/.exec(ym || '');
   return m ? `${m[2]}/${m[1]}` : ym || '';
 }
 
-/** `formatDateTimeVN()` hệ thống. */
+/** Giờ:phút + ngày dạng Việt Nam; giá trị không hợp lệ thì trả rỗng. */
 function dateTimeVN(value: string): string {
   const date = new Date(value);
   return isNaN(+date) ? '' : `${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${date.toLocaleDateString('vi-VN')}`;
@@ -128,7 +128,7 @@ export function ReportPage() {
   useStoreInvalidation(['period_locks', 'report_templates'], undefined, () => { loadLocks(); loadTemplate(); });
 
   // Tìm không dấu trên nhãn hiển thị; lựa chọn mất khỏi danh sách khớp thì
-  // nhảy về phần tử đầu — đúng `reportModel()` hệ thống.
+  // nhảy về phần tử đầu.
   const selection = useTestSelection({ items: summaries, idOf: (t) => t.testId, searchTextOf: (t) => testSelectLabel(t, summaries) });
   const { matched, selectedId } = selection;
 
@@ -143,11 +143,11 @@ export function ReportPage() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 3 + i);
   const already = locks.some((l) => l.ym === lockYm);
 
-  /** Lấy dữ liệu theo lựa chọn hiện tại — hệ thống không có bước "Xem" riêng,
-   * mỗi lần xuất/in là truy vấn lại đúng lúc đó. */
+  /** Lấy dữ liệu theo lựa chọn hiện tại — không có bước "Xem" riêng, mỗi
+   * lần xuất/in là truy vấn lại đúng lúc đó. */
   async function collect() {
-    // Truy vấn TỨC THỜI cho đúng lần xuất/in này (hệ thống cũng không có bước
-    // "Xem" riêng) — trang không có bảng xem trước, dữ liệu chỉ tồn tại đủ
+    // Truy vấn TỨC THỜI cho đúng lần xuất/in này — trang không có bảng xem
+    // trước, dữ liệu chỉ tồn tại đủ
     // lâu để dựng tệp nên không vào store.
     const points = await window.qcApi.queryReport({ testId: selectedId, from: start, to: end });
     if (!withNce) return { points, nce: null };
@@ -183,7 +183,7 @@ export function ReportPage() {
       const rows: (string | number)[][] = points.map(pointRow);
       if (nce) {
         // 1 sheet duy nhất: chèn 1 dòng trống + tiêu đề phụ lục rồi tới các
-        // dòng NCE. `buildXlsxBase64` (Giai đoạn C1) chỉ nhận 1 sheet — đủ
+        // dòng NCE. `buildXlsxBase64` chỉ nhận 1 sheet — đủ
         // dùng, không cần đổi hợp đồng IPC cho việc này.
         rows.push([], ['PHỤ LỤC NCE'], NCE_HEADERS, ...nce.map(nceRow));
       }
@@ -321,9 +321,8 @@ export function ReportPage() {
   );
 }
 
-/** Mở khóa đi qua modal nhập lý do — hệ thống dùng `unlockModalHtml()` +
- * `unlockReason()` (bắt buộc có lý do); main của hệ thốngng đòi ghi chú
- * ≥5 ký tự, nên đây là cùng một cổng ở 2 tầng. */
+/** Mở khóa đi qua modal nhập lý do (bắt buộc có lý do); main cũng đòi ghi
+ * chú ≥5 ký tự, nên đây là cùng một cổng ở 2 tầng. */
 function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void; onDone: (note: string) => Promise<boolean> }) {
   const [note, setNote] = useState('');
   const [err, setErr] = useState<string | null>(null);

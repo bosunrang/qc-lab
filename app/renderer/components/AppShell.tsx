@@ -5,8 +5,8 @@
 // Ẩn/hiện mục điều hướng theo vai trò CHỈ LÀ HIỂN THỊ. Bảng vai trò theo
 // trang không còn ở đây — đã gom về lib/permissions.ts (PAGE_DEFS) để
 // sidebar và route dùng CÙNG một bảng; chặn truy cập thật theo route nằm ở
-// router.tsx, chặn ghi thật nằm ở main/ipc/shared.ts. `pagePerms` tuỳ biến
-// theo từng người dùng vẫn chưa làm (Giai đoạn A2/D3.1).
+// router.tsx, chặn ghi thật nằm ở main. Quyền theo từng người dùng
+// (`pagePerms`) được tính cùng bảng đó qua `canUserAccessPage()`.
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -25,7 +25,7 @@ const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Quản trị', ids: ['manage', 'users', 'audit', 'settings'] },
 ];
 
-const COLLAPSE_KEY = 'qclab-v2-nav-collapsed';
+const COLLAPSE_KEY = 'qclab-nav-collapsed';
 
 function RuntimeIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h.01M8 15h.01M12 9h4M12 15h4" /></svg>;

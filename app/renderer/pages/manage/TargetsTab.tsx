@@ -40,9 +40,9 @@ export function TargetsTab() {
   const groupLevels = useMemo(() => [...new Set(groupLots.map((lot) => lot.level).filter((value) => Number.isFinite(value)))]
     .sort((left, right) => left - right), [groupLots]);
   const levelLots = groupLots.filter((lot) => lot.level === level);
-  // Mức đang chọn phải luôn nằm trong các mức của nhóm lô (hệ thống:
-  // `targetLevelSelection()` tự rơi về mức đầu tiên khi mức hiện tại không
-  // còn hợp lệ, ví dụ vừa đổi sang nhóm lô chỉ có Mức 2).
+  // Mức đang chọn phải luôn nằm trong các mức của nhóm lô: tự rơi về mức đầu
+  // tiên khi mức hiện tại không còn hợp lệ, ví dụ vừa đổi sang nhóm lô chỉ có
+  // Mức 2.
   useEffect(() => {
     if (!groupLevels.length) return;
     if (!groupLevels.includes(level)) setLevel(groupLevels[0]);
@@ -76,16 +76,14 @@ export function TargetsTab() {
   }
 
   /** Lưu cả mức: đọc DOM từng hàng đang tick → chuẩn hoá qua
-   * `normalizeTargetPick()` (cùng công thức/câu chữ hệ thống) → nếu có hàng
-   * đang gắn LÔ KHÁC thì hỏi trước (hệ thống mở modal "chuyển lô") → xác thực
-   * lại mật khẩu → ghi từng mức qua `config:saveTestLevel` (chính handler đó
-   * tự chốt Mean/SD cũ vào `mean_sd_history_json`).
+   * `normalizeTargetPick()` → nếu có hàng đang gắn LÔ KHÁC thì hỏi trước →
+   * xác thực lại mật khẩu → ghi từng mức qua `config:saveTestLevel` (chính
+   * handler đó tự chốt Mean/SD cũ vào `mean_sd_history_json`).
    *
-   * KHÁC hệ thống có chủ đích: hệ thống còn "điền lô/Mean-SD cho điểm QC cũ chưa
-   * ghi lô" (`targetPickBackfillPoints`) và hỏi thêm nếu việc đó đụng kỳ đã
-   * khoá. app KHÔNG cần: từ Giai đoạn B2, `entry:addPoint` đã chốt
-   * `qc_mean`/`qc_sd`/`lot` vào từng điểm ngay lúc nhập, nên không có điểm
-   * nào thiếu lô để phải điền bù. */
+   * Có chủ đích KHÔNG điền lô/Mean-SD cho điểm QC cũ chưa ghi lô (nên cũng
+   * không phải hỏi thêm khi việc đó đụng kỳ đã khoá):
+   * `entry:addPoint` đã chốt `qc_mean`/`qc_sd`/`lot` vào từng điểm ngay lúc
+   * nhập, nên không có điểm nào thiếu lô để phải điền bù. */
   async function saveTargetMatrix() {
     const rowEls = [...document.querySelectorAll<HTMLElement>('.target-table .target-row')];
     const picked: { testId: string; level: number; mean: number; sd: number; low: number | null; high: number | null; qcLotId: string; name: string; switching: boolean }[] = [];
@@ -166,7 +164,7 @@ export function TargetsTab() {
     }
   }
 
-  /** Nhãn ô chọn Panel QC gồm cả tên máy như hệ thống ("Panel Hóa sinh ·
+  /** Nhãn ô chọn Panel QC gồm cả tên máy ("Panel Hóa sinh ·
    * EasyLyte Expand") — cùng một tên panel có thể tồn tại trên 2 máy. */
   const panelLabel = (item: QcPanel) => {
     const instrument = instruments.find((machine) => machine.id === item.instrument_id);
@@ -193,7 +191,7 @@ export function TargetsTab() {
               const ready = target?.mean != null && target?.sd != null && target.sd > 0;
               const linkedLot = target ? groupLots.find((lot) => lot.id === target.qc_lot_id) : undefined;
               // Ưu tiên lô đang gắn; nếu chưa gắn thì chọn lô còn dùng đầu
-              // tiên của mức. `targetRowState()` hệ thống khoá lô `depleted`.
+              // tiên của mức. Lô `depleted` bị khoá.
               const rowLot = linkedLot || levelLots.find((lot) => !lot.depleted) || levelLots[0];
               const locked = !!rowLot?.depleted;
               // Số DỰ KIẾN (nếu có) là thứ phải hiện trong 4 ô, không phải số

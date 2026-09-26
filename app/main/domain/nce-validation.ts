@@ -134,8 +134,8 @@ export function validateNceCreate(input: NceCreateInput): ValidationResult<Prepa
   const date = cleanText(input.date, 20).trim();
   if (!DATE_RE.test(date)) return { ok: false, code: 'invalid-date', message: 'Ngày ghi nhận sự cố không hợp lệ.' };
   const correction = cleanText(input.correction, 2000).trim();
-  // Khớp `action-draft-status.ts` hệ thống: đủ để lưu NCE đang điều tra là
-  // một mô tả ngắn có nghĩa; phê duyệt sau đó còn có gate protocol đầy đủ.
+  // Đủ để lưu NCE đang điều tra là một mô tả ngắn có nghĩa; phê duyệt sau
+  // đó còn có gate protocol đầy đủ.
   if (correction.length < 5) return { ok: false, code: 'missing-correction', message: 'Xử lý tức thời phải có ít nhất 5 ký tự.' };
   const dueDate = cleanText(input.dueDate, 20).trim();
   if (dueDate && !DATE_RE.test(dueDate)) return { ok: false, code: 'invalid-due-date', message: 'Hạn hoàn thành không hợp lệ.' };

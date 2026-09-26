@@ -47,7 +47,7 @@ test('tiến trình phụ dựng và gửi gói sao lưu từ tệp CSDL', { tim
     assert.equal(received[0].method, 'PUT');
     assert.equal(received[0].url, '/qclab-shared/khoaXN.json?auth=token');
     const payload = JSON.parse(received[0].body);
-    assert.equal(payload._format, 'qclab-v2-firebase');
+    assert.equal(payload._format, 'qclab-firebase');
     assert.equal(validateBackupEnvelope(payload.backup, SCHEMA_VERSION).ok, true, 'checksum hợp lệ');
     assert.equal(payload.backup.checksum, result.checksum);
     assert.equal(Buffer.byteLength(received[0].body), result.bytes, 'số byte báo về đúng cỡ đã gửi');

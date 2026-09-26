@@ -24,8 +24,8 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
 
   const [editing, setEditing] = useState<QcPanel | 'new' | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  // hệ thống tự chọn MÁY ĐẦU TIÊN khi mở modal Panel QC (`openConfigPanel`),
-  // nên danh sách xét nghiệm hiện ngay; app để rỗng thì modal chỉ hiện
+  // Mở modal Panel QC thì tự chọn MÁY ĐẦU TIÊN để danh sách xét nghiệm hiện
+  // ngay; để rỗng thì modal chỉ hiện
   // "Chọn máy để hiện danh sách xét nghiệm" — cùng lớp lỗi "không tự chọn
   // mục đầu tiên" đã gặp ở Entry/Sigma/Westgard/Reagent.
   const [instrumentId, setInstrumentId] = useState('');
@@ -109,10 +109,8 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
                   <select value={instrumentId} onChange={(e) => {
                     const nextId = e.target.value;
                     setInstrumentId(nextId);
-                    // hệ thống (`PanelModal.tsx`): checkbox không kiểm soát, list xét
-                    // nghiệm remount theo máy — đổi máy rồi đổi LẠI đúng máy ban đầu
-                    // thì `testIds` gốc của Panel tự phục hồi (vì initialInstrumentId
-                    // khớp lại). Bản trước LUÔN xoá sạch `checked` ở mọi lần đổi máy,
+                    // Đổi máy rồi đổi LẠI đúng máy ban đầu thì `testIds` gốc của
+                    // Panel phải tự phục hồi. Bản trước LUÔN xoá sạch `checked` ở mọi lần đổi máy,
                     // kể cả đổi lại đúng máy cũ — người dùng lỡ tay đổi máy rồi đổi lại
                     // sẽ mất hết lựa chọn đã lưu, phải tick lại từ đầu. Chỉ xoá khi máy
                     // MỚI khác máy gốc của Panel đang sửa; khi tạo mới (không có máy

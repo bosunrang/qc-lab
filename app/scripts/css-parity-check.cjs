@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const RENDERER = path.join(ROOT, 'app', 'renderer');
-const V2_STYLES = path.join(RENDERER, 'styles');
+const STYLES_DIR = path.join(RENDERER, 'styles');
 const BASELINE = path.join(ROOT, 'app', 'tests', 'css-dead-class-baseline.json');
 
 function walk(dir, ext, out = []) {
@@ -32,8 +32,8 @@ for (const file of walk(RENDERER, '.tsx')) {
   }
 }
 
-const v2Css = stripComments(readAll(walk(V2_STYLES, '.css')));
-const hasRule = (cls) => new RegExp('\\.' + cls.replace(/-/g, '\\-') + '(?![\\w-])').test(v2Css);
+const stylesCss = stripComments(readAll(walk(STYLES_DIR, '.css')));
+const hasRule = (cls) => new RegExp('\\.' + cls.replace(/-/g, '\\-') + '(?![\\w-])').test(stylesCss);
 
 const dead = [...usedClasses].filter((cls) => !hasRule(cls)).sort();
 const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : { allowed: [] };

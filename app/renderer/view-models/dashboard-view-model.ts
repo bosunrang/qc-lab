@@ -57,7 +57,7 @@ export function dashboardNceOverdue(record: NceRecord | null | undefined): Dashb
   return days > 0 ? { overdue: true, days, label: `Quá hạn ${days} ngày`, owner } : { overdue: false, days: 0, label: '', owner };
 }
 
-/** Thứ tự bảng xét nghiệm hệ thống: loại bỏ → cảnh báo → chưa đủ QC hôm nay
+/** Thứ tự bảng xét nghiệm ở Tổng quan: loại bỏ → cảnh báo → chưa đủ QC hôm nay
  * → đạt → trạng thái khác. */
 export function dashboardTestRank(test: Pick<DashboardTestItem, 'status' | 'todayCount' | 'levels'>): number {
   if (test.status === 'rej') return 0;

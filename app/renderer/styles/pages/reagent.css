@@ -5,8 +5,8 @@
    File này chứa các quy tắc thuộc riêng trang, gồm cả grid desktop vì grid
    ấy chỉ phục vụ thẻ này. */
 
-/* Khung desktop của hệ thống. Những rule nền này từng bị thiếu trong app;
-   chỉ còn các rule hiệu chỉnh nên toàn bộ trang rơi thành một cột. */
+/* Khung desktop của trang. Những rule nền này từng bị thiếu, chỉ còn các
+   rule hiệu chỉnh nên toàn bộ trang rơi thành một cột. */
 .rc-toolbar {
   display: flex;
   flex-wrap: wrap;

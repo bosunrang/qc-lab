@@ -10,8 +10,8 @@ function CalendarIcon() {
   );
 }
 
-/** ISO `yyyy-mm-dd` → `dd/mm/yyyy` để hiện; giá trị khác giữ nguyên. Khớp
- * `vnDate()`/`formatDisplay()` hệ thống. */
+/** ISO `yyyy-mm-dd` → `dd/mm/yyyy` để hiện, qua `vnDate()`; giá trị khác
+ * giữ nguyên. */
 export function formatDateDisplay(value: unknown): string {
   if (!value) return '';
   return vnDate(String(value));

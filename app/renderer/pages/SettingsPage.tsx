@@ -25,9 +25,35 @@ function formatMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function UnitProfileIcon() {
+  return (
+    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 21h18M5 21v-7c0-.6.4-1 1-1h4v8M10 21V5c0-.6.4-1 1-1h7c.6 0 1 .4 1 1v16M7 16h1M7 18h1M13 8h1M16 8h1M13 12h1M16 12h1M13 16h1M16 16h1" />
+    </svg>
+  );
+}
+
+function BrandIcon() {
+  return (
+    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m8 15 2.4-2.5 2.2 2 2.1-2.2L18 16M8 9h.01" />
+    </svg>
+  );
+}
+
+function CloudSyncIcon() {
+  return (
+    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.5 18.5h9a4.5 4.5 0 0 0 .5-9 5.8 5.8 0 0 0-11-1.4A4.4 4.4 0 0 0 7.5 18.5Z" />
+      <path d="m10 13 2-2 2 2M12 11v5" />
+    </svg>
+  );
+}
+
 function DataAdminIcon() {
   return (
-    <svg className="settings-admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
       <ellipse cx="10" cy="5" rx="6.5" ry="2.5" />
       <path d="M3.5 5v5c0 1.4 2.9 2.5 6.5 2.5.7 0 1.4 0 2-.1M3.5 10v5c0 1.4 2.9 2.5 6.5 2.5h1.2" />
       <path d="M16.7 12.4a4.2 4.2 0 1 1-1.8 7.9 4.2 4.2 0 0 1 1.8-7.9Z" />
@@ -88,9 +114,9 @@ export function SettingsPage() {
     setFbCode(firebase.labCode || 'khoaXN'); setFbEmail(firebase.email); setFbConfig(firebase.config); setFbSeeded(true);
   }, [firebase, fbSeeded]);
 
-  // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn hệ thống
-  // hứa (`LIS_POLL_MS`). Trước Giai đoạn D3.3 app chỉ lấy hàng chờ khi
-  // bấm nút, nên nhãn đó là lời hứa suông — nay có bộ đếm thật.
+  // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn trên trang
+  // hứa (`LIS_POLL_MS`). Trước đây app chỉ lấy hàng chờ khi bấm nút, nên
+  // nhãn đó là lời hứa suông — nay có bộ đếm thật.
   // Chạy theo cấu hình ĐÃ LƯU (`lis.enabled`), không theo ô tick đang sửa:
   // tick mà chưa lưu thì main vẫn coi Gateway là tắt, và trước 2026-09-26 vòng
   // hỏi chạy ngay rồi báo lỗi "LIS Gateway chưa được bật" (kế hoạch D.10).
@@ -201,7 +227,7 @@ export function SettingsPage() {
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
 
-  // Giai đoạn C5 — LIS Gateway (xem main/ipc/lis-handlers.ts).
+  // Lưu cấu hình LIS Gateway (xem main/ipc/lis-handlers.ts).
   async function saveLisSettings() {
     setLisErr(null);
     const result = await saveLis({ enabled: lisEnabled, url: lisUrl, token: lisToken });
@@ -286,9 +312,9 @@ export function SettingsPage() {
     return backupInfo?.lastBackupBytes ? `Backup gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
   }
 
-  /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký
-   * (ánh xạ `ResetOperationalDataCommand` hệ thống). Không thể hoàn tác nên đi
-   * qua đủ confirm + reauth, và main tự chốt 1 bản an toàn ra đĩa trước. */
+  /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký.
+   * Không thể hoàn tác nên đi qua đủ confirm + reauth, và main tự chốt 1 bản
+   * an toàn ra đĩa trước. */
   async function resetAll() {
     if (!(await confirmDialog(
       'Toàn bộ máy xét nghiệm, xét nghiệm, mức QC, điểm QC, hồ sơ NCE, so sánh hoá chất, kỳ Sigma, khoá kỳ báo cáo và bảng TEa sẽ bị xoá. Tài khoản người dùng và nhật ký hoạt động được giữ lại. Một bản sao lưu an toàn sẽ được tạo tự động trước khi xoá. Tiếp tục?',
@@ -303,11 +329,10 @@ export function SettingsPage() {
 
   return (
     <>
-      {/* Tiêu đề/phụ đề đã trở về đúng hệ thống từ khi C2 Firebase hoàn tất. */}
       <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">
-          <h2 className="panel-title">Thông tin đơn vị</h2>
+          <h2 className="panel-title settings-panel-title"><UnitProfileIcon />Thông tin đơn vị</h2>
           <div className="settings-unit-fields">
             <div className="field"><label htmlFor="labName">Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="field"><label htmlFor="labDept">Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value={dept} onChange={(e) => setDept(e.target.value)} /></div>
@@ -317,7 +342,7 @@ export function SettingsPage() {
         </div>
 
         <div className="panel">
-          <h2 className="panel-title">Logo &amp; tên phần mềm</h2>
+          <h2 className="panel-title settings-panel-title"><BrandIcon />Logo &amp; tên phần mềm</h2>
           <div className="grid2">
             <div className="settings-brand-fields">
               <div className="field"><label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} /></div>
@@ -351,7 +376,7 @@ export function SettingsPage() {
       </div>
 
       <div className="panel settings-admin-panel">
-        <h2 className="panel-title settings-admin-title"><DataAdminIcon />Quản trị dữ liệu</h2>
+        <h2 className="panel-title settings-panel-title"><DataAdminIcon />Quản trị dữ liệu</h2>
         <div className="admin-tools">
           <div className="admin-tool">
             <b>Xuất backup</b>
@@ -364,11 +389,6 @@ export function SettingsPage() {
             <button className="btn ghost" onClick={pickBackupFile}>Chọn file backup</button>
           </div>
           <div className="admin-tool">
-            <b>Xóa sạch dữ liệu test</b>
-            <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
-            <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
-          </div>
-          <div className="admin-tool">
             <b>Nhật ký lỗi của ứng dụng</b>
             <span>Lỗi và tệp crash chỉ lưu trên máy này, không gửi đi đâu. Xuất gói log (một tệp .zip) để gửi kèm khi báo lỗi; tệp log không chứa mật khẩu, token hay dữ liệu QC.</span>
             <div className="admin-tool-actions">
@@ -376,12 +396,17 @@ export function SettingsPage() {
               <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
             </div>
           </div>
+          <div className="admin-tool">
+            <b>Xóa sạch dữ liệu test</b>
+            <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
+            <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
+          </div>
         </div>
       </div>
 
       <div className="settings-cloud-grid">
         <div className="panel firebase-sync-panel">
-          <h2 className="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
+          <h2 className="panel-title settings-panel-title"><CloudSyncIcon />Đồng bộ đám mây (Firebase Realtime Database)</h2>
           <div className="firebase-body">
             <div className="firebase-auth-grid">
               <div className="field"><label htmlFor="fbCode">Mã phòng</label><input id="fbCode" value={fbCode} onChange={(e) => setFbCode(e.target.value)} /></div>

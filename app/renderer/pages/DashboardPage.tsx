@@ -32,19 +32,18 @@ function todayIso(): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-/** `vnDate()` của hệ thống. */
+/** Ngày ISO → `dd/mm/yyyy`; trống thì hiện "—". */
 function dateText(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value || '—';
 }
 
-/** `fmtPointValue(point, test)` của hệ thống — giá trị theo số thập phân của
- * xét nghiệm. */
+/** Giá trị điểm QC theo số thập phân của xét nghiệm. */
 function pointValue(val: number, decimalPlaces: number): string {
   return val.toFixed(decimalPlaces);
 }
 
-/** `fmt(x, 2)` của hệ thống. */
+/** Số làm tròn 2 chữ số thập phân. */
 function num2(value: number): string {
   return value.toFixed(2);
 }
@@ -71,7 +70,7 @@ function ShiftItem({ tone, title, meta, action }: { tone: 'rej' | 'warn'; title:
 }
 
 /** Nhãn + meta của 1 mức đang báo động — dùng chung cho nhóm "loại bỏ" và
- * nhóm "cảnh báo", đúng như hệ thống dùng cùng một cặp title/meta cho cả hai. */
+ * nhóm "cảnh báo", để hai nhóm cùng một cặp title/meta. */
 function alertMeta(item: DashboardAlertItem) {
   return <>{dateText(item.point.date)} · {pointValue(item.point.val, item.test.decimalPlaces)} {item.test.unit || ''} · {item.rules.join(', ') || '—'}</>;
 }
@@ -191,7 +190,7 @@ export function DashboardPage() {
   if (error) return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="panel"><EmptyState title="Không tải được Tổng quan" action={<button type="button" className="btn teal" onClick={() => { void load(); }}>Thử lại</button>}>Dữ liệu đã lưu không bị ảnh hưởng. Nội dung lỗi: {error}</EmptyState></div></>;
   if (loading) return <LoadingView subtitle={subtitle} />;
   const today = todayIso(), model = buildDashboardViewModel(testSummaries, lots, overdueActions, today);
-  // `safePercent` của hệ thống — kẹp 0..100 trước khi vẽ thanh tiến độ.
+  // Kẹp 0..100 trước khi vẽ thanh tiến độ.
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{[
     ['Xét nghiệm', model.tests.length, ''], ['Điểm QC', model.kpi.totalPoints, ''], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'teal'],

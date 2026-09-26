@@ -175,9 +175,8 @@ export function createAuthHandlers(db: Db) {
     if (wouldRemoveLastActiveAdmin(db, id, role, active)) {
       return { ok: false, error: { code: 'last-admin', message: 'Phải còn ít nhất 1 quản trị viên đang hoạt động.' } };
     }
-    // Tự sửa quyền của CHÍNH MÌNH bị chặn (hệ thống: openUserPerms/applyUserPerms
-    // đều từ chối) — một admin hạ quyền chính mình rồi mất luôn trang Người
-    // dùng là không tự cứu được. Đổi tên/khoá thì không rơi vào đây.
+    // Tự sửa quyền của CHÍNH MÌNH bị chặn — một admin hạ quyền chính mình rồi
+    // mất luôn trang Người dùng là không tự cứu được. Đổi tên/khoá thì không rơi vào đây.
     if (id === actor.userId && (pagePerms !== undefined || role !== existing.role)) {
       return { ok: false, error: { code: 'self-perms', message: 'Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.' } };
     }
@@ -245,11 +244,11 @@ export function createAuthHandlers(db: Db) {
   });
 
   /** Đổi/xoá ảnh đại diện — LUÔN tự phục vụ (chỉ trên `actor.userId`, không
-   * nhận id người khác) khớp `avatar-modal-controller.ts` hệ thống: avatar chỉ
-   * đổi được cho chính tài khoản đang đăng nhập, không phải thao tác quản
-   * trị. Renderer đã resize về canvas 160×160 trước khi gửi lên (giữ đúng
-   * "Ảnh sẽ được cắt vuông và thu nhỏ tự động" của hệ thống) — main không resize
-   * lại, chỉ validate hình dạng data URL. */
+   * nhận id người khác): avatar chỉ đổi được cho chính tài khoản đang đăng
+   * nhập, không phải thao tác quản trị. Renderer đã resize về canvas 160×160
+   * trước khi gửi lên (đúng lời hứa "Ảnh sẽ được cắt vuông và thu nhỏ tự
+   * động" trong `AvatarModal.tsx`) — main không resize lại, chỉ validate hình
+   * dạng data URL. */
   const setAvatar = writeCommand(db, 'setAvatar', signedIn, (w, input: { data: { dataUrl?: unknown } }): IpcResult<{ avatar: string }> => {
     const actor = w.actor;
     const result = validateSetAvatar(input.data?.dataUrl);

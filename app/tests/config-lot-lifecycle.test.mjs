@@ -1,5 +1,5 @@
 // End-to-end cho 2 nghiệp vụ "Cấu hình chung" được bổ sung 2026-09-03 sau khi
-// rà soát lại toàn bộ trang so với hệ thống. Cả hai đều thuộc loại HỎNG ÂM THẦM
+// rà soát lại toàn bộ trang. Cả hai đều thuộc loại HỎNG ÂM THẦM
 // (không có thông báo lỗi nào, chỉ sai dữ liệu), nên cần test riêng:
 //
 //  (1) `saveLot` đổi số lô phải GHI LẠI nhãn lô trên mọi điểm QC cũ.
@@ -102,7 +102,7 @@ assert.equal(config.listTestLevels(test.id).find((level) => level.level === 1).q
 // Lưu Mean/SD cho lô mới (mức 1) — đây là bước "phê duyệt" trước khi kích hoạt.
 config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 105, sd: 3, qcLotId: lotNewL1.id } }, actor);
 // Đưa mức 1 trở về lô cũ để mô phỏng "nhóm mới chưa được dùng" mà Mean/SD của
-// lô mới đã có trong lịch sử — chính tình huống hệ thống dùng để áp.
+// lô mới đã có trong lịch sử — chính tình huống `activateLotGroup` dùng để áp.
 config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 100, sd: 2, qcLotId: lotOld.id } }, actor);
 
 const applied = config.activateLotGroup({ id: group.id }, actor);
@@ -178,7 +178,7 @@ assert.equal(config.listLotTransitions().length, 1, 'khong duoc sinh them ho so'
 
 // "Chấp nhận": ĐÂY mới thật sự áp Mean/SD ứng viên (bản đã SỬA: 212/4.2,
 // không phải bản gốc 210/4), đánh dấu lô cũ hết dùng. MỘT hàm lưu duy nhất
-// (2026-09-03, khớp hệ thống): status đi kèm createLotTransition, không phải
+// (2026-09-03): status đi kèm createLotTransition, không phải
 // hàm riêng — không cần gửi lại `criteria` vì hồ sơ đã giữ criteria_json từ
 // lần sửa trước, và status thiếu thì giữ nguyên (ở đây gửi rõ 'accepted').
 const accepted = config.createLotTransition({ id: created.data.id, data: { panelId: panel.id, fromLotId: runningLot.id, toLotId: candidateLot.id, startDate: '2026-04-05', note: 'da sua', status: 'accepted', criteria: [{ testId: test.id, level: 1, mean: 212, sd: 4.2 }] } }, actor);
@@ -212,8 +212,8 @@ assert.equal(removeAcceptedTo.ok, false);
 assert.equal(removeAcceptedTo.error.code, 'used-by-assay', 'lô mới đang được mức QC dùng nên cổng trực tiếp phải chặn trước');
 assert.equal(config.listLotTransitions().some((tr) => tr.id === accepted.data.id), true, 'bị chặn thì hồ sơ chuyển tiếp phải còn nguyên');
 
-// Hồ sơ đã 'accepted' thì KHÔNG đổi status khác 'accepted' được nữa (khớp
-// hệ thống: `switchesLot(old) && status!=='accepted'` → 'accepted-immutable').
+// Hồ sơ đã 'accepted' thì KHÔNG đổi status khác 'accepted' được nữa
+// (lỗi 'accepted-immutable').
 // Sửa các trường khác (ngày/ghi chú) kèm status='accepted' vẫn hợp lệ,
 // KHÔNG chạy lại cascade lần nữa vì `finalChanged` lúc này là false.
 const blocked = config.createLotTransition({ id: created.data.id, data: { panelId: panel.id, fromLotId: runningLot.id, toLotId: candidateLot.id, startDate: '2026-04-09', status: 'active' } }, actor);
@@ -235,7 +235,7 @@ assert.equal(lvl2.qc_lot_id, runningLot2.id, 'Khong chap nhan KHONG duoc doi lo 
 assert.equal(lvl2.mean, 50); assert.equal(lvl2.sd, 1);
 assert.equal(config.listLots().find((l) => l.id === runningLot2.id).depleted, 0, 'lo dang chay KHONG bi danh dau het dung');
 
-// "Không chấp nhận" KHÔNG khoá hồ sơ — hệ thống cho sửa/đổi status lại được
+// "Không chấp nhận" KHÔNG khoá hồ sơ — vẫn cho sửa/đổi status lại được
 // (chỉ 'accepted' mới khoá vĩnh viễn).
 const reopened = config.createLotTransition({ id: toReject.data.id, data: { panelId: panel.id, fromLotId: runningLot2.id, toLotId: candidateLot2.id, status: 'planned' } }, actor);
 assert.equal(reopened.ok, true);

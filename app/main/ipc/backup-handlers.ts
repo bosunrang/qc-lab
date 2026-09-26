@@ -228,10 +228,8 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
   });
 
   /** "Xóa sạch dữ liệu test" — xoá dữ liệu VẬN HÀNH, giữ lại tài khoản và
-   * nhật ký hoạt động. Ánh xạ đúng `ResetOperationalDataCommand` hệ thống: mặc
-   * định `keepUsers`/`keepAudit` đều bật, và `blankAppState()` của nó đưa
-   * `lab` về giá trị mặc định — nên ở đây cũng reset bảng `lab` về default
-   * của schema chứ không giữ tên đơn vị.
+   * nhật ký hoạt động. Bảng `lab` cũng được reset về default của schema chứ
+   * không giữ tên đơn vị.
    *
    * GIỮ `activity` + `app_meta` (gồm `activityAnchor`) là điều kiện để chuỗi
    * hash tamper-evident không bị phá: xoá nhật ký mà giữ anchor, hoặc ngược

@@ -69,12 +69,11 @@ export function applyLotGroupActivation(db: Db, input: {
     const oldLot = candidate.prevLotId ? db.prepare('SELECT lot_no, opened FROM qc_lots WHERE id=?').get(candidate.prevLotId) as
       { lot_no: string; opened: string } | undefined : undefined;
     const nextFrom = lots.find((lot) => lot.id === candidate.lotId)?.opened || at.slice(0, 10);
-    // `test_levels` KHÔNG có cột `lot` — số lô lấy qua `qc_lot_id`
-    // (khác hệ thống, nơi mức QC giữ cả nhãn lô dạng chuỗi).
+    // `test_levels` KHÔNG có cột `lot` — số lô lấy qua `qc_lot_id`.
     // Nguồn 'mfg' (NSX), KHÔNG phải 'lab' — cùng bug/lý do đã sửa ở cascade
-    // chuyển lô: `applyTargetPick()` hệ thống (dùng chung bởi Mean/SD tab VÀ
-    // kích hoạt nhóm lô) LUÔN ghi `source:'mfg'`; 'lab' (PXN) chỉ dành riêng
-    // cho luồng "Xây dựng dải PXN" ở trang Nhập QC & Biểu đồ.
+    // chuyển lô: Mean/SD gán từ tab Mean/SD VÀ khi kích hoạt nhóm lô LUÔN ghi
+    // `source:'mfg'`; 'lab' (PXN) chỉ dành riêng cho luồng "Xây dựng dải PXN"
+    // ở trang Nhập QC & Biểu đồ.
     db.prepare('UPDATE test_levels SET qc_lot_id=?, mean=?, sd=?, low=?, high=?, applied=?, mean_sd_history_json=?, mean_sd_effective_from=? WHERE id=?')
       .run(candidate.lotId, candidate.mean, candidate.sd, candidate.low, candidate.high, 'mfg',
         appendMeanSdHistory(candidate.historyJson,

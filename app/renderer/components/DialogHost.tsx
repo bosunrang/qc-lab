@@ -1,13 +1,11 @@
-// Mount 1 lần, cố định (giống #dialogRoot của hệ thống) — render confirm/info/
+// Mount 1 lần, cố định (portal vào #dialogRoot) — render confirm/info/
 // reauth theo dialog-store.ts. Đặt trong AppShell, ngoài <Outlet/>, nên tồn
 // tại xuyên suốt vòng đời app, không unmount khi chuyển trang.
 //
-// **2026-09-03**: viết lại theo đúng cấu trúc `.confirm-modal` hệ thống
-// (`src/react/dialogs/DialogOverlay.tsx`) — bản trước chỉ dùng khung modal
-// trơn (`.modal-h`/`.modal-b`), thiếu kicker đỏ "Thao tác được kiểm soát",
-// icon tròn theo mức độ (nguy hiểm/thông tin/cảnh báo/thành công), và dòng
-// "Tài khoản: ..." của hộp xác thực lại mật khẩu — người dùng phát hiện khi
-// so ảnh chụp với hệ thống.
+// **2026-09-03**: viết lại theo cấu trúc `.confirm-modal` — bản trước chỉ
+// dùng khung modal trơn (`.modal-h`/`.modal-b`), thiếu kicker đỏ "Thao tác
+// được kiểm soát", icon tròn theo mức độ (nguy hiểm/thông tin/cảnh báo/thành
+// công), và dòng "Tài khoản: ..." của hộp xác thực lại mật khẩu.
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogState, closeDialog } from '../state/dialog-store';

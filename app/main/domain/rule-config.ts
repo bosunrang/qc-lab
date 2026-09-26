@@ -1,5 +1,5 @@
 // Chính sách từng luật Westgard THEO TỪNG XÉT NGHIỆM. Cấu hình chung vẫn là
-// boolean bật/tắt; ghi đè riêng xét nghiệm có đủ ba hành động như hệ thống:
+// boolean bật/tắt; ghi đè riêng xét nghiệm có đủ ba hành động:
 // không dùng / cảnh báo / loại bỏ. Boolean cũ vẫn được đọc để dữ liệu đã lưu
 // trước khi nâng cấp không bị mất nghĩa.
 import { WG_DEFAULT_ON, WG_RULES, WG_RULE_BY_ID, allowedRuleScopes, defaultRuleAction, defaultRuleScope, isAllowedRuleScope, type RuleScope } from './westgard-rules';
@@ -30,21 +30,21 @@ export function serializeRuleActions(overrides: RuleActionsMap): string {
   return JSON.stringify(overrides);
 }
 
-/** Phân giải luật ĐÚNG 2 TẦNG như hệ thống (`resolveRuleAction(rule,
+/** Phân giải luật ĐÚNG 2 TẦNG:
  *   1. Ghi đè RIÊNG của xét nghiệm (`tests.rule_actions_json`) — chỉnh ở
  *      modal "Sửa xét nghiệm" của trang Cấu hình chung;
- *   2. Cấu hình CHUNG toàn phòng xét nghiệm (`app_meta.westgardRules`, hệ thống
- *      là `state.westgardRules`) — chỉnh ở panel "Cấu hình chung của luật"
- *      trên trang Phân tích Westgard;
+ *   2. Cấu hình CHUNG toàn phòng xét nghiệm (`app_meta.westgardRules`) —
+ *      chỉnh ở panel "Cấu hình chung của luật" trên trang Phân tích Westgard;
  *   3. Mặc định của `WG_RULE_REGISTRY` (`defaultOn`).
- * `rule_actions_json` của RIÊNG xét nghiệm đang chọn, trong khi hệ thống đổi
- * MẶC ĐỊNH CHO MỌI XÉT NGHIỆM — sai hẳn phạm vi tác động. */
+ * Trước đây app chỉ có tầng 1: checkbox trên trang Westgard ghi thẳng vào
+ * `rule_actions_json` của RIÊNG xét nghiệm đang chọn, trong khi cấu hình
+ * chung phải đổi MẶC ĐỊNH CHO MỌI XÉT NGHIỆM — sai hẳn phạm vi tác động. */
 export function makeIsOnLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap): (ruleId: string) => boolean {
   const actionOf = makeRuleActionLayered(globalRules, overrides);
   return (ruleId: string) => actionOf(ruleId) !== 'inactive';
 }
 
-/** Phân giải đúng thứ tự hệ thống: hành động riêng của xét nghiệm → trạng thái
+/** Phân giải đúng thứ tự: hành động riêng của xét nghiệm → trạng thái
  * chung → mặc định registry. `true` cũ mang hành động mặc định của luật. */
 export function makeRuleActionLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap): (ruleId: string) => RuleAction {
   return (ruleId: string) => {

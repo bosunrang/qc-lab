@@ -39,7 +39,7 @@ export const TEA_CATALOG: readonly TeaCatalogItem[] = TEA_CATALOG_ROWS.map(
   }),
 );
 
-/** Các giới hạn tuyệt đối có trong `TEA_ANALYTE_CATALOG` của hệ thống. Tách
+/** Các giới hạn tuyệt đối của danh mục TEa. Tách
  * riêng khỏi tuple 77 dòng giúp phần danh mục dễ rà soát; giá trị là nguồn
  * tham chiếu, tuyệt đối không phải TEa% đã quy đổi. */
 const CLIA_ABSOLUTE: Readonly<Record<string, readonly [number, string]>> = {

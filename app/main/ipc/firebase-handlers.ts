@@ -99,7 +99,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
   function parsePayload(value: unknown): { ok: true; data: FirebasePayload } | { ok: false; message: string } {
     if (!value) return { ok: false, message: 'empty' };
     const row = value as Partial<FirebasePayload>;
-    if (row._format !== 'qclab-v2-firebase' || !row.backup) {
+    if (row._format !== 'qclab-firebase' || !row.backup) {
       return { ok: false, message: 'Dữ liệu Firebase này không đúng định dạng backup được hỗ trợ.' };
     }
     const checked = validateBackupEnvelope(row.backup, SCHEMA_VERSION);

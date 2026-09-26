@@ -112,7 +112,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   }, [editingId, ruleScopesByTestId]);
 
   function openNew() {
-    // hệ thống mở thẳng form tạo máy nếu chưa có máy; tránh đưa người dùng vào
+    // Mở thẳng form tạo máy nếu chưa có máy; tránh đưa người dùng vào
     // form xét nghiệm không thể lưu vì select Máy hoàn toàn rỗng.
     if (!instruments.length) { onNeedInstrument?.(); return; }
     setErr(null); setEditingSingleAssignment(false); setEditing('new');

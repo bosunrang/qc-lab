@@ -25,8 +25,8 @@ assert.equal(saved1.ok, true);
 assert.equal(saved1.data.mean_sd_effective_from, today, 'luu Mean/SD lan dau phai dong dau hom nay');
 
 // 3) Lưu lại Y HỆT số cũ (không đổi mean/sd) — vẫn phải đóng dấu lại hôm
-// nay, KHÔNG chỉ khi giá trị khác (đúng hệ thống: mỗi lần bấm "Lưu Mean/SD
-// mức này" đều re-stamp effectiveFrom, không điều kiện gì).
+// nay, KHÔNG chỉ khi giá trị khác (mỗi lần bấm "Lưu Mean/SD mức này" đều
+// re-stamp effectiveFrom, không điều kiện gì).
 const saved2 = config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 100, sd: 2, qcLotId: lot1.id } }, actor);
 assert.equal(saved2.ok, true);
 assert.equal(saved2.data.mean_sd_effective_from, today, 'luu lai cung so cu van phai dong dau lai hom nay');

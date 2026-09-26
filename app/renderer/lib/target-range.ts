@@ -66,7 +66,7 @@ export function normalizeTargetPick(input: {
   return { use: true, mean, sd, low, high };
 }
 
-/** In số theo số thập phân của xét nghiệm (hệ thống: `targetNumberText`). */
+/** In số theo số thập phân của xét nghiệm. */
 export function targetNumberText(value: number | null | undefined, decimals: number): string {
   if (value == null || !Number.isFinite(value)) return '';
   return Number(value).toFixed(decimals);

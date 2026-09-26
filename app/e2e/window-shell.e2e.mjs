@@ -43,7 +43,7 @@ test('mở app lần hai: phiên mới tự thoát, cửa sổ đang chạy hi�
 
     // Cùng thư mục dữ liệu nên cùng khoá một phiên chạy.
     const env = { ...process.env, QCLAB_USER_DATA_DIR: userDataDir, QCLAB_LAN_PORT: String(port) };
-    delete env.APP_V2_DEV_SERVER_URL;
+    delete env.QCLAB_DEV_SERVER_URL;
     delete env.ELECTRON_RUN_AS_NODE;
     const second = spawn(require('electron'), ['.'], { cwd: REPO_ROOT, env, stdio: 'ignore' });
     const exitCode = await new Promise((resolve, reject) => {

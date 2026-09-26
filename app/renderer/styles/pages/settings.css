@@ -105,28 +105,28 @@
   letter-spacing:.06em;
 }
 
-/* 3 thẻ công cụ quản trị: lưới 3 cột, mỗi thẻ cao đều nhau và nút luôn dính
-   đáy thẻ (`grid-template-rows:auto minmax(66px,1fr) auto`) — nhờ vậy 3 thẻ
-   có độ dài mô tả khác nhau vẫn thẳng hàng nút. */
-.admin-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:var(--panel-content-gap) 16px 16px;align-items:stretch}
+/* Bốn công cụ quản trị dùng một hàng. Lưới tự lấy chiều cao của mô tả dài
+   nhất, vì vậy nút thao tác của cả bốn thẻ luôn thẳng hàng mà không cần ép
+   chiều cao riêng. */
+.admin-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-3);margin:var(--panel-content-gap) var(--space-4) var(--space-4);align-items:stretch}
 .admin-tool{
   border:1px solid var(--surface-border); border-radius:var(--radius-md); box-shadow:var(--panel-shadow); overflow:hidden; background:var(--surface);
-  padding:12px;display:grid;grid-template-rows:auto minmax(66px,1fr) auto;gap:8px;min-height:188px;
+  padding:var(--space-3);display:grid;grid-template-rows:auto 1fr auto;gap:var(--space-2);min-width:0;
 }
 .admin-tool b{font-size:var(--text-sm)}
 .admin-tool span{color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body)}
 .admin-tool .btn{width:100%;align-self:end}
 /* Hai nút cùng một công cụ (Xuất gói log / Mở thư mục log) chia đôi hàng. */
-.admin-tool-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-self:end}
+.admin-tool-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);align-self:end}
 
 /* Header dùng `.panel-title` chuẩn (nền, đường kẻ đáy, cỡ chữ); lớp này chỉ
-   thêm khoảng cách giữa icon và chữ. */
-.settings-admin-title{gap:var(--space-2)}
-.settings-admin-icon{width:var(--icon-md);height:var(--icon-md);flex:none;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+   thêm khoảng cách giữa icon và chữ cho các khu vực Cài đặt. */
+.settings-panel-title{gap:var(--space-2)}
+.settings-panel-icon{width:var(--icon-md);height:var(--icon-md);flex:none;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 .lis-gateway-body{display:grid;gap:var(--space-2);margin:var(--panel-content-gap) 16px 0}
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
-   chỉ còn nửa bề rộng trang — giữ đúng lý do hệ thống ghi tại chỗ. */
+   chỉ còn nửa bề rộng trang. */
 .lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--field-gap)}
 .lis-gateway-toggle{display:flex;margin:0;align-items:center;gap:8px;min-height:var(--control-h);padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .lis-gateway-toggle input{flex:none}
@@ -141,7 +141,7 @@
 .firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap)}
 .firebase-auth-grid > div:last-child{grid-column:1 / -1}
 /* Ô dán cấu hình vẫn cao để đọc dễ, nhưng dùng đúng cỡ/chữ/line-height của
-   textarea hệ thống; khối Firebase Rules bên dưới mới là vùng monospace. */
+   textarea chung của app; khối Firebase Rules bên dưới mới là vùng monospace. */
 .firebase-config-input{width:100%;min-height:168px;resize:vertical;font-family:var(--font-sans);font-size:var(--text-base);line-height:var(--leading-body)}
 .firebase-actions{display:flex;gap:8px;flex-wrap:wrap}
 .settings-firebase-help{margin:0 0 16px;color:var(--text-tertiary);font-size:var(--text-sm)}

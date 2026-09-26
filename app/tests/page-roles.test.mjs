@@ -1,23 +1,22 @@
 // Oracle cho bảng TRANG × VAI TRÒ + quyền theo từng trang
 // (`main/domain/page-roles.ts` — nguồn dùng chung cho cả 2 tiến trình, file
 // đó KHÔNG import gì nên test được thẳng trên .ts qua ESM).
-//
-// Thay `tests/permissions.test.mjs` của Giai đoạn D0b: bảng đã dời từ
-// `renderer/lib/permissions.ts` sang main khi Giai đoạn D3.1 cần chính bảng
-// này để thu hẹp `pagePerms` phía server (không tin danh sách renderer gửi).
+// Bảng nằm ở main vì main cần chính bảng này để thu hẹp `pagePerms` phía
+// server (không tin danh sách renderer gửi); `renderer/lib/permissions.ts`
+// chỉ xuất lại.
 import assert from 'node:assert/strict';
 import {
   PAGE_DEFS, ROLE_LIST, roleOf, canWriteRole, isAdminRole, pageById, rolePageIds,
   selectUserPermissions, userPageIds, canAccessPage, canUserAccessPage, firstAccessPath, roleLabel,
 } from '../main/domain/page-roles.ts';
 
-// ── 1) Đúng 11 trang, đúng thứ tự/id/nhãn như ROUTER_PAGE_DEFS hệ thống ─────
+// ── 1) Đúng 11 trang, đúng thứ tự/id/nhãn ─────────────────────────────────
 assert.deepEqual(
   PAGE_DEFS.map((p) => p.id),
   ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'actions', 'report', 'manage', 'users', 'audit', 'settings'],
 );
 // Nhãn hiện ở 2 nơi nhìn thấy được (sidebar + lưới "Thẻ được phép dùng") nên
-// khoá luôn từng chuỗi — kể cả "Cài đặt & Đám mây", nhãn hệ thống.
+// khoá luôn từng chuỗi — kể cả "Cài đặt & Đám mây".
 assert.deepEqual(PAGE_DEFS.map((p) => p.label), [
   'Tổng quan', 'Nhập QC & Biểu đồ', 'Phân tích Westgard', 'Six Sigma & Sai số', 'So sánh hóa chất',
   'Khắc phục sự cố', 'Báo cáo & Biểu mẫu', 'Cấu hình chung', 'Người dùng', 'Nhật ký hoạt động', 'Cài đặt & Đám mây',
@@ -85,7 +84,7 @@ assert.equal(firstAccessPath(null), '/dashboard');
 assert.equal(firstAccessPath({ role: 'technician', pagePerms: ['report'] }), '/report');
 assert.equal(firstAccessPath({ role: 'admin', pagePerms: ['settings', 'audit'] }), '/audit', 'theo thứ tự bảng, không theo thứ tự pagePerms');
 
-// ── 9) Nhãn vai trò giống hệ thống (roleLabel trong router-permission.ts) ──
+// ── 9) Nhãn vai trò hiển thị (roleLabel) ────────────────────────────────────
 assert.equal(roleLabel('admin'), 'Quản trị');
 assert.equal(roleLabel('technician'), 'KTV');
 assert.equal(roleLabel('viewer'), 'Chỉ xem');

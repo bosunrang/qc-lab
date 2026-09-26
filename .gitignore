@@ -1,7 +1,6 @@
 # Generated test and tooling output
 dist/
-# Đầu ra của `npm run build` (package.json's `main` trỏ vào đây). Tên cũ
-# `app-v2-dist/` đã hết dùng sau khi `app-v2/` đổi thành `app/`.
+# Đầu ra của `npm run build` (package.json's `main` trỏ vào đây).
 app-dist/
 .cache/
 .tmp-edits/

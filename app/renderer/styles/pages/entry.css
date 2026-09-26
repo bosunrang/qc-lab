@@ -203,7 +203,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-card{display:block;flex:1 1 340px;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;}
 /* Thu gọn bảng chi tiết để hai mức QC vừa cạnh nhau ở bố cục desktop. */
 .qc-table-card h4,.qc-table-card table,.qc-cumulative{min-width:540px;}
-/* CHỈ thêm phần hệ thống khai RIÊNG cho `.qc-table-card h4` ngoài rule dùng
+/* CHỈ thêm phần khai RIÊNG cho `.qc-table-card h4` ngoài rule dùng
    chung (`.qc-table-card h4,.lj-mini-h,.tree h4` ở trên) —
    không lặp lại background/border-bottom/margin/padding/font-size, nếu
    không bản khai lại (cùng độ đặc hiệu, đến SAU) sẽ đè mất giá trị đúng của
@@ -266,7 +266,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-month-picker select, .qc-current-month, .qc-today-jump { height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0 10px; font-size: var(--text-sm); }
 .qc-today-jump { white-space: nowrap; min-width: 104px; }
 
-/* Nút "＋ Thêm" chỉ hiện khi trỏ vào ô — hệ thống dùng opacity + nở ngang. */
+/* Nút "＋ Thêm" chỉ hiện khi trỏ vào ô — dùng opacity + nở ngang. */
 .qc-run-grid.has-add-btn { padding-right: 14px; }
 .qc-add-run-btn {
   position: absolute; top: 0; right: 0; bottom: 0; width: 22px; margin: 0; padding: 0;

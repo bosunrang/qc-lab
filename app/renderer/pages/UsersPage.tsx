@@ -1,7 +1,6 @@
 // Người dùng: trang quản lý tài khoản có ba điểm cấu trúc chính:
-//   1. Hai panel cùng một hàng: form "Thêm người dùng" nằm NGAY TRONG TRANG ở
-//      bên trái (2 thẻ con cạnh nhau: thông tin tài khoản + "Thẻ được phép
-//      dùng" xếp dọc), không phải modal; "Danh sách người dùng" ở bên phải.
+//   1. Form "Thêm người dùng" nằm ngang phía trên danh sách. Thông tin tài
+//      khoản và các màn hình truy cập dùng chung một panel, không lồng thẻ.
 //   2. Bảng danh sách có 4 cột (Người dùng / Vai trò / Trạng thái / Hành
 //      động) với cụm nút trên từng dòng, không phải select+checkbox inline.
 //   3. `pagePerms` — quyền theo từng trang.
@@ -21,19 +20,18 @@ import { PAGE_DEFS, ROLE_LIST, rolePageIds, roleLabel } from '../lib/permissions
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
 
-/** Lưới "Thẻ được phép dùng" — ô có viền, ô tick bên trái như bản cũ. Khi
- * đổi vai trò, thẻ không còn hợp lệ bị bỏ chọn; thẻ mới được phép vẫn chờ
- * quản trị viên chủ động chọn. Thẻ ngoài vai trò hiện mờ, không tick được. */
-function PermGrid({ groupId, labelledBy, role, selected, onToggle }: {
-  groupId: string; labelledBy: string; role: string; selected: ReadonlySet<string>; onToggle: (id: string, on: boolean) => void;
+/** Khi tạo tài khoản, chỉ hiện các màn hình của vai trò đã chọn. Hộp sửa quyền
+ * vẫn hiện toàn bộ để quản trị viên thấy rõ những màn hình bị giới hạn. */
+function PermGrid({ groupId, labelledBy, role, selected, onToggle, availableOnly = false }: {
+  groupId: string; labelledBy: string; role: string; selected: ReadonlySet<string>; onToggle: (id: string, on: boolean) => void; availableOnly?: boolean;
 }) {
   const allowed = useMemo(() => new Set(rolePageIds(role)), [role]);
   return (
     <div id={groupId} className="user-perm-grid" role="group" aria-labelledby={labelledBy}>
-      {PAGE_DEFS.map((page) => {
+      {PAGE_DEFS.filter((page) => !availableOnly || allowed.has(page.id)).map((page) => {
         const enabled = allowed.has(page.id);
         return (
-          <label key={page.id} className={enabled ? '' : 'disabled'} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
+          <label key={page.id} className={enabled ? (selected.has(page.id) ? 'selected' : '') : 'disabled'} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
             <input type="checkbox" value={page.id} checked={enabled && selected.has(page.id)} disabled={!enabled}
               onChange={(e) => onToggle(page.id, e.target.checked)} />
             <span>{page.label}</span>
@@ -67,6 +65,8 @@ function CreatePanel() {
   // Mặc định tick sẵn toàn bộ thẻ của vai trò — khớp `userPermChecks()` app
   // cũ khi chưa có lựa chọn nào (`selectedIds` rỗng → dùng `rolePageIds`).
   const [selected, setSelected] = useState<Set<string>>(() => new Set(rolePageIds('technician')));
+  const availableCount = rolePageIds(role).length;
+  const initials = initialsFromName(name);
 
   function changeRole(next: string) {
     setRole(next);
@@ -86,26 +86,29 @@ function CreatePanel() {
     <div className="panel users-create-panel">
       <h2 className="panel-title">Thêm người dùng</h2>
       <div className="user-create-layout">
-        <div className="user-create-card">
-          <div className="user-create-card-title">Thông tin tài khoản</div>
+        <section className="user-create-section" aria-labelledby="userAccountTitle">
+          <h3 id="userAccountTitle">Thông tin tài khoản</h3>
           <div className="user-create-fields">
             <div className="field"><label htmlFor="uUser">Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
             <div className="field"><label htmlFor="uName">Họ tên</label><input id="uName" aria-label="Họ tên" value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <div className="field"><label htmlFor="uInitials">Mã viết tắt</label><input id="uInitials" readOnly placeholder="NTL" value={initialsFromName(name)} title="Tự động lấy chữ cái đầu của họ tên" /></div>
             <div className="field"><label htmlFor="uRole">Vai trò</label><RoleSelect id="uRole" value={role} onChange={changeRole} /></div>
             <div className="field"><label htmlFor="uPass">Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-            <div className="user-create-actions"><button className="btn teal" onClick={submit}>Thêm</button></div>
+            <div className="user-initials-preview">Mã viết tắt tự tạo <span className="pill">{initials || '—'}</span></div>
           </div>
-        </div>
-        <div className="user-create-card">
-          <div className="user-create-card-title" id="newUserPermsLabel">Thẻ được phép dùng</div>
-          <div className="user-perm-block">
-            <PermGrid groupId="newUserPerms" labelledBy="newUserPermsLabel" role={role} selected={selected}
-              onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
+        </section>
+        <section className="user-create-section user-create-perms" aria-labelledby="newUserPermsLabel">
+          <div className="user-perm-heading">
+            <h3 id="newUserPermsLabel">Màn hình truy cập</h3>
+            <span className="pill">{selected.size}/{availableCount} đã chọn</span>
           </div>
-        </div>
+          <PermGrid groupId="newUserPerms" labelledBy="newUserPermsLabel" role={role} selected={selected} availableOnly
+            onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
+        </section>
       </div>
-      <div className="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div>
+      <div className="user-create-footer">
+        <p>Vai trò quyết định quyền sửa dữ liệu. Người dùng mới phải đổi mật khẩu ở lần đăng nhập đầu tiên.</p>
+        <button className="btn teal" onClick={submit}>Tạo tài khoản</button>
+      </div>
     </div>
   );
 }
@@ -181,8 +184,8 @@ export function UsersPage() {
   );
 }
 
-/** "Sửa quyền" — modal của hệ thống (`UserPermissionsModal.tsx`): 1 select vai
- * trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở đây, đúng phạm vi hệ thống. */
+/** "Sửa quyền": 1 select vai trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở
+ * đây — modal này chỉ lo quyền. */
 function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
   const { update } = useUsersStore(useShallow((s) => ({ update: s.update })));
   const [role, setRole] = useState<string>(user.role);

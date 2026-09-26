@@ -20,7 +20,7 @@ export function AuditPage() {
   const [archiving, setArchiving] = useState(false);
   const [chain, setChain] = useState<ChainVerifyView | null>(null);
   const chainEpoch = useRef(0);
-  /** Ngưỡng tự kiểm chuỗi hash — hệ thống (`AUDIT_AUTO_VERIFY_MAX`) tự kiểm khi
+  /** Ngưỡng tự kiểm chuỗi hash (`AUTO_VERIFY_MAX`) — tự kiểm khi
    * nhật ký còn nhỏ và chỉ đưa nút bấm khi log lớn, để không băm lại hàng
    * chục nghìn dòng mỗi lần mở trang. */
 
@@ -35,7 +35,7 @@ export function AuditPage() {
     return result;
   }
 
-  // Tự kiểm chuỗi hash khi nhật ký còn nhỏ, đúng hệ thống.
+  // Tự kiểm chuỗi hash khi nhật ký còn nhỏ.
   useEffect(() => {
     if (chain || !result.total || result.total > AUTO_VERIFY_MAX) return;
     // `r.ok` là cổng quyền, `r.data.ok` mới là kết luận chuỗi hash. Bị chặn
