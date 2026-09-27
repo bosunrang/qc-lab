@@ -4,7 +4,7 @@
 // do huỷ điểm là vẽ lại cả bảng 31 ngày và mọi biểu đồ. Nay hộp thoại tự giữ
 // form của mình, còn bảng nhập và biểu đồ bọc `memo` và chỉ nhận props ổn
 // định (cột dựng bằng `useMemo`, callback bằng `useCallback`).
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalog } from '../lib/useCatalog';
@@ -28,7 +28,7 @@ import { EntryPointsPanel } from './entry/EntryPointsPanel';
 import { EntryRangePanel } from './entry/EntryRangePanel';
 import { VoidPointModal } from './entry/VoidPointModal';
 import { RangeWorkflowModal, type RangeMode } from './entry/RangeWorkflowModal';
-import { formatQcValue, pad2, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
+import { formatQcValue, pad2, parseQcValueText, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
 import { lotNoOfLevel } from '../lib/lot-label';
 
 const EMPTY_LEVELS: TestLevel[] = [];
@@ -114,6 +114,9 @@ export function EntryPage() {
   }, [testId, levelNums, loadTestData, resetTestData]);
   useEffect(() => { if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel); }, [testId, rangeLevel, loadRangeCandidate]);
   useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions'], testId || undefined, () => {
+    // Mean/SD hay trạng thái vận hành của mức có thể vừa đổi ở máy khác: nạp
+    // lại mức trước, effect theo `levelNums` sẽ nạp lại dữ liệu nếu tập mức đổi.
+    if (testId) loadLevels(testId);
     if (testId && levelNums.length) loadTestData(testId, levelNums);
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
@@ -134,22 +137,38 @@ export function EntryPage() {
   // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ để mở trang
   // là có ngay bảng nhập. `location.state.testId` cho phép điều hướng chéo từ
   // Tổng quan đến đúng xét nghiệm.
-  const navState = useLocation().state as { testId?: string; level?: number } | null;
+  // Chỉ áp `location.state` MỘT lần cho mỗi lần điều hướng (theo
+  // `location.key`): `summaries` nạp lại sau mỗi lần lưu, nếu áp lại thì
+  // trang kéo người dùng về xét nghiệm lúc mới vào dù họ đã chọn cái khác.
+  const location = useLocation();
+  const navState = location.state as { testId?: string; level?: number } | null;
+  const handledNavKey = useRef<string | null>(null);
+  const handledNavLevelKey = useRef<string | null>(null);
   useEffect(() => {
     if (!summaries.length) return;
-    const wanted = navState?.testId;
-    if (wanted && wanted !== testId && summaries.some((s) => s.testId === wanted)) { selectLeaf(wanted); return; }
+    const wanted = handledNavKey.current === location.key ? undefined : navState?.testId;
+    if (wanted && summaries.some((s) => s.testId === wanted)) {
+      handledNavKey.current = location.key;
+      if (wanted !== testId) selectLeaf(wanted);
+      return;
+    }
     if (testId && summaries.some((s) => s.testId === testId)) return;
     // Chỉ tự chọn xét nghiệm đã sẵn sàng nhập — không rơi vào một xét nghiệm
     // chưa có nhóm lô hoạt động, thứ
     // vốn còn không hiện trong cây để mà chọn.
     const first = summaries.find((s) => catalog.isOperationalTest(s));
     if (first) selectLeaf(first.testId);
-  }, [summaries, navState?.testId, catalog]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [summaries, navState?.testId, catalog, location.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Mức được yêu cầu cũng chỉ áp một lần; `levelNums` đổi sau khi đặt dải PXN
+  // thì không kéo dải QC đang xem về lại mức đó.
   useEffect(() => {
     const wantedLevel = Number(navState?.level);
-    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) setRangeLevel(wantedLevel);
-  }, [testId, levelNums, navState?.testId, navState?.level]);
+    if (handledNavLevelKey.current === location.key) return;
+    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) {
+      handledNavLevelKey.current = location.key;
+      setRangeLevel(wantedLevel);
+    }
+  }, [testId, levelNums, navState?.testId, navState?.level, location.key]);
 
   /** Preset "N ngày": đặt Đến = hôm nay, Từ = hôm nay − (N−1) ngày. */
   const applyDayPreset = useCallback((days: number) => {
@@ -226,7 +245,14 @@ export function EntryPage() {
   }, [previousLotSeries]);
 
   // Chỉ xoá ô nhập khi lưu thành công; nếu thất bại thì hiển thị lỗi trả về.
-  const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, val: number): Promise<boolean> => {
+  const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, raw: string): Promise<boolean> => {
+    const val = parseQcValueText(raw);
+    if (val == null) return false;
+    if (Number.isNaN(val)) {
+      setPointErr(`"${raw.trim()}" không phải một giá trị số. Dùng dấu chấm hoặc dấu phẩy cho phần thập phân, ví dụ 5.25 hoặc 5,25.`);
+      setPointFeedback(null);
+      return false;
+    }
     const deviation = extremeQcPointDeviation(val, column.mean, column.sd);
     if (deviation != null) {
       const confirmed = await confirmDialog(

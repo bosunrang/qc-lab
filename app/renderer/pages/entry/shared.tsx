@@ -22,6 +22,16 @@ export function runExcludedNote(point: QcPointView): string | null {
 export const vnDate = (iso: string) => formatVnDate(iso, iso || '—');
 export function pad2(n: number): string { return String(n).padStart(2, '0'); }
 
+/** Đọc giá trị QC người dùng gõ: nhận cả dấu phẩy lẫn dấu chấm thập phân
+ * (máy đặt vùng Việt Nam hay gõ `5,2`). Ô trống trả `null`; chữ không phải số
+ * trả `NaN` để nơi gọi báo lỗi thay vì im lặng bỏ qua. */
+export function parseQcValueText(raw: string): number | null {
+  const text = raw.trim();
+  if (!text) return null;
+  if (!/^[+-]?(\d+([.,]\d*)?|[.,]\d+)$/.test(text)) return Number.NaN;
+  return Number(text.replace(',', '.'));
+}
+
 export type EntryColumn = {
   key: string; level: number; lot: string; mean: number | null; sd: number | null; exp: string;
   parallel: boolean; applied: 'mfg' | 'lab'; points: QcPointView[]; chartPoints: QcChartPoint[];

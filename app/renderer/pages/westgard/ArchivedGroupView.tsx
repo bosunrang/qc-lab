@@ -4,6 +4,7 @@
 import { QcMultiChart } from '../../components/QcChart';
 import { EmptyState } from '../../components/EmptyState';
 import { WestgardPointTable, vnDate } from './shared';
+import { statText } from '../../lib/westgard-view';
 import type { ArchivedWestgardState } from './useArchivedWestgard';
 
 export function ArchivedGroupPicker({ state }: { state: ArchivedWestgardState }) {
@@ -68,7 +69,7 @@ export function ArchivedGroupResults({ state }: { state: ArchivedWestgardState }
         <div className={`panel wg-level-panel${b.analysis.points.length ? ' wg-prev-lot' : ''}`} key={`${b.level}-${b.lotId}`}>
           <h3>
             <div className="wg-level-title"><span>Mức {b.level}</span><span className="wg-lot-name">Lô {b.lotNo}</span></div>
-            <div className="wg-level-meta"><span className="tag rej">{archivedStatusLabel}</span><span>Mean {b.mean.toFixed(archivedDecimals)}</span><span>SD {b.sd.toFixed(archivedDecimals)}</span><span>{b.analysis.points.length} điểm</span></div>
+            <div className="wg-level-meta"><span className="tag rej">{archivedStatusLabel}</span><span>Mean {statText(b.mean, archivedDecimals)}</span><span>SD {statText(b.sd, archivedDecimals)}</span><span>{b.analysis.points.length} điểm</span></div>
           </h3>
           {!b.analysis.points.length ? (
             <EmptyState title="Chưa có dữ liệu">Không tìm thấy điểm QC nào cho lô này.</EmptyState>

@@ -56,14 +56,14 @@ assert.equal(halfDone.kpi.completionPercent, 0);
 assert.equal(halfDone.kpi.missingToday, 1);
 assert.equal(halfDone.kpi.todayPoints, 1, 'todayPoints van dem theo MUC da co diem hom nay');
 
-// ── 4) daysToExpiry: nửa đêm giờ địa phương, làm tròn theo giờ hiện tại ───
-// 15:45 chiều ngày 02/09, lô hết hạn 20/09 → còn 17,34 ngày → 17 (KHÔNG 18).
+// ── 4) daysToExpiry: đếm theo NGÀY LỊCH, không phụ thuộc giờ trong ngày ───
+// Trước 2026-09-27 phép tính so với giờ hiện tại nên buổi chiều ra số khác
+// buổi sáng, và đúng ngày hết hạn mà quá 12 giờ trưa thì hiện "Hết hạn 1 ngày".
 const afternoon = new Date(2026, 8, 2, 15, 45, 0);
-assert.equal(daysToExpiry('2026-09-20', afternoon), 17);
-// Lô đã hết hạn 31/08 → -2,66 → -3.
-assert.equal(daysToExpiry('2026-08-31', afternoon), -3);
-// Buổi sáng cùng ngày cho ra con số khác — đúng bản chất phép tính này.
-assert.equal(daysToExpiry('2026-09-20', new Date(2026, 8, 2, 8, 0, 0)), 18);
+assert.equal(daysToExpiry('2026-09-20', afternoon), 18);
+assert.equal(daysToExpiry('2026-09-20', new Date(2026, 8, 2, 8, 0, 0)), 18, 'sáng hay chiều cùng một số ngày');
+assert.equal(daysToExpiry('2026-08-31', afternoon), -2);
+assert.equal(daysToExpiry('2026-09-02', new Date(2026, 8, 2, 13, 0, 0)), 0, 'đúng ngày hết hạn là 0, chưa phải "hết hạn 1 ngày"');
 assert.equal(daysToExpiry('', afternoon), null);
 
 // ── 5) Gom lô sắp hết hạn theo lô, giữ ngày gần nhất, đếm số mức dùng chung
@@ -79,7 +79,7 @@ const shared = buildDashboardViewModel([
 ], [], [], '2026-09-02', afternoon);
 assert.equal(shared.expiringLots.length, 1, 'lo dung chung chi hien 1 dong; lo con han 3 nam khong hien');
 assert.equal(shared.expiringLots[0].count, 2, 'dem dung 2 muc dung chung lo L1');
-assert.equal(shared.expiringLots[0].days, 17);
+assert.equal(shared.expiringLots[0].days, 18);
 
 assert.deepEqual(dashboardShiftStatus({ rejected: 1, overdueActions: 9, warnings: 9, missingToday: 9 }), {
   mood: 'Cần xử lý ngay', text: 'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.',

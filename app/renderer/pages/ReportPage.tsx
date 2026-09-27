@@ -22,6 +22,7 @@ import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import type { NceRecord, ReportPointRow, TestSummary } from '../../shared/qc-api';
+import { NCE_APPROVAL_LABEL, NCE_EFFECTIVENESS_LABEL } from '../lib/nce-labels';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -81,7 +82,7 @@ function nceRow(r: NceRecord): string[] {
   // chuỗi dài nên vẫn đi qua `normalizeErrorClass()`.
   return [r.nce_id || '—', vnDate(r.date), r.level == null ? '—' : `M${r.level}`, r.rule || '—', ERROR_CLASS_LABEL[normalizeErrorClass(r.error_type)],
     r.due_date ? vnDate(r.due_date) : '—', NCE_RECORD_STATUS[r.record_status] || r.record_status || '—',
-    r.approval_status, r.effectiveness_status];
+    NCE_APPROVAL_LABEL[r.approval_status] || r.approval_status || '—', NCE_EFFECTIVENESS_LABEL[r.effectiveness_status] || r.effectiveness_status || '—'];
 }
 
 /** Trang in — tĩnh, tự đứng một mình (cửa sổ in ở main process nạp qua

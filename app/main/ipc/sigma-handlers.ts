@@ -260,7 +260,7 @@ export function createSigmaHandlers(db: Db) {
     const testId = cleanId(input?.testId), source = cleanText(input?.source, 20).trim();
     if (!TEA_SOURCES.has(source)) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
     const test = db.prepare('SELECT * FROM tests WHERE id=?').get(testId) as {
-      id: string; name: string; tea: number; eflm_tea: number | null; eflm_analyte: string; eflm_aps: string; eflm_lookup_date: string; eflm_ref: string;
+      id: string; name: string; tea_source: string; tea: number; eflm_tea: number | null; eflm_analyte: string; eflm_aps: string; eflm_lookup_date: string; eflm_ref: string;
     } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     const tea = input?.tea == null || input.tea === '' ? Number(source === 'eflm' ? test.eflm_tea ?? test.tea ?? 0 : test.tea || 0) : finiteNumber(input.tea, NaN);
@@ -269,15 +269,18 @@ export function createSigmaHandlers(db: Db) {
     if (!['minimum', 'desirable', 'optimum'].includes(eflmAps || 'desirable')) return { ok: false, error: { code: 'invalid-eflm-aps', message: 'Mức APS EFLM không hợp lệ.' } };
     // API vá từng trường: đổi nguồn không được làm mất thông tin EFLM đã nhập
     // trước đó, kể cả khi lời gọi đến từ một màn hình khác trong tương lai.
+    const next = [
+      source, Number.isFinite(tea) ? tea : 0,
+      input?.eflmAnalyte == null ? test.eflm_analyte : cleanText(input.eflmAnalyte, 160).trim(),
+      eflmAps || 'desirable',
+      input?.eflmLookupDate == null ? test.eflm_lookup_date : cleanText(input.eflmLookupDate, 10).trim(),
+      input?.eflmRef == null ? test.eflm_ref : cleanText(input.eflmRef, 500).trim(),
+      source === 'eflm' && input.tea != null && input.tea !== '' ? tea : test.eflm_tea,
+    ] as const;
+    const current = [test.tea_source, test.tea, test.eflm_analyte, test.eflm_aps, test.eflm_lookup_date, test.eflm_ref, test.eflm_tea];
+    if (next.every((value, i) => value === current[i])) return w.noChange(test as unknown as Test);
     w.commit((tx) => {
-      db.prepare('UPDATE tests SET tea_source=?,tea=?,eflm_analyte=?,eflm_aps=?,eflm_lookup_date=?,eflm_ref=?,eflm_tea=? WHERE id=?').run(
-        source, Number.isFinite(tea) ? tea : 0,
-        input?.eflmAnalyte == null ? test.eflm_analyte : cleanText(input.eflmAnalyte, 160).trim(),
-        eflmAps || 'desirable',
-        input?.eflmLookupDate == null ? test.eflm_lookup_date : cleanText(input.eflmLookupDate, 10).trim(),
-        input?.eflmRef == null ? test.eflm_ref : cleanText(input.eflmRef, 500).trim(),
-        source === 'eflm' && input.tea != null && input.tea !== '' ? tea : test.eflm_tea, testId,
-      );
+      db.prepare('UPDATE tests SET tea_source=?,tea=?,eflm_analyte=?,eflm_aps=?,eflm_lookup_date=?,eflm_ref=?,eflm_tea=? WHERE id=?').run(...next, testId);
       tx.audit('Cập nhật TEa Six Sigma', `Nguồn ${source} cho xét nghiệm "${test.name}"`, test.name);
       tx.changed(['tests'], [testId]);
     });

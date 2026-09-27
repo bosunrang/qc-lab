@@ -44,8 +44,12 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
   },
   loadAnalysis: async (testId: string, levels: number[]) => {
     const revision = ++analysisRevision;
-    set({ analysisTestId: testId, analysisLoading: !!testId && !!levels.length, analysisError: '', analysisByLevel: {}, previousLotBlocks: [] });
-    if (!testId || !levels.length) return;
+    // Nạp lại CÙNG xét nghiệm (vừa có điểm mới, đổi luật…) thì giữ phân tích
+    // đang hiện cho tới khi bản mới về: xoá trắng làm cả trang đổi sang
+    // "Đang tải phân tích…" và mất vị trí cuộn. Chỉ xoá khi đổi xét nghiệm.
+    if (get().analysisTestId === testId && !get().analysisError) set({ analysisLoading: false });
+    else set({ analysisTestId: testId, analysisLoading: !!testId && !!levels.length, analysisError: '', analysisByLevel: {}, previousLotBlocks: [] });
+    if (!testId || !levels.length) { set({ analysisByLevel: {}, previousLotBlocks: [], analysisLoading: false }); return; }
     try {
       const [results, previousLotBlocks] = await Promise.all([
         Promise.all(levels.map((level) => window.qcApi.analyzeLevel(testId, level))),

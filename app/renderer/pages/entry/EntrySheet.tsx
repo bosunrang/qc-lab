@@ -6,7 +6,7 @@ import { memo, useState } from 'react';
 import { initialsFromName } from '../../../main/domain/name-initials';
 import { handleSheetKeyDown } from '../../lib/entry-sheet-navigation';
 import { nextSharedRunId } from '../../lib/entry-run-id';
-import { VERDICT_LABEL, formatQcValue, pad2, runExcludedNote, zText, type EntryColumn } from './shared';
+import { VERDICT_LABEL, formatQcValue, pad2, runExcludedNote, vnDate, zText, type EntryColumn } from './shared';
 import type { PreviousLotSeries, QcPointView, TestLevel } from '../../../shared/qc-api';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -50,7 +50,8 @@ export const EntrySheet = memo(function EntrySheet({
   onViewYear: (year: number) => void;
   onViewMonth: (month: number) => void;
   messages: SheetMessages;
-  onCommitRun: (column: EntryColumn, date: string, runId: string, val: number) => Promise<boolean>;
+  /** `raw` là chuỗi người dùng gõ; trang tự đọc số và báo lỗi nếu không hợp lệ. */
+  onCommitRun: (column: EntryColumn, date: string, runId: string, raw: string) => Promise<boolean>;
   onSaveNote: (date: string, note: string) => void;
 }) {
   // Ngày đã có điểm chỉ mở lần chạy bổ sung khi người dùng bấm "＋ Thêm".
@@ -209,8 +210,8 @@ export const EntrySheet = memo(function EntrySheet({
                               </div>
                             );
                           })}
-                          {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (val) => {
-                            const saved = await onCommitRun(column, date, sharedRunIdFor(column, date), val);
+                          {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (raw) => {
+                            const saved = await onCommitRun(column, date, sharedRunIdFor(column, date), raw);
                             if (saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
                             return saved;
                           }} />}
@@ -234,7 +235,8 @@ export const EntrySheet = memo(function EntrySheet({
                     : worst === 'warn' ? <span className="tag warn">W(A)</span> : <span className="tag ok">A</span>}</td>
                   <td>{!dayPoints.length ? '—' : writable
                     ? <textarea key={`note:${testId}:${date}:${dayNote}`} className="qc-note-input" rows={1} placeholder="Ghi chú" defaultValue={dayNote}
-                        onBlur={(e) => onSaveNote(date, e.target.value)} />
+                        aria-label={`Ghi chú ngày ${vnDate(date)}`}
+                        onBlur={(e) => { if (e.target.value.trim() !== (dayNote || '').trim()) onSaveNote(date, e.target.value); }} />
                     : (dayNote || '—')}</td>
                 </tr>
               );
@@ -262,15 +264,16 @@ export const EntrySheet = memo(function EntrySheet({
  * ngày cùng mức; Enter xuống hàng dưới và quay vòng về đầu cột. */
 function RunSlot({ date, level, columnKey, columnOrder, onCommit }: {
   date: string; level: number; columnKey: string; columnOrder: number;
-  onCommit: (val: number) => Promise<boolean>;
+  onCommit: (raw: string) => Promise<boolean>;
 }) {
   const [val, setVal] = useState('');
   return (
     <div className="qc-run-slot">
       <input className="qc-inline-input is-empty" type="text" inputMode="decimal" placeholder="--" value={val}
+        aria-label={`Mức ${level} ngày ${vnDate(date)}`}
         data-focus-date={date} data-focus-level={level} data-focus-column={columnKey} data-focus-column-order={columnOrder}
         onChange={(e) => setVal(e.target.value)}
-        onBlur={async () => { const n = Number(val); if (val.trim() !== '' && !Number.isNaN(n) && await onCommit(n)) setVal(''); }}
+        onBlur={async () => { if (val.trim() !== '' && await onCommit(val)) setVal(''); }}
         onKeyDown={handleSheetKeyDown} />
     </div>
   );

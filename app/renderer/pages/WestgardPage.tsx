@@ -72,12 +72,17 @@ export function WestgardPage() {
   const previousLotBlocks = useMemo(() => (analysisTestId === testId ? loadedPrevious : []), [analysisTestId, testId, loadedPrevious]);
   const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError;
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
+  // Đã nạp danh sách mức (khác `undefined`) mà không còn mức nào vận hành.
+  const noOperationalLevels = !!testId && levelsByTestId[testId] !== undefined && !levels.length;
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   useEffect(() => { loadAnalysis(testId, levelNums); }, [testId, levelNums.join(','), loadAnalysis]); // eslint-disable-line react-hooks/exhaustive-deps
   // Cấu hình dải hoặc đổi lô ở trang Cấu hình chung cũng làm thay z-score,
   // tập điểm đang vận hành và nhãn LOT. Không chỉ nghe `qc_points`: nếu không
   // thẻ này sẽ tiếp tục hiện phân tích cũ cho đến khi người dùng tự đổi trang.
-  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], undefined, () => {
+  // Lọc theo xét nghiệm đang xem: điểm QC mới của xét nghiệm KHÁC không được
+  // làm trang này nạp lại. Lời báo toàn cục (luật chung, lô, nhóm lô) không
+  // kèm `testIds` nên vẫn lọt qua bộ lọc.
+  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], testId || undefined, () => {
     // Danh mục (xét nghiệm, lô, nhóm lô, tóm tắt) do `useCatalog` nạp lại.
     void loadRuleSettings();
     // Lọc theo cờ `operational` đúng như tập mức đang render: `listTestLevels()`
@@ -218,8 +223,8 @@ export function WestgardPage() {
                 <div>
                   <label>&nbsp;</label>
                   <div className="wg-export-actions">
-                    <button className="btn teal" disabled={!analysisReady} title="Xuất bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={exportXlsx}><DownloadIcon />Xuất Excel</button>
-                    <button className="btn teal" disabled={!analysisReady} title="In bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={printPdf}><PrintIcon />In PDF</button>
+                    <button className="btn teal" disabled={!analysisReady || noOperationalLevels} title="Xuất bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={exportXlsx}><DownloadIcon />Xuất Excel</button>
+                    <button className="btn teal" disabled={!analysisReady || noOperationalLevels} title="In bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={printPdf}><PrintIcon />In PDF</button>
                   </div>
                 </div>
               )}
@@ -275,6 +280,10 @@ export function WestgardPage() {
       {view === 'current' && !testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở panel phía trên.</EmptyState></div>}
 
       {view === 'current' && testId && !analysisReady && <div className="panel"><EmptyState action={analysisError ? <button className="btn ghost sm" onClick={() => loadAnalysis(testId, levelNums)}>Thử lại</button> : undefined}>{analysisError || 'Đang tải phân tích…'}</EmptyState></div>}
+      {view === 'current' && testId && analysisReady && noOperationalLevels && <div className="panel"><EmptyState
+        title="Chưa có mức QC đang vận hành"
+        action={admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Mở Cấu hình chung</button>}
+      >Xét nghiệm này chưa có mức QC nào gắn với nhóm lô đang hoạt động, nên chưa có gì để phân tích.</EmptyState></div>}
 
       {/* CUSUM vẫn tính riêng từng mức (không quy đổi chung một trục như LJ)
           và chỉ hiện khi xét nghiệm đã bật CUSUM. */}

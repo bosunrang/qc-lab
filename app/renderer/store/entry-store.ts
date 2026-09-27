@@ -43,7 +43,12 @@ export const useEntryStore = create<EntryState>((set, get) => ({
 
   loadTestData: async (testId, levels) => {
     const request = ++dataRequestSerial;
-    set({ activeTestId: testId });
+    // Đổi sang xét nghiệm khác thì bỏ ngay dữ liệu của xét nghiệm cũ: giữ lại
+    // thì điểm cũ hiện dưới cột mức cùng số của xét nghiệm mới cho tới khi
+    // IPC trả về. Nạp lại CÙNG xét nghiệm thì vẫn giữ để bảng không chớp trống.
+    if (get().activeTestId !== testId) {
+      set({ activeTestId: testId, pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [] });
+    }
     const [pairs, parallelColumns, previousLotSeries, voidedPoints] = await Promise.all([Promise.all(levels.map(async (level) => {
       const [points, analysis] = await Promise.all([
         window.qcApi.queryPoints(testId, level),

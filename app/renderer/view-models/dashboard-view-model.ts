@@ -73,7 +73,10 @@ export function daysToExpiry(value: string, now: Date = new Date()): number | nu
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
   const target = match ? new Date(+match[1], +match[2] - 1, +match[3]) : new Date(value);
   const time = target.getTime();
-  return Number.isFinite(time) ? Math.round((time - now.getTime()) / 86400000) : null;
+  // So với 0 giờ hôm nay, không với giờ hiện tại: nếu không, đúng ngày hết
+  // hạn mà quá 12 giờ trưa thì làm tròn thành "Hết hạn 1 ngày".
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Number.isFinite(time) ? Math.round((time - today) / 86400000) : null;
 }
 
 

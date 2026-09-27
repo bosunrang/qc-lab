@@ -3,6 +3,7 @@
 // main process + webContents.printToPDF); ở trình duyệt thì tự tạo XLSX và gọi
 // hộp in của chính trình duyệt. Hai đường dùng cùng dữ liệu/headers từ renderer.
 import type { IpcResult } from '../../shared/qc-api';
+import { safeSheetName } from '../../main/domain/xlsx-sheet-name';
 
 type ExportTableInput = { sheetName: string; headers: string[]; rows: (string | number | null)[][] };
 
@@ -25,7 +26,7 @@ export async function exportTableXlsxInBrowser(input: ExportTableInput): Promise
     // làm chậm việc mở trang xem trước thông thường.
     const { default: ExcelJS } = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet((input.sheetName || 'Sheet1').slice(0, 31));
+    const sheet = workbook.addWorksheet(safeSheetName(input.sheetName));
     const headerRow = sheet.addRow(input.headers);
     headerRow.font = { bold: true };
     headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F4' } }; });

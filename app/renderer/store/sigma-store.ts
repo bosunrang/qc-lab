@@ -39,7 +39,10 @@ export const useSigmaStore = create<SigmaState>((set, get) => ({
 
   loadPeriods: async (testId) => {
     const revision = ++requestRevision;
-    set({ testId, loading: !!testId, error: '', periods: [] });
+    // Nạp lại cùng xét nghiệm (sau khi lưu, hay khi QC đổi) thì giữ danh sách
+    // kỳ đang hiện: xoá trắng làm vùng làm việc unmount và mất chữ đang gõ.
+    if (get().testId === testId && !get().error) set({ error: '' });
+    else set({ testId, loading: !!testId, error: '', periods: [] });
     if (!testId) return;
     try {
       const periods = await window.qcApi.listSigmaPeriods(testId);

@@ -233,8 +233,10 @@ export function SigmaPage() {
       testName: test.name,
       unit: test.unit,
       instrumentName,
-      teaSource: TEA_SOURCES.find((source) => source.value === teaSource)?.label || teaSource,
-      teaCriterion: teaSourceValueText(teaSource),
+      // Nguồn TEa là của KỲ đang in (chụp lúc lưu kỳ), không phải lựa chọn
+      // hiện tại của xét nghiệm: số TEa trong bảng là ảnh chụp cùng kỳ.
+      teaSource: TEA_SOURCES.find((source) => source.value === (period.teaSource || teaSource))?.label || period.teaSource || teaSource,
+      teaCriterion: teaSourceValueText(period.teaSource || teaSource),
       period,
     }), `Báo cáo Six Sigma - ${period.period}.pdf`, { pageNumbers: true });
     if (error) await infoDialog(error, { type: 'warn' });
@@ -308,14 +310,17 @@ export function SigmaPage() {
     </>;
   }
 
-  if (!tableLevels.length) {
+  // Chỉ kết luận "chưa có mức" khi đã nạp xong cả danh sách mức lẫn kỳ; đang
+  // tải mà rơi vào nhánh này thì cảnh báo chớp lên và ô tìm bị unmount giữa
+  // lúc đang gõ.
+  if (!tableLevels.length && levelsByTestId[testId] !== undefined && !loading) {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       <div className="panel sg-no-level-panel">
         <div className="row-flex sg-control-row"><div className="field sg-test-picker"><label>Chọn xét nghiệm</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{sigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}</select></div>
         </div>
         <div className="alert warn sg-no-level-alert">Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.
-          {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'mean-sd' } })}>Cấu hình Mean/SD</button>}
+          {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Cấu hình Mean/SD</button>}
         </div>
       </div>
     </>;
@@ -365,10 +370,10 @@ export function SigmaPage() {
             </div>
           </div>
           {teaSource === 'eflm' && test && <div className="sg-eflm-box">
-            <div className="field sg-eflm-field"><label>Xét nghiệm trên EFLM</label><input disabled={!writable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => saveTeaConfig({ eflmAnalyte: e.currentTarget.value })} /></div>
+            <div className="field sg-eflm-field"><label>Xét nghiệm trên EFLM</label><input disabled={!writable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_analyte || test.name).trim()) saveTeaConfig({ eflmAnalyte: e.currentTarget.value }); }} /></div>
             <div className="field sg-eflm-field"><label>Mức APS</label><select disabled={!writable} value={test.eflm_aps || 'desirable'} onChange={(e) => saveTeaConfig({ eflmAps: e.target.value })}><option value="minimum">minimum</option><option value="desirable">desirable</option><option value="optimum">optimum</option></select></div>
             <div className="field sg-eflm-field"><label htmlFor="sg-eflm-lookup-date">Ngày tra cứu</label><DateField id="sg-eflm-lookup-date" value={test.eflm_lookup_date || ''} disabled={!writable} onChange={(value) => { if (value !== (test.eflm_lookup_date || '')) saveTeaConfig({ eflmLookupDate: value }); }} /></div>
-            <div className="field sg-eflm-field"><label>Link/tài liệu EFLM</label><input disabled={!writable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => saveTeaConfig({ eflmRef: e.currentTarget.value })} /></div>
+            <div className="field sg-eflm-field"><label>Link/tài liệu EFLM</label><input disabled={!writable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_ref || '').trim()) saveTeaConfig({ eflmRef: e.currentTarget.value }); }} /></div>
           </div>}
           <div className="alert info sg-sigma-input-note">
             <div className="sg-sigma-note-list">
@@ -394,7 +399,7 @@ export function SigmaPage() {
           {operationalLevels.length === 0 && (
             <div className="alert warn sg-historical-level-note">
               Chỉ còn dữ liệu Sigma lịch sử; xét nghiệm hiện không có mức QC đang vận hành. Không thể tạo kỳ mới để tránh sinh mức QC giả.
-              {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'mean-sd' } })}>Cấu hình Mean/SD</button>}
+              {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Cấu hình Mean/SD</button>}
             </div>
           )}
           {periods.length > 0 && displayPeriod ? <div className="sg-period-workspace">

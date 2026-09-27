@@ -19,6 +19,7 @@ import { vnDate as formatVnDate, todayIso } from '../lib/format';
 import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
 import type { NceBiasSuggestion } from '../../main/domain/nce-bias-suggestion';
 import { errorClass, normalizeErrorClass } from '../../main/domain/westgard-rules';
+import { NCE_EFFECTIVENESS_LABEL, nceApprovalBadge, nceEffectivenessBadge } from '../lib/nce-labels';
 
 /** Nhãn trạng thái NGẮN cho cây sự cố. */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
@@ -256,12 +257,8 @@ function ActionLogPanel({
                       <div className="action-sub">Phụ trách: {detail.owner || '—'}{record.due_date ? ` · hạn ${vnDate(record.due_date)}` : ''}</div>
                     </td>
                     <td><div className="action-status-stack">
-                      <span className={`tag ${cancelled ? 'none' : record.approval_status === 'approved' ? 'ok' : record.approval_status === 'returned' ? 'rej' : 'warn'}`}>
-                        {cancelled ? 'Đã huỷ' : record.approval_status === 'approved' ? 'Đã duyệt' : record.approval_status === 'returned' ? 'Trả lại' : 'Chờ duyệt'}
-                      </span>
-                      <span className={`tag ${record.effectiveness_status === 'effective' ? 'ok' : record.effectiveness_status === 'ineffective' ? 'rej' : 'none'}`}>
-                        {record.effectiveness_status === 'effective' ? 'Hiệu quả' : record.effectiveness_status === 'ineffective' ? 'Không hiệu quả' : 'Chưa đánh giá'}
-                      </span>
+                      {(() => { const b = nceApprovalBadge(record); return <span className={`tag ${b.tone}`}>{b.label}</span>; })()}
+                      {(() => { const b = nceEffectivenessBadge(record); return <span className={`tag ${b.tone}`}>{b.label}</span>; })()}
                       {record.parent_nce_id ? <span className="tag none">vòng tiếp</span> : null}
                     </div></td>
                     <td><div className="action-row-actions">
@@ -409,7 +406,7 @@ function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | n
     </details>
     <details className="action-form-section"><summary className="action-form-section-title"><span>7</span><div><b>Đánh giá ảnh hưởng bệnh nhân</b><small>Ghi rõ phạm vi và cách xử lý khi có kết quả liên quan</small></div></summary><div className="action-patient-grid">{field('Kết luận ảnh hưởng', <NceSelect disabled={disabled} value={protocol.patientImpact || ''} onChange={(value) => set('patientImpact', value as never)} options={NCE_PATIENT} />)}{field('Xử lý mẫu/kết quả liên quan', <textarea disabled={disabled} rows={2} value={protocol.patientAction || ''} onChange={(event) => set('patientAction', event.target.value)} />)}</div></details>
     <details className="action-form-section"><summary className="action-form-section-title"><span>8</span><div><b>Đánh giá hiệu lực và nguy cơ còn lại</b><small>Kết luận “hiệu quả” bắt buộc có FMEA còn lại, không vượt RPN ban đầu</small></div><span className="tag none">RPN {residualRpn}</span></summary>
-      <div className="action-effectiveness-grid">{field('Kết luận hiệu lực', <NceSelect disabled={disabled} value={protocol.effectivenessStatus || 'pending'} onChange={(value) => set('effectivenessStatus', value as never)} options={[['pending', 'Chưa đánh giá'], ['effective', 'Có hiệu lực'], ['ineffective', 'Không hiệu lực']]} />)}{field('Ngày đánh giá', <DateField value={protocol.effectivenessDate || ''} onChange={(value) => set('effectivenessDate', value)} disabled={disabled} />)}{field('Bằng chứng/nhận xét', <textarea disabled={disabled} rows={2} value={protocol.effectivenessNote || ''} onChange={(event) => set('effectivenessNote', event.target.value)} />)}</div>
+      <div className="action-effectiveness-grid">{field('Kết luận hiệu lực', <NceSelect disabled={disabled} value={protocol.effectivenessStatus || 'pending'} onChange={(value) => set('effectivenessStatus', value as never)} options={[['pending', NCE_EFFECTIVENESS_LABEL.pending], ['effective', NCE_EFFECTIVENESS_LABEL.effective], ['ineffective', NCE_EFFECTIVENESS_LABEL.ineffective]]} />)}{field('Ngày đánh giá', <DateField value={protocol.effectivenessDate || ''} onChange={(value) => set('effectivenessDate', value)} disabled={disabled} />)}{field('Bằng chứng/nhận xét', <textarea disabled={disabled} rows={2} value={protocol.effectivenessNote || ''} onChange={(event) => set('effectivenessNote', event.target.value)} />)}</div>
       {protocol.effectivenessStatus === 'effective' && <div className="action-residual-block"><div className="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div className="action-residual-grid">{scale('residualSeverity', 'Mức độ (S)')}{scale('residualOccurrence', 'Khả năng xảy ra (O)')}{scale('residualDetectability', 'Khả năng không phát hiện (D)')}{field('Phân loại theo SOP', <NceSelect disabled={disabled} value={protocol.residualRiskLevel || ''} onChange={(value) => set('residualRiskLevel', value as never)} options={NCE_RISK} />)}{field('Căn cứ đánh giá lại', <input disabled={disabled} value={protocol.residualRiskBasis || ''} onChange={(event) => set('residualRiskBasis', event.target.value)} />)}</div></div>}
     </details>
     <div className="action-form-submit"><div><b>{record ? 'Cập nhật tiến độ hồ sơ' : 'Lưu hồ sơ đang điều tra'}</b><span>Có thể lưu dở; khi duyệt, hệ thống sẽ kiểm đầy đủ protocol và tính độc lập người duyệt.</span></div><div className="action-submit-buttons"><button type="button" className="btn ghost" onClick={onClose}>Đóng</button>{!readOnly && <button type="button" className="btn teal" disabled={saving} onClick={submit}>{saving ? 'Đang lưu…' : record ? 'Lưu thay đổi' : 'Lập hồ sơ NCE'}</button>}</div></div>

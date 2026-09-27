@@ -503,10 +503,13 @@ export function createEntryHandlers(db: Db) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: { code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' } };
     const test = db.prepare('SELECT name FROM tests WHERE id=?').get(testId) as { name: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
-    if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể sửa ghi chú.` } };
     const note = String(input.data?.note ?? '').slice(0, 1000).trim();
-    const rows = db.prepare('SELECT id FROM qc_points WHERE test_id=? AND date=? AND voided=0').all(testId, date) as { id: string }[];
+    const rows = db.prepare('SELECT id, note FROM qc_points WHERE test_id=? AND date=? AND voided=0').all(testId, date) as { id: string; note: string | null }[];
     if (!rows.length) return { ok: false, error: { code: 'no-points', message: 'Ngày này chưa có điểm QC nào để gắn ghi chú.' } };
+    // Lưu lại đúng ghi chú đang có (vd chỉ bấm vào ô rồi rời đi) thì không ghi
+    // nhật ký, không báo thay đổi.
+    if (rows.every((row) => (row.note || '') === note)) return w.noChange({ note, updated: 0 });
+    if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể sửa ghi chú.` } };
     w.commit((tx) => {
       db.prepare('UPDATE qc_points SET note=? WHERE test_id=? AND date=? AND voided=0').run(note, testId, date);
       tx.audit('Ghi chú QC', `Ngày ${date}${note ? ' · ' + note : ' · xoá ghi chú'}`, test.name);

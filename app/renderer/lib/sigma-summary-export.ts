@@ -3,6 +3,7 @@
 // bản xem trước trên localhost.
 import type { SigmaLevelResult, SigmaPeriodView, Test } from '../../shared/qc-api';
 import { mdcRatios } from './sigma-workflow';
+import { safeSheetName } from '../../main/domain/xlsx-sheet-name';
 
 export interface SigmaReportInput {
   test: Pick<Test, 'name' | 'unit'>;
@@ -162,7 +163,7 @@ export async function exportSigmaReportXlsx(input: SigmaReportInput): Promise<st
     const onePeriod = input.mode === 'period';
     const displayedPeriod = periodLabel(periods[0].period);
     const sheetName = onePeriod ? `Kỳ ${displayedPeriod.replace('/', '-')}` : 'So sánh các kỳ';
-    const sheet = workbook.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 3, activeCell: 'A4', showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .25, right: .25, top: .35, bottom: .35, header: .2, footer: .2 } } });
+    const sheet = workbook.addWorksheet(safeSheetName(sheetName), { views: [{ state: 'frozen', ySplit: 3, activeCell: 'A4', showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .25, right: .25, top: .35, bottom: .35, header: .2, footer: .2 } } });
     const title = onePeriod ? `BÁO CÁO THEO DÕI SIX SIGMA – KỲ ${displayedPeriod}` : 'BÁO CÁO TỔNG HỢP THEO DÕI SIX SIGMA – SO SÁNH CÁC KỲ';
     sheet.mergeCells(`A1:${lastName}1`); sheet.getCell('A1').value = title;
     sheet.getCell('A1').font = { name: 'Arial', size: 13, bold: true, color: { argb: 'FFFFFFFF' } }; sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REPORT_TEAL } }; sheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }; sheet.getRow(1).height = 28;

@@ -3,6 +3,7 @@
 // chỉ vẽ lại cây, không vẽ lại bảng nhập và biểu đồ.
 import { memo, useEffect, useMemo, useState } from 'react';
 import { handleTreeKeyDown } from '../../lib/entry-tree-navigation';
+import { normalizeSearch } from '../../lib/useTestSelection';
 import { latestOf, type OperationalCatalog, type TreeVerdict } from './operational';
 import type { Instrument, TestSummary } from '../../../shared/qc-api';
 
@@ -46,7 +47,9 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
   const [openTests, setOpenTests] = useState<Set<string>>(new Set());
 
   const tree = useMemo(() => {
-    const bySearch = (s: TestSummary) => !search || s.testName.toLowerCase().includes(search.toLowerCase());
+    // Tìm không dấu, theo cả tên xét nghiệm lẫn tên máy (placeholder hứa "Tìm test, máy...").
+    const needle = normalizeSearch(search);
+    const bySearch = (s: TestSummary) => !needle || normalizeSearch(`${s.testName} ${s.instrumentName}`).includes(needle);
     const machines = new Map<string, Map<string, { name: string; tests: TestSummary[] }>>();
     for (const s of summaries) {
       if (!catalog.isOperationalTest(s)) continue;
