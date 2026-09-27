@@ -28,8 +28,15 @@ import type { NceRecord } from '../../shared/qc-api';
 export type { NceRecord };
 
 function protocolOf(record: NceRecord, extra?: unknown): PreparedNceProtocol {
-  const detail = { ...parseDetail(record.detail_json), ...objectInput(extra) };
-  return prepareNceProtocol({ ...detail, actionCompletedDate: record.action_completed_date || detail.actionCompletedDate, effectivenessStatus: record.effectiveness_status || detail.effectivenessStatus });
+  const submitted = objectInput(extra);
+  const detail = { ...parseDetail(record.detail_json), ...submitted };
+  // Giá trị người dùng vừa gửi (form hồ sơ) thắng giá trị trong cột; chỉ khi
+  // không gửi mới lấy cột. Trước đây cột luôn thắng, mà `effectiveness_status`
+  // mặc định là 'pending' (chuỗi khác rỗng), nên kết luận hiệu quả chọn trong
+  // form bị bỏ âm thầm khi lưu.
+  return prepareNceProtocol({ ...detail,
+    actionCompletedDate: submitted.actionCompletedDate !== undefined ? detail.actionCompletedDate : record.action_completed_date || detail.actionCompletedDate,
+    effectivenessStatus: submitted.effectivenessStatus !== undefined ? detail.effectivenessStatus : record.effectiveness_status || detail.effectivenessStatus });
 }
 function protocolJson(protocol: PreparedNceProtocol, previous: Record<string, unknown>): string {
   return JSON.stringify({ ...previous, ...protocol });
@@ -50,6 +57,13 @@ export function createNceHandlers(db: Db) {
     return row ? withOverdue(row, isoLocalDate()) : undefined;
   }
   function result(record: NceRecord): IpcResult<NceRecord> { return { ok: true, data: get(record.id)! }; }
+  /** Hồ sơ đã hủy chỉ để xem; đã duyệt là đã khép vòng. Mọi thao tác sửa đều
+   * bị chặn — sự cố tái diễn thì "Mở lại" thành một hồ sơ mới. */
+  function closedError(record: NceRecord): IpcResult<NceRecord> | null {
+    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy chỉ được xem, không thể sửa.' } };
+    if (record.approval_status === 'approved') return { ok: false, error: { code: 'approved', message: 'Hồ sơ đã duyệt không thể sửa; hãy mở NCE mới nếu sự cố tái diễn.' } };
+    return null;
+  }
 
   const create = writeCommand(db, 'create', 'write', (w, input: unknown): IpcResult<NceRecord> => {
     const actor = w.actor;
@@ -83,6 +97,7 @@ export function createNceHandlers(db: Db) {
     if (dueDate && !validDate(dueDate)) return { ok: false, error: { code: 'invalid-due-date', message: 'Hạn hoàn thành không hợp lệ.' } };
     if (dueDate && dueDate < record.date) return { ok: false, error: { code: 'due-before-date', message: 'Hạn hoàn thành không được trước ngày ghi nhận sự cố.' } };
     if (protocol.actionCompletedDate && !validDate(protocol.actionCompletedDate)) return { ok: false, error: { code: 'invalid-completed-date', message: 'Ngày hoàn thành hành động không hợp lệ.' } };
+    if (protocol.actionCompletedDate && (protocol.actionCompletedDate < record.date || protocol.actionCompletedDate > todayIso())) return { ok: false, error: { code: 'invalid-date-order', message: 'Ngày hoàn thành phải sau ngày sự cố và không ở tương lai.' } };
     w.commit((tx) => {
       db.prepare('UPDATE actions SET due_date=?, action_completed_date=?, effectiveness_status=?, risk_level=?, approval_status=?, updated_at=?, detail_json=? WHERE id=?')
         .run(dueDate, protocol.actionCompletedDate, protocol.effectivenessStatus, protocol.riskLevel, record.approval_status === 'returned' ? 'pending' : record.approval_status, nowIso(), protocolJson(protocol, current), id);
@@ -123,7 +138,7 @@ export function createNceHandlers(db: Db) {
     const validated = validateNceReview(objectInput(objectInput(input).data), true);
     if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
     const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy.' } };
+    const closed = closedError(record); if (closed) return closed;
     const detail = parseDetail(record.detail_json); Object.assign(detail, { returnNote: validated.data.note, returnBy: actor.name, returnAt: nowIso() });
     w.commit((tx) => {
       db.prepare("UPDATE actions SET approval_status='returned', updated_at=?, detail_json=? WHERE id=?").run(nowIso(), JSON.stringify(detail), record.id);
@@ -156,6 +171,7 @@ export function createNceHandlers(db: Db) {
     const data = objectInput(objectInput(input).data), id = cleanId(data.id), date = cleanText(data.actionCompletedDate, 20).trim();
     if (!validDate(date)) return { ok: false, error: { code: 'invalid-date', message: 'Ngày hoàn thành không hợp lệ.' } };
     const record = get(id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
+    const closed = closedError(record); if (closed) return closed;
     if (date < record.date || date > todayIso()) return { ok: false, error: { code: 'invalid-date-order', message: 'Ngày hoàn thành phải sau ngày sự cố và không ở tương lai.' } };
     const detail = parseDetail(record.detail_json); detail.actionCompletedDate = date;
     w.commit((tx) => {
@@ -171,7 +187,7 @@ export function createNceHandlers(db: Db) {
     const actor = w.actor;
     const data = objectInput(objectInput(input).data), id = cleanId(data.id), record = get(id);
     if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy.' } };
+    const closed = closedError(record); if (closed) return closed;
     if (!record.action_completed_date) return { ok: false, error: { code: 'missing-completed-date', message: 'Cần nhập ngày hoàn thành hành động trước khi đánh giá hiệu lực.' } };
     const validated = validateResidualRisk(data); if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
     const detail = parseDetail(record.detail_json); Object.assign(detail, { effectivenessStatus: validated.data.status, effectivenessDate: todayIso(), effectivenessNote: validated.data.note || detail.effectivenessNote || '', residualRisk: validated.data.residualRisk || detail.residualRisk || '' });
@@ -188,7 +204,7 @@ export function createNceHandlers(db: Db) {
     const actor = w.actor;
     const validated = validateReleaseDecision(objectInput(objectInput(input).data)); if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
     const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy.' } };
+    const closed = closedError(record); if (closed) return closed;
     const detail = parseDetail(record.detail_json); Object.assign(detail, { releaseDecision: validated.data.decision, releaseStatus: validated.data.decision === 'released' ? 'released' : '', releaseNote: validated.data.note, releaseDate: todayIso(), releaseBy: actor.name, releaseDecidedAt: nowIso(), releaseDecidedBy: actor.name });
     w.commit((tx) => {
       db.prepare('UPDATE actions SET updated_at=?, detail_json=? WHERE id=?').run(nowIso(), JSON.stringify(detail), record.id);
@@ -203,7 +219,7 @@ export function createNceHandlers(db: Db) {
     const actor = w.actor;
     const validated = validateRerunEvidence(objectInput(objectInput(input).data)); if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
     const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy.' } };
+    const closed = closedError(record); if (closed) return closed;
     const point = db.prepare('SELECT id, test_id, level, date, run_id, val FROM qc_points WHERE id=? AND voided=0').get(validated.data.rerunPointId) as { id: string; test_id: string; level: number; date: string; run_id: string; val: number } | undefined;
     if (!point) return { ok: false, error: { code: 'point-not-found', message: 'Không tìm thấy điểm QC rerun hợp lệ.' } };
     if (record.test_id && point.test_id !== record.test_id) return { ok: false, error: { code: 'point-wrong-test', message: 'Điểm QC rerun phải cùng xét nghiệm với hồ sơ NCE.' } };

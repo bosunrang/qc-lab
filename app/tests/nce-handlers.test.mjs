@@ -87,27 +87,41 @@ assert.equal(cancelAgain.error.code, 'already-cancelled');
 
 assert.equal(nce.listRecords().length, 2);
 
-const releaseNoNote = nce.setReleaseDecision({ data: { id: created.data.id, decision: 'held', note: '' } }, actor);
+// Hồ sơ đã duyệt là đã khép vòng: không trả lại, không đổi quyết định cho
+// phép trở lại, không gắn rerun, không sửa ngày hoàn thành hay hiệu quả.
+for (const [label, call] of [
+  ['returnForRevision', () => nce.returnForRevision({ data: { id: created.data.id, note: 'Tra lai sau khi duyet' } }, actor)],
+  ['setReleaseDecision', () => nce.setReleaseDecision({ data: { id: created.data.id, decision: 'released', note: 'Doi quyet dinh sau duyet' } }, actor)],
+  ['setActionCompletedDate', () => nce.setActionCompletedDate({ data: { id: created.data.id, actionCompletedDate: '2026-08-06' } }, actor)],
+  ['markEffectiveness', () => nce.markEffectiveness({ data: { id: created.data.id, status: 'ineffective', note: 'Doi ket luan sau duyet' } }, actor)],
+]) {
+  const blocked = call();
+  assert.equal(blocked.ok, false, label);
+  assert.equal(blocked.error.code, 'approved', label);
+}
+const third = nce.create({ data: { testId: test.id, date: '2026-08-03', correction: 'Tam dung tra ket qua, kiem tra lai' } }, actor);
+assert.equal(third.ok, true);
+const releaseNoNote = nce.setReleaseDecision({ data: { id: third.data.id, decision: 'held', note: '' } }, actor);
 assert.equal(releaseNoNote.ok, false);
 assert.equal(releaseNoNote.error.code, 'missing-note');
-const released = nce.setReleaseDecision({ data: { id: created.data.id, decision: 'released', note: 'Da co ket qua rerun xac nhan dat' } }, actor);
+const released = nce.setReleaseDecision({ data: { id: third.data.id, decision: 'released', note: 'Da co ket qua rerun xac nhan dat' } }, actor);
 assert.equal(released.ok, true);
 const releaseDetail = JSON.parse(released.data.detail_json);
 assert.equal(releaseDetail.releaseDecision, 'released');
 
-const rerunMissing = nce.setRerunEvidence({ data: { id: created.data.id, rerunPointId: 'khong-ton-tai' } }, actor);
+const rerunMissing = nce.setRerunEvidence({ data: { id: third.data.id, rerunPointId: 'khong-ton-tai' } }, actor);
 assert.equal(rerunMissing.ok, false);
 assert.equal(rerunMissing.error.code, 'point-not-found');
 
 const otherTest = config.saveTest({ data: { name: 'Ure', instrumentId: instrument.id, unit: 'mg/dL' } }, actor).data;
 makeOperationalQc(db, { testId: otherTest.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
 const pointOtherTest = entry.addPoint({ data: { testId: otherTest.id, level: 1, date: '2026-08-06', val: 5 } }, actor).data;
-const rerunWrongTest = nce.setRerunEvidence({ data: { id: created.data.id, rerunPointId: pointOtherTest.id } }, actor);
+const rerunWrongTest = nce.setRerunEvidence({ data: { id: third.data.id, rerunPointId: pointOtherTest.id } }, actor);
 assert.equal(rerunWrongTest.ok, false);
 assert.equal(rerunWrongTest.error.code, 'point-wrong-test', 'ho so gan xet nghiem Glucose khong duoc nhan bang chung tu xet nghiem Ure');
 
 const pointSameTest = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-06', val: 5 } }, actor).data;
-const rerunOk = nce.setRerunEvidence({ data: { id: created.data.id, rerunPointId: pointSameTest.id, note: 'Da lam lai, ket qua binh thuong' } }, actor);
+const rerunOk = nce.setRerunEvidence({ data: { id: third.data.id, rerunPointId: pointSameTest.id, note: 'Da lam lai, ket qua binh thuong' } }, actor);
 assert.equal(rerunOk.ok, true);
 assert.equal(JSON.parse(rerunOk.data.detail_json).rerunPointId, pointSameTest.id);
 
@@ -132,3 +146,13 @@ assert.equal(reopenAgain.error.code, 'already-reopened');
 console.log('app nce-handlers end-to-end tests passed');
 
 
+
+// Kết luận hiệu quả và ngày hoàn thành chọn trong form hồ sơ phải được lưu:
+// trước đây giá trị trong cột ('pending') luôn thắng giá trị người dùng gửi.
+const fourth = nce.create({ data: { testId: test.id, date: '2026-08-04', correction: 'Kiem tra lai vat lieu QC' } }, actor);
+const formEffective = nce.saveProtocol({ data: { id: fourth.data.id, protocol: { actionCompletedDate: '2026-08-05', effectivenessStatus: 'effective' } } }, actor);
+assert.equal(formEffective.ok, true, formEffective.ok ? '' : formEffective.error.message);
+assert.equal(formEffective.data.effectiveness_status, 'effective');
+assert.equal(formEffective.data.action_completed_date, '2026-08-05');
+const formDateBeforeEvent = nce.saveProtocol({ data: { id: fourth.data.id, protocol: { actionCompletedDate: '2026-08-01' } } }, actor);
+assert.equal(formDateBeforeEvent.error?.code, 'invalid-date-order');

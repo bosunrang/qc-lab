@@ -58,7 +58,7 @@ export function ActionsPage() {
    * CÓ LƯU VẾT (soft-delete + lý do), không xoá dữ liệu. */
   async function cancelRecord(id: string) {
     const note = 'Hủy từ bảng nhật ký';
-    if (!(await confirmDialog('Hủy hồ sơ này? Dữ liệu được giữ lại để truy xuất.', { title: 'Hủy hồ sơ NCE', danger: true, confirmLabel: 'Hủy hồ sơ' }))) return;
+    if (!(await confirmDialog('Hủy hồ sơ này? Dữ liệu được giữ lại để truy xuất.', { title: 'Hủy hồ sơ NCE', danger: true, confirmLabel: 'Hủy hồ sơ', cancelLabel: 'Quay lại' }))) return;
     const result = await store.cancel(id, note);
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
@@ -173,7 +173,9 @@ export function ActionsPage() {
           <div><h2 className="panel-title">Lập hồ sơ sự không phù hợp (NCE)</h2><p>Lưu tiến độ điều tra, bằng chứng rerun và quyết định khép vòng trong cùng một hồ sơ.</p></div>
           <button type="button" className="btn ghost sm" onClick={() => setShowGuide(true)}>Quy trình 8 bước</button>
         </div>
-        {form ? <NceProtocolForm prefill={form.prefill} record={form.record} onClose={() => setForm(null)} /> : <EmptyState
+        {/* `key`: mọi state của form khởi tạo từ props một lần; chuyển sang hồ sơ/sự cố khác
+            mà không remount thì form giữ dữ liệu cũ và lưu đè sang hồ sơ mới. */}
+        {form ? <NceProtocolForm key={form.record?.id ?? form.prefill?.pointId ?? 'new'} prefill={form.prefill} record={form.record} onClose={() => setForm(null)} /> : <EmptyState
           title={issueCount ? 'Chọn một sự cố để lập hồ sơ' : 'Không có vi phạm nào cần lập hồ sơ'}
           action={writable && <button type="button" className="btn ghost" onClick={() => setForm({ prefill: null, record: null })}>Lập hồ sơ từ nguồn khác</button>}
         >{issueCount
@@ -360,7 +362,7 @@ function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | n
   </div>);
 
   return <div className="action-form-body">
-    {error && <div className="alert danger">{error}</div>}
+    {error && <div className="alert rej" role="alert">{error}</div>}
     <div className="action-incident-banner"><b>{record ? `Đang tiếp tục hồ sơ ${record.nce_id}` : 'Đang lập hồ sơ NCE'}</b><div>{tests.find((test) => test.id === testId)?.name || 'Chưa chọn xét nghiệm'} · M{level} · Lô {lot || '—'} · {vnDate(date)}</div></div>
     <div className="action-form-step-ident"><span className="step-number">1</span><div><b>Nhận diện và phân công sự cố</b><small>Ghi đúng đối tượng QC, nguồn phát hiện và người phụ trách trước khi điều tra.</small></div></div>
     <div className="action-ident-groups">
@@ -426,8 +428,7 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
   const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
   const detail = parseDetail(record.detail_json);
   const [completedDate, setCompletedDate] = useState('');
-  const [returnNote, setReturnNote] = useState('');
-  const [cancelNote, setCancelNote] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
   const [releaseDecision, setReleaseDecision] = useState<'held' | 'released'>('held');
   const [releaseNote, setReleaseNote] = useState('');
   const [rerunPointId, setRerunPointId] = useState('');
@@ -441,7 +442,7 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
     if (record.test_id && record.level != null) {
       // Đọc TỨC THỜI cho ô chọn bằng chứng rerun trong modal chi tiết —
       // không phải dữ liệu hiển thị của trang nên không đưa vào store.
-      window.qcApi.queryPoints(record.test_id, record.level).then(setRerunPoints);
+      window.qcApi.queryPoints(record.test_id, record.level).then(setRerunPoints, () => setRerunPoints([]));
     }
   }, [record.test_id, record.level]);
 
@@ -451,7 +452,9 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
     if (!result.ok) setErr(result.error?.message || 'Lỗi không xác định.');
   }
 
-  const canReview = record.record_status !== 'cancelled';
+  // Hồ sơ đã duyệt là đã khép vòng (main chặn mọi thao tác sửa); chỉ còn xem
+  // và "Mở lại" thành hồ sơ mới nếu sự cố tái diễn.
+  const canReview = record.record_status !== 'cancelled' && record.approval_status !== 'approved';
 
   return (
     <Modal title={`Hồ sơ ${record.nce_id} — ${testName}`} onClose={onClose}
@@ -463,10 +466,20 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
       {record.parent_nce_id && <p className="action-detail-muted">Vòng tiếp theo của hồ sơ {record.parent_nce_id}.</p>}
 
       <SectionTitle n={2} title="Điều tra" />
-      <p>{detail.investigation || <span className="hint-inline">Chưa ghi nhận.</span>}</p>
+      {(() => {
+        // Điều tra được ghi bằng bảng kiểm trong form (vật liệu QC, máy, hóa chất…).
+        const checked = NCE_CHECK_ROWS.map(([key, label]) => {
+          const status = String(detail[`${key}Status` as keyof NceDetail] || '');
+          const note = String(detail[`${key}Note` as keyof NceDetail] || '');
+          return status ? `${label}: ${NCE_CHECKS.find(([value]) => value === status)?.[1] || status}${note ? ` — ${note}` : ''}` : '';
+        }).filter(Boolean);
+        return checked.length || detail.investigation
+          ? <>{detail.investigation && <p>{detail.investigation}</p>}{checked.length > 0 && <ul className="action-detail-list">{checked.map((line) => <li key={line}>{line}</li>)}</ul>}</>
+          : <p><span className="hint-inline">Chưa ghi nhận.</span></p>;
+      })()}
 
       <SectionTitle n={3} title="Nguyên nhân" />
-      <p>{detail.causeCategory ? `${detail.causeCategory} — ` : ''}{detail.causeDescription || <span className="hint-inline">Chưa ghi nhận.</span>}</p>
+      <p>{detail.causeCategory ? `${NCE_CAUSES.find(([value]) => value === detail.causeCategory)?.[1] || detail.causeCategory} — ` : ''}{detail.cause || detail.causeDescription || <span className="hint-inline">Chưa ghi nhận.</span>}</p>
 
       <SectionTitle n={4} title="Khắc phục" />
       <p>{detail.correction}</p>
@@ -536,12 +549,10 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
         <>
           <SectionTitle title="Duyệt hồ sơ" />
           <div className="action-detail-actions action-detail-review-actions">
-            {record.approval_status !== 'approved' && <button className="btn teal sm" onClick={() => guard(() => store.approve(record.id))}>Duyệt</button>}
-            <input className="action-detail-review-note" placeholder="Lý do trả lại/huỷ" value={returnNote || cancelNote} onChange={(e) => { setReturnNote(e.target.value); setCancelNote(e.target.value); }} />
-            <button className="btn ghost sm" onClick={() => guard(() => store.returnForRevision(record.id, returnNote))}>Trả lại</button>
-            {record.approval_status !== 'approved' && (
-              <button className="btn danger sm" onClick={async () => { if (await confirmDialog('Hủy hồ sơ này?', { danger: true })) guard(() => store.cancel(record.id, cancelNote)); }}>Hủy hồ sơ</button>
-            )}
+            <button className="btn teal sm" onClick={() => guard(() => store.approve(record.id))}>Duyệt</button>
+            <input className="action-detail-review-note" aria-label="Lý do trả lại hoặc hủy hồ sơ" placeholder="Lý do (bắt buộc khi trả lại hoặc hủy)" value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
+            <button className="btn ghost sm" onClick={() => guard(() => store.returnForRevision(record.id, reviewNote))}>Trả lại</button>
+            <button className="btn danger sm" onClick={async () => { if (await confirmDialog('Hủy hồ sơ này? Dữ liệu được giữ lại để truy xuất.', { title: 'Hủy hồ sơ NCE', danger: true, confirmLabel: 'Hủy hồ sơ', cancelLabel: 'Quay lại' })) guard(() => store.cancel(record.id, reviewNote)); }}>Hủy hồ sơ</button>
           </div>
         </>
       )}
