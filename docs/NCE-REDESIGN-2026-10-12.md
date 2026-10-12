@@ -261,16 +261,36 @@ NCE cũ trong lúc làm.
   lô). Phần NCE trong đó sẽ bị thay ở giai đoạn 3.
 - Con trỏ trong `APP-PLAN.md` trỏ tới tài liệu này.
 
-### Giai đoạn 1 — Domain thuần
+### Giai đoạn 1 — Domain thuần (xong 2026-10-12, nhánh `feat/nce-redesign`)
 
-- `domain/nce/state.ts`: chuyển trạng thái hợp lệ và quyền theo trạng thái.
-- `domain/nce/gates.ts`: cổng 5.1–5.5, trả `missing[]` tiếng Việt.
-- `domain/nce/rerun.ts`: kiểm D-04 trên dữ liệu đánh giá có mốc cắt giả định.
-- `domain/nce/impact-window.ts`: lần chạy đạt cuối trước sự kiện → rerun.
-- `domain/nce/tier.ts`, `domain/nce/separation.ts`.
-- Test thuần cho từng tệp.
+Các tệp trong `app/main/domain/nce/`, chưa được handler nào gọi:
 
-**Xong khi:** mọi ca nghiệm thu ở mục 11 có test thuần đạt.
+| Tệp | Nội dung |
+| --- | --- |
+| `types.ts` | hằng số trạng thái, nguồn, tầng, kết luận…; kiểu `NceDossier`, snapshot lần chạy |
+| `state.ts` | chuyển trạng thái hợp lệ; thao tác sửa được phép theo trạng thái |
+| `permissions.ts` | capability, ai được nộp/hủy/trả lại, phân tách nhiệm vụ khi duyệt, ngoại lệ SOP |
+| `gates.ts` | cổng 5.1 tạo, 5.2 cho chạy lại, 5.4 nộp duyệt, 5.5 duyệt; bước tiếp theo |
+| `rerun.ts` | kiểm lần rerun (D-04) và lần chạy khởi đầu (D-14) |
+| `patient-impact.ts` | khoảng nghi ngờ, kiểm quyết định ảnh hưởng bệnh nhân (D-05) |
+| `tier.ts` | điểm nguy cơ, tiêu chí ép CAPA, loại sai số, phát hiện tái diễn |
+| `actions.ts` | kiểm hành động, hoàn thành, hủy; đánh giá hiệu lực |
+| `checklist.ts` | checklist theo nguồn |
+| `queue.ts` | hàng chờ theo lần chạy, gợi ý gắn vào hồ sơ đang mở |
+| `overdue.ts`, `config.ts`, `format.ts` | quá hạn, cấu hình mặc định, tiện ích ngày/lần chạy |
+
+Test: `nce-domain-state`, `nce-domain-rerun`, `nce-domain-gates`,
+`nce-domain-queue` (50 ca, dữ liệu mẫu ở `tests/helpers/nce-fixture.mjs`).
+
+Ca nghiệm thu đã có test thuần: 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 15 (phần
+kiểm ngày), 16 (phần quá hạn), 20. Các ca còn lại cần CSDL, engine Westgard
+hoặc giao diện nên làm ở giai đoạn 2–3: 6, 7 (mốc cắt trong engine), 13
+(khóa lạc quan), 14 (lịch sử sửa), 17 (đổi dải), 18 (migration), 19 (Sigma).
+
+Hai điểm handler giai đoạn 2 phải làm đúng vì hàm thuần không tự kiểm được:
+verdict của lần rerun truyền vào `checkNceRerun()` phải được đánh giá trong
+giai đoạn mới (coi lần rerun là mốc cắt); "hôm nay" truyền vào mọi cổng là
+`isoLocalDate()`.
 
 ### Giai đoạn 2 — Schema, handler, tích hợp
 

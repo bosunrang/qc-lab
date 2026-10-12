@@ -1,0 +1,217 @@
+// Cổng từng bước của hồ sơ NCE mới (docs/NCE-REDESIGN-2026-10-12.md mục 5),
+// phân tầng (D-06), hành động và đánh giá hiệu lực (D-02, D-08).
+// Ca nghiệm thu 2, 5, 8, 11, 15.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createRequire } from 'node:module';
+import { dossier, goodRerun, point, run, triggerRun } from './helpers/nce-fixture.mjs';
+const require = createRequire(import.meta.url);
+
+const {
+  validateNceCreate, validateNceReleaseInput, nceReleaseMissing, nceSubmitMissing, nceApproveMissing, nceNextStep,
+} = require('../../app-dist/main/domain/nce/gates.js');
+const { nceCapaTriggers, nceTierMissing, nceErrorClass, nceRiskScore } = require('../../app-dist/main/domain/nce/tier.js');
+const { checkNceRerun } = require('../../app-dist/main/domain/nce/rerun.js');
+const {
+  validateNceActionDraft, validateNceActionCompletion, validateNceActionCancel, validateNceEffectivenessReview,
+} = require('../../app-dist/main/domain/nce/actions.js');
+const { checklistMissing, prepareChecklist, checklistKeys } = require('../../app-dist/main/domain/nce/checklist.js');
+
+const codes = (missing) => missing.map((m) => m.code);
+const createInput = (over = {}) => ({
+  source: 'iqc', testId: 'T1', trigger: { date: '2026-10-01', runId: '1' },
+  description: 'QC mức 2 vượt +3SD', correction: 'Dừng trả kết quả', holdResults: true,
+  detectedAt: '2026-10-01', ownerUserId: 'u-owner', ...over,
+});
+
+test('tạo hồ sơ IQC chỉ nhận khoá lần chạy; main tự đọc phần còn lại', () => {
+  const result = validateNceCreate(createInput(), '2026-10-01');
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(result.data.trigger, { date: '2026-10-01', runId: '1' });
+  assert.equal(result.data.phase, 'exam');
+  assert.equal(result.data.dueDate, '', 'hạn rỗng để handler đặt theo cấu hình');
+  assert.equal(validateNceCreate(createInput({ trigger: null }), '2026-10-01').code, 'missing-trigger');
+  assert.equal(validateNceCreate(createInput({ holdResults: undefined }), '2026-10-01').code, 'missing-hold');
+  assert.equal(validateNceCreate(createInput({ ownerUserId: '' }), '2026-10-01').code, 'missing-owner');
+  assert.equal(validateNceCreate(createInput({ detectedAt: '2026-09-30' }), '2026-10-01').code, 'detected-before-run');
+  assert.equal(validateNceCreate(createInput({ dueDate: '2026-02-30' }), '2026-10-01').code, 'invalid-due-date', 'ngày không có thật');
+});
+
+test('ca 15: "hôm nay" là tham số ngày địa phương, không phải ngày UTC', () => {
+  // Handler truyền isoLocalDate(): 01:00 sáng 12/10 giờ Việt Nam vẫn là 12/10.
+  assert.equal(validateNceCreate(createInput({ trigger: { date: '2026-10-12', runId: '1' }, detectedAt: '2026-10-12' }), '2026-10-12').ok, true);
+  assert.equal(validateNceCreate(createInput({ detectedAt: '2026-10-13' }), '2026-10-12').code, 'invalid-detected');
+});
+
+test('hồ sơ nguồn khác không cần xét nghiệm hay lần chạy', () => {
+  const result = validateNceCreate(createInput({ source: 'other', testId: '', trigger: undefined, phase: 'pre' }), '2026-10-01');
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.data.testId, null);
+  assert.equal(result.data.trigger, null);
+  assert.equal(result.data.phase, 'pre');
+});
+
+test('đầu vào cho chạy lại', () => {
+  assert.equal(validateNceReleaseInput({ reason: 'Rerun đạt' }, 'iqc').code, 'missing-rerun');
+  assert.equal(validateNceReleaseInput({ rerun: { date: '2026-10-01', runId: '2' }, reason: 'ok' }, 'iqc').code, 'missing-reason');
+  assert.equal(validateNceReleaseInput({ rerun: { date: '2026-10-01', runId: '2' }, reason: 'Rerun đạt' }, 'iqc').ok, true);
+  const other = validateNceReleaseInput({ notApplicable: true, reason: 'Không phải dừng dịch vụ, lỗi hồ sơ' }, 'other');
+  assert.equal(other.ok, true);
+  assert.equal(other.data.rerun, null);
+});
+
+test('ca 5: rerun đạt nhưng chưa có quyết định ảnh hưởng bệnh nhân thì chưa cho chạy lại', () => {
+  const open = dossier({ status: 'open', release: null, patientImpacts: [], runs: [{ role: 'trigger', snapshot: triggerRun() }] });
+  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  assert.deepEqual(codes(nceReleaseMissing(open, rerun)), ['patient-impact']);
+  assert.deepEqual(codes(nceReleaseMissing(open, null)), ['missing-rerun', 'patient-impact']);
+});
+
+test('chỉ cho chạy lại hồ sơ đang xử lý', () => {
+  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  for (const status of ['released', 'pending_approval', 'closed', 'cancelled']) {
+    assert.deepEqual(codes(nceReleaseMissing(dossier({ status }), rerun)), ['status'], status);
+  }
+});
+
+test('hồ sơ IQC chưa gắn lần chạy bị loại thì chưa cho chạy lại', () => {
+  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', runs: [] }), rerun)), ['no-trigger']);
+  // Nguồn khác IQC không cần lần chạy, chỉ cần quyết định ảnh hưởng bệnh nhân.
+  assert.deepEqual(nceReleaseMissing(dossier({ status: 'open', source: 'instrument', runs: [] }), null), []);
+});
+
+test('ca 8: cho chạy lại được khi hành động khắc phục chưa xong (sửa R-01)', () => {
+  const open = dossier({
+    status: 'open', release: null, effectivenessReviews: [],
+    actions: [{ ...dossier().actions[0], status: 'open', doneAt: '', doneByUserId: '', evidence: '' }],
+  });
+  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  assert.deepEqual(nceReleaseMissing(open, rerun), []);
+});
+
+test('ca 2: QC hỏng tiếp sau xử lý tức thời ép tầng CAPA', () => {
+  const repeat = run('2026-10-01', '2', [point(1), point(2, { verdict: 'rej', rules: ['1-3s'] })]);
+  const base = dossier({ tier: 'low', tierReason: 'Lỗi đơn lẻ, không tái diễn', riskLevel: 'low' });
+  assert.deepEqual(nceTierMissing(base), []);
+  const withRepeat = { ...base, runs: [...base.runs, { role: 'repeat_reject', snapshot: repeat }] };
+  assert.deepEqual(codes(nceCapaTriggers(withRepeat)), ['repeat']);
+  assert.deepEqual(codes(nceTierMissing(withRepeat)), ['tier-capa-required']);
+});
+
+test('các tiêu chí khác ép tầng CAPA; tầng low phải có lý do', () => {
+  const low = dossier({ tier: 'low', tierReason: '', riskLevel: 'low' });
+  assert.deepEqual(codes(nceTierMissing(low)), ['tier-reason']);
+  assert.deepEqual(codes(nceCapaTriggers({ ...low, riskLevel: 'high' })), ['risk']);
+  assert.deepEqual(codes(nceCapaTriggers({ ...low, source: 'eqa' })), ['eqa']);
+  assert.deepEqual(codes(nceCapaTriggers({ ...low, recurrence: true })), ['recurrence']);
+  assert.deepEqual(codes(nceCapaTriggers({ ...low, causeStatus: 'undetermined' })), ['cause']);
+  assert.deepEqual(codes(nceCapaTriggers({ ...low, patientImpacts: [{ ...low.patientImpacts[0], outcome: 'reported_corrected' }] })), ['patient']);
+  assert.deepEqual(codes(nceTierMissing({ ...low, tier: '' })), ['tier']);
+});
+
+test('nguy cơ = mức độ × khả năng, mỗi trục 1–5', () => {
+  assert.equal(nceRiskScore(3, 4), 12);
+  assert.equal(nceRiskScore(0, 4), 0);
+  assert.equal(nceRiskScore(6, 1), 0);
+  assert.equal(nceRiskScore(2.5, 2), 0);
+});
+
+test('loại sai số đọc từ luật của điểm bị loại trong lần chạy khởi đầu', () => {
+  assert.equal(nceErrorClass([{ role: 'trigger', snapshot: triggerRun() }]), 'RE');
+  const se = run('2026-10-01', '1', [point(1, { verdict: 'warn', rules: ['1-2s'] }), point(2, { verdict: 'rej', rules: ['2-2s', '4-1s'] })]);
+  assert.equal(nceErrorClass([{ role: 'trigger', snapshot: se }]), 'SE');
+  assert.equal(nceErrorClass([]), '');
+});
+
+test('checklist theo nguồn; bất thường/không áp dụng phải ghi chú', () => {
+  assert.deepEqual(checklistKeys('other'), []);
+  assert.ok(checklistKeys('eqa').includes('transcription'));
+  const prepared = prepareChecklist('iqc', { qcMaterial: { status: 'abnormal', note: '' }, bogus: { status: 'ok' }, reagent: { status: 'xyz' } });
+  assert.equal(prepared.bogus, undefined);
+  assert.equal(prepared.reagent.status, '');
+  const missing = codes(checklistMissing('iqc', prepared));
+  assert.ok(missing.includes('check-note-qcMaterial'));
+  assert.ok(missing.includes('check-reagent'));
+});
+
+test('hồ sơ mẫu đủ điều kiện nộp duyệt', () => {
+  assert.deepEqual(nceSubmitMissing(dossier()), []);
+  assert.deepEqual(codes(nceSubmitMissing(dossier({ status: 'open' }))), ['status']);
+});
+
+test('ca 11: lần đánh giá cuối không hiệu quả thì không nộp được; bổ sung và đánh giá lại thì nộp được', () => {
+  const base = dossier();
+  const ineffective = { ...base.effectivenessReviews[0], result: 'ineffective', reviewedAt: '2026-10-20' };
+  const blocked = dossier({ effectivenessReviews: [ineffective] });
+  assert.deepEqual(codes(nceSubmitMissing(blocked)), ['effectiveness-not-effective']);
+  const extend = dossier({ effectivenessReviews: [{ ...ineffective, result: 'extend' }] });
+  assert.deepEqual(codes(nceSubmitMissing(extend)), ['effectiveness-not-effective']);
+
+  const extraAction = { ...base.actions[0], id: 'a2', description: 'Đào tạo lại KTV về lịch hiệu chuẩn', doneAt: '2026-10-22' };
+  const reviewedAgain = dossier({ actions: [...base.actions, extraAction], effectivenessReviews: [ineffective, { ...base.effectivenessReviews[0], reviewedAt: '2026-10-28' }] });
+  assert.deepEqual(nceSubmitMissing(reviewedAgain), []);
+  // Hành động hoàn thành SAU lần đánh giá hiệu quả → phải đánh giá lại.
+  const stale = dossier({ actions: [...base.actions, { ...extraAction, doneAt: '2026-10-29' }] });
+  assert.deepEqual(codes(nceSubmitMissing(stale)), ['effectiveness-stale']);
+});
+
+test('tầng CAPA đòi nguyên nhân, hành động khắc phục đã xong và tiêu chí hiệu lực', () => {
+  const missing = codes(nceSubmitMissing(dossier({ causeStatus: '', actions: [], effectivenessCriteria: '', effectivenessReviews: [] })));
+  for (const code of ['cause', 'corrective', 'criteria', 'effectiveness']) assert.ok(missing.includes(code), code);
+  const undetermined = dossier({ causeStatus: 'undetermined', causeCategory: '', causeText: '', causeCheckPlan: '' });
+  assert.deepEqual(codes(nceSubmitMissing(undetermined)), ['cause-plan']);
+  const openAction = { ...dossier().actions[0], id: 'a2', status: 'open', doneAt: '' };
+  assert.deepEqual(codes(nceSubmitMissing(dossier({ actions: [...dossier().actions, openAction] }))), ['actions-open']);
+});
+
+test('tầng xử lý nhanh không đòi nguyên nhân, hành động hay đánh giá hiệu lực', () => {
+  const low = dossier({ tier: 'low', tierReason: 'Lỗi đơn lẻ, đã khôi phục ngay', riskLevel: 'low', causeStatus: '', actions: [], effectivenessCriteria: '', effectivenessReviews: [] });
+  assert.deepEqual(nceSubmitMissing(low), []);
+});
+
+test('duyệt kiểm lại bằng chứng rerun trên dữ liệu hiện tại', () => {
+  const pending = dossier({ status: 'pending_approval' });
+  const okRecheck = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  assert.deepEqual(nceApproveMissing(pending, okRecheck), []);
+  const voided = goodRerun();
+  const recheck = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: { ...voided, points: [voided.points[0], { ...voided.points[1], voided: true }] }, lotChangeNote: '' });
+  assert.deepEqual(codes(nceApproveMissing(pending, recheck)), ['recheck-rerun-missing-level']);
+  assert.deepEqual(codes(nceApproveMissing(dossier(), okRecheck)), ['status']);
+});
+
+test('bước tiếp theo theo trạng thái', () => {
+  assert.equal(nceNextStep(dossier({ status: 'open', release: null })).step, 'release');
+  assert.equal(nceNextStep(dossier()).step, 'submit');
+  assert.equal(nceNextStep(dossier({ status: 'pending_approval' })).step, 'approve');
+  assert.deepEqual(nceNextStep(dossier({ status: 'closed' })), { step: null, missing: [] });
+});
+
+test('hành động: người chịu trách nhiệm, hạn, bằng chứng hoàn thành, lý do hủy', () => {
+  assert.equal(validateNceActionDraft({ kind: 'corrective', description: 'ngắn', ownerUserId: 'u', dueDate: '2026-10-05' }, '2026-10-01').code, 'missing-description');
+  assert.equal(validateNceActionDraft({ kind: 'corrective', description: 'Đào tạo lại về hiệu chuẩn', ownerUserId: '', dueDate: '2026-10-05' }, '2026-10-01').code, 'missing-owner');
+  assert.equal(validateNceActionDraft({ kind: 'corrective', description: 'Đào tạo lại về hiệu chuẩn', ownerUserId: 'u', dueDate: '2026-09-30' }, '2026-10-01').code, 'due-before-detected');
+  assert.equal(validateNceActionDraft({ kind: 'preventive', description: 'Rà các máy cùng dòng', ownerUserId: 'u', dueDate: '2026-10-05' }, '2026-10-01').ok, true);
+
+  const open = { status: 'open' };
+  assert.equal(validateNceActionCompletion(open, { doneAt: '2026-10-05', evidence: '' }, '2026-10-01', '2026-10-06').code, 'missing-evidence');
+  assert.equal(validateNceActionCompletion(open, { doneAt: '2026-10-07', evidence: 'Phiếu HC-12' }, '2026-10-01', '2026-10-06').code, 'invalid-done-order');
+  assert.equal(validateNceActionCompletion(open, { doneAt: '2026-10-05', evidence: 'Phiếu HC-12' }, '2026-10-01', '2026-10-06').ok, true);
+  assert.equal(validateNceActionCompletion({ status: 'done' }, { doneAt: '2026-10-05', evidence: 'Phiếu HC-12' }, '2026-10-01', '2026-10-06').code, 'action-not-open');
+  assert.equal(validateNceActionCancel(open, 'trùng').code, 'missing-reason');
+  assert.equal(validateNceActionCancel(open, 'Trùng với hành động a1').ok, true);
+});
+
+test('đánh giá hiệu lực: tiêu chí đặt trước, sau hành động cuối, nguy cơ còn lại không tăng', () => {
+  const d = dossier();
+  const review = { result: 'effective', reviewedAt: '2026-10-25', evidence: '20 lần chạy liên tiếp đạt', residualSeverity: 3, residualProbability: 1, residualLevel: 'low', residualBasis: 'SOP-QC-07' };
+  assert.equal(validateNceEffectivenessReview(review, d, '2026-10-26').ok, true);
+  assert.equal(validateNceEffectivenessReview(review, { ...d, effectivenessCriteria: '' }, '2026-10-26').code, 'missing-criteria');
+  assert.equal(validateNceEffectivenessReview(review, { ...d, actions: [] }, '2026-10-26').code, 'no-done-action');
+  assert.equal(validateNceEffectivenessReview({ ...review, reviewedAt: '2026-10-04' }, d, '2026-10-26').code, 'review-before-action');
+  assert.equal(validateNceEffectivenessReview({ ...review, reviewedAt: '2026-10-27' }, d, '2026-10-26').code, 'invalid-review-date');
+  assert.equal(validateNceEffectivenessReview({ ...review, residualLevel: '' }, d, '2026-10-26').code, 'missing-residual');
+  assert.equal(validateNceEffectivenessReview({ ...review, residualSeverity: 4, residualProbability: 2 }, d, '2026-10-26').code, 'residual-above-initial');
+  // "Không hiệu quả" không cần nguy cơ còn lại: hồ sơ chưa đóng được.
+  assert.equal(validateNceEffectivenessReview({ result: 'ineffective', reviewedAt: '2026-10-25', evidence: 'Vẫn hỏng 2 lần trong tuần' }, d, '2026-10-26').ok, true);
+});
