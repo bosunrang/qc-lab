@@ -9,10 +9,12 @@
 .action-sub,.action-rule{margin-top:var(--space-1);color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-snug);}
 .action-text{color:var(--text-primary);line-height:var(--leading-snug);}
 .action-log-row-cancelled{opacity:.5;}
-.action-log-wrap{margin:0 var(--panel-content-gap) var(--panel-content-gap);overflow-x:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
+/* Bảng là nội dung của panel, không nối thẳng vào header: giữ cùng một nhịp
+   đệm ở bốn cạnh để viền bảng không dính đường phân cách tiêu đề. */
+.action-log-wrap{margin:var(--panel-content-gap);overflow-x:auto;}
 .action-status-stack{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-1-5);}
-.action-row-actions{display:flex;flex-direction:column;align-items:stretch;gap:var(--space-1-5);}
-.action-row-actions .btn{justify-content:center;min-height:var(--control-h-compact);}
+.action-row-actions{display:flex;align-items:center;justify-content:center;gap:var(--space-2);white-space:nowrap;}
+.action-row-actions .btn{flex:none;justify-content:center;min-height:var(--control-h-compact);}
 .action-chipline{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1-5);margin-top:var(--space-1-5);}
 .action-chipline .tag{white-space:nowrap;}
 .action-detail-muted{color:var(--text-tertiary);}
@@ -25,25 +27,29 @@
 .issue-group-count{flex:none;color:var(--text-tertiary);font-size:var(--text-xs);font-weight:700;white-space:nowrap;}
 
 .action-log-panel{overflow:hidden;}
-.action-log-table{width:100%;min-width:1040px;margin:0;border:0;border-radius:0;table-layout:fixed;}
-.action-log-table th,.action-log-table td{vertical-align:top;padding:var(--table-cell-py) var(--table-cell-px);}
-.action-log-table th{height:var(--table-header-h);background:var(--table-head-bg);color:var(--table-head-ink);border-bottom-color:var(--table-head-border);font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);text-transform:none;}
+.action-log-table{width:100%;min-width:1120px;margin:0;table-layout:fixed;}
+/* Nhật ký là bảng dữ liệu chuẩn: để bảng tự giữ viền/bo góc và canh giữa
+   nội dung theo hàng. Chỉ phần trạng thái cần xếp dọc do có hai kết luận. */
+.action-log-table th,.action-log-table td{vertical-align:middle;padding:var(--table-cell-py) var(--table-cell-px);}
 .action-log-table th:nth-child(1),.action-log-table td:nth-child(1){width:90px;}
 .action-log-table th:nth-child(2),.action-log-table td:nth-child(2){width:230px;}
 .action-log-table th:nth-child(3),.action-log-table td:nth-child(3){width:360px;}
-.action-log-table th:nth-child(4),.action-log-table td:nth-child(4){width:270px;}
-.action-log-table th:nth-child(5),.action-log-table td:nth-child(5){width:110px;}
+.action-log-table th:nth-child(4),.action-log-table td:nth-child(4){width:180px;}
+.action-log-table th:nth-child(5),.action-log-table td:nth-child(5){width:210px;}
 .action-log-table th:nth-child(5){text-align:center;}
 
 /* Trạng thái duyệt/hiệu lực trong bảng nhật ký dùng `.tag` chuẩn; cột hẹp nên
    cho phép xuống dòng thay vì tràn ô. */
 .action-log-table .tag{max-width:230px;white-space:normal;}
 
-.issue-group-body{display:grid;}
-.issue-row{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-2-5) var(--space-3-5);border-top:1px solid var(--border-subtle);border-radius:var(--radius-md);}
-.issue-group-body .issue-row:first-child{border-top:none;}
-.issue-row.rej{background:var(--danger-surface);}
-.issue-row.warn{background:var(--warning-surface);}
+/* Mỗi sự cố là một thẻ độc lập để các lô/mức không dính vào nhau. Vạch trái
+   thuộc về TỪNG sự cố (không thuộc cả nhóm): loại bỏ màu đỏ, cảnh báo màu vàng. */
+/* Khối sự cố là cụm dữ liệu dày: mép khung và khoảng giữa các dòng cùng dùng
+   nhịp 8px để dễ quét mà không tạo cảm giác các thẻ rời nhau. */
+.issue-group-body{display:grid;gap:var(--space-2);padding:var(--space-2);background:var(--surface-subtle);}
+.issue-row{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-2-5) var(--space-3-5);border:1px solid var(--surface-border);border-left:3px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
+.issue-row.rej{border-color:var(--danger-border);border-left-color:var(--danger-accent);background:var(--danger-surface);}
+.issue-row.warn{border-color:var(--warning-border);border-left-color:var(--warning-accent);background:var(--warning-surface);}
 .issue-row-main{min-width:0;}
 .issue-row-main b{font-size:var(--text-sm);color:var(--text-primary);}
 .issue-row-main .meta{margin-top:var(--space-0-5);}
@@ -72,8 +78,6 @@
 .action-guide-step p{margin:var(--space-1) 0 0;color:var(--text-secondary);font-size:var(--text-xs);line-height:var(--leading-body);}
 .action-guide-step small{display:block;margin-top:var(--space-1);color:var(--text-accent);font-size:var(--text-2xs);font-weight:var(--weight-semibold);line-height:var(--leading-snug);}
 .issue-group{border:1px solid var(--surface-border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface);}
-.issue-group.rej{border-left:3px solid var(--danger-accent);}
-.issue-group.warn{border-left:3px solid var(--warning-accent);}
 /* Protocol NCE v3 — cấu trúc desktop native của app. Các lưới field dùng
    nhịp nội dung 12px chung của app; không đặt breakpoint mobile vì app
    hiện phục vụ desktop. */

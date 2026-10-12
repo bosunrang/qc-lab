@@ -20,6 +20,7 @@ import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
 import type { NceBiasSuggestion } from '../../main/domain/nce-bias-suggestion';
 import { errorClass, normalizeErrorClass } from '../../main/domain/westgard-rules';
 import { NCE_EFFECTIVENESS_LABEL, nceApprovalBadge, nceEffectivenessBadge } from '../lib/nce-labels';
+import { nceIssuePoints } from '../view-models/nce-issues-view-model';
 
 /** Nhãn trạng thái NGẮN cho cây sự cố. */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
@@ -49,6 +50,8 @@ export function ActionsPage() {
   const { tests } = useManageStore(useShallow((s) => ({ tests: s.tests })));
   const store = useNceStore(useShallow((s) => ({ approve: s.approve, cancel: s.cancel, create: s.create, load: s.load, markEffectiveness: s.markEffectiveness, records: s.records, reopen: s.reopen, returnForRevision: s.returnForRevision, saveProtocol: s.saveProtocol, setCompletedDate: s.setCompletedDate, setReleaseDecision: s.setReleaseDecision, setRerunEvidence: s.setRerunEvidence })));
   const { summaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries })));
+  const [issuePoints, setIssuePoints] = useState<QcPointView[]>([]);
+  const issueRequest = useRef(0);
   const [form, setForm] = useState<{ prefill: NcePrefill | null; record: NceRecord | null } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
@@ -69,6 +72,14 @@ export function ActionsPage() {
 
   useEffect(() => { store.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useCatalog(['tests', 'summaries']);
+  useEffect(() => {
+    const request = ++issueRequest.current;
+    const levels = summaries.flatMap((summary) => summary.levels.map((level) => ({ testId: summary.testId, level: level.level })));
+    if (!levels.length) { setIssuePoints([]); return; }
+    Promise.all(levels.map(({ testId, level }) => window.qcApi.queryPoints(testId, level)))
+      .then((rows) => { if (request === issueRequest.current) setIssuePoints(rows.flat()); })
+      .catch(() => { if (request === issueRequest.current) setIssuePoints([]); });
+  }, [summaries]);
   useEffect(() => {
     if (!requestedRecordId.current) return;
     const record = store.records.find(item => item.id === requestedRecordId.current);
@@ -91,42 +102,40 @@ export function ActionsPage() {
         openRecordId: string | null;
       }[];
     }[] = [];
-    for (const s of summaries) {
-      const items = s.levels
-        .filter((lv) => (lv.latestVerdict === 'warn' || lv.latestVerdict === 'rej') && lv.latest)
-        .map((lv) => {
-          // Hồ sơ gắn với dòng sự cố theo ĐIỂM QC (`pointId`), không
-          // theo test+mức: một hồ sơ chưa gắn điểm nào thì dòng vi phạm vẫn
-          // hiện "Chưa ghi khắc phục" và nút "Lập hồ sơ".
-          const open = lv.latest
-            ? store.records.find((r) => r.record_status === 'active' && r.point_id === lv.latest!.id)
-            : undefined;
-          const errorType = errorClass(lv.latestRules);
+    for (const issue of nceIssuePoints(summaries, issuePoints, store.records)) {
+      const { point, testName, unit, decimalPlaces, openRecord } = issue;
+      const items = (() => {
+          const errorType = errorClass(point.rules);
           const err = errorType === 'SE' ? 'SE — Sai số hệ thống' : errorType === 'RE' ? 'RE — Sai số ngẫu nhiên' : 'Chưa phân loại';
           return {
-            key: `${s.testId}:${lv.level}`, testId: s.testId, level: lv.level,
-            pointId: lv.latest!.id, lot: lv.lot, date: lv.latest!.date, rule: lv.latestRules.join(', '), errorType,
-            severity: lv.latestVerdict as 'warn' | 'rej',
-            levelLabel: `M${lv.level} · Lô ${lv.lot || '—'}`,
-            state: TREE_STATE[lv.latestVerdict],
-            meta: `${lv.latest ? lv.latest.val.toFixed(s.decimalPlaces) : '—'} ${s.unit || ''} · ${lv.latestRules.join(', ') || '—'} · ${err}`,
-            footer: open ? 'Đã có hồ sơ đang mở' : 'Chưa ghi khắc phục',
+            key: point.id, testId: point.test_id, level: point.level,
+            pointId: point.id, lot: point.lot || '—', date: point.date, rule: point.rules.join(', '), errorType,
+            severity: point.verdict as 'warn' | 'rej',
+            levelLabel: `M${point.level} · Lô ${point.lot || '—'}`,
+            state: TREE_STATE[point.verdict],
+            meta: `${point.val.toFixed(decimalPlaces)} ${unit || ''} · ${point.rules.join(', ') || '—'} · ${err}`,
+            footer: openRecord ? 'Đã có hồ sơ đang mở' : 'Chưa ghi khắc phục',
             guidance: errorType === 'RE'
               ? 'Rà soát bọt khí, thể tích hút, vật liệu QC, điện áp và thao tác.'
               : errorType === 'SE' ? 'Rà soát xu hướng, hiệu chuẩn, hóa chất/calibrator và tình trạng thiết bị.' : 'Theo dõi theo SOP; chưa đủ căn cứ để phân loại sai số.',
-            openRecordId: open ? open.id : null,
+            openRecordId: openRecord ? openRecord.id : null,
           };
-        });
-      if (!items.length) continue;
-      const newest = items.reduce((latest, item) => item.date > latest ? item.date : latest, '');
+        })();
+      const group = groups.find((item) => item.key === point.test_id);
+      if (group) {
+        group.items.push(items);
+        group.count += 1;
+        if (items.severity === 'rej') group.severity = 'rej';
+        if (items.date > group.date) group.date = items.date;
+        continue;
+      }
       groups.push({
-        key: s.testId, testName: s.testName, date: vnDate(newest),
-        severity: items.some((i) => i.severity === 'rej') ? 'rej' : 'warn',
-        count: items.length, items,
+        key: point.test_id, testName, date: point.date,
+        severity: items.severity, count: 1, items: [items],
       });
     }
-    return groups;
-  }, [summaries, store.records]);
+    return groups.map((group) => ({ ...group, date: vnDate(group.date) }));
+  }, [summaries, issuePoints, store.records]);
   const issueCount = issueGroups.reduce((sum, g) => sum + g.count, 0);
 
   return (
@@ -266,7 +275,7 @@ function ActionLogPanel({
                     <td><div className="action-row-actions">
                       <button type="button" className="btn ghost sm" onClick={() => onDetail(record.id)}>Chi tiết</button>
                       {!cancelled && record.approval_status !== 'approved' && <button type="button" className="btn ghost sm" onClick={() => onContinue(record)}>Tiếp tục</button>}
-                      {!cancelled && record.approval_status !== 'approved' && writable && <button type="button" className="btn danger sm" title="Hủy có lưu vết — không xóa dữ liệu" onClick={() => onCancel(record.id)}>Hủy hồ sơ</button>}
+                      {!cancelled && record.approval_status !== 'approved' && writable && <button type="button" className="btn danger sm" title="Hủy có lưu vết — không xóa dữ liệu" onClick={() => onCancel(record.id)}>Hủy</button>}
                     </div></td>
                   </tr>
                 );
@@ -563,5 +572,3 @@ function errorClassLabel(value: unknown): string {
   const kind = normalizeErrorClass(value);
   return kind === 'SE' ? 'Sai số hệ thống' : kind === 'RE' ? 'Sai số ngẫu nhiên' : 'Chưa phân loại';
 }
-
-
