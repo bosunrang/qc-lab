@@ -8,9 +8,10 @@ import { withTransaction } from './transaction';
 import { cleanId, uid } from '../domain/text-utils';
 import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 import { quoteIdent } from './sql-ident';
+import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -285,6 +286,128 @@ CREATE INDEX IF NOT EXISTS idx_actions_test ON actions(test_id);
 CREATE INDEX IF NOT EXISTS idx_actions_approval ON actions(approval_status);
 CREATE INDEX IF NOT EXISTS idx_actions_due ON actions(due_date);
 
+-- Hồ sơ NCE protocol 4 (docs/NCE-REDESIGN-2026-10-12.md mục 6). Bảng
+-- actions ở trên giữ nguyên để migration đọc và để phục hồi được backup cũ;
+-- mã nghiệp vụ không đọc/ghi nó nữa. test_id cố ý không khoá ngoại, cùng lý
+-- do với actions.test_id: xoá xét nghiệm không được xoá hồ sơ NCE.
+CREATE TABLE IF NOT EXISTS nce_records (
+  id TEXT PRIMARY KEY,
+  nce_id TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'other',
+  phase TEXT NOT NULL DEFAULT 'exam',
+  test_id TEXT,
+  detected_at TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  correction TEXT NOT NULL DEFAULT '',
+  -- NULL = chưa xác định (hồ sơ tự mở khi hủy điểm).
+  hold_results INTEGER,
+  status TEXT NOT NULL DEFAULT 'open',
+  tier TEXT NOT NULL DEFAULT '',
+  tier_reason TEXT NOT NULL DEFAULT '',
+  risk_severity INTEGER NOT NULL DEFAULT 0,
+  risk_probability INTEGER NOT NULL DEFAULT 0,
+  risk_level TEXT NOT NULL DEFAULT '',
+  risk_basis TEXT NOT NULL DEFAULT '',
+  checklist_json TEXT NOT NULL DEFAULT '{}',
+  cause_status TEXT NOT NULL DEFAULT '',
+  cause_category TEXT NOT NULL DEFAULT '',
+  cause_text TEXT NOT NULL DEFAULT '',
+  cause_check_plan TEXT NOT NULL DEFAULT '',
+  effectiveness_criteria TEXT NOT NULL DEFAULT '',
+  effectiveness_review_due TEXT NOT NULL DEFAULT '',
+  owner_user_id TEXT NOT NULL DEFAULT '',
+  due_date TEXT NOT NULL DEFAULT '',
+  reported_by_user_id TEXT NOT NULL DEFAULT '',
+  reported_by_name TEXT NOT NULL DEFAULT '',
+  -- SE/RE của lần chạy khởi đầu: dùng cho phát hiện tái diễn và cổng đổi dải.
+  error_class TEXT NOT NULL DEFAULT '',
+  -- 1 = điểm bị loại của hồ sơ đã được xử lý trọn vẹn (Sigma, D-11). Hồ sơ mới
+  -- đặt khi duyệt đóng; hồ sơ cũ chỉ khi đã duyệt VÀ hiệu quả, giữ đúng cách
+  -- tính trước khi đổi.
+  qc_resolved INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  -- Khoá lạc quan: mọi lệnh sửa gửi kèm phiên bản đang xem.
+  row_version INTEGER NOT NULL DEFAULT 1,
+  protocol_version INTEGER NOT NULL DEFAULT 4,
+  legacy_action_id TEXT,
+  legacy_json TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_nce_records_test ON nce_records(test_id);
+CREATE INDEX IF NOT EXISTS idx_nce_records_status ON nce_records(status);
+CREATE INDEX IF NOT EXISTS idx_nce_records_nce_id ON nce_records(nce_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nce_records_legacy ON nce_records(legacy_action_id) WHERE legacy_action_id IS NOT NULL;
+
+-- Lần chạy gắn với hồ sơ: khởi đầu, bị loại thêm, rerun. Snapshot chụp giá
+-- trị, Mean/SD, z, luật và kết luận của mọi mức tại lúc gắn.
+CREATE TABLE IF NOT EXISTS nce_runs (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  test_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  run_id TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL DEFAULT '{}',
+  attached_at TEXT NOT NULL DEFAULT '',
+  attached_by_user_id TEXT NOT NULL DEFAULT '',
+  attached_by_name TEXT NOT NULL DEFAULT '',
+  UNIQUE (nce_record_id, test_id, date, run_id)
+);
+CREATE INDEX IF NOT EXISTS idx_nce_runs_run ON nce_runs(test_id, date, run_id);
+
+CREATE TABLE IF NOT EXISTS nce_actions (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  kind TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  owner_user_id TEXT NOT NULL DEFAULT '',
+  due_date TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  done_at TEXT NOT NULL DEFAULT '',
+  done_by_user_id TEXT NOT NULL DEFAULT '',
+  done_by_name TEXT NOT NULL DEFAULT '',
+  evidence TEXT NOT NULL DEFAULT '',
+  cancel_reason TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  created_by_user_id TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_nce_actions_record ON nce_actions(nce_record_id);
+
+-- Quyết định append-only: cho chạy lại, ảnh hưởng bệnh nhân, hiệu lực, nộp,
+-- duyệt, trả lại, hủy. Không sửa, không xoá.
+CREATE TABLE IF NOT EXISTS nce_decisions (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  type TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  actor_user_id TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  decided_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_nce_decisions_record ON nce_decisions(nce_record_id);
+
+-- Lịch sử sửa nội dung, append-only: changes_json = { trường: [trước, sau] }.
+CREATE TABLE IF NOT EXISTS nce_revisions (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  actor_user_id TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL DEFAULT '',
+  changes_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_nce_revisions_record ON nce_revisions(nce_record_id);
+
+-- Mốc bắt đầu lại chuỗi Westgard/CUSUM (domain/qc-cuts.ts). run_id NULL là
+-- mốc theo ngày của hồ sơ cũ (giai đoạn mới từ ngày sau date).
+CREATE TABLE IF NOT EXISTS nce_cuts (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  test_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  run_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_nce_cuts_test ON nce_cuts(test_id);
+
 -- Nhật ký audit — append-only, chuỗi hash tamper-evident. Xem
 -- app/main/domain/audit-chain.ts cho thuật toán hash.
 CREATE TABLE IF NOT EXISTS activity (
@@ -316,7 +439,10 @@ CREATE TABLE IF NOT EXISTS users (
   pass_hash TEXT NOT NULL DEFAULT '',
   active INTEGER NOT NULL DEFAULT 1,
   must_change_password INTEGER NOT NULL DEFAULT 0,
-  avatar TEXT NOT NULL DEFAULT ''
+  avatar TEXT NOT NULL DEFAULT '',
+  -- Quyền nghiệp vụ NCE cấp riêng cho KTV (nce.release, nce.approve); quản
+  -- trị viên mặc nhiên có cả hai (domain/nce/permissions.ts).
+  capabilities_json TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS reagent_tests (
@@ -417,7 +543,58 @@ const MIGRATIONS: Migration[] = [
       normalizeErrorTypes(db);
     },
   },
+  {
+    version: 3,
+    name: 'Hồ sơ NCE protocol 4: bảng nce_*, quyền NCE, chuyển hồ sơ cũ',
+    up(db) {
+      addColumnIfMissing(db, 'users', 'capabilities_json', "TEXT NOT NULL DEFAULT '[]'");
+      migrateLegacyNce(db);
+    },
+  },
 ];
+
+/** Chuyển các dòng `actions` sang mô hình NCE mới (kế hoạch mục 6.1). Chạy lại
+ * được: dòng đã chuyển (theo `legacy_action_id`) bị bỏ qua, và lần chạy/mốc
+ * cắt chỉ ghi cho hồ sơ vừa được chèn. Hồ sơ đổi dải QC không chuyển (D-12). */
+function migrateLegacyNce(db: SqliteLike): void {
+  const users = db.prepare("SELECT id, name FROM users WHERE name<>''").all() as { id: string; name: string }[];
+  const counts = new Map<string, number>();
+  for (const user of users) counts.set(user.name.trim(), (counts.get(user.name.trim()) ?? 0) + 1);
+  // Chỉ nhận tên khớp đúng MỘT tài khoản; trùng tên thì không đoán.
+  const ownerIdByName = new Map(users.filter((user) => counts.get(user.name.trim()) === 1).map((user) => [user.name.trim(), user.id]));
+  const rows = db.prepare('SELECT * FROM actions ORDER BY created_at, id').all() as unknown as LegacyActionRow[];
+  for (const row of rows) {
+    const mapped = mapLegacyAction(row, ownerIdByName);
+    if (mapped.skip) continue;
+    const cols = Object.keys(mapped.record);
+    const inserted = db.prepare(`INSERT OR IGNORE INTO nce_records(${cols.map(quoteIdent).join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
+      .run(...cols.map((col) => mapped.record[col]));
+    if (Number(inserted.changes) !== 1) continue;
+    const point = row.point_id
+      ? db.prepare('SELECT test_id, date, run_id FROM qc_points WHERE id=?').get(row.point_id) as { test_id: string; date: string; run_id: string } | undefined
+      : undefined;
+    if (point) {
+      const points = db.prepare('SELECT id, level, lot, val, voided, qc_mean, qc_sd FROM qc_points WHERE test_id=? AND date=? AND run_id=? ORDER BY level')
+        .all(point.test_id, point.date, point.run_id) as { id: string; level: number; lot: string; val: number; voided: number; qc_mean: number | null; qc_sd: number | null }[];
+      // Migration không chạy lại engine: chỉ điểm của hồ sơ mang kết luận đã
+      // lưu; các mức khác ghi "chưa đánh giá".
+      const verdict = row.qc_verdict === 'rej' || row.qc_verdict === 'warn' ? row.qc_verdict : 'none';
+      const snapshot = {
+        legacy: true, testId: point.test_id, date: point.date, runId: point.run_id,
+        points: points.map((p) => ({
+          pointId: p.id, level: p.level, lot: p.lot, voided: !!p.voided, val: p.val, mean: p.qc_mean, sd: p.qc_sd, z: null,
+          verdict: p.id === row.point_id ? verdict : 'none',
+          rules: p.id === row.point_id && row.rule ? row.rule.split(',').map((r) => r.trim()).filter(Boolean) : [],
+        })),
+      };
+      db.prepare(`INSERT OR IGNORE INTO nce_runs(id,nce_record_id,test_id,date,run_id,role,snapshot_json,attached_at,attached_by_user_id,attached_by_name)
+        VALUES (?,?,?,?,?,'trigger',?,?,?,?)`).run(uid(), row.id, point.test_id, point.date, point.run_id, JSON.stringify(snapshot), row.created_at || '', row.created_by_user_id || '', row.created_by_username || '');
+    }
+    if (mapped.cutDate && row.test_id) {
+      db.prepare('INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES (?,?,?,?,NULL)').run(uid(), row.id, row.test_id, mapped.cutDate);
+    }
+  }
+}
 
 /** `actions.error_type` chỉ được chứa MÃ `SE`/`RE`/`''`. Ba nguồn ghi từng
  * dùng ba bộ từ vựng khác nhau — form NCE ghi `SE`, huỷ điểm ghi

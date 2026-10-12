@@ -121,25 +121,27 @@ const trendSummary = westgardHandlers.listTestSummaries()[0].levels[0];
 assert.equal(trendSummary.latestVerdict, 'warn', 'CUSUM phải tạo cảnh báo cho luồng xử lý');
 assert.ok(trendSummary.latestRules.includes('CUSUM +h'));
 
-// 9b) Mốc NCE ĐÃ DUYỆT + kết luận HIỆU QUẢ phải ĐẶT LẠI chuỗi cộng dồn
-// (chốt 2026-09-11). Không có mốc này thì C+ chỉ trôi về 0.5 mỗi điểm, nên
-// một đợt drift đã khắc phục xong vẫn kéo cờ thêm nhiều điểm — cùng lớp lỗi
-// "đã khắc phục xong vẫn đỏ mãi" mà trang Tổng quan đã tránh có chủ đích.
-// Mốc lấy `action_completed_date` (lúc nguyên nhân thật sự được xử lý), nên
-// điểm 2026-08-05 mở lại chuỗi từ 0: C+ = max(0, 1.5 - 0.5) = 1.0 < h.
-db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,test_id,level,nce_id,
-  approval_status,effectiveness_status,record_status,action_completed_date)
-  VALUES('nce-fix','2026-08-04','2026-08-04','2026-08-04',?,1,'NCE-1',
-  'approved','effective','active','2026-08-04')`).run(test.id);
+// 9b) Mốc bắt đầu lại chuỗi (`nce_cuts`) phải ĐẶT LẠI chuỗi cộng dồn. Không
+// có mốc này thì C+ chỉ trôi về 0.5 mỗi điểm, nên một đợt drift đã khắc phục
+// xong vẫn kéo cờ thêm nhiều điểm.
+// - Mốc theo NGÀY (hồ sơ phiên bản cũ đã duyệt và hiệu quả): giai đoạn mới
+//   từ ngày SAU ngày hoàn thành, nên điểm 2026-08-05 mở lại chuỗi từ 0 và
+//   C+ của nó bằng 1,0, chưa tới ngưỡng h.
+// - Mốc theo LẦN CHẠY (cho phép hoạt động trở lại bằng lần rerun): chính lần
+//   chạy đó là lần đầu của giai đoạn mới (D-03).
+db.prepare("INSERT INTO nce_records(id,nce_id,source,test_id,detected_at,status) VALUES ('nce-fix','NCE-1','iqc',?,'2026-08-04','closed')").run(test.id);
+db.prepare("INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES ('cut-day','nce-fix',?,'2026-08-04',NULL)").run(test.id);
 const afterFix = westgardHandlers.analyzeLevel(test.id, 1);
-assert.equal(afterFix.points.at(-1).cusumSignal, null, 'NCE hieu qua phai dat lai CUSUM');
+assert.equal(afterFix.points.at(-1).cusumSignal, null, 'moc cat theo ngay phai dat lai CUSUM');
 assert.equal(afterFix.cusum.cPos.at(-1), 1, 'C+ phai bat dau lai tu 0 sau moc khac phuc');
-// Hồ sơ CHƯA duyệt hoặc chưa kết luận hiệu quả thì KHÔNG được đặt lại —
-// nếu không, chỉ cần mở một hồ sơ là cờ tự biến mất.
-db.prepare("UPDATE actions SET approval_status='pending' WHERE id='nce-fix'").run();
-const pendingFix = westgardHandlers.analyzeLevel(test.id, 1);
-assert.equal(pendingFix.points.at(-1).cusumSignal, 'CUSUM +h', 'NCE chua duyet khong duoc dat lai CUSUM');
-db.prepare("DELETE FROM actions WHERE id='nce-fix'").run();
+db.prepare("DELETE FROM nce_cuts WHERE id='cut-day'").run();
+assert.equal(westgardHandlers.analyzeLevel(test.id, 1).points.at(-1).cusumSignal, 'CUSUM +h', 'khong co moc cat thi chuoi cong don tiep');
+db.prepare("INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES ('cut-run','nce-fix',?,'2026-08-05','2026-08-05-1')").run(test.id);
+const afterRunCut = westgardHandlers.analyzeLevel(test.id, 1);
+assert.equal(afterRunCut.points.at(-1).cusumSignal, null, 'moc cat theo lan chay phai dat lai CUSUM');
+assert.equal(afterRunCut.cusum.cPos.at(-1), 1, 'lan chay rerun la lan dau cua giai doan moi');
+db.prepare("DELETE FROM nce_cuts WHERE nce_record_id='nce-fix'").run();
+db.prepare("DELETE FROM nce_records WHERE id='nce-fix'").run();
 
 const badTest = westgardHandlers.saveRuleAction('khong-ton-tai', '1-3s', 'inactive', actor);
 assert.equal(badTest.ok, false);

@@ -37,8 +37,11 @@ trong cùng ngày (DB chưa lưu tới run/giờ), và giao diện/export trên 
 ## Quyết định 12/10/2026 — mốc bắt đầu lại chuỗi sau sự cố (thay phần WG-07)
 
 Chốt cùng kế hoạch làm lại NCE (`docs/NCE-REDESIGN-2026-10-12.md`, D-03).
-Chưa triển khai; mã hiện hành vẫn theo cách cũ cho tới giai đoạn 2 của kế
-hoạch đó.
+Đã triển khai ở giai đoạn 2 của kế hoạch đó: mốc cắt lưu ở bảng `nce_cuts`,
+đọc qua `qcCuts()` (`db/westgard-evaluation.ts`) và so bằng `qcEpochOf()`
+(`domain/qc-cuts.ts`) cho cả luật nhiều lần chạy lẫn CUSUM. Kiểm thử:
+`WG07`/`WG07b` trong `westgard-review-regressions.test.mjs`, mục 9b của
+`westgard-handlers.test.mjs`, ca thẩm định CU-05.
 
 **Cách cũ và vấn đề.** `effectiveQcFixDates()` lấy `action_completed_date` của
 hồ sơ NCE đã duyệt, hiệu quả, không hủy; luật nhiều lần chạy và CUSUM bắt đầu

@@ -35,7 +35,7 @@ assert.equal(point.ok, true);
 const voided = entry.voidPoint({ data: { pointId: point.data.id, kind: 'analytical' } }, actor);
 assert.equal(voided.ok, true);
 assert.ok(voided.data.nceId, 'huỷ điểm kind=analytical phải tự mở hồ sơ NCE');
-const nceBefore = nce.listRecords().find((r) => r.test_id === test.id);
+const nceBefore = nce.listNce().find((r) => r.test_id === test.id);
 assert.ok(nceBefore, 'phải có đúng 1 hồ sơ NCE gắn với xét nghiệm này trước khi xoá');
 
 // 3) đã có lịch sử thì luôn bị chặn, bất kể kỳ báo cáo đang mở hay khoá.
@@ -57,7 +57,7 @@ const panelAfter = config.listPanels().find((p) => p.id === panel.id);
 assert.deepEqual(panelAfter.testIds, [test.id], 'Panel QC phải giữ xét nghiệm có lịch sử và chỉ gỡ cấu hình mới');
 
 // 5) Hồ sơ NCE và xét nghiệm nguồn còn nguyên sau lần xoá bị từ chối.
-const nceAfter = nce.listRecords().find((r) => r.id === nceBefore.id);
+const nceAfter = nce.listNce().find((r) => r.id === nceBefore.id);
 assert.ok(nceAfter, 'hồ sơ NCE không được biến mất');
 assert.equal(nceAfter.test_id, test.id);
 assert.deepEqual(nceAfter, nceBefore, 'toàn bộ nội dung hồ sơ NCE không đổi');

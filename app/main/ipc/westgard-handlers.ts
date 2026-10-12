@@ -2,7 +2,8 @@ import type { Db } from '../db/sqlite-like';
 import { listOperationalLevels, isTestInActivePanel } from '../db/operational-levels';
 import { readGlobalRules, writeGlobalRules } from '../db/rule-settings';
 import { createHistoricalWestgard } from '../db/historical-westgard';
-import { evaluateQcSets, effectiveQcFixDates } from '../db/westgard-evaluation';
+import { evaluateQcSets, qcCuts } from '../db/westgard-evaluation';
+import { qcEpochOf } from '../domain/qc-cuts';
 import { cusumScan, acceptedRunPoints, rejectedLevelsByRun, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
 import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
@@ -189,12 +190,14 @@ export function createWestgardHandlers(db: Db) {
     mean: unknown, sd: unknown, k: unknown, h: unknown, maWindow: number,
   ): CusumResult {
     const accepted = rows.filter(r => acceptedIds.has(r.id));
-    const fixDates = effectiveQcFixDates(db, testId);
-    let fixCursor = 0;
+    // Đặt lại khi điểm sang giai đoạn mới so với điểm được chấp nhận trước nó
+    // — cùng mốc cắt với luật Westgard (`domain/qc-cuts.ts`).
+    const cuts = qcCuts(db, testId);
+    let epoch = 0;
     const scan = cusumScan(accepted as unknown as QcPointLike[], mean, sd, Number(k), Number(h), maWindow, (point) => {
-      const date = String((point as { date?: unknown }).date || '');
-      let reset = false;
-      while (fixCursor < fixDates.length && fixDates[fixCursor] < date) { reset = true; fixCursor++; }
+      const next = qcEpochOf(point, cuts);
+      const reset = next > epoch;
+      epoch = next;
       return reset;
     });
     // Ánh xạ về đúng độ dài `rows`: điểm ngoài chuỗi giữ nguyên trạng thái

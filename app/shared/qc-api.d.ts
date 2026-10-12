@@ -387,37 +387,93 @@ export interface SigmaCohortView {
   status: 'insufficient' | 'provisional' | 'eligible' | 'unstable' | 'out-of-control';
 }
 
-export interface NceRecord {
-  id: string; date: string; created_at: string; updated_at?: string; created_by_user_id?: string; test_id: string | null; level: number | null; lot: string;
-  point_id: string | null; rule: string; error_type: string; nce_id: string; parent_nce_id: string; follow_up_nce_id: string; protocol_version: number;
-  approval_status: 'pending' | 'approved' | 'returned'; effectiveness_status: 'pending' | 'effective' | 'ineffective';
-  record_status: 'active' | 'cancelled'; risk_level?: string; due_date: string; action_completed_date: string; detail_json: string;
-  /** Số ngày quá hạn, main tính lúc đọc (`domain/nce-overdue.ts`); 0 là chưa quá hạn. */
-  overdue_days: number;
+/** Hồ sơ NCE protocol 4 (docs/NCE-REDESIGN-2026-10-12.md). Các dòng dưới đây
+ * là bảng `nce_*` đọc thẳng từ SQLite (snake_case) kèm vài trường main tính. */
+export type NceStatus = 'open' | 'released' | 'pending_approval' | 'closed' | 'cancelled';
+export type NceSource = 'iqc' | 'eqa' | 'instrument' | 'reagent' | 'calibration' | 'other';
+export type NceNextStepName = 'release' | 'submit' | 'approve' | null;
+
+export interface NceRecordRow {
+  id: string; nce_id: string; source: NceSource; phase: 'pre' | 'exam' | 'post';
+  test_id: string | null; detected_at: string; description: string; correction: string;
+  /** 1 có giữ kết quả, 0 không, null chưa xác định. */
+  hold_results: 0 | 1 | null;
+  status: NceStatus; tier: 'low' | 'capa' | ''; tier_reason: string;
+  risk_severity: number; risk_probability: number; risk_level: 'low' | 'medium' | 'high' | 'critical' | ''; risk_basis: string;
+  checklist_json: string;
+  cause_status: 'identified' | 'suspected' | 'undetermined' | ''; cause_category: string; cause_text: string; cause_check_plan: string;
+  effectiveness_criteria: string; effectiveness_review_due: string;
+  owner_user_id: string; due_date: string; reported_by_user_id: string; reported_by_name: string;
+  error_class: 'SE' | 'RE' | ''; qc_resolved: 0 | 1;
+  created_at: string; updated_at: string; row_version: number; protocol_version: number; legacy_json: string;
+  /** Main tính lúc đọc. */
+  test_name: string; owner_name: string; overdue_days: number; next_step: NceNextStepName;
+  open_actions: number; overdue_actions: number;
 }
 
-export interface NceDetail {
-  correction?: string; investigation?: string;
-  /** Nhóm nguyên nhân gốc, tách khỏi `NceRecord.error_type` (SE/RE). */
-  causeCategory?: 'qc' | 'operator' | 'instrument' | 'reagent' | 'calibration' | 'environment' | 'unknown' | '';
-  cause?: string; /** Tên cũ để đọc dữ liệu thí điểm trước protocol-v3. */ causeDescription?: string; action?: string;
-
-  owner?: string;
-  releaseDecision?: 'held' | 'released'; releaseNote?: string; releaseDecidedAt?: string; releaseDecidedBy?: string;
-  rerunPointId?: string; rerunNote?: string; rerunSnapshot?: { date: string; runId: string; val: number; level: number };
-  effectivenessNote?: string; residualRisk?: string;
-  eventSource?: 'iqc' | 'eqa' | 'instrument' | 'clinical' | 'audit' | 'other' | '';
-  processPhase?: 'pre' | 'exam' | 'post' | '';
-  containmentStatus?: 'held' | 'none' | ''; containmentNote?: string;
-  riskSeverity?: number; riskOccurrence?: number; riskDetectability?: number; riskLevel?: 'low' | 'medium' | 'high' | 'critical' | ''; riskBasis?: string;
-  qcMaterialStatus?: string; qcMaterialNote?: string; instrumentStatus?: string; instrumentNote?: string; reagentStatus?: string; reagentNote?: string; calibrationStatus?: string; calibrationNote?: string; lotToLotStatus?: string; lotToLotNote?: string;
-  biasBefore?: string; biasAfter?: string; actionCompletedDate?: string;
-  releaseStatus?: 'released' | ''; releaseDate?: string; releaseBy?: string;
-  patientImpact?: 'none' | 'held' | 'affected' | ''; patientAction?: string;
-  effectivenessStatus?: 'pending' | 'effective' | 'ineffective'; effectivenessDate?: string;
-  residualSeverity?: number; residualOccurrence?: number; residualDetectability?: number; residualRiskLevel?: 'low' | 'medium' | 'high' | 'critical' | ''; residualRiskBasis?: string;
-  reopenedFrom?: string; reopenNote?: string; returnNote?: string; cancelReason?: string; cancelledBy?: string; cancelledAt?: string;
+export interface NceRunRow {
+  id: string; nce_record_id: string; test_id: string; date: string; run_id: string;
+  role: 'trigger' | 'repeat_reject' | 'rerun'; snapshot_json: string;
+  attached_at: string; attached_by_user_id: string; attached_by_name: string;
 }
+
+export interface NceActionRow {
+  id: string; nce_record_id: string; kind: 'corrective' | 'preventive' | 'system_change'; description: string;
+  owner_user_id: string; due_date: string; status: 'open' | 'done' | 'cancelled';
+  done_at: string; done_by_user_id: string; done_by_name: string; evidence: string; cancel_reason: string;
+  created_at: string; created_by_user_id: string;
+  owner_name: string; overdue_days: number;
+}
+
+export interface NceDecisionRow {
+  id: string; nce_record_id: string;
+  type: 'release' | 'patient_impact' | 'effectiveness' | 'submit' | 'approve' | 'return' | 'cancel';
+  payload_json: string; actor_user_id: string; actor_name: string; decided_at: string;
+}
+
+export interface NceRevisionRow { id: string; nce_record_id: string; actor_user_id: string; actor_name: string; at: string; changes_json: string }
+
+export interface NceMissingItem { code: string; message: string }
+export interface NceRunKeyView { date: string; runId: string }
+
+export interface NceDossierView {
+  record: NceRecordRow;
+  runs: NceRunRow[]; actions: NceActionRow[]; decisions: NceDecisionRow[]; revisions: NceRevisionRow[];
+  /** Bước kế tiếp còn thiếu gì (main tính bằng `domain/nce/gates.ts`). */
+  missing: NceMissingItem[];
+  /** Lý do bắt buộc tầng CAPA; rỗng thì được chọn xử lý nhanh. */
+  capa_triggers: NceMissingItem[];
+  recurrence: boolean;
+  /** Khoảng nghi ngờ ảnh hưởng kết quả bệnh nhân (chỉ hồ sơ có lần chạy khởi đầu). */
+  suspect_window: { last_accepted: NceRunKeyView | null; trigger: NceRunKeyView; rerun: NceRunKeyView | null; runs: NceRunKeyView[] } | null;
+  /** Thao tác người đang xem được phép làm, để giao diện ẩn/hiện nút; main vẫn chặn thật. */
+  can: { edit: boolean; release: boolean; submit: boolean; approve: boolean; return: boolean; cancel: boolean; review_effectiveness: boolean };
+  /** Lý do người đang xem không được duyệt (không độc lập…); rỗng nếu được. */
+  approve_block: string;
+}
+
+export interface NceQueueRowView {
+  test_id: string; test_name: string; date: string; run_id: string;
+  rejected_levels: { level: number; lot: string; rules: string[]; point_id: string }[];
+  record: { id: string; nce_id: string } | null;
+  attach_to: { id: string; nce_id: string } | null;
+}
+
+export interface NceReleasePreview {
+  ok: boolean; problems: NceMissingItem[]; lot_changed_levels: number[];
+  points: { level: number; lot: string; val: number; z: number | null; verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[]; voided: boolean }[];
+}
+
+export interface NceUserOption { id: string; name: string; username: string; role: 'admin' | 'technician' | 'viewer'; capabilities: string[] }
+
+export interface NceConfigView {
+  dueDays: { low: number; capa: number }; recurrenceWindowDays: number;
+  separationException: { enabled: boolean; sopRef: string };
+}
+
+/** Mọi lệnh sửa một hồ sơ gửi kèm `expectedVersion` (= `row_version` đang
+ * xem); lệch thì main trả lỗi `stale`. */
+export interface NceWriteBase { id: string; expectedVersion: number }
 
 export interface ReagentComparisonFit { a: number; b: number; r2: number }
 export interface ReagentComparisonResult {
@@ -444,6 +500,9 @@ export interface PublicUser {
   /** Data URL PNG 160×160 (canvas tự resize ở renderer trước khi gửi lên) —
    * chuỗi rỗng = chưa đặt, hiện chữ cái đầu tên/username thay ảnh. */
   avatar: string;
+  /** Quyền nghiệp vụ NCE cấp riêng (`nce.release`, `nce.approve`); quản trị
+   * viên mặc nhiên có cả hai nên mảng có thể rỗng. */
+  capabilities: string[];
 }
 
 export interface LabProfile {
@@ -491,6 +550,8 @@ export interface QcApi {
   /** `initials` giữ để tương thích API cũ nhưng bị main bỏ qua; `pagePerms`
    * bỏ trống = GIỮ NGUYÊN giá trị đang có (không phải xoá). */
   updateUser(input: { id: string; data: { name: string; role: string; active: boolean; initials?: string; pagePerms?: string[] } }): Promise<IpcResult<PublicUser>>;
+  /** Cấp/thu quyền NCE cho một tài khoản (chỉ quản trị viên). */
+  setUserNceCapabilities(input: { id: string; capabilities: string[] }): Promise<IpcResult<PublicUser>>;
   deleteUser(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   resetUserPassword(input: { id: string; data: { newPassword: string } }): Promise<IpcResult<{ id: string }>>;
   changeOwnPassword(input: { data: { oldPassword: string; newPassword: string } }): Promise<IpcResult<{ id: string }>>;
@@ -611,18 +672,29 @@ export interface QcApi {
   saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
   renameSigmaPeriod(input: { id: string; period: string }): Promise<IpcResult<SigmaPeriodView>>;
   removeSigmaPeriod(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
-  listNceRecords(): Promise<NceRecord[]>;
-  createNce(input: { data: { testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string; errorType?: string; correction: string; dueDate?: string; investigation?: string; causeCategory?: string; causeDescription?: string; protocol?: Partial<NceDetail> } }): Promise<IpcResult<NceRecord>>;
-  /** Lưu tiến độ protocol-v3; phê duyệt vẫn có cổng đầy đủ ở main process. */
-  saveNceProtocol(input: { data: { id: string; dueDate?: string; protocol: Partial<NceDetail> } }): Promise<IpcResult<NceRecord>>;
-  approveNce(input: { data: { id: string } }): Promise<IpcResult<NceRecord>>;
-  returnNce(input: { data: { id: string; note: string } }): Promise<IpcResult<NceRecord>>;
-  cancelNce(input: { data: { id: string; note: string } }): Promise<IpcResult<NceRecord>>;
-  setNceCompletedDate(input: { data: { id: string; actionCompletedDate: string } }): Promise<IpcResult<NceRecord>>;
-  markNceEffectiveness(input: { data: { id: string; status: 'effective' | 'ineffective'; residualRisk?: string; note?: string } }): Promise<IpcResult<NceRecord>>;
-  setNceReleaseDecision(input: { data: { id: string; decision: 'held' | 'released'; note: string } }): Promise<IpcResult<NceRecord>>;
-  setNceRerunEvidence(input: { data: { id: string; rerunPointId: string; note?: string } }): Promise<IpcResult<NceRecord>>;
-  reopenNce(input: { data: { id: string; note?: string } }): Promise<IpcResult<NceRecord>>;
+  listNceQueue(): Promise<NceQueueRowView[]>;
+  listNce(): Promise<NceRecordRow[]>;
+  getNce(id: string): Promise<NceDossierView | null>;
+  listNceUsers(): Promise<NceUserOption[]>;
+  getNceConfig(): Promise<NceConfigView>;
+  saveNceConfig(input: { data: NceConfigView }): Promise<IpcResult<NceConfigView>>;
+  /** Đánh giá thử lần chạy rerun/xác minh trong giai đoạn mới, không ghi gì. */
+  previewNceRelease(input: { data: { id: string; rerun: NceRunKeyView; lotChangeNote?: string } }): Promise<IpcResult<NceReleasePreview>>;
+  /** IQC chỉ gửi khoá lần chạy; main tự đọc xét nghiệm, mức, lô, luật, verdict. */
+  createNce(input: { data: { source: NceSource; phase?: 'pre' | 'exam' | 'post'; testId?: string; trigger?: NceRunKeyView; description: string; correction: string; holdResults: boolean; detectedAt: string; ownerUserId: string; dueDate?: string } }): Promise<IpcResult<NceDossierView>>;
+  attachNceRun(input: { data: NceWriteBase & { run: NceRunKeyView } }): Promise<IpcResult<NceDossierView>>;
+  updateNce(input: { data: NceWriteBase & { patch: Record<string, unknown> } }): Promise<IpcResult<NceDossierView>>;
+  addNceAction(input: { data: NceWriteBase & { action: { kind: string; description: string; ownerUserId: string; dueDate: string } } }): Promise<IpcResult<NceDossierView>>;
+  updateNceAction(input: { data: NceWriteBase & { actionId: string; action: { kind: string; description: string; ownerUserId: string; dueDate: string } } }): Promise<IpcResult<NceDossierView>>;
+  completeNceAction(input: { data: NceWriteBase & { actionId: string; doneAt: string; evidence: string } }): Promise<IpcResult<NceDossierView>>;
+  cancelNceAction(input: { data: NceWriteBase & { actionId: string; reason: string } }): Promise<IpcResult<NceDossierView>>;
+  recordNcePatientImpact(input: { data: NceWriteBase & { impact: { outcome: string; description: string; resultCount?: number | null; reference?: string; notified?: string } } }): Promise<IpcResult<NceDossierView>>;
+  releaseNce(input: { data: NceWriteBase & { release: { reason: string; rerun?: NceRunKeyView | null; lotChangeNote?: string; notApplicable?: boolean } } }): Promise<IpcResult<NceDossierView>>;
+  reviewNceEffectiveness(input: { data: NceWriteBase & { review: { result: string; reviewedAt: string; evidence: string; residualSeverity?: number; residualProbability?: number; residualLevel?: string; residualBasis?: string } } }): Promise<IpcResult<NceDossierView>>;
+  submitNce(input: { data: NceWriteBase }): Promise<IpcResult<NceDossierView>>;
+  approveNce(input: { data: NceWriteBase & { note?: string } }): Promise<IpcResult<NceDossierView>>;
+  returnNce(input: { data: NceWriteBase & { note: string } }): Promise<IpcResult<NceDossierView>>;
+  cancelNce(input: { data: NceWriteBase & { reason: string } }): Promise<IpcResult<NceDossierView>>;
   listReagentComparisons(): Promise<ReagentComparisonView[]>;
   createReagentComparison(input: { data: { name?: string; unit?: string } }): Promise<IpcResult<ReagentComparisonView>>;
   saveReagentMetadata(input: { id: string; data: { reagent?: string; lotOld?: string; lotNew?: string; date?: string; operator?: string; sampleType?: string; unit?: string; biasTarget?: number; alpha?: number; coverageConfirmed?: boolean } }): Promise<IpcResult<ReagentComparisonView>>;

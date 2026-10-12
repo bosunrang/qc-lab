@@ -1,4 +1,4 @@
-import type { NceDetail, NceRecord, QcLot, QcPanel, Test, TestSummary } from '../../shared/qc-api';
+import type { NceRecordRow, QcLot, QcPanel, Test, TestSummary } from '../../shared/qc-api';
 
 const RANK = { ok: 0, warn: 1, rej: 2 } as const;
 
@@ -49,11 +49,10 @@ export function operationalDashboardSummaries(summaries: TestSummary[], tests: T
 
 
 /** Thông tin hiển thị cho hồ sơ quá hạn. Số ngày do main tính
- * (`NceRecord.overdue_days`); ở đây chỉ dựng nhãn và người phụ trách. */
-export function dashboardNceOverdue(record: NceRecord | null | undefined): DashboardOverdueInfo {
+ * (`NceRecordRow.overdue_days`); ở đây chỉ dựng nhãn và người phụ trách. */
+export function dashboardNceOverdue(record: Pick<NceRecordRow, 'overdue_days' | 'owner_name'> | null | undefined): DashboardOverdueInfo {
   const days = Number(record?.overdue_days) || 0;
-  let owner = '';
-  try { owner = String((JSON.parse(record?.detail_json || '{}') as NceDetail).owner || '').trim(); } catch { /* JSON hỏng: chưa ghi người phụ trách */ }
+  const owner = String(record?.owner_name || '').trim();
   return days > 0 ? { overdue: true, days, label: `Quá hạn ${days} ngày`, owner } : { overdue: false, days: 0, label: '', owner };
 }
 
@@ -92,10 +91,10 @@ export function levelTargetOk(level: LevelSummary): boolean {
   return Number.isFinite(Number(level.mean)) && Number.isFinite(Number(level.sd)) && Number(level.sd) > 0;
 }
 
-// Generic theo hồ sơ NCE: store bơm vào `OverdueAction` (NceRecord + tên
+// Generic theo hồ sơ NCE: store bơm vào `OverdueAction` (NceRecordRow + tên
 // xét nghiệm đã join sẵn) — giữ nguyên kiểu đó ở đầu ra để trang đọc được
 // `testName` mà không cần cast.
-export function buildDashboardViewModel<TOverdue extends NceRecord>(
+export function buildDashboardViewModel<TOverdue extends NceRecordRow>(
   testSummaries: TestSummary[], lots: QcLot[], overdueActions: TOverdue[], today: string, now: Date = new Date(),
 ) {
   const tests: DashboardTestItem[] = testSummaries.map(test => {

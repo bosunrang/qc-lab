@@ -65,7 +65,7 @@ export function SigmaPage() {
     setTestId(tests[0].id);
   }, [tests, testId]);
   useEffect(() => { loadPeriods(testId); if (testId) loadLevels(testId); }, [testId, loadPeriods, loadLevels]);
-  useStoreInvalidation(['sigma_data', 'qc_points', 'actions', 'app_meta'], testId || undefined, () => { if (testId) loadPeriods(testId); });
+  useStoreInvalidation(['sigma_data', 'qc_points', 'nce_records', 'app_meta'], testId || undefined, () => { if (testId) loadPeriods(testId); });
   useStoreInvalidation(['tests', 'test_levels', 'instruments', 'tea_refs'], testId || undefined, () => {
     // Xét nghiệm, TEa tham chiếu và máy do `useCatalog` nạp lại.
     if (testId) loadLevels(testId);

@@ -82,7 +82,7 @@ export function WestgardPage() {
   // Lọc theo xét nghiệm đang xem: điểm QC mới của xét nghiệm KHÁC không được
   // làm trang này nạp lại. Lời báo toàn cục (luật chung, lô, nhóm lô) không
   // kèm `testIds` nên vẫn lọt qua bộ lọc.
-  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], testId || undefined, () => {
+  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'nce_cuts', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], testId || undefined, () => {
     // Danh mục (xét nghiệm, lô, nhóm lô, tóm tắt) do `useCatalog` nạp lại.
     void loadRuleSettings();
     // Lọc theo cờ `operational` đúng như tập mức đang render: `listTestLevels()`

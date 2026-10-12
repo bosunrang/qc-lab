@@ -128,13 +128,10 @@ const operational = operationalDashboardSummaries(
 );
 assert.deepEqual(operational.map(item => item.testId), ['T2', 'T1'], 'lọc đủ active/panel/nhóm lô và giữ thứ tự Panel');
 
-// ── 10) Hồ sơ quá hạn: số ngày do main tính (`overdue_days`), ở đây chỉ
-// dựng nhãn. Quy tắc nằm ở `domain/nce-overdue.ts`, test ở nce-overdue.test.mjs.
-const nce = (over = {}) => ({
-  id: 'N1', due_date: '2026-09-01', record_status: 'active', approval_status: 'pending',
-  detail_json: JSON.stringify({ owner: 'Nguyễn An', correction: 'Đã kiểm tra lại QC' }), overdue_days: 3,
-  ...over,
-});
+// ── 10) Hồ sơ quá hạn: số ngày và tên người phụ trách do main tính
+// (`overdue_days`, `owner_name`), ở đây chỉ dựng nhãn. Quy tắc nằm ở
+// `domain/nce/overdue.ts`, test ở nce-domain-queue.test.mjs.
+const nce = (over = {}) => ({ id: 'N1', due_date: '2026-09-01', status: 'open', owner_name: 'Nguyễn An', overdue_days: 3, ...over });
 assert.deepEqual(dashboardNceOverdue(nce()), {
   overdue: true, days: 3, label: 'Quá hạn 3 ngày', owner: 'Nguyễn An',
 });

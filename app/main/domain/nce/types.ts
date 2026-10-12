@@ -88,7 +88,8 @@ export interface NceEffectivenessReview {
 export interface NceDossier {
   status: NceStatus; source: NceSource; testId: string | null;
   reportedByUserId: string; ownerUserId: string; detectedAt: string; dueDate: string;
-  description: string; correction: string; holdResults: boolean;
+  /** `null` = chưa xác định (hồ sơ tự mở khi hủy điểm); phải chọn trước khi cho chạy lại. */
+  description: string; correction: string; holdResults: boolean | null;
   tier: NceTier | ''; tierReason: string;
   riskSeverity: number; riskProbability: number; riskLevel: NceRiskLevel | ''; riskBasis: string;
   checklist: Readonly<Record<string, NceChecklistItem>>;

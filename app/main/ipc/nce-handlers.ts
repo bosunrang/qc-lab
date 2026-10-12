@@ -1,265 +1,468 @@
-// IPC handler cho NCE/CAPA. `detail_json` giữ protocol-v3 (FMEA, checklist,
-// kiểm soát, tác động bệnh nhân) vì các trường đó luôn được đọc/ghi nguyên
-// một hồ sơ; các cột thật của `actions` dành cho danh sách, lọc và audit.
+// IPC handler cho hồ sơ NCE protocol 4 (docs/NCE-REDESIGN-2026-10-12.md).
+// Nghiệp vụ (trạng thái, cổng, quyền, rerun) nằm ở `domain/nce/`; đọc/ghi
+// bảng ở `db/nce-repository.ts`; đánh giá Westgard cho snapshot lần chạy ở
+// `db/nce-evaluation.ts`. Tệp này chỉ ghép các bước theo khuôn
+// `writeCommand()`: quyền → kiểm dữ liệu → commit (ghi + nhật ký + báo đổi).
+//
+// Mọi lệnh sửa một hồ sơ gửi `expectedVersion`; lệch `row_version` thì trả
+// `stale` thay vì ghi đè thay đổi của người khác (sửa R-09).
 import type { Db } from '../db/sqlite-like';
-import { cleanId, cleanText, uid } from '../domain/text-utils';
-import { normalizeErrorClass } from '../domain/westgard-rules';
-import {
-  nceApprovalReadiness, prepareNceProtocol, validateNceCreate, validateNceReview, validateReleaseDecision, validateRerunEvidence, validateResidualRisk,
-  type PreparedNceProtocol,
-} from '../domain/nce-validation';
-import { nextNceId } from '../db/nce-ids';
-import { nceOverdueDays } from '../domain/nce-overdue';
+import type {
+  NceConfigView, NceDossierView, NceQueueRowView, NceRecordRow, NceReleasePreview, NceUserOption,
+} from '../../shared/qc-api';
+import { cleanId, uid } from '../domain/text-utils';
 import { isoLocalDate } from '../domain/local-date';
-import { type IpcResult, nowIso } from './shared';
-import { writeCommand } from './write-command';
+import { canWriteRole, roleOf } from '../domain/page-roles';
+import type { NceDossier, NceMissing, NceRunKey, NceRunSnapshot } from '../domain/nce/types';
+import { canDoNceOperation, nextNceStatus, type NceEditOperation, type NceTransition } from '../domain/nce/state';
+import {
+  canApproveNce, canCancelNce, canReleaseNce, canReturnNce, canSubmitNce, canWriteNce, parseNceCapabilities, type NceActorLike,
+} from '../domain/nce/permissions';
+import { nceApproveMissing, nceNextStep, nceReleaseMissing, nceSubmitMissing, validateNceCreate, validateNceReleaseInput } from '../domain/nce/gates';
+import { checkNceRerun, nceTriggerMissing, type NceRerunResult } from '../domain/nce/rerun';
+import { nceSuspectWindow, validateNcePatientImpact } from '../domain/nce/patient-impact';
+import { nceCapaTriggers, nceErrorClass } from '../domain/nce/tier';
+import { validateNceActionCancel, validateNceActionCompletion, validateNceActionDraft, validateNceEffectivenessReview } from '../domain/nce/actions';
+import { emptyChecklist, nceFieldChanges, prepareNcePatch } from '../domain/nce/update';
+import { buildNceQueue } from '../domain/nce/queue';
+import { defaultNceDueDate, prepareNceConfig, type NceConfig } from '../domain/nce/config';
+import { compareRun, runLabel, textLength } from '../domain/nce/format';
+import { nextNceId } from '../db/nce-ids';
+import {
+  columnsOfPatch, editableOf, insertNceDecision, insertNceRecord, insertNceRevision, insertNceRun, listNceRows, loadNce,
+  readNceConfig, recordOfRun, updateNceRecord, type NceLoaded,
+} from '../db/nce-repository';
+import { nceOperationalLevels, nceRejectedPoints, nceRunOutcomes, nceRunSnapshot } from '../db/nce-evaluation';
+import { type Actor, type IpcResult, nowIso } from './shared';
+import { writeCommand, type WriteSteps, type WriteTx } from './write-command';
 
-function todayIso(): string { return nowIso().slice(0, 10); }
-function objectInput(value: unknown): Record<string, unknown> { return value && typeof value === 'object' ? value as Record<string, unknown> : {}; }
-function parseDetail(json: string): Record<string, unknown> { try { return objectInput(JSON.parse(json || '{}')); } catch { return {}; } }
-function validDate(value: string): boolean { return /^\d{4}-\d{2}-\d{2}$/.test(value); }
+const fail = <T>(code: string, message: string): IpcResult<T> => ({ ok: false, error: { code, message } });
+const objectInput = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {};
+const missingText = (missing: readonly NceMissing[]) => missing.map((item) => item.message.replace(/\.$/, '')).join('; ');
 
-// Nguồn DUY NHẤT là `shared/qc-api.d.ts` — trước 2026-09-10 file này khai
-// một `NceRecord` riêng dùng `string` cho 3 trường trạng thái, trong khi hợp
-// đồng khai union; và hợp đồng lại thiếu `created_by_user_id`/`risk_level`
-// mà file này có. Hai khai báo song song, lệch theo hai chiều ngược nhau.
-import type { NceRecord } from '../../shared/qc-api';
-
-export type { NceRecord };
-
-function protocolOf(record: NceRecord, extra?: unknown): PreparedNceProtocol {
-  const submitted = objectInput(extra);
-  const detail = { ...parseDetail(record.detail_json), ...submitted };
-  // Giá trị người dùng vừa gửi (form hồ sơ) thắng giá trị trong cột; chỉ khi
-  // không gửi mới lấy cột. Trước đây cột luôn thắng, mà `effectiveness_status`
-  // mặc định là 'pending' (chuỗi khác rỗng), nên kết luận hiệu quả chọn trong
-  // form bị bỏ âm thầm khi lưu.
-  return prepareNceProtocol({ ...detail,
-    actionCompletedDate: submitted.actionCompletedDate !== undefined ? detail.actionCompletedDate : record.action_completed_date || detail.actionCompletedDate,
-    effectivenessStatus: submitted.effectivenessStatus !== undefined ? detail.effectivenessStatus : record.effectiveness_status || detail.effectivenessStatus });
-}
-function protocolJson(protocol: PreparedNceProtocol, previous: Record<string, unknown>): string {
-  return JSON.stringify({ ...previous, ...protocol });
+function runKeyInput(value: unknown): NceRunKey | null {
+  const run = objectInput(value);
+  const date = String(run.date ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? { date, runId: String(run.runId ?? '').trim() } : null;
 }
 
 export function createNceHandlers(db: Db) {
-  /** Kèm `overdue_days` do main tính theo ngày giờ địa phương của máy chính —
-   * nguồn duy nhất của quy tắc quá hạn (`domain/nce-overdue.ts`). */
-  function withOverdue(row: Omit<NceRecord, 'overdue_days'>, today: string): NceRecord {
-    return { ...row, overdue_days: nceOverdueDays(row, today) };
+  const config = (): NceConfig => readNceConfig(db);
+
+  /** Quyền NCE của người thực hiện đọc từ CSDL mỗi lần, để cấp/thu quyền có
+   * hiệu lực ngay, kể cả với máy trạm LAN. */
+  function actorLike(actor: Actor): NceActorLike {
+    const row = db.prepare('SELECT capabilities_json FROM users WHERE id=?').get(actor.userId) as { capabilities_json: string } | undefined;
+    return { userId: actor.userId, role: actor.role, capabilities: parseNceCapabilities(row?.capabilities_json) };
   }
-  function listRecords(): NceRecord[] {
+
+  function load(id: string): NceLoaded | null { return loadNce(db, id, isoLocalDate(), config().recurrenceWindowDays); }
+
+  // Đọc dữ liệu
+
+  function view(loaded: NceLoaded, actor: Actor): NceDossierView {
+    const { row, dossier } = loaded, who = actorLike(actor);
+    const trigger = dossier.runs.find((run) => run.role === 'trigger')?.snapshot;
+    const suspect = trigger && row.test_id ? nceSuspectWindow(nceRunOutcomes(db, row.test_id), trigger, dossier.release?.rerun ?? null) : null;
+    const approval = row.status === 'pending_approval' ? canApproveNce(who, dossier, config().separationException) : null;
+    const editable = row.status === 'open' || row.status === 'released';
+    return {
+      record: row, runs: loaded.runs, actions: loaded.actions, decisions: loaded.decisions, revisions: loaded.revisions,
+      missing: nceNextStep(dossier).missing, capa_triggers: nceCapaTriggers(dossier), recurrence: dossier.recurrence,
+      suspect_window: suspect ? {
+        last_accepted: suspect.lastAccepted, trigger: { date: suspect.trigger.date, runId: suspect.trigger.runId },
+        rerun: suspect.rerun, runs: suspect.runs,
+      } : null,
+      can: {
+        edit: editable && canWriteNce(who).ok,
+        release: row.status === 'open' && canReleaseNce(who).ok,
+        submit: row.status === 'released' && canSubmitNce(who, dossier).ok,
+        approve: !!approval?.ok,
+        return: row.status === 'pending_approval' && canReturnNce(who).ok,
+        cancel: row.status === 'open' && canCancelNce(who, dossier).ok,
+        review_effectiveness: row.status === 'released' && canWriteNce(who).ok,
+      },
+      approve_block: approval && !approval.ok ? approval.message : '',
+    };
+  }
+
+  function getNce(id: unknown, actor: Actor): NceDossierView | null {
+    const loaded = load(cleanId(id));
+    return loaded ? view(loaded, actor) : null;
+  }
+
+  function listNce(): NceRecordRow[] { return listNceRows(db, isoLocalDate()); }
+
+  function listNceQueue(): NceQueueRowView[] {
+    const records = db.prepare('SELECT id, nce_id, status, test_id FROM nce_records WHERE test_id IS NOT NULL').all() as { id: string; nce_id: string; status: NceDossier['status']; test_id: string }[];
+    const runs = db.prepare("SELECT nce_record_id, date, run_id FROM nce_runs WHERE role<>'rerun'").all() as { nce_record_id: string; date: string; run_id: string }[];
+    const runsByRecord = new Map<string, NceRunKey[]>();
+    for (const run of runs) runsByRecord.set(run.nce_record_id, [...(runsByRecord.get(run.nce_record_id) ?? []), { date: run.date, runId: run.run_id }]);
+    const names = new Map((db.prepare('SELECT id, name FROM tests').all() as { id: string; name: string }[]).map((t) => [t.id, t.name]));
+    return buildNceQueue(nceRejectedPoints(db), records.map((r) => ({ id: r.id, nceId: r.nce_id, status: r.status, testId: r.test_id, runs: runsByRecord.get(r.id) ?? [] })))
+      .map((row) => ({
+        test_id: row.testId, test_name: names.get(row.testId) ?? '', date: row.date, run_id: row.runId,
+        rejected_levels: row.rejectedLevels.map((l) => ({ level: l.level, lot: l.lot, rules: [...l.rules], point_id: l.pointId })),
+        record: row.record ? { id: row.record.id, nce_id: row.record.nceId } : null,
+        attach_to: row.attachTo ? { id: row.attachTo.id, nce_id: row.attachTo.nceId } : null,
+      }));
+  }
+
+  /** Tài khoản có thể làm người phụ trách / chịu trách nhiệm hành động. */
+  function listNceUsers(): NceUserOption[] {
+    const rows = db.prepare("SELECT id, name, username, role, capabilities_json FROM users WHERE active<>0 ORDER BY name, username").all() as
+      { id: string; name: string; username: string; role: string; capabilities_json: string }[];
+    return rows.filter((row) => canWriteRole(row.role)).map((row) => ({
+      id: row.id, name: row.name || row.username, username: row.username, role: roleOf(row.role), capabilities: parseNceCapabilities(row.capabilities_json),
+    }));
+  }
+
+  function getNceConfig(): NceConfigView { return config(); }
+
+  function activeWriter(userId: string): boolean {
+    const row = db.prepare('SELECT role, active FROM users WHERE id=?').get(userId) as { role: string; active: number } | undefined;
+    return !!row && !!row.active && canWriteRole(row.role);
+  }
+
+  // Lần chạy rerun hoặc xác minh
+
+  function failureSnapshots(dossier: NceDossier): { trigger: NceRunSnapshot | null; repeats: NceRunSnapshot[] } {
+    return {
+      trigger: dossier.runs.find((run) => run.role === 'trigger')?.snapshot ?? null,
+      repeats: dossier.runs.filter((run) => run.role === 'repeat_reject').map((run) => run.snapshot),
+    };
+  }
+
+  /** Đánh giá lần chạy ứng viên TRONG GIAI ĐOẠN MỚI (coi chính nó là mốc cắt). */
+  function checkCandidate(dossier: NceDossier, run: NceRunKey, lotChangeNote: string, alreadyCut = false): { snapshot: NceRunSnapshot; result: NceRerunResult } {
+    const testId = dossier.testId!;
+    const snapshot = nceRunSnapshot(db, testId, run, alreadyCut ? [] : [{ date: run.date, runId: run.runId }]);
+    const { trigger, repeats } = failureSnapshots(dossier);
+    const result = checkNceRerun({
+      testId, trigger: dossier.source === 'iqc' ? trigger : null, repeatRejects: repeats, candidate: snapshot, lotChangeNote,
+      requiredLevels: dossier.source === 'iqc' ? undefined : nceOperationalLevels(db, testId),
+      notBeforeDate: dossier.detectedAt,
+    });
+    return { snapshot, result };
+  }
+
+  function previewNceRelease(input: unknown): IpcResult<NceReleasePreview> {
+    const data = objectInput(objectInput(input).data);
+    const loaded = load(cleanId(data.id));
+    if (!loaded) return fail('not-found', 'Không tìm thấy hồ sơ.');
+    if (!loaded.dossier.testId) return fail('no-test', 'Hồ sơ không gắn xét nghiệm nên không có lần chạy QC để xác minh.');
+    const run = runKeyInput(data.rerun);
+    if (!run) return fail('invalid-rerun', 'Chọn lần chạy QC để đánh giá.');
+    const { snapshot, result } = checkCandidate(loaded.dossier, run, String(data.lotChangeNote ?? ''));
+    return { ok: true, data: {
+      ok: result.ok, problems: result.problems, lot_changed_levels: result.lotChangedLevels,
+      points: snapshot.points.map((p) => ({ level: p.level, lot: p.lot, val: p.val, z: p.z, verdict: p.verdict, rules: [...p.rules], voided: p.voided })),
+    } };
+  }
+
+  // Khung ghi dùng chung
+
+  /** Nạp hồ sơ, kiểm phiên bản và (nếu có) thao tác được phép ở trạng thái hiện tại. */
+  function open(data: Record<string, unknown>, operation: NceEditOperation | null): { loaded: NceLoaded; version: number } | IpcResult<never> {
+    const id = cleanId(data.id);
+    if (!id) return fail('missing-id', 'Thiếu mã hồ sơ.');
+    const loaded = load(id);
+    if (!loaded) return fail('not-found', 'Không tìm thấy hồ sơ.');
+    const version = Number(data.expectedVersion);
+    if (!Number.isInteger(version) || version !== loaded.row.row_version) return fail('stale', 'Hồ sơ vừa được người khác cập nhật; hãy tải lại trước khi sửa.');
+    if (operation && !canDoNceOperation(loaded.row.status, operation)) return fail('status', 'Trạng thái hiện tại của hồ sơ không cho phép thao tác này.');
+    return { loaded, version };
+  }
+  const isFailure = (value: unknown): value is IpcResult<never> => !!value && typeof value === 'object' && 'ok' in value;
+
+  /** Ghi phần chung của mọi lệnh sửa: cập nhật bản ghi + tăng phiên bản, nhật
+   * ký và lời báo đổi. `extra` ghi các bảng con trong cùng transaction. */
+  function commitEdit(w: WriteSteps, loaded: NceLoaded, version: number, audit: [string, string], columns: Record<string, string | number | null>, extra?: (tx: WriteTx, now: string) => void, tables: string[] = ['nce_records']): IpcResult<NceDossierView> {
+    const now = nowIso();
+    w.commit((tx) => {
+      if (!updateNceRecord(db, loaded.row.id, version, now, columns)) throw new Error('Hồ sơ vừa được người khác cập nhật.');
+      extra?.(tx, now);
+      tx.audit(audit[0], `${loaded.row.nce_id}: ${audit[1]}`, loaded.row.test_id || '');
+      tx.changed(tables, loaded.row.test_id ? [loaded.row.test_id] : []);
+    });
+    return { ok: true, data: view(load(loaded.row.id)!, w.actor) };
+  }
+
+  // Tạo hồ sơ
+
+  const createNce = writeCommand(db, 'createNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
     const today = isoLocalDate();
-    return (db.prepare('SELECT * FROM actions ORDER BY created_at DESC').all() as unknown as Omit<NceRecord, 'overdue_days'>[]).map((row) => withOverdue(row, today));
+    const checked = validateNceCreate(objectInput(objectInput(input).data), today);
+    if (!checked.ok) return fail(checked.code, checked.message);
+    const draft = checked.data;
+    if (!activeWriter(draft.ownerUserId)) return fail('invalid-owner', 'Người phụ trách phải là tài khoản đang hoạt động có quyền ghi.');
+    if (draft.testId && !db.prepare('SELECT 1 FROM tests WHERE id=?').get(draft.testId)) return fail('test-not-found', 'Không tìm thấy xét nghiệm.');
+    let snapshot: NceRunSnapshot | null = null;
+    if (draft.trigger && draft.testId) {
+      snapshot = nceRunSnapshot(db, draft.testId, draft.trigger);
+      const missing = nceTriggerMissing(snapshot);
+      if (missing.length) return fail(missing[0].code, missing[0].message);
+      const owner = recordOfRun(db, draft.testId, draft.trigger.date, draft.trigger.runId);
+      if (owner) return fail('run-has-record', `Lần chạy này đã thuộc hồ sơ ${owner.nce_id}.`);
+    }
+    const id = uid(), now = nowIso(), nceId = nextNceId(db, today);
+    const errorClass = snapshot ? nceErrorClass([{ role: 'trigger', snapshot }]) : '';
+    w.commit((tx) => {
+      insertNceRecord(db, {
+        id, nceId, source: draft.source, phase: draft.phase, testId: draft.testId, detectedAt: draft.detectedAt,
+        description: draft.description, correction: draft.correction, holdResults: draft.holdResults,
+        ownerUserId: draft.ownerUserId, dueDate: draft.dueDate || defaultNceDueDate(draft.detectedAt, '', config()),
+        errorClass, checklistJson: JSON.stringify(emptyChecklist(draft.source)),
+      }, w.actor, now);
+      if (snapshot) insertNceRun(db, id, 'trigger', snapshot, w.actor, now);
+      tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId}${snapshot ? ` · lần chạy ${runLabel(snapshot)}` : ''}`, draft.testId || '');
+      tx.changed(['nce_records'], draft.testId ? [draft.testId] : []);
+    });
+    return { ok: true, data: view(load(id)!, w.actor) };
+  });
+
+  const attachNceRun = writeCommand(db, 'attachNceRun', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'attachRun'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened, { dossier } = loaded;
+    if (dossier.source !== 'iqc' || !dossier.testId) return fail('not-iqc', 'Chỉ gắn lần chạy QC vào hồ sơ nội kiểm.');
+    const run = runKeyInput(data.run);
+    if (!run) return fail('invalid-run', 'Lần chạy không hợp lệ.');
+    const trigger = dossier.runs.find((r) => r.role === 'trigger')?.snapshot;
+    if (trigger && compareRun(run, trigger) <= 0) return fail('run-before-trigger', 'Chỉ gắn lần chạy bị loại SAU lần chạy khởi đầu.');
+    const snapshot = nceRunSnapshot(db, dossier.testId, run);
+    const missing = nceTriggerMissing(snapshot);
+    if (missing.length) return fail(missing[0].code, missing[0].message);
+    const owner = recordOfRun(db, dossier.testId, run.date, run.runId);
+    if (owner) return fail('run-has-record', `Lần chạy này đã thuộc hồ sơ ${owner.nce_id}.`);
+    return commitEdit(w, loaded, version, ['Gắn lần chạy vào NCE', `lần chạy ${runLabel(run)} bị loại`], {}, (_tx, now) => insertNceRun(db, loaded.row.id, 'repeat_reject', snapshot, w.actor, now));
+  });
+
+  // Sửa nội dung
+
+  const updateNce = writeCommand(db, 'updateNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'update'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const patch = prepareNcePatch(data.patch, loaded.dossier);
+    if (!patch.ok) return fail(patch.code, patch.message);
+    if (patch.data.ownerUserId !== undefined && !activeWriter(patch.data.ownerUserId)) return fail('invalid-owner', 'Người phụ trách phải là tài khoản đang hoạt động có quyền ghi.');
+    const changes = nceFieldChanges(editableOf(loaded.dossier, loaded.row.phase), patch.data);
+    if (!Object.keys(changes).length) return w.noChange(view(loaded, w.actor));
+    const changedPatch = Object.fromEntries(Object.keys(changes).map((key) => [key, patch.data[key as keyof typeof patch.data]]));
+    return commitEdit(w, loaded, version, ['Cập nhật hồ sơ NCE', `sửa ${Object.keys(changes).join(', ')}`], columnsOfPatch(changedPatch),
+      (_tx, now) => insertNceRevision(db, loaded.row.id, changes, w.actor, now));
+  });
+
+  // Hành động khắc phục
+
+  function actionOf(loaded: NceLoaded, actionId: unknown) {
+    return loaded.actions.find((action) => action.id === cleanId(actionId));
   }
-  function get(id: string): NceRecord | undefined {
-    const row = db.prepare('SELECT * FROM actions WHERE id=?').get(id) as Omit<NceRecord, 'overdue_days'> | undefined;
-    return row ? withOverdue(row, isoLocalDate()) : undefined;
+
+  const addNceAction = writeCommand(db, 'addNceAction', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'addAction'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const draft = validateNceActionDraft(data.action, loaded.dossier.detectedAt);
+    if (!draft.ok) return fail(draft.code, draft.message);
+    if (!activeWriter(draft.data.ownerUserId)) return fail('invalid-owner', 'Người chịu trách nhiệm phải là tài khoản đang hoạt động có quyền ghi.');
+    const actionId = uid();
+    return commitEdit(w, loaded, version, ['Thêm hành động NCE', draft.data.description.slice(0, 120)], {}, (_tx, now) => {
+      db.prepare(`INSERT INTO nce_actions(id,nce_record_id,kind,description,owner_user_id,due_date,status,created_at,created_by_user_id)
+        VALUES (?,?,?,?,?,?,'open',?,?)`).run(actionId, loaded.row.id, draft.data.kind, draft.data.description, draft.data.ownerUserId, draft.data.dueDate, now, w.actor.userId);
+      insertNceRevision(db, loaded.row.id, { [`action:${actionId}`]: [null, draft.data] }, w.actor, now);
+    });
+  });
+
+  const updateNceAction = writeCommand(db, 'updateNceAction', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'updateAction'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const action = actionOf(loaded, data.actionId);
+    if (!action) return fail('action-not-found', 'Không tìm thấy hành động.');
+    if (action.status !== 'open') return fail('action-not-open', 'Chỉ sửa được hành động chưa hoàn thành.');
+    const draft = validateNceActionDraft(data.action, loaded.dossier.detectedAt);
+    if (!draft.ok) return fail(draft.code, draft.message);
+    if (!activeWriter(draft.data.ownerUserId)) return fail('invalid-owner', 'Người chịu trách nhiệm phải là tài khoản đang hoạt động có quyền ghi.');
+    const before = { kind: action.kind, description: action.description, ownerUserId: action.owner_user_id, dueDate: action.due_date };
+    if (JSON.stringify(before) === JSON.stringify(draft.data)) return w.noChange(view(loaded, w.actor));
+    return commitEdit(w, loaded, version, ['Sửa hành động NCE', draft.data.description.slice(0, 120)], {}, (_tx, now) => {
+      db.prepare('UPDATE nce_actions SET kind=?, description=?, owner_user_id=?, due_date=? WHERE id=?')
+        .run(draft.data.kind, draft.data.description, draft.data.ownerUserId, draft.data.dueDate, action.id);
+      insertNceRevision(db, loaded.row.id, { [`action:${action.id}`]: [before, draft.data] }, w.actor, now);
+    });
+  });
+
+  const completeNceAction = writeCommand(db, 'completeNceAction', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'completeAction'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const action = actionOf(loaded, data.actionId);
+    if (!action) return fail('action-not-found', 'Không tìm thấy hành động.');
+    const done = validateNceActionCompletion({ status: action.status }, data, loaded.dossier.detectedAt, isoLocalDate());
+    if (!done.ok) return fail(done.code, done.message);
+    return commitEdit(w, loaded, version, ['Hoàn thành hành động NCE', `${action.description.slice(0, 100)} · ${done.data.doneAt}`], {}, (_tx, now) => {
+      db.prepare("UPDATE nce_actions SET status='done', done_at=?, done_by_user_id=?, done_by_name=?, evidence=? WHERE id=?")
+        .run(done.data.doneAt, w.actor.userId, w.actor.name || w.actor.username, done.data.evidence, action.id);
+      insertNceRevision(db, loaded.row.id, { [`action:${action.id}:done`]: [null, done.data] }, w.actor, now);
+    });
+  });
+
+  const cancelNceAction = writeCommand(db, 'cancelNceAction', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'cancelAction'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const action = actionOf(loaded, data.actionId);
+    if (!action) return fail('action-not-found', 'Không tìm thấy hành động.');
+    const checked = validateNceActionCancel({ status: action.status }, data.reason);
+    if (!checked.ok) return fail(checked.code, checked.message);
+    return commitEdit(w, loaded, version, ['Hủy hành động NCE', `${action.description.slice(0, 100)} · lý do: ${checked.data.reason}`], {}, (_tx, now) => {
+      db.prepare("UPDATE nce_actions SET status='cancelled', cancel_reason=? WHERE id=?").run(checked.data.reason, action.id);
+      insertNceRevision(db, loaded.row.id, { [`action:${action.id}:cancel`]: [null, checked.data.reason] }, w.actor, now);
+    });
+  });
+
+  // Quyết định
+
+  const recordNcePatientImpact = writeCommand(db, 'recordNcePatientImpact', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'recordPatientImpact'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const impact = validateNcePatientImpact(data.impact, loaded.dossier.source);
+    if (!impact.ok) return fail(impact.code, impact.message);
+    return commitEdit(w, loaded, version, ['Đánh giá ảnh hưởng bệnh nhân NCE', impact.data.outcome], {},
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'patient_impact', impact.data, w.actor, now));
+  });
+
+  const reviewNceEffectiveness = writeCommand(db, 'reviewNceEffectiveness', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, 'reviewEffectiveness'); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const review = validateNceEffectivenessReview(data.review, loaded.dossier, isoLocalDate());
+    if (!review.ok) return fail(review.code, review.message);
+    return commitEdit(w, loaded, version, ['Đánh giá hiệu lực NCE', `${review.data.result} · ${review.data.reviewedAt}`], {},
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'effectiveness', review.data, w.actor, now));
+  });
+
+  // Chuyển trạng thái
+
+  function transitionTo(loaded: NceLoaded, transition: NceTransition): string | null {
+    return nextNceStatus(loaded.row.status, transition);
   }
-  function result(record: NceRecord): IpcResult<NceRecord> { return { ok: true, data: get(record.id)! }; }
-  /** Hồ sơ đã hủy chỉ để xem; đã duyệt là đã khép vòng. Mọi thao tác sửa đều
-   * bị chặn — sự cố tái diễn thì "Mở lại" thành một hồ sơ mới. */
-  function closedError(record: NceRecord): IpcResult<NceRecord> | null {
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy chỉ được xem, không thể sửa.' } };
-    if (record.approval_status === 'approved') return { ok: false, error: { code: 'approved', message: 'Hồ sơ đã duyệt không thể sửa; hãy mở NCE mới nếu sự cố tái diễn.' } };
-    return null;
+
+  const releaseNce = writeCommand(db, 'releaseNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, null); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened, { dossier } = loaded;
+    const target = transitionTo(loaded, 'release');
+    if (!target) return fail('status', 'Chỉ cho chạy lại hồ sơ đang xử lý.');
+    const allowed = canReleaseNce(actorLike(w.actor)); if (!allowed.ok) return fail(allowed.code, allowed.message);
+    const release = validateNceReleaseInput(data.release, dossier.source);
+    if (!release.ok) return fail(release.code, release.message);
+    if (release.data.rerun && !dossier.testId) return fail('no-test', 'Hồ sơ không gắn xét nghiệm nên không dùng lần chạy QC xác minh.');
+    const candidate = release.data.rerun ? checkCandidate(dossier, release.data.rerun, release.data.lotChangeNote) : null;
+    const missing = nceReleaseMissing(dossier, candidate?.result ?? null);
+    if (missing.length) return fail('gate', `Chưa đủ điều kiện cho phép hoạt động trở lại: ${missingText(missing)}.`);
+    const rerun = release.data.rerun;
+    return commitEdit(w, loaded, version,
+      ['Cho phép hoạt động trở lại NCE', rerun ? `rerun ${runLabel(rerun)} · ${release.data.reason}` : release.data.reason],
+      { status: target },
+      (_tx, now) => {
+        if (candidate) insertNceRun(db, loaded.row.id, 'rerun', candidate.snapshot, w.actor, now);
+        insertNceDecision(db, loaded.row.id, 'release', { ...release.data, lotChangedLevels: candidate?.result.lotChangedLevels ?? [] }, w.actor, now);
+        // Mốc bắt đầu lại chuỗi có hiệu lực ngay khi cho chạy lại (D-03).
+        if (rerun && dossier.testId) db.prepare('INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES (?,?,?,?,?)').run(uid(), loaded.row.id, dossier.testId, rerun.date, rerun.runId);
+      },
+      rerun ? ['nce_records', 'nce_cuts'] : ['nce_records']);
+  });
+
+  const submitNce = writeCommand(db, 'submitNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, null); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const target = transitionTo(loaded, 'submit');
+    if (!target) return fail('status', 'Chỉ nộp duyệt hồ sơ đã cho chạy lại.');
+    const allowed = canSubmitNce(actorLike(w.actor), loaded.dossier); if (!allowed.ok) return fail(allowed.code, allowed.message);
+    const missing = nceSubmitMissing(loaded.dossier);
+    if (missing.length) return fail('gate', `Hồ sơ chưa đủ điều kiện nộp duyệt: ${missingText(missing)}.`);
+    return commitEdit(w, loaded, version, ['Nộp duyệt hồ sơ NCE', 'chờ duyệt'], { status: target },
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'submit', {}, w.actor, now));
+  });
+
+  /** Kiểm lại bằng chứng rerun trên dữ liệu hiện tại (điểm có thể đã bị hủy
+   * sau khi cho chạy lại). Mốc cắt đã ghi nên không thêm mốc giả định. */
+  function recheckRelease(dossier: NceDossier): NceRerunResult | null {
+    const rerun = dossier.release?.rerun;
+    if (!rerun || !dossier.testId) return null;
+    return checkCandidate(dossier, rerun, dossier.release?.lotChangeNote ?? '', true).result;
   }
 
-  const create = writeCommand(db, 'create', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const body = objectInput(input); const validated = validateNceCreate(objectInput(body.data));
-    if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const v = validated.data;
-    const protocol = prepareNceProtocol({ ...v.protocol, correction: v.correction, investigation: v.investigation, causeCategory: v.causeCategory, cause: v.causeDescription });
-    const id = uid(), nceId = nextNceId(db, todayIso()), now = nowIso();
-    w.commit((tx) => {
-      db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,point_id,rule,error_type,nce_id,protocol_version,approval_status,effectiveness_status,record_status,risk_level,due_date,action_completed_date,detail_json)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,3,'pending','pending','active',?,?,?,?)`)
-        .run(id, v.date, now, now, actor.userId, actor.username, v.testId || null, v.level, v.lot, v.pointId || null, v.rule, normalizeErrorClass(v.errorType), nceId, protocol.riskLevel, v.dueDate, '', protocolJson(protocol, {}));
-      tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} · đang điều tra`, v.testId || '');
-      tx.changed(['actions'], v.testId ? [v.testId] : []);
-    });
-    const record = get(id)!;
-    return result(record);
+  const approveNce = writeCommand(db, 'approveNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, null); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const target = transitionTo(loaded, 'approve');
+    if (!target) return fail('status', 'Chỉ duyệt hồ sơ đang chờ duyệt.');
+    const exception = config().separationException;
+    const allowed = canApproveNce(actorLike(w.actor), loaded.dossier, exception);
+    if (!allowed.ok) return fail(allowed.code, allowed.message);
+    const missing = nceApproveMissing(loaded.dossier, recheckRelease(loaded.dossier));
+    if (missing.length) return fail('gate', `Hồ sơ chưa đủ điều kiện đóng: ${missingText(missing)}.`);
+    const note = String(data.note ?? '').trim().slice(0, 2000);
+    return commitEdit(w, loaded, version, ['Duyệt đóng hồ sơ NCE', allowed.usedException ? `ngoại lệ phân tách theo ${exception.sopRef}` : 'người duyệt độc lập'],
+      { status: target, qc_resolved: 1 },
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'approve', { note, usedException: allowed.usedException, conflicts: allowed.conflicts, sopRef: allowed.usedException ? exception.sopRef : '' }, w.actor, now));
   });
 
-  /** Lưu toàn bộ protocol ở trạng thái đang điều tra. Người lập có thể hoàn
-   * thiện theo từng bước; chỉ phê duyệt mới yêu cầu khép vòng đầy đủ. */
-  const saveProtocol = writeCommand(db, 'saveProtocol', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const data = objectInput(objectInput(input).data), id = cleanId(data.id);
-    if (!id) return { ok: false, error: { code: 'missing-id', message: 'Thiếu mã hồ sơ.' } };
-    const record = get(id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy chỉ được xem, không thể sửa.' } };
-    if (record.approval_status === 'approved') return { ok: false, error: { code: 'approved', message: 'Hồ sơ đã duyệt không thể sửa; hãy mở NCE mới nếu sự cố tái diễn.' } };
-    const current = parseDetail(record.detail_json), protocol = protocolOf(record, data.protocol);
-    const dueDate = cleanText(data.dueDate ?? record.due_date, 20).trim();
-    if (dueDate && !validDate(dueDate)) return { ok: false, error: { code: 'invalid-due-date', message: 'Hạn hoàn thành không hợp lệ.' } };
-    if (dueDate && dueDate < record.date) return { ok: false, error: { code: 'due-before-date', message: 'Hạn hoàn thành không được trước ngày ghi nhận sự cố.' } };
-    if (protocol.actionCompletedDate && !validDate(protocol.actionCompletedDate)) return { ok: false, error: { code: 'invalid-completed-date', message: 'Ngày hoàn thành hành động không hợp lệ.' } };
-    if (protocol.actionCompletedDate && (protocol.actionCompletedDate < record.date || protocol.actionCompletedDate > todayIso())) return { ok: false, error: { code: 'invalid-date-order', message: 'Ngày hoàn thành phải sau ngày sự cố và không ở tương lai.' } };
-    w.commit((tx) => {
-      db.prepare('UPDATE actions SET due_date=?, action_completed_date=?, effectiveness_status=?, risk_level=?, approval_status=?, updated_at=?, detail_json=? WHERE id=?')
-        .run(dueDate, protocol.actionCompletedDate, protocol.effectivenessStatus, protocol.riskLevel, record.approval_status === 'returned' ? 'pending' : record.approval_status, nowIso(), protocolJson(protocol, current), id);
-      tx.audit('Cập nhật hồ sơ NCE', `${record.nce_id} · đang điều tra`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-    const saved = get(id)!;
-    return result(saved);
+  const returnNce = writeCommand(db, 'returnNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, null); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const target = transitionTo(loaded, 'return');
+    if (!target) return fail('status', 'Chỉ trả lại hồ sơ đang chờ duyệt.');
+    const allowed = canReturnNce(actorLike(w.actor)); if (!allowed.ok) return fail(allowed.code, allowed.message);
+    const note = String(data.note ?? '').trim().slice(0, 2000);
+    if (textLength(note) < 10) return fail('missing-note', 'Trả lại phải ghi lý do (ít nhất 10 ký tự).');
+    return commitEdit(w, loaded, version, ['Trả lại hồ sơ NCE', note], { status: target },
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'return', { note }, w.actor, now));
   });
 
-  function approvalReadiness(record: NceRecord): { ok: boolean; missing: string[] } {
-    const detail = parseDetail(record.detail_json), protocol = protocolOf(record);
-    return nceApprovalReadiness({ date: record.date, dueDate: record.due_date, actionCompletedDate: record.action_completed_date, effectivenessStatus: record.effectiveness_status, followUpNceId: record.follow_up_nce_id, protocol, hasAcceptedRerun: !!detail.rerunPointId }, todayIso());
-  }
-
-  const approve = writeCommand(db, 'approve', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const validated = validateNceReview(objectInput(objectInput(input).data));
-    if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy, không thể duyệt.' } };
-    if (record.approval_status === 'approved') return { ok: false, error: { code: 'already-approved', message: 'Hồ sơ đã duyệt trước đó.' } };
-    if (record.created_by_user_id && record.created_by_user_id === actor.userId) return { ok: false, error: { code: 'self-approval', message: 'Người lập hoặc người đã tham gia xử lý không được tự phê duyệt hồ sơ NCE.' } };
-    const ready = approvalReadiness(record);
-    if (!ready.ok) return { ok: false, error: { code: 'protocol-incomplete', message: `Hồ sơ chưa đủ điều kiện khép vòng: ${ready.missing.join(', ')}.` } };
-    const detail = parseDetail(record.detail_json); Object.assign(detail, { approvedBy: actor.name, approvedAt: nowIso() });
-    w.commit((tx) => {
-      db.prepare("UPDATE actions SET approval_status='approved', updated_at=?, detail_json=? WHERE id=?").run(nowIso(), JSON.stringify(detail), record.id);
-      tx.audit('Duyệt hồ sơ NCE', `Duyệt hồ sơ ${record.nce_id}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-   
-    return result(record);
+  const cancelNce = writeCommand(db, 'cancelNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
+    const data = objectInput(objectInput(input).data);
+    const opened = open(data, null); if (isFailure(opened)) return opened;
+    const { loaded, version } = opened;
+    const target = transitionTo(loaded, 'cancel');
+    if (!target) return fail('status', 'Chỉ hủy được hồ sơ chưa cho phép hoạt động trở lại.');
+    const allowed = canCancelNce(actorLike(w.actor), loaded.dossier); if (!allowed.ok) return fail(allowed.code, allowed.message);
+    const reason = String(data.reason ?? '').trim().slice(0, 2000);
+    if (textLength(reason) < 10) return fail('missing-reason', 'Hủy hồ sơ phải ghi lý do (ít nhất 10 ký tự).');
+    return commitEdit(w, loaded, version, ['Hủy hồ sơ NCE', reason], { status: target },
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'cancel', { reason }, w.actor, now));
   });
 
-  const returnForRevision = writeCommand(db, 'returnForRevision', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const validated = validateNceReview(objectInput(objectInput(input).data), true);
-    if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    const closed = closedError(record); if (closed) return closed;
-    const detail = parseDetail(record.detail_json); Object.assign(detail, { returnNote: validated.data.note, returnBy: actor.name, returnAt: nowIso() });
+  // Cấu hình
+
+  const saveNceConfig = writeCommand(db, 'saveNceConfig', 'admin', (w, input: unknown): IpcResult<NceConfigView> => {
+    const raw = objectInput(objectInput(input).data);
+    const next = prepareNceConfig(raw);
+    const sep = objectInput(raw.separationException);
+    if (sep.enabled === true && !next.separationException.enabled) return fail('missing-sop', 'Bật ngoại lệ phân tách nhiệm vụ phải ghi mã SOP.');
+    const current = config();
+    if (JSON.stringify(current) === JSON.stringify(next)) return w.noChange(next);
     w.commit((tx) => {
-      db.prepare("UPDATE actions SET approval_status='returned', updated_at=?, detail_json=? WHERE id=?").run(nowIso(), JSON.stringify(detail), record.id);
-      tx.audit('Trả lại hồ sơ NCE', `Lý do: ${validated.data.note}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
+      db.prepare("INSERT INTO app_meta(key,value) VALUES('nceConfig',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(next));
+      tx.audit('Cấu hình NCE', `Hạn xử lý nhanh ${next.dueDays.low} ngày, CAPA ${next.dueDays.capa} ngày · tái diễn ${next.recurrenceWindowDays} ngày · ngoại lệ phân tách ${next.separationException.enabled ? `bật (${next.separationException.sopRef})` : 'tắt'}`);
+      tx.changed(['app_meta']);
     });
-   
-    return result(record);
+    return { ok: true, data: next };
   });
 
-  const cancel = writeCommand(db, 'cancel', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const validated = validateNceReview(objectInput(objectInput(input).data), true);
-    if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.approval_status === 'approved') return { ok: false, error: { code: 'already-approved', message: 'Hồ sơ đã duyệt không thể hủy.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'already-cancelled', message: 'Hồ sơ đã hủy trước đó.' } };
-    const detail = parseDetail(record.detail_json); Object.assign(detail, { cancelReason: validated.data.note, cancelledBy: actor.name, cancelledAt: nowIso() });
-    w.commit((tx) => {
-      db.prepare("UPDATE actions SET record_status='cancelled', updated_at=?, detail_json=? WHERE id=?").run(nowIso(), JSON.stringify(detail), record.id);
-      tx.audit('Hủy hồ sơ NCE', `Lý do: ${validated.data.note}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-   
-    return result(record);
-  });
-
-  const setActionCompletedDate = writeCommand(db, 'setActionCompletedDate', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const data = objectInput(objectInput(input).data), id = cleanId(data.id), date = cleanText(data.actionCompletedDate, 20).trim();
-    if (!validDate(date)) return { ok: false, error: { code: 'invalid-date', message: 'Ngày hoàn thành không hợp lệ.' } };
-    const record = get(id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    const closed = closedError(record); if (closed) return closed;
-    if (date < record.date || date > todayIso()) return { ok: false, error: { code: 'invalid-date-order', message: 'Ngày hoàn thành phải sau ngày sự cố và không ở tương lai.' } };
-    const detail = parseDetail(record.detail_json); detail.actionCompletedDate = date;
-    w.commit((tx) => {
-      db.prepare('UPDATE actions SET action_completed_date=?, updated_at=?, detail_json=? WHERE id=?').run(date, nowIso(), JSON.stringify(detail), id);
-      tx.audit('Cập nhật ngày hoàn thành NCE', `Hồ sơ ${record.nce_id}: ${date}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-   
-    return result(record);
-  });
-
-  const markEffectiveness = writeCommand(db, 'markEffectiveness', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const data = objectInput(objectInput(input).data), id = cleanId(data.id), record = get(id);
-    if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    const closed = closedError(record); if (closed) return closed;
-    if (!record.action_completed_date) return { ok: false, error: { code: 'missing-completed-date', message: 'Cần nhập ngày hoàn thành hành động trước khi đánh giá hiệu lực.' } };
-    const validated = validateResidualRisk(data); if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const detail = parseDetail(record.detail_json); Object.assign(detail, { effectivenessStatus: validated.data.status, effectivenessDate: todayIso(), effectivenessNote: validated.data.note || detail.effectivenessNote || '', residualRisk: validated.data.residualRisk || detail.residualRisk || '' });
-    w.commit((tx) => {
-      db.prepare('UPDATE actions SET effectiveness_status=?, updated_at=?, detail_json=? WHERE id=?').run(validated.data.status, nowIso(), JSON.stringify(detail), id);
-      tx.audit('Đánh giá hiệu lực NCE', `Hồ sơ ${record.nce_id}: ${validated.data.status}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-   
-    return result(record);
-  });
-
-  const setReleaseDecision = writeCommand(db, 'setReleaseDecision', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const validated = validateReleaseDecision(objectInput(objectInput(input).data)); if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    const closed = closedError(record); if (closed) return closed;
-    const detail = parseDetail(record.detail_json); Object.assign(detail, { releaseDecision: validated.data.decision, releaseStatus: validated.data.decision === 'released' ? 'released' : '', releaseNote: validated.data.note, releaseDate: todayIso(), releaseBy: actor.name, releaseDecidedAt: nowIso(), releaseDecidedBy: actor.name });
-    w.commit((tx) => {
-      db.prepare('UPDATE actions SET updated_at=?, detail_json=? WHERE id=?').run(nowIso(), JSON.stringify(detail), record.id);
-      tx.audit('Quyết định release-to-service', `Hồ sơ ${record.nce_id}: ${validated.data.decision}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-   
-    return result(record);
-  });
-
-  const setRerunEvidence = writeCommand(db, 'setRerunEvidence', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const validated = validateRerunEvidence(objectInput(objectInput(input).data)); if (!validated.ok) return { ok: false, error: { code: validated.code, message: validated.message } };
-    const record = get(validated.data.id); if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    const closed = closedError(record); if (closed) return closed;
-    const point = db.prepare('SELECT id, test_id, level, date, run_id, val FROM qc_points WHERE id=? AND voided=0').get(validated.data.rerunPointId) as { id: string; test_id: string; level: number; date: string; run_id: string; val: number } | undefined;
-    if (!point) return { ok: false, error: { code: 'point-not-found', message: 'Không tìm thấy điểm QC rerun hợp lệ.' } };
-    if (record.test_id && point.test_id !== record.test_id) return { ok: false, error: { code: 'point-wrong-test', message: 'Điểm QC rerun phải cùng xét nghiệm với hồ sơ NCE.' } };
-    if (point.date < record.date) return { ok: false, error: { code: 'point-too-early', message: 'Điểm QC rerun phải được chạy sau khi xảy ra sự cố.' } };
-    const detail = parseDetail(record.detail_json); Object.assign(detail, { rerunPointId: point.id, rerunNote: validated.data.note, rerunSnapshot: { date: point.date, runId: point.run_id, val: point.val, level: point.level } });
-    w.commit((tx) => {
-      db.prepare('UPDATE actions SET updated_at=?, detail_json=? WHERE id=?').run(nowIso(), JSON.stringify(detail), record.id);
-      tx.audit('Gắn bằng chứng rerun NCE', `Hồ sơ ${record.nce_id}: điểm ${point.date} lần ${point.run_id}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-   
-    return result(record);
-  });
-
-  const reopenNce = writeCommand(db, 'reopenNce', 'write', (w, input: unknown): IpcResult<NceRecord> => {
-    const actor = w.actor;
-    const data = objectInput(objectInput(input).data), id = cleanId(data.id), record = get(id);
-    if (!record) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ.' } };
-    if (record.record_status === 'cancelled') return { ok: false, error: { code: 'cancelled', message: 'Hồ sơ đã hủy, không thể mở lại.' } };
-    if (record.effectiveness_status !== 'ineffective') return { ok: false, error: { code: 'not-ineffective', message: 'Chỉ mở vòng tiếp theo khi hành động đã bị kết luận không hiệu quả.' } };
-    if (record.follow_up_nce_id) return { ok: false, error: { code: 'already-reopened', message: 'Hồ sơ này đã có vòng tiếp theo, mở tiếp từ vòng đó.' } };
-    const newId = uid(), nceId = nextNceId(db, todayIso()), now = nowIso(), prior = protocolOf(record);
-    const inherited = { ...prior, correction: '', cause: '', action: '', actionCompletedDate: '', effectivenessStatus: 'pending', effectivenessDate: '', effectivenessNote: '', residualSeverity: 0, residualOccurrence: 0, residualDetectability: 0, residualRiskLevel: '', residualRiskBasis: '' };
-    // Hồ sơ mới và liên kết từ hồ sơ cũ là một đơn vị: thiếu một trong hai là
-    // chuỗi vòng NCE bị đứt.
-    w.commit((tx) => {
-      db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,point_id,rule,error_type,nce_id,parent_nce_id,protocol_version,approval_status,effectiveness_status,record_status,risk_level,due_date,action_completed_date,detail_json)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,3,'pending','pending','active',?,?,?,?)`)
-        .run(newId, now.slice(0, 10), now, now, actor.userId, actor.username, record.test_id, record.level, record.lot, record.point_id, record.rule, normalizeErrorClass(record.error_type), nceId, record.nce_id, inherited.riskLevel, record.due_date, '', JSON.stringify({ ...inherited, reopenedFrom: record.nce_id, reopenNote: cleanText(data.note, 2000).trim() }));
-      db.prepare('UPDATE actions SET follow_up_nce_id=?, updated_at=? WHERE id=?').run(newId, now, id);
-      tx.audit('Mở vòng tiếp theo NCE', `Từ hồ sơ ${record.nce_id} sang ${nceId}`, record.test_id || '');
-      tx.changed(['actions'], record.test_id ? [record.test_id] : []);
-    });
-    const fresh = get(newId)!;
-    return result(fresh);
-  });
-
-  return { listRecords, create, saveProtocol, approve, returnForRevision, cancel, setActionCompletedDate, markEffectiveness, setReleaseDecision, setRerunEvidence, reopenNce };
+  return {
+    listNce, listNceQueue, getNce, listNceUsers, getNceConfig, previewNceRelease,
+    createNce, attachNceRun, updateNce, addNceAction, updateNceAction, completeNceAction, cancelNceAction,
+    recordNcePatientImpact, releaseNce, reviewNceEffectiveness, submitNce, approveNce, returnNce, cancelNce, saveNceConfig,
+  };
 }
 
 export type NceHandlers = ReturnType<typeof createNceHandlers>;
-
-

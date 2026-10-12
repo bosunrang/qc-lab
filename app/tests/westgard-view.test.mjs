@@ -77,7 +77,7 @@ test('WG11/12: chart and invalidation wiring use the shared run key and all eval
   const page = readWestgardPageSources();
   const subscriptions = [...page.matchAll(/useStoreInvalidation\(\[([^\]]+)\]/g)];
   assert.equal(subscriptions.length, 2);
-  for (const subscription of subscriptions) for (const table of ['actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions']) assert.ok(subscription[1].includes(`'${table}'`));
+  for (const subscription of subscriptions) for (const table of ['nce_cuts', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions']) assert.ok(subscription[1].includes(`'${table}'`));
 });
 
 test('WG11: actual canvas drawing places same-day runs at distinct increasing X coordinates', () => {

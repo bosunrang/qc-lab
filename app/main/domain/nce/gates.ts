@@ -66,22 +66,28 @@ export function validateNceReleaseInput(raw: unknown, source: NceSource): NceVal
     return { ok: true, data: { notApplicable: false, reason, rerun: { date, runId: String(run.runId ?? '').trim() }, lotChangeNote } };
   }
   // Nguồn khác IQC: ghi căn cứ trở lại hoạt động, hoặc xác nhận không phải
-  // dừng dịch vụ; cả hai đều là một quyết định có người chịu trách nhiệm.
+  // dừng dịch vụ; cả hai đều là một quyết định có người chịu trách nhiệm. Có
+  // thể kèm một lần chạy QC xác minh để bắt đầu lại chuỗi Westgard/CUSUM.
   if (reason.length < 10) return { ok: false, code: 'missing-reason', message: 'Ghi căn cứ cho phép hoạt động trở lại hoặc lý do không cần dừng dịch vụ (ít nhất 10 ký tự).' };
-  return { ok: true, data: { notApplicable: input.notApplicable === true, reason, rerun: null, lotChangeNote: '' } };
+  const run = input.rerun && typeof input.rerun === 'object' ? input.rerun as Record<string, unknown> : null;
+  const date = run ? cleanDate(run.date) : '';
+  if (run && !date) return { ok: false, code: 'invalid-rerun', message: 'Lần chạy QC xác minh không hợp lệ.' };
+  const rerun = run && date ? { date, runId: String(run.runId ?? '').trim() } : null;
+  return { ok: true, data: { notApplicable: !rerun && input.notApplicable === true, reason, rerun, lotChangeNote: '' } };
 }
 
 /** Còn thiếu gì để cho chạy lại. `rerun` là kết quả `checkNceRerun()` cho lần
  * chạy ứng viên (chỉ với IQC; `null` khi chưa chọn). Không đòi hành động khắc
  * phục đã xong (D-02, sửa R-01). */
-export function nceReleaseMissing(dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'runs'>, rerun: NceRerunResult | null): NceMissing[] {
+export function nceReleaseMissing(dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'runs' | 'holdResults'>, rerun: NceRerunResult | null): NceMissing[] {
   if (dossier.status !== 'open') return [{ code: 'status', message: 'Chỉ cho chạy lại hồ sơ đang xử lý.' }];
   const missing: NceMissing[] = [];
+  if (dossier.holdResults === null) missing.push({ code: 'hold', message: 'Chưa ghi có dừng/giữ kết quả liên quan hay không.' });
   if (dossier.source === 'iqc') {
     if (!dossier.runs.some((run) => run.role === 'trigger')) missing.push({ code: 'no-trigger', message: 'Hồ sơ nội kiểm chưa gắn lần chạy bị loại.' });
     if (!rerun) missing.push({ code: 'missing-rerun', message: 'Chưa chọn lần chạy QC rerun làm bằng chứng.' });
     else missing.push(...rerun.problems);
-  }
+  } else if (rerun) missing.push(...rerun.problems);
   missing.push(...ncePatientImpactMissing(dossier.patientImpacts, dossier.source));
   return missing;
 }

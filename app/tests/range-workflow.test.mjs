@@ -53,9 +53,11 @@ assert.equal(afterApply.mfg_sd, 1);
 assert.equal(afterApply.mean, applied.data.current.mean);
 assert.equal(JSON.parse(afterApply.mean_sd_history_json).length, 1);
 
-const rangeAction = db.prepare("SELECT * FROM actions WHERE rule='Thiết lập dải QC mới'").get();
-assert.ok(rangeAction, 'áp dụng dải phải tạo hồ sơ quản lý dải chờ duyệt');
-assert.equal(rangeAction.approval_status, 'pending');
+// Đổi dải QC là kiểm soát thay đổi, không phải sự không phù hợp (D-12): không
+// tạo hồ sơ NCE; lịch sử nằm ở `mean_sd_history_json` và nhật ký.
+assert.equal(db.prepare('SELECT COUNT(*) AS n FROM nce_records').get().n, 0, 'đổi dải không tạo hồ sơ NCE');
+assert.equal(db.prepare('SELECT COUNT(*) AS n FROM actions').get().n, 0, 'không còn ghi vào bảng actions cũ');
+assert.ok(db.prepare("SELECT 1 FROM activity WHERE type='Thiết lập dải QC mới'").get(), 'đổi dải vẫn có dấu vết trong nhật ký');
 
 assert.equal(entry.revertManufacturerRange({ data: { testId: test.id, level: 1, reason: 'Hoàn lại dải NSX' } }, actor).ok, true);
 const reverted = config.listTestLevels(test.id)[0];
@@ -69,13 +71,12 @@ assert.equal(manualApplied.ok, true, JSON.stringify(manualApplied));
 const afterManual = config.listTestLevels(test.id)[0];
 assert.equal(afterManual.mean, 10.05);
 assert.equal(afterManual.sd, 0.25);
-const manualAction = db.prepare("SELECT detail_json FROM actions WHERE rule='Thiết lập dải QC mới' ORDER BY created_at DESC LIMIT 1").get();
-assert.equal(JSON.parse(manualAction.detail_json).selection, 'chỉnh thủ công');
-assert.deepEqual(JSON.parse(manualAction.detail_json).applied, { mean: 10.05, sd: 0.25 });
+assert.match(db.prepare("SELECT detail FROM activity WHERE type='Thiết lập dải QC mới' ORDER BY seq DESC LIMIT 1").get().detail, /chỉnh thủ công/);
 
-// Nếu có NCE sai số hệ thống, hệ thống yêu cầu xác nhận nguyên nhân và Bias
-// nằm trong TEa/4 trước khi cho đổi dải.
-db.prepare("INSERT INTO actions(id,date,created_at,test_id,level,rule,nce_id) VALUES ('se-gate','2026-07-20','2026-07-20',?,?, '2-2s','NCE-SE-01')").run(test.id, 1);
+// Nếu có NCE sai số hệ thống CHƯA ĐÓNG, hệ thống yêu cầu xác nhận nguyên
+// nhân và Bias nằm trong TEa/4 trước khi cho đổi dải (D-12).
+db.prepare("INSERT INTO nce_records(id,nce_id,source,test_id,detected_at,status,error_class) VALUES ('se-gate','NCE-SE-01','iqc',?,'2026-07-20','open','SE')").run(test.id);
+assert.equal(entry.rangeCandidate(test.id, 1).data.safety.nceId, 'NCE-SE-01');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống' } }, actor).error.code, 'cause-not-confirmed');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 0 } }, actor).error.code, 'missing-tea');
 db.prepare('UPDATE tests SET tea=8 WHERE id=?').run(test.id);

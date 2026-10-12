@@ -74,9 +74,9 @@ function enterRuns(ctx, item, created, inputs) {
       created.targets[level] = { mean, sd };
       continue;
     }
-    if (step.nceEffective) {
-      const date = runDates[step.nceEffective.completedRun - 1];
-      closeNceEffective(nce, created.testId, date, `${item.id}-M1`);
+    if (step.nceRelease) {
+      const date = runDates[step.nceRelease.verifyRun - 1];
+      releaseNceAt(nce, created.testId, date, `${date}-1`);
       continue;
     }
     const runIndex = runDates.length;
@@ -95,20 +95,21 @@ function enterRuns(ctx, item, created, inputs) {
   return runDates;
 }
 
-/** NCE đầy đủ tới "khắc phục hiệu quả, đã duyệt" — đúng cổng mà trang Khắc phục sự cố đi qua. */
-function closeNceEffective(nce, testId, date, lot) {
-  const record = must(nce.create({ data: { testId, level: 1, lot, date, rule: 'CUSUM', errorType: 'SE', correction: 'Tạm dừng trả kết quả, kiểm tra hiệu chuẩn và chạy lại QC', dueDate: date } }, ADMIN), 'NCE tạo');
-  must(nce.setActionCompletedDate({ data: { id: record.id, actionCompletedDate: date } }, ADMIN), 'NCE ngày hoàn thành');
-  must(nce.saveProtocol({ data: { id: record.id, dueDate: date, protocol: {
-    eventSource: 'iqc', processPhase: 'exam', owner: 'Người thẩm định', containmentStatus: 'none', correction: 'Tạm dừng trả kết quả, kiểm tra hiệu chuẩn và chạy lại QC',
-    riskSeverity: 2, riskOccurrence: 2, riskDetectability: 2, riskLevel: 'low', riskBasis: 'Ca thẩm định',
-    qcMaterialStatus: 'ok', instrumentStatus: 'ok', reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
-    causeCategory: 'calibration', cause: 'Hiệu chuẩn lệch', action: 'Hiệu chuẩn lại và xác nhận bằng QC',
-    patientImpact: 'none', effectivenessStatus: 'pending',
-    residualSeverity: 1, residualOccurrence: 1, residualDetectability: 1, residualRiskLevel: 'low', residualRiskBasis: 'Theo dõi sau hiệu chuẩn',
-  } } }, ADMIN), 'NCE hồ sơ');
-  must(nce.markEffectiveness({ data: { id: record.id, status: 'effective', residualRisk: 'Rủi ro còn lại thấp', note: 'QC ổn định sau hiệu chuẩn' } }, ADMIN), 'NCE hiệu quả');
-  must(nce.approve({ data: { id: record.id } }, REVIEWER), 'NCE duyệt');
+/** Hồ sơ NCE cho phép hoạt động trở lại bằng một lần chạy QC xác minh — đúng
+ * cổng mà trang Khắc phục sự cố đi qua. Mốc bắt đầu lại chuỗi Westgard/CUSUM
+ * là chính lần chạy đó (D-03, docs/NCE-REDESIGN-2026-10-12.md). Nguồn
+ * "hiệu chuẩn" vì tín hiệu CUSUM không loại lần chạy nào để làm lần khởi đầu. */
+function releaseNceAt(nce, testId, date, runId) {
+  const record = must(nce.createNce({ data: {
+    source: 'calibration', testId, description: 'Tín hiệu CUSUM, nghi lệch hiệu chuẩn', correction: 'Tạm dừng trả kết quả, hiệu chuẩn lại',
+    holdResults: true, detectedAt: date, ownerUserId: ADMIN.userId,
+  } }, ADMIN), 'NCE tạo');
+  const impact = must(nce.recordNcePatientImpact({ data: { id: record.record.id, expectedVersion: record.record.row_version, impact: {
+    outcome: 'not_reported', description: 'Đã giữ toàn bộ kết quả trong khoảng nghi ngờ',
+  } } }, ADMIN), 'NCE ảnh hưởng bệnh nhân');
+  must(nce.releaseNce({ data: { id: record.record.id, expectedVersion: impact.record.row_version, release: {
+    reason: 'Hiệu chuẩn lại, QC xác minh đạt', rerun: { date, runId },
+  } } }, ADMIN), 'NCE cho chạy lại');
 }
 
 /** Điểm của mọi mức theo `lần chạy/mức`, đọc như trang Phân tích Westgard. */
@@ -251,7 +252,7 @@ function describeInput(item) {
   const levels = item.levels.map((l) => `M${l.level} ${fmt(l.mean)}/${fmt(l.sd)}`).join(', ');
   const steps = (item.runs || []).map((step) => {
     if (step.setTarget) return `[đổi Mean/SD M${step.setTarget.level} → ${fmt(step.setTarget.mean)}/${fmt(step.setTarget.sd)}]`;
-    if (step.nceEffective) return '[NCE khắc phục hiệu quả]';
+    if (step.nceRelease) return `[NCE cho chạy lại bằng lần ${step.nceRelease.verifyRun}]`;
     if (step.z) return Object.values(step.z).map((z) => (z > 0 ? '+' : '') + fmt(z)).join('|');
     return Object.values(step.val).map(fmt).join('|');
   });
@@ -275,6 +276,8 @@ export function runValidation() {
   const results = [];
   const inputs = [];
   try {
+    // Người phụ trách hồ sơ NCE phải là một tài khoản có thật trong CSDL.
+    db.prepare("INSERT INTO users(id,username,name,role,active) VALUES (?,?,?,'admin',1)").run(ADMIN.userId, ADMIN.username, ADMIN.name);
     ctx.instrumentId = must(ctx.config.saveInstrument({ data: { name: 'Máy thẩm định' } }, ADMIN), 'máy').id;
     for (const group of ALL_GROUPS) {
       for (const item of group.cases) {

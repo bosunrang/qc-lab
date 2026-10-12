@@ -76,6 +76,7 @@ Các quyết định dưới đây chọn theo chuẩn. Chỉ đổi khi SOP ph�
 | D-12 | Đổi dải QC không phải NCE: thôi ghi vào bảng NCE (lịch sử đã có ở `test_levels.mean_sd_history_json` và audit). Cổng an toàn đổi dải chỉ bật khi có NCE sai số hệ thống **chưa đóng** hoặc gắn **lô đang dùng** của mức đó | Kiểm soát thay đổi khác với sự không phù hợp (ISO 15189:2022 8.5 so với 7.5) |
 | D-13 | Mọi ngày "hôm nay" ở main lấy theo giờ địa phương của máy chính (`isoLocalDate()`); thời điểm lưu ISO đầy đủ | Thống nhất với quy tắc quá hạn hiện có |
 | D-14 | Hàng chờ NCE chỉ gồm lần chạy bị **loại**; cảnh báo (1-2s và mọi luật đặt hành động "Cảnh báo") không vào hàng chờ, vẫn hiện ở Nhập QC và Tổng quan. Người dùng vẫn có thể tự mở NCE từ nguồn khác khi cần. Người dùng xác nhận ngày 2026-10-12 | Westgard: 1-2s là quy tắc cảnh báo, không loại lần chạy |
+| D-15 | Hồ sơ không phải IQC có xét nghiệm được kèm một lần chạy QC xác minh khi cho chạy lại (từ ngày phát hiện, đủ mức đang vận hành, không bị loại trong giai đoạn mới) và lần chạy đó cũng là mốc cắt. Thêm ngày 2026-10-12 khi làm giai đoạn 2 | Westgard bài 18 như D-03; tín hiệu CUSUM không loại lần chạy nào nên cần đường này để bắt đầu lại chuỗi |
 
 **Cấu hình có giá trị mặc định tạm, chờ SOP** (lưu `app_meta`, sửa ở Cài đặt):
 
@@ -292,18 +293,47 @@ verdict của lần rerun truyền vào `checkNceRerun()` phải được đánh
 giai đoạn mới (coi lần rerun là mốc cắt); "hôm nay" truyền vào mọi cổng là
 `isoLocalDate()`.
 
-### Giai đoạn 2 — Schema, handler, tích hợp
+### Giai đoạn 2 — Schema, handler, tích hợp (xong 2026-10-12)
 
-- Migration version 3 và test chạy lại nhiều lần, test phục hồi backup cũ.
-- Handler mới, `capabilities_json`, khóa lạc quan, `nce_revisions`.
-- Đổi Westgard/CUSUM sang `nce_cuts`; đổi Sigma, hủy điểm, đổi dải, đồng bộ,
-  cache.
-- Bộ ca thẩm định: sửa CU-05 theo lần chạy rerun; thêm ca WG-07 (4-1s bắt đầu
-  lại sau khi cho chạy lại); thêm nhóm ca NCE.
-- Xóa `nce-handlers.ts`, `nce-validation.ts` cũ và test cũ.
+Đã làm:
 
-**Xong khi:** `npm test`, `npm run validate` đạt; không còn mã nghiệp vụ nào đọc
-bảng `actions` ngoài migration.
+- Schema 3 (`db/schema.ts`): bảng `nce_records`, `nce_runs`, `nce_actions`,
+  `nce_decisions`, `nce_revisions`, `nce_cuts`; cột `users.capabilities_json`;
+  migration chuyển hồ sơ cũ (`domain/nce/legacy.ts`), chạy lại được, chạy cả
+  sau khi phục hồi backup cũ.
+- Đọc/ghi ở `db/nce-repository.ts`; snapshot và hàng chờ ở
+  `db/nce-evaluation.ts`; handler viết lại ở `ipc/nce-handlers.ts` (21 thao
+  tác, mục 8) và `setUserNceCapabilities` ở `ipc/auth-handlers.ts`.
+- Westgard và CUSUM cắt theo `nce_cuts` (`domain/qc-cuts.ts`); Sigma đọc điểm
+  đã xử lý từ hồ sơ đã đóng; hủy điểm loại phân tích gắn/tạo hồ sơ theo lần
+  chạy; đổi dải QC thôi tạo hồ sơ NCE và cổng an toàn theo D-12; đồng bộ
+  Firebase, bộ nhớ đệm tóm tắt và các chỗ nghe thay đổi đổi sang bảng mới.
+- Renderer chỉ đổi đủ để chạy: store NCE, Tổng quan, phụ lục Báo cáo, và một
+  trang Khắc phục sự cố **tạm, chỉ đọc** (hàng chờ, danh sách, chi tiết).
+- Bỏ `nce-validation.ts`, `nce-overdue.ts`, `nce-bias-suggestion.ts`,
+  `nce-issues-view-model.ts` cùng test của chúng.
+- Test: `nce-handlers.test.mjs` (viết lại), `nce-migration.test.mjs`, helper
+  `tests/helpers/nce-flow.mjs`; cập nhật 20 tệp test và e2e bám mô hình cũ.
+  Ca nghiệm thu 6, 7, 13, 14, 16, 17, 18, 19 đã có test; cùng các ca của
+  giai đoạn 1 là đủ 20 ca. Riêng ca 15 mới kiểm ở mức hàm (tham số "hôm nay")
+  và mã hồ sơ theo ngày địa phương lúc chạy test; chưa giả lập đồng hồ ở
+  khung 0–7 giờ sáng.
+
+Bổ sung so với kế hoạch ban đầu:
+
+- **D-15.** Hồ sơ không phải IQC nhưng có xét nghiệm (hiệu chuẩn, thiết bị,
+  hóa chất, tín hiệu CUSUM…) được kèm một lần chạy QC xác minh khi cho chạy
+  lại; lần chạy đó phải từ ngày phát hiện trở đi, đủ mọi mức đang vận hành,
+  không mức nào bị loại khi đánh giá trong giai đoạn mới, và cũng ghi mốc cắt.
+  Lý do: tín hiệu CUSUM không loại lần chạy nào nên không có lần chạy khởi
+  đầu để lập hồ sơ IQC, nhưng sau khắc phục vẫn phải bắt đầu lại chuỗi.
+- `hold_results` có thể là "chưa xác định" (hồ sơ tự mở khi hủy điểm); phải
+  ghi trước khi cho chạy lại.
+
+Còn lại cho giai đoạn 3: dọn CSS `pages/actions.css` của trang cũ (phần lớn
+selector không còn dùng), giao diện cấp quyền NCE ở trang Người dùng, cấu hình
+NCE ở Cài đặt. E2E `reload-count` hỏng từ trước giai đoạn 2 (đã kiểm trên
+commit `9017e96`), không thuộc phạm vi này.
 
 ### Giai đoạn 3 — Giao diện
 

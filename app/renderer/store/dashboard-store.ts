@@ -2,10 +2,10 @@
 // IPC đã có. Quy tắc trình bày/ lọc nghiệp vụ thuần nằm trong view-model.
 import { create } from 'zustand';
 import { dashboardNceOverdue, operationalDashboardSummaries, type DashboardStatus } from '../view-models/dashboard-view-model';
-import type { TestSummary, NceRecord, Test, QcLot } from '../../shared/qc-api';
+import type { TestSummary, NceRecordRow, Test, QcLot } from '../../shared/qc-api';
 
 export type DashboardFilterStatus = 'all' | 'missing' | DashboardStatus;
-export interface OverdueAction extends NceRecord { testName: string; overdueDays: number; overdueLabel: string; owner: string }
+export interface OverdueAction extends NceRecordRow { testName: string; overdueDays: number; overdueLabel: string; owner: string }
 
 interface DashboardState {
   testSummaries: TestSummary[];
@@ -46,7 +46,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
 async function loadDashboard(set: (partial: Partial<DashboardState>) => void): Promise<void> {
   const [allSummaries, nceRecords, tests, panels, lots] = await Promise.all([
     window.qcApi.listTestSummaries(),
-    window.qcApi.listNceRecords(),
+    window.qcApi.listNce(),
     window.qcApi.listTests(),
     window.qcApi.listPanels(),
     window.qcApi.listLots(),

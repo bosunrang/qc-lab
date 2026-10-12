@@ -15,14 +15,14 @@ import { TestPicker } from '../components/TestPicker';
 import { normalizeSearch, useTestSelection } from '../lib/useTestSelection';
 import { PrintIcon } from '../components/PrintIcon';
 import { Modal } from '../components/Modal';
-import { ERROR_CLASS_LABEL, normalizeErrorClass } from '../../main/domain/westgard-rules';
+import { ERROR_CLASS_LABEL } from '../../main/domain/westgard-rules';
 import { reauthDialog, infoDialog, confirmDialog } from '../state/dialog-store';
 import { downloadCsv, exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import type { NceRecord, ReportPointRow, TestSummary } from '../../shared/qc-api';
-import { NCE_APPROVAL_LABEL, NCE_EFFECTIVENESS_LABEL } from '../lib/nce-labels';
+import type { NceRecordRow, ReportPointRow, TestSummary } from '../../shared/qc-api';
+import { NCE_SOURCE_LABEL, NCE_STATUS_LABEL, NCE_TIER_LABEL } from '../../main/domain/nce/labels';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -66,29 +66,23 @@ function csvCell(value: unknown): string {
 // không phân biệt được — mà số lô là định danh bắt buộc của vật liệu kiểm
 // trong hồ sơ nội kiểm ISO 15189.
 const POINT_HEADERS = ['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'];
-const NCE_HEADERS = ['Mã NCE', 'Ngày', 'Mức', 'Luật', 'Loại sai số', 'Hạn xử lý', 'Trạng thái hồ sơ', 'Duyệt', 'Hiệu lực'];
+const NCE_HEADERS = ['Mã NCE', 'Ngày phát hiện', 'Nguồn', 'Mô tả', 'Loại sai số', 'Tầng xử lý', 'Hạn xử lý', 'Trạng thái'];
 
-/** Hồ sơ ĐÃ HUỶ vẫn nằm trong phụ lục (nó là dấu vết, không được lọc đi)
- * nhưng phải nói rõ ra. Bản trước chỉ in `approval_status`/`effectiveness_status`,
- * nên một hồ sơ đã huỷ hiện y hệt hồ sơ đang chờ duyệt — thẻ Khắc phục sự cố
- * thì hiển thị và xuất `record_status`, chỉ báo cáo là mất. */
-const NCE_RECORD_STATUS: Record<string, string> = { cancelled: 'Đã huỷ', active: 'Đang hiệu lực' };
-
+/** Hồ sơ ĐÃ HUỶ vẫn nằm trong phụ lục (nó là dấu vết, không được lọc đi);
+ * cột trạng thái nói rõ điều đó. */
 function pointRow(p: ReportPointRow): (string | number)[] {
   return [vnDate(p.date), p.level, p.lot || '—', p.run_id, p.val, p.operator_name || '—', p.voided ? `Đã huỷ: ${p.void_reason}` : 'Hợp lệ'];
 }
-function nceRow(r: NceRecord): string[] {
-  // Cột lưu MÃ (`SE`/`RE`/`''`); bảng in đọc ra nhãn. Dữ liệu cũ có thể còn
-  // chuỗi dài nên vẫn đi qua `normalizeErrorClass()`.
-  return [r.nce_id || '—', vnDate(r.date), r.level == null ? '—' : `M${r.level}`, r.rule || '—', ERROR_CLASS_LABEL[normalizeErrorClass(r.error_type)],
-    r.due_date ? vnDate(r.due_date) : '—', NCE_RECORD_STATUS[r.record_status] || r.record_status || '—',
-    NCE_APPROVAL_LABEL[r.approval_status] || r.approval_status || '—', NCE_EFFECTIVENESS_LABEL[r.effectiveness_status] || r.effectiveness_status || '—'];
+function nceRow(r: NceRecordRow): string[] {
+  return [r.nce_id || '—', vnDate(r.detected_at), NCE_SOURCE_LABEL[r.source] || r.source, r.description || '—',
+    ERROR_CLASS_LABEL[r.error_class] ?? ERROR_CLASS_LABEL[''], NCE_TIER_LABEL[r.tier] || '—',
+    r.due_date ? vnDate(r.due_date) : '—', NCE_STATUS_LABEL[r.status] || r.status];
 }
 
 /** Trang in — tĩnh, tự đứng một mình (cửa sổ in ở main process nạp qua
  * `data:` URL, không dùng CSS/JS của renderer). Phụ lục NCE chỉ in khi
  * người dùng tick — đúng nhãn "(Áp dụng cho PDF và Excel)". */
-function buildPrintHtml(label: string, from: string, to: string, points: ReportPointRow[], nce: NceRecord[] | null): string {
+function buildPrintHtml(label: string, from: string, to: string, points: ReportPointRow[], nce: NceRecordRow[] | null): string {
   const rows = points.map((p) => `<tr${p.voided ? ' class="voided"' : ''}>${pointRow(p).map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
   const appendix = nce
     ? `<h2>Phụ lục NCE</h2>${nce.length
@@ -152,8 +146,8 @@ export function ReportPage() {
     // lâu để dựng tệp nên không vào store.
     const points = await window.qcApi.queryReport({ testId: selectedId, from: start, to: end });
     if (!withNce) return { points, nce: null };
-    const all = await window.qcApi.listNceRecords();
-    const nce = all.filter((r) => r.test_id === selectedId && (!start || r.date >= start) && (!end || r.date <= end));
+    const all = await window.qcApi.listNce();
+    const nce = all.filter((r) => r.test_id === selectedId && (!start || r.detected_at >= start) && (!end || r.detected_at <= end));
     return { points, nce };
   }
 

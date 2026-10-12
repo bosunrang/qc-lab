@@ -14,7 +14,7 @@ import { useWestgardStore } from '../store/westgard-store';
 /** Các bảng mà `listTestSummaries` đọc hoặc dùng để đánh giá Westgard: điểm,
  * xét nghiệm, Mean/SD, máy (tên hiển thị), lô, nhóm lô, Panel, chuyển lô,
  * luật chung (`app_meta`) và mốc khắc phục (`actions`). */
-export const SUMMARY_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'actions', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
+export const SUMMARY_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'nce_cuts', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
 
 const CATALOG = {
   instruments: { tables: ['instruments'], load: () => useManageStore.getState().loadInstruments() },

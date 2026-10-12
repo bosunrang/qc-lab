@@ -1,82 +1,60 @@
-// Zustand store cho trang Khắc phục sự cố (NCE) — chỉ ActionsPage.tsx dùng.
-// Mọi hàm ghi trả `IpcResult` để form hiển thị đúng lỗi validate của chính
-// nó, không dùng field `error` dùng chung nữa (khác bản thí điểm cũ).
+// Zustand store cho trang Khắc phục sự cố (NCE protocol 4). Mọi hàm ghi trả
+// `IpcResult<NceDossierView>` để trang hiển thị đúng lỗi của chính thao tác
+// và nhận ngay hồ sơ mới (kèm `row_version` cho lần sửa kế tiếp).
+//
+// Không tự nạp lại danh sách sau khi ghi (kế hoạch kiến trúc D.1): main báo
+// `nce_records` sau commit và trang nạp lại qua `useStoreInvalidation`.
 import { create } from 'zustand';
-import type { NceRecord, NceDetail, IpcResult } from '../../shared/qc-api';
-import { latestNceSigmaBias, type NceBiasSuggestion } from '../../main/domain/nce-bias-suggestion';
+import type { IpcResult, NceDossierView, NceQueueRowView, NceRecordRow, NceReleasePreview, NceRunKeyView, NceUserOption, QcApi } from '../../shared/qc-api';
 
-interface NceCreateData {
-  testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string;
-  errorType?: string; correction: string; dueDate?: string;
-  investigation?: string; causeCategory?: string; causeDescription?: string; protocol?: Partial<NceDetail>;
-}
+type Input<K extends keyof QcApi> = Parameters<QcApi[K]>[0] extends { data: infer D } ? D : never;
+type Write = IpcResult<NceDossierView>;
 
 interface NceState {
-  records: NceRecord[];
+  records: NceRecordRow[];
+  queue: NceQueueRowView[];
+  users: NceUserOption[];
   load: () => Promise<void>;
-  /** Gợi ý chỉ-đọc từ kỳ Sigma gần nhất, không ghi gì vào hồ sơ NCE. */
-  latestSigmaBias: (testId: string, level: number) => Promise<NceBiasSuggestion | null>;
-  create: (data: NceCreateData) => Promise<IpcResult<NceRecord>>;
-  saveProtocol: (id: string, dueDate: string, protocol: Partial<NceDetail>) => Promise<IpcResult<NceRecord>>;
-  approve: (id: string) => Promise<IpcResult<NceRecord>>;
-  returnForRevision: (id: string, note: string) => Promise<IpcResult<NceRecord>>;
-  cancel: (id: string, note: string) => Promise<IpcResult<NceRecord>>;
-  setCompletedDate: (id: string, date: string) => Promise<IpcResult<NceRecord>>;
-  markEffectiveness: (id: string, status: 'effective' | 'ineffective', residualRisk?: string, note?: string) => Promise<IpcResult<NceRecord>>;
-  setReleaseDecision: (id: string, decision: 'held' | 'released', note: string) => Promise<IpcResult<NceRecord>>;
-  setRerunEvidence: (id: string, rerunPointId: string, note?: string) => Promise<IpcResult<NceRecord>>;
-  reopen: (id: string, note?: string) => Promise<IpcResult<NceRecord>>;
+  get: (id: string) => Promise<NceDossierView | null>;
+  previewRelease: (id: string, rerun: NceRunKeyView, lotChangeNote?: string) => Promise<IpcResult<NceReleasePreview>>;
+  create: (data: Input<'createNce'>) => Promise<Write>;
+  attachRun: (data: Input<'attachNceRun'>) => Promise<Write>;
+  update: (data: Input<'updateNce'>) => Promise<Write>;
+  addAction: (data: Input<'addNceAction'>) => Promise<Write>;
+  updateAction: (data: Input<'updateNceAction'>) => Promise<Write>;
+  completeAction: (data: Input<'completeNceAction'>) => Promise<Write>;
+  cancelAction: (data: Input<'cancelNceAction'>) => Promise<Write>;
+  recordPatientImpact: (data: Input<'recordNcePatientImpact'>) => Promise<Write>;
+  release: (data: Input<'releaseNce'>) => Promise<Write>;
+  reviewEffectiveness: (data: Input<'reviewNceEffectiveness'>) => Promise<Write>;
+  submit: (data: Input<'submitNce'>) => Promise<Write>;
+  approve: (data: Input<'approveNce'>) => Promise<Write>;
+  returnForRevision: (data: Input<'returnNce'>) => Promise<Write>;
+  cancel: (data: Input<'cancelNce'>) => Promise<Write>;
 }
 
-export const useNceStore = create<NceState>((set, get) => ({
+export const useNceStore = create<NceState>((set) => ({
   records: [],
-
-  load: async () => set({ records: await window.qcApi.listNceRecords() }),
-  latestSigmaBias: async (testId, level) => latestNceSigmaBias(await window.qcApi.listSigmaPeriods(testId), level),
-
-  // Không tự nạp lại sau khi ghi (kế hoạch kiến trúc D.1): main báo `actions`
-  // sau commit và trang Khắc phục sự cố nạp lại qua `useStoreInvalidation` — tự nạp ở đây làm
-  // danh sách nạp HAI lần. Không chỗ gọi nào đọc danh sách ngay sau `await`.
-  create: async (data) => {
-    const result = await window.qcApi.createNce({ data });
-    return result;
+  queue: [],
+  users: [],
+  load: async () => {
+    const [records, queue, users] = await Promise.all([window.qcApi.listNce(), window.qcApi.listNceQueue(), window.qcApi.listNceUsers()]);
+    set({ records, queue, users });
   },
-  saveProtocol: async (id, dueDate, protocol) => {
-    const result = await window.qcApi.saveNceProtocol({ data: { id, dueDate, protocol } });
-    return result;
-  },
-  approve: async (id) => {
-    const result = await window.qcApi.approveNce({ data: { id } });
-    return result;
-  },
-  returnForRevision: async (id, note) => {
-    const result = await window.qcApi.returnNce({ data: { id, note } });
-    return result;
-  },
-  cancel: async (id, note) => {
-    const result = await window.qcApi.cancelNce({ data: { id, note } });
-    return result;
-  },
-  setCompletedDate: async (id, date) => {
-    const result = await window.qcApi.setNceCompletedDate({ data: { id, actionCompletedDate: date } });
-    return result;
-  },
-  markEffectiveness: async (id, status, residualRisk, note) => {
-    const result = await window.qcApi.markNceEffectiveness({ data: { id, status, residualRisk, note } });
-    return result;
-  },
-  setReleaseDecision: async (id, decision, note) => {
-    const result = await window.qcApi.setNceReleaseDecision({ data: { id, decision, note } });
-    return result;
-  },
-  setRerunEvidence: async (id, rerunPointId, note) => {
-    const result = await window.qcApi.setNceRerunEvidence({ data: { id, rerunPointId, note } });
-    return result;
-  },
-  reopen: async (id, note) => {
-    const result = await window.qcApi.reopenNce({ data: { id, note } });
-    return result;
-  },
+  get: (id) => window.qcApi.getNce(id),
+  previewRelease: (id, rerun, lotChangeNote) => window.qcApi.previewNceRelease({ data: { id, rerun, lotChangeNote } }),
+  create: (data) => window.qcApi.createNce({ data }),
+  attachRun: (data) => window.qcApi.attachNceRun({ data }),
+  update: (data) => window.qcApi.updateNce({ data }),
+  addAction: (data) => window.qcApi.addNceAction({ data }),
+  updateAction: (data) => window.qcApi.updateNceAction({ data }),
+  completeAction: (data) => window.qcApi.completeNceAction({ data }),
+  cancelAction: (data) => window.qcApi.cancelNceAction({ data }),
+  recordPatientImpact: (data) => window.qcApi.recordNcePatientImpact({ data }),
+  release: (data) => window.qcApi.releaseNce({ data }),
+  reviewEffectiveness: (data) => window.qcApi.reviewNceEffectiveness({ data }),
+  submit: (data) => window.qcApi.submitNce({ data }),
+  approve: (data) => window.qcApi.approveNce({ data }),
+  returnForRevision: (data) => window.qcApi.returnNce({ data }),
+  cancel: (data) => window.qcApi.cancelNce({ data }),
 }));
-
-

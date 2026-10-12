@@ -62,7 +62,7 @@ test('đáp án CUSUM tái lập được bằng bộ tính tham chiếu', () =>
     const zs = [];
     const resets = new Set();
     for (const step of item.runs) {
-      if (step.nceEffective) resets.add(zs.length);
+      if (step.nceRelease) resets.add(step.nceRelease.verifyRun - 1);
       else zs.push(step.z[1]);
     }
     const rows = ref.tabularCusum(zs, item.cusum.k, item.cusum.h, resets);

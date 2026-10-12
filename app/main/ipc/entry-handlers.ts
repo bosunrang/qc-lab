@@ -11,6 +11,7 @@ import { listPreviousLotSeriesData } from '../db/lot-lineage';
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
 // đợt 2026-09-10 đi gỡ.
 import type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
+import type { NceRunSnapshot } from '../domain/nce/types';
 
 export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries };
 import { uid } from '../domain/text-utils';
@@ -18,15 +19,19 @@ import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPo
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
 import { readGlobalRules } from '../db/rule-settings';
 import { parseRuleActions, makeIsOnLayered, makeRuleActionLayered, parseRuleScopes, makeScopeOf } from '../domain/rule-config';
-import { errorClass, WG_RULE_REGISTRY } from '../domain/westgard-rules';
 import { evaluateRangeCandidate, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
 import { isDateInLockedPeriod } from '../db/period-locks';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
-import { isoLocalDateAfter } from '../domain/local-date';
+import { isoLocalDate } from '../domain/local-date';
 import { initialsFromName } from '../domain/name-initials';
 import { nextNceId } from '../db/nce-ids';
+import { insertNceRecord, insertNceRun, openRecordOfRun, readNceConfig } from '../db/nce-repository';
+import { nceRunSnapshot } from '../db/nce-evaluation';
+import { nceErrorClass } from '../domain/nce/tier';
+import { emptyChecklist } from '../domain/nce/update';
+import { defaultNceDueDate } from '../domain/nce/config';
 import { type Actor, type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
 
@@ -267,9 +272,16 @@ export function createEntryHandlers(db: Db) {
       verdict: active.byPoint.get(point)?.level || 'ok',
       runRejected: (rejectedRuns.get(qcRunKey(point))?.length ?? 0) > 0,
     })));
-    const systematic = new Set(WG_RULE_REGISTRY.filter((rule) => rule.err === 'SE').map((rule) => rule.id));
-    const nce = (db.prepare("SELECT nce_id,rule FROM actions WHERE test_id=? AND level=? AND record_status<>'cancelled' ORDER BY date DESC,created_at DESC").all(testId, level) as { nce_id: string; rule: string }[])
-      .find((action) => action.rule.split(',').map((rule) => rule.trim()).some((rule) => systematic.has(rule)));
+    // Cổng an toàn sai số hệ thống (D-12): có hồ sơ NCE sai số hệ thống CHƯA
+    // ĐÓNG của xét nghiệm, hoặc hồ sơ (kể cả đã đóng) có lần chạy hỏng chứa
+    // điểm của đúng mức này trong lô đang dùng. Hồ sơ cũ ở lô khác không còn
+    // bật cổng mãi mãi (sửa R-12).
+    const nce = db.prepare(`SELECT n.nce_id FROM nce_records n
+      WHERE n.test_id=? AND n.error_class='SE' AND n.status<>'cancelled'
+        AND (n.status<>'closed' OR EXISTS (
+          SELECT 1 FROM nce_runs r JOIN qc_points p ON p.test_id=r.test_id AND p.date=r.date AND p.run_id=r.run_id
+          WHERE r.nce_record_id=n.id AND r.role<>'rerun' AND p.level=? AND p.lot=?))
+      ORDER BY n.detected_at DESC, n.created_at DESC LIMIT 1`).get(testId, level, lot) as { nce_id: string } | undefined;
     const tea = test.tea != null && test.tea > 0 ? test.tea : null;
     return { ok: true, data: {
       testId, level, lot, source: config.applied,
@@ -280,16 +292,6 @@ export function createEntryHandlers(db: Db) {
       eligible: !!candidate?.eligible,
       canRevert: config.applied === 'lab' && config.mfg_mean != null && config.mfg_sd != null && config.mfg_sd > 0,
     } };
-  }
-
-  function createRangeAction(testId: string, level: number, lot: string, rule: string, reason: string, actor: Actor, detail: Record<string, unknown>): void {
-    const id = uid(), now = nowIso();
-    const nceId = nextNceId(db, now.slice(0, 10));
-    db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,rule,error_type,nce_id,protocol_version,approval_status,effectiveness_status,record_status,detail_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,3,'pending','pending','active',?)`)
-      // `error_type` chỉ chứa mã SE/RE — hồ sơ quản lý dải KHÔNG phân loại sai số
-      // (loại việc đã nằm ở cột `rule` và cờ `rangeWorkflow` trong `detail_json`).
-      .run(id, now.slice(0, 10), now, now, actor.userId, actor.username, testId, level, lot, rule, '', nceId, JSON.stringify({ correction: reason, rangeWorkflow: true, ...detail }));
   }
 
   const applyLabRange = writeCommand(db, 'applyLabRange', 'write', (w, input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): IpcResult<RangeCandidateView> => {
@@ -328,11 +330,8 @@ export function createEntryHandlers(db: Db) {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
       const selection = manual ? 'chỉnh thủ công' : 'dải đề xuất';
-      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Thiết lập dải QC mới', reason, actor, {
-        selection, proposed: fresh.data.proposed, applied: p,
-      });
       tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
-      tx.changed(['test_levels', 'actions'], [fresh.data.testId]);
+      tx.changed(['test_levels'], [fresh.data.testId]);
     });
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   });
@@ -356,9 +355,8 @@ export function createEntryHandlers(db: Db) {
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
-      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor, { selection: 'nhà sản xuất', applied: { mean: m, sd } });
       tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
-      tx.changed(['test_levels', 'actions'], [fresh.data.testId]);
+      tx.changed(['test_levels'], [fresh.data.testId]);
     });
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   });
@@ -458,37 +456,43 @@ export function createEntryHandlers(db: Db) {
       const index = history.findIndex((item) => item.id === pointId);
       if (index >= 0) view = { ...history[index], verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
     }
-    const rules = view ? Array.from(new Set(view.rules)) : [];
-    const rule = rules.length ? rules.join(', ') : 'Không có luật Westgard';
-    const qcVerdict = view && (view.verdict === 'warn' || view.verdict === 'rej') ? view.verdict : 'invalid';
     const kindLabel = kind === 'analytical' ? 'Kết quả QC thực tế không hợp lệ' : kind === 'data-entry' ? 'Nhập sai dữ liệu' : '';
     const composedReason = kindLabel ? (reason ? `${kindLabel} — ${reason}` : kindLabel) : reason;
+    // Hồ sơ NCE theo LẦN CHẠY (D-01): dùng lại hồ sơ đang xử lý của chính lần
+    // chạy này; không có thì chụp lần chạy TRƯỚC khi đánh dấu hủy để làm lần
+    // khởi đầu. Điểm ngoài tập đang vận hành (lô song song/lịch sử) lấy kết
+    // luận đã tính ở trên.
+    const existingNce = openNce ? openRecordOfRun(db, point.test_id, point.date, point.run_id) : undefined;
+    let snapshot: NceRunSnapshot | null = null;
+    if (openNce && !existingNce) {
+      const taken = nceRunSnapshot(db, point.test_id, { date: point.date, runId: point.run_id });
+      snapshot = { ...taken, points: taken.points.map((p) => p.pointId === pointId && p.verdict === 'none' && view
+        ? { ...p, verdict: view.verdict, rules: Array.from(new Set(view.rules)) } : p) };
+    }
     const mutation = w.commit((tx) => {
       db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=? WHERE id=?')
         .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, pointId);
       tx.audit('Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}`, test ? test.name : '');
       let nceId: string | null = null, reusedAction = false, createdAction = false;
-      if (openNce) {
-        // Dùng lại hồ sơ NCE ĐANG MỞ của CHÍNH điểm này nếu có (chưa huỷ,
-        // chưa duyệt), tránh mở trùng cho cùng một lần vi phạm.
-        const existing = db.prepare("SELECT nce_id FROM actions WHERE point_id=? AND record_status<>'cancelled' AND approval_status<>'approved' ORDER BY created_at DESC LIMIT 1")
-          .get(pointId) as { nce_id: string } | undefined;
-        if (existing) { nceId = existing.nce_id; reusedAction = true; }
-        else {
-          const id = uid();
-          nceId = nextNceId(db, nowIso().slice(0, 10));
-          const dueDate = isoLocalDateAfter(7);
-          const correction = `Hủy điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}. Lý do: ${composedReason}`;
-          const now = nowIso();
-          db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,point_id,rule,error_type,qc_verdict,nce_id,protocol_version,approval_status,effectiveness_status,record_status,due_date,detail_json)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,3,'pending','pending','active',?,?)`)
-      .run(id, point.date, now, now, actor.userId, actor.username, point.test_id, point.level, point.lot, pointId, rule, errorClass(rules), qcVerdict, nceId, dueDate,
-              JSON.stringify({ correction, openedFromVoid: true }));
-          tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ hủy điểm QC`, test ? test.name : '');
-          createdAction = true;
-        }
+      if (openNce && existingNce) { nceId = existingNce.nce_id; reusedAction = true; }
+      else if (openNce && snapshot) {
+        const id = uid(), now = nowIso(), today = isoLocalDate();
+        nceId = nextNceId(db, today);
+        const label = `Hủy điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}`;
+        // Người hủy là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
+        // tự mở không còn lọt khỏi cảnh báo quá hạn (sửa R-11). Có giữ kết quả
+        // hay không thì chưa biết, phải ghi trước khi cho chạy lại.
+        insertNceRecord(db, {
+          id, nceId, source: 'iqc', phase: 'exam', testId: point.test_id, detectedAt: today,
+          description: `${label}. Lý do: ${composedReason}`, correction: `${label}. Lý do: ${composedReason}`, holdResults: null,
+          ownerUserId: actor.userId, dueDate: defaultNceDueDate(today, '', readNceConfig(db)),
+          errorClass: nceErrorClass([{ role: 'trigger', snapshot }]), checklistJson: JSON.stringify(emptyChecklist('iqc')),
+        }, actor, now);
+        insertNceRun(db, id, 'trigger', snapshot, actor, now);
+        tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ hủy điểm QC`, test ? test.name : '');
+        createdAction = true;
       }
-      tx.changed(createdAction ? ['qc_points', 'actions'] : ['qc_points'], [point.test_id]);
+      tx.changed(createdAction ? ['qc_points', 'nce_records'] : ['qc_points'], [point.test_id]);
       return { nceId, reusedAction };
     });
     return { ok: true, data: { id: pointId, nceId: mutation.nceId, reusedAction: mutation.reusedAction } };

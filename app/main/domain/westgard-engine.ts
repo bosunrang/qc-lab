@@ -4,6 +4,7 @@
 import { WG_RUN_RULES, defaultRuleAction, wgScanRuns } from './westgard-rules';
 import type { RuleAction } from './rule-config';
 import { compareQcRunKey, qcRunKey } from './sort-order';
+import { qcEpochOf, type QcCut } from './qc-cuts';
 
 export interface StatsResult { n: number; m: number; sd: number; cv: number }
 
@@ -280,17 +281,16 @@ export function rejectingRules(rules: readonly string[], actionOf?: (rule: strin
 export function combinedWestgardByPoint<T extends QcPointLike>(
   levelSets: readonly MultiLevelSet<T>[], within: (rule: string) => boolean, across: (rule: string) => boolean,
   actionOf?: (rule: string) => RuleAction,
-  resetDates: readonly string[] = [],
+  cuts: readonly QcCut[] = [],
 ): Map<T, CombinedPointFlag> {
-  // Ngày hoàn thành khắc phục là ngày cuối của giai đoạn cũ. Không ghép
-  // bằng chứng qua ranh giới này, và không thay đổi kết luận giai đoạn cũ.
-  if (resetDates.length) {
-    const cuts = [...new Set(resetDates)].sort();
+  // Mốc cắt sau sự cố (`qc-cuts.ts`): không ghép bằng chứng qua ranh giới,
+  // và không thay đổi kết luận của giai đoạn trước mốc.
+  if (cuts.length) {
     const epochs = new Map<number, MultiLevelSet<T>[]>();
     for (const set of levelSets) {
       const parts = new Map<number, T[]>();
       for (const point of set.pts) {
-        const epoch = cuts.filter(date => date < String(point.date || '')).length;
+        const epoch = qcEpochOf(point, cuts);
         const pts = parts.get(epoch) || []; pts.push(point); parts.set(epoch, pts);
       }
       for (const [epoch, pts] of parts) {

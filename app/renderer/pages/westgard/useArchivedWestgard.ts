@@ -122,7 +122,7 @@ export function useArchivedWestgard({ active, lotGroups, lots, tests, instrument
 
   // Tab lưu trữ không dùng `analysisByLevel`, nên phải có nhịp nạp lại riêng
   // khi điểm QC, lô hoặc Mean/SD của xét nghiệm đang xem vừa thay đổi.
-  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], archivedTestId || undefined, () => {
+  useStoreInvalidation(['tests', 'test_levels', 'qc_points', 'qc_lots', 'lot_groups', 'nce_cuts', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions'], archivedTestId || undefined, () => {
     if (active && archivedGroupId) setArchivedRefresh((revision) => revision + 1);
   });
 

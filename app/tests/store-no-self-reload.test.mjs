@@ -38,17 +38,13 @@ test('Người dùng: tạo, sửa, xoá không tự nạp lại danh sách', as
 
 test('NCE: mọi thao tác ghi không tự nạp lại danh sách', async () => {
   const { store, calls } = storeFrom('nce-store.ts', 'useNceStore', {});
+  const base = { id: 'n1', expectedVersion: 1 };
   await store.create({});
-  await store.saveProtocol('n1', '', {});
-  await store.approve('n1');
-  await store.returnForRevision('n1', 'x');
-  await store.cancel('n1', 'x');
-  await store.setCompletedDate('n1', '2026-09-01');
-  await store.markEffectiveness('n1', 'effective', '', '');
-  await store.setReleaseDecision('n1', 'held', 'x');
-  await store.setRerunEvidence('n1', 'p1', '');
-  await store.reopen('n1', '');
-  assert.equal(calls.filter((name) => name === 'listNceRecords').length, 0, calls.join(', '));
+  for (const name of ['attachRun', 'update', 'addAction', 'updateAction', 'completeAction', 'cancelAction', 'recordPatientImpact', 'release', 'reviewEffectiveness', 'submit', 'approve', 'returnForRevision', 'cancel']) {
+    await store[name](base);
+  }
+  assert.equal(calls.length, 14, calls.join(', '));
+  assert.equal(calls.filter((name) => ['listNce', 'listNceQueue', 'listNceUsers'].includes(name)).length, 0, calls.join(', '));
 });
 
 test('Khoá kỳ báo cáo không tự nạp lại danh sách kỳ khoá', async () => {

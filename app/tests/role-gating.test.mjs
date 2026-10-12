@@ -62,7 +62,7 @@ assertForbidden(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-
 assertForbidden(entry.voidPoint({ data: { pointId: 'bat-ky', reason: 'Ly do du dai' } }, viewer), 'viewer voidPoint');
 assertForbidden(sigma.savePeriod({ testId: test.id, period: '2026-09', tea: 10, levels: [{ level: 1, cv: 3 }] }, viewer), 'viewer saveSigmaPeriod');
 assertForbidden(westgard.saveRuleAction(test.id, '1-3s', 'inactive', viewer), 'viewer saveRuleAction');
-assertForbidden(nce.create({ data: { testId: test.id, level: 1, date: '2026-09-01', ruleId: '1-3s', errorType: 'SE', correction: 'Chay lai QC', dueDate: '2026-09-05' } }, viewer), 'viewer createNce');
+assertForbidden(nce.createNce({ data: { source: 'other', description: 'Hồ sơ đào tạo thiếu chữ ký', correction: 'Bổ sung hồ sơ đào tạo', holdResults: false, detectedAt: '2026-09-01', ownerUserId: 'u-tech' } }, viewer), 'viewer createNce');
 assertForbidden(reagent.saveMetadata({ id: comparison.id, data: { reagent: 'Doi ten' } }, viewer), 'viewer saveReagentMetadata');
 assertForbidden(reagent.removeComparison({ id: comparison.id }, viewer), 'viewer removeReagentComparison');
 assertForbidden(report.lockPeriod({ data: { ym: '2026-09' } }, viewer), 'viewer lockPeriod');
@@ -94,7 +94,8 @@ assert.equal(techPoint.ok, true, 'KTV phai them duoc diem QC');
 assert.equal(westgard.saveRuleAction(test.id, '1-2s', 'alert', tech).ok, true, 'KTV phai cap nhat duoc hanh dong luat Westgard');
 assert.equal(sigma.savePeriod({ testId: test.id, period: '2026-09', tea: 10, levels: [{ level: 1, cv: 3 }] }, tech).ok, true, 'KTV phai luu duoc ky Sigma');
 assert.equal(reagent.saveMetadata({ id: comparison.id, data: { reagent: 'KTV sua ten' } }, tech).ok, true, 'KTV phai sua duoc so sanh hoa chat');
-const techNce = nce.create({ data: { testId: test.id, level: 1, date: '2026-09-01', ruleId: '1-3s', errorType: 'SE', correction: 'Chay lai QC sau hieu chuan', dueDate: '2026-09-05' } }, tech);
+db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-tech','ktv','Ky thuat vien','technician',1)").run();
+const techNce = nce.createNce({ data: { source: 'other', description: 'Hồ sơ đào tạo thiếu chữ ký', correction: 'Bổ sung hồ sơ đào tạo', holdResults: false, detectedAt: '2026-09-01', ownerUserId: 'u-tech' } }, tech);
 assert.equal(techNce.ok, true, 'KTV phai lap duoc ho so NCE');
 
 // ── 4) technician: KHÔNG đụng được cấu hình/khoá kỳ/xoá/cài đặt/nhật ký ──

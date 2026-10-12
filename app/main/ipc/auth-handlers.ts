@@ -11,14 +11,15 @@ import {
   validateUserCreate, validateUserUpdate, validateNewPassword, validateLoginInput, validateSetAvatar,
   type UserCreateInput, type UserUpdateInput, type LoginInput,
 } from '../domain/auth-validation';
-import { roleLabel, roleOf } from '../domain/page-roles';
+import { canWriteRole, roleLabel, roleOf } from '../domain/page-roles';
+import { parseNceCapabilities } from '../domain/nce/permissions';
 import { type Actor, type IpcResult, type PermissionDenied, writeAudit, withTransaction } from './shared';
 import { writeCommand, writeCommandAsync } from './write-command';
 
 interface UserRow {
   id: string; username: string; name: string; initials: string; external_code: string;
   role: string; page_perms_json: string | null; pass_hash: string; active: number;
-  must_change_password: number; avatar: string;
+  must_change_password: number; avatar: string; capabilities_json: string;
 }
 
 // `PublicUser` (và các kiểu dữ liệu dùng chung khác) có NGUỒN DUY NHẤT là
@@ -50,6 +51,7 @@ function toPublicUser(row: UserRow): PublicUser {
     role: roleOf(row.role),
     pagePerms: parsePagePerms(row.page_perms_json), active: !!row.active, mustChangePassword: !!row.must_change_password,
     avatar: row.avatar || '',
+    capabilities: parseNceCapabilities(row.capabilities_json),
   };
 }
 
@@ -191,6 +193,29 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
   });
 
+  /** Cấp/thu quyền nghiệp vụ NCE (`nce.release`, `nce.approve`) cho một tài
+   * khoản. Người chỉ xem không được cấp: quyền NCE là quyền ghi. Quản trị viên
+   * mặc nhiên có cả hai, nên lưu cho tài khoản quản trị không đổi gì thực tế
+   * nhưng vẫn được ghi để giữ lựa chọn khi vai trò đổi. */
+  const setNceCapabilities = writeCommand(db, 'setNceCapabilities', adminOnly, (w, input: { id: unknown; capabilities: unknown }): IpcResult<PublicUser> => {
+    const id = String(input?.id || '');
+    const existing = db.prepare('SELECT * FROM users WHERE id=?').get(id) as UserRow | undefined;
+    if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy người dùng.' } };
+    const requested = Array.isArray(input?.capabilities) ? input.capabilities : null;
+    if (!requested) return { ok: false, error: { code: 'invalid-capabilities', message: 'Danh sách quyền NCE không hợp lệ.' } };
+    const capabilities = parseNceCapabilities(requested).sort();
+    if (capabilities.length !== new Set(requested).size) return { ok: false, error: { code: 'invalid-capabilities', message: 'Có mã quyền NCE không hợp lệ.' } };
+    if (capabilities.length && !canWriteRole(existing.role)) return { ok: false, error: { code: 'viewer-capabilities', message: 'Tài khoản chỉ xem không được cấp quyền NCE.' } };
+    const before = parseNceCapabilities(existing.capabilities_json).sort();
+    if (JSON.stringify(before) === JSON.stringify(capabilities)) return w.noChange(toPublicUser(existing));
+    w.commit((tx) => {
+      db.prepare('UPDATE users SET capabilities_json=? WHERE id=?').run(JSON.stringify(capabilities), id);
+      tx.audit('Phân quyền NCE', `"${existing.username}": ${capabilities.length ? capabilities.join(', ') : 'không có quyền NCE riêng'}`, existing.username);
+      tx.changed(['users']);
+    });
+    return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
+  });
+
   /** Admin đặt lại mật khẩu cho người khác — luôn bật must_change_password
    * để buộc đổi lại ở lần đăng nhập kế tiếp, không âm thầm giữ mật khẩu admin
    * vừa gõ làm mật khẩu lâu dài của người dùng. */
@@ -291,7 +316,7 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: { id } };
   });
 
-  return { hasAnyUsers, getUser, listUsers, bootstrapAdmin, login, createUser, updateUser, deleteUser, resetPassword, changeOwnPassword, verifyOwnPassword, setAvatar, clearAvatar };
+  return { hasAnyUsers, getUser, listUsers, bootstrapAdmin, login, createUser, updateUser, deleteUser, resetPassword, setNceCapabilities, changeOwnPassword, verifyOwnPassword, setAvatar, clearAvatar };
 }
 
 export type AuthHandlers = ReturnType<typeof createAuthHandlers>;

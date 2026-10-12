@@ -87,9 +87,9 @@ nay PHẢI fail (nó khẳng định trạng thái lỗi), đúng như thiết k
 
 ## Quyết định 12/10/2026 — điểm bị loại "đã xử lý" theo NCE mới
 
-Chốt cùng kế hoạch làm lại NCE (`docs/NCE-REDESIGN-2026-10-12.md`, D-11). Chưa
-triển khai; mã hiện hành vẫn đọc bảng `actions` cho tới giai đoạn 2 của kế
-hoạch đó.
+Chốt cùng kế hoạch làm lại NCE (`docs/NCE-REDESIGN-2026-10-12.md`, D-11). Đã
+triển khai ở giai đoạn 2 của kế hoạch đó qua `nceResolvedPointIds()`
+(`db/nce-repository.ts`); hồ sơ đóng đặt `qc_resolved = 1`.
 
 - **Hiện nay:** `listCohorts()` coi một điểm bị loại là đã xử lý khi có hồ sơ
   `actions` gắn đúng `point_id`, `record_status='active'`,

@@ -96,7 +96,7 @@ test('Tổng quan không treo ở trạng thái tải khi IPC lỗi, và nạp l
   let fail = true;
   globalThis.window = { qcApi: {
     listTestSummaries: async () => { if (fail) throw new Error('IPC hỏng'); return []; },
-    listNceRecords: async () => [], listTests: async () => [], listPanels: async () => [], listLots: async () => [],
+    listNce: async () => [], listTests: async () => [], listPanels: async () => [], listLots: async () => [],
   } };
   try {
     const { useDashboardStore } = await load('/store/dashboard-store.ts');

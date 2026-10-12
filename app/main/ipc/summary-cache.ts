@@ -13,7 +13,7 @@ import type { StoreChangedPayload } from './shared';
 
 /** Bảng mà mỗi dòng thuộc đúng một xét nghiệm, và mọi chỗ ghi các bảng này
  * báo kèm đủ `testIds` (đã rà từng lời gọi `notifyChanged`, 2026-09-26). */
-export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points', 'test_levels', 'tests', 'actions']);
+export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points', 'test_levels', 'tests', 'nce_cuts']);
 
 /** Bảng mà phần tóm tắt KHÔNG đọc tới (đã đối chiếu các câu SQL của
  * `listTestSummaries` và các hàm nó gọi). Bảng không có ở đây và cũng không ở
@@ -21,6 +21,8 @@ export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points'
 export const SUMMARY_IGNORED_TABLES: ReadonlySet<string> = new Set([
   'activity', 'users', 'lab', 'tea_refs', 'reagent_tests', 'report_templates',
   'period_locks', 'sigma_data', 'planned_targets', 'lot_transitions',
+  // Tóm tắt chỉ đọc mốc cắt `nce_cuts`; nội dung hồ sơ NCE không đổi kết quả Westgard.
+  'nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions',
 ]);
 
 export class TestSummaryCache<T> {

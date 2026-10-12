@@ -62,23 +62,38 @@ test('đầu vào cho chạy lại', () => {
 
 test('ca 5: rerun đạt nhưng chưa có quyết định ảnh hưởng bệnh nhân thì chưa cho chạy lại', () => {
   const open = dossier({ status: 'open', release: null, patientImpacts: [], runs: [{ role: 'trigger', snapshot: triggerRun() }] });
-  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  const rerun = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
   assert.deepEqual(codes(nceReleaseMissing(open, rerun)), ['patient-impact']);
   assert.deepEqual(codes(nceReleaseMissing(open, null)), ['missing-rerun', 'patient-impact']);
 });
 
 test('chỉ cho chạy lại hồ sơ đang xử lý', () => {
-  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  const rerun = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
   for (const status of ['released', 'pending_approval', 'closed', 'cancelled']) {
     assert.deepEqual(codes(nceReleaseMissing(dossier({ status }), rerun)), ['status'], status);
   }
 });
 
 test('hồ sơ IQC chưa gắn lần chạy bị loại thì chưa cho chạy lại', () => {
-  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  const rerun = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
   assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', runs: [] }), rerun)), ['no-trigger']);
   // Nguồn khác IQC không cần lần chạy, chỉ cần quyết định ảnh hưởng bệnh nhân.
   assert.deepEqual(nceReleaseMissing(dossier({ status: 'open', source: 'instrument', runs: [] }), null), []);
+});
+
+test('chưa ghi có giữ kết quả hay không thì chưa cho chạy lại', () => {
+  const rerun = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', holdResults: null }), rerun)), ['hold']);
+});
+
+test('hồ sơ không phải IQC có thể kèm lần chạy QC xác minh', () => {
+  const withRun = validateNceReleaseInput({ reason: 'Đã hiệu chuẩn lại, QC xác minh đạt', rerun: { date: '2026-10-02', runId: '1' }, notApplicable: true }, 'calibration');
+  assert.equal(withRun.ok, true);
+  assert.deepEqual(withRun.data.rerun, { date: '2026-10-02', runId: '1' });
+  assert.equal(withRun.data.notApplicable, false, 'đã có lần chạy xác minh thì không phải "không cần dừng dịch vụ"');
+  assert.equal(validateNceReleaseInput({ reason: 'Đã hiệu chuẩn lại, QC xác minh đạt', rerun: { date: 'x' } }, 'calibration').code, 'invalid-rerun');
+  const bad = checkNceRerun({ testId: 'T1', trigger: null, repeatRejects: [], candidate: run('2026-10-02', '1', [point(1)]), lotChangeNote: '', requiredLevels: [1, 2] });
+  assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', source: 'calibration', runs: [] }), bad)), ['rerun-missing-level']);
 });
 
 test('ca 8: cho chạy lại được khi hành động khắc phục chưa xong (sửa R-01)', () => {
@@ -86,7 +101,7 @@ test('ca 8: cho chạy lại được khi hành động khắc phục chưa xong
     status: 'open', release: null, effectivenessReviews: [],
     actions: [{ ...dossier().actions[0], status: 'open', doneAt: '', doneByUserId: '', evidence: '' }],
   });
-  const rerun = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  const rerun = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
   assert.deepEqual(nceReleaseMissing(open, rerun), []);
 });
 
@@ -172,10 +187,10 @@ test('tầng xử lý nhanh không đòi nguyên nhân, hành động hay đánh
 
 test('duyệt kiểm lại bằng chứng rerun trên dữ liệu hiện tại', () => {
   const pending = dossier({ status: 'pending_approval' });
-  const okRecheck = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
+  const okRecheck = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
   assert.deepEqual(nceApproveMissing(pending, okRecheck), []);
   const voided = goodRerun();
-  const recheck = checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate: { ...voided, points: [voided.points[0], { ...voided.points[1], voided: true }] }, lotChangeNote: '' });
+  const recheck = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: { ...voided, points: [voided.points[0], { ...voided.points[1], voided: true }] }, lotChangeNote: '' });
   assert.deepEqual(codes(nceApproveMissing(pending, recheck)), ['recheck-rerun-missing-level']);
   assert.deepEqual(codes(nceApproveMissing(dossier(), okRecheck)), ['status']);
 });

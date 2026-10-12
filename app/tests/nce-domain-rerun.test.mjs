@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const { checkNceRerun, nceTriggerMissing } = require('../../app-dist/main/domain/nce/rerun.js');
 const { nceSuspectWindow, validateNcePatientImpact, ncePatientImpactMissing } = require('../../app-dist/main/domain/nce/patient-impact.js');
 
-const check = (candidate, extra = {}) => checkNceRerun({ trigger: triggerRun(), repeatRejects: [], candidate, lotChangeNote: '', ...extra });
+const check = (candidate, extra = {}) => checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate, lotChangeNote: '', ...extra });
 const codes = (result) => result.problems.map((p) => p.code);
 
 test('rerun đạt đủ mức, sau sự cố, cùng lô được chấp nhận', () => {
@@ -49,7 +49,7 @@ test('ca 3: thiếu mức, có mức bị loại, có điểm đã hủy hoặc 
 test('ca 3: mức của lần khởi đầu bị hủy sau đó vẫn phải được chạy lại', () => {
   const trigger = triggerRun();
   const voidedTrigger = { ...trigger, points: [trigger.points[0], { ...trigger.points[1], voided: true }] };
-  const result = checkNceRerun({ trigger: voidedTrigger, repeatRejects: [], candidate: run('2026-10-02', '1', [point(1)]), lotChangeNote: '' });
+  const result = checkNceRerun({ testId: 'T1', trigger: voidedTrigger, repeatRejects: [], candidate: run('2026-10-02', '1', [point(1)]), lotChangeNote: '' });
   assert.deepEqual(codes(result), ['rerun-missing-level']);
 });
 
@@ -65,6 +65,15 @@ test('ca 4: rerun khác lô phải có giải thích', () => {
   const withNote = check(candidate, { lotChangeNote: 'Lọ QC cũ hỏng, mở lô mới đã thiết lập dải' });
   assert.equal(withNote.ok, true);
   assert.deepEqual(withNote.lotChangedLevels, [2]);
+});
+
+test('hồ sơ không phải IQC: lần chạy xác minh từ ngày phát hiện, đủ mức đang vận hành', () => {
+  const verify = (candidate, over = {}) => checkNceRerun({ testId: 'T1', trigger: null, repeatRejects: [], candidate, lotChangeNote: '', requiredLevels: [1, 2], notBeforeDate: '2026-10-02', ...over });
+  assert.equal(verify(run('2026-10-02', '1', [point(1), point(2)])).ok, true);
+  assert.deepEqual(codes(verify(run('2026-10-01', '9', [point(1), point(2)]))), ['rerun-too-early']);
+  assert.deepEqual(codes(verify(run('2026-10-02', '1', [point(1)]))), ['rerun-missing-level']);
+  assert.deepEqual(verify(run('2026-10-02', '1', [point(1), point(2, { lot: 'khác' })])).lotChangedLevels, [], 'không có lần khởi đầu để so lô');
+  assert.deepEqual(codes(verify(run('2026-10-02', '1', [point(1)]), { requiredLevels: [] })), ['rerun-no-levels']);
 });
 
 test('D-14: lần chạy chỉ có cảnh báo không mở được NCE', () => {

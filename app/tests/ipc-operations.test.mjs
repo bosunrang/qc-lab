@@ -64,8 +64,13 @@ function setup({ backup, pickOpen = async () => null } = {}) {
   return { db, auth, business, desktop, tables, session, printed, lan: createLanInvoker(tables) };
 }
 
-/** KTV được tạo NCE; vai trò chỉ xem thì không. */
-const NCE_INPUT = { data: { date: '2026-09-25', correction: 'Chạy lại mẫu QC' } };
+/** KTV được tạo NCE; vai trò chỉ xem thì không. Người phụ trách phải là tài
+ * khoản có thật: test nào tạo NCE thành công gọi `addTech(db)` trước. */
+const NCE_INPUT = { data: { source: 'other', description: 'Hồ sơ đào tạo thiếu chữ ký', correction: 'Bổ sung hồ sơ đào tạo', holdResults: false, detectedAt: '2026-09-25', ownerUserId: 'u-tech' } };
+
+function addTech(db) {
+  db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-tech','ktv','Ky thuat vien','technician',1)").run();
+}
 
 function lastAudit(db) {
   return db.prepare('SELECT username, type FROM activity ORDER BY seq DESC LIMIT 1').get();
@@ -84,9 +89,10 @@ test('preload khớp đúng bảng thao tác: cùng tên hàm, cùng kênh, khô
 
 test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng phiên máy chính', async () => {
   const { tables, session, db } = setup();
+  addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 127);
+  assert.equal(handlers.size, 138);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -105,21 +111,22 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
   // 2026-09-25: máy trạm chỉ nhập liệu, quản trị làm trên máy chính). Sửa có
   // chủ đích, kèm lý do ghi tại dòng tương ứng trong bảng.
   assert.deepEqual(open, [
-    'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce', 'backupStatus',
-    'cancelNce', 'changeOwnPassword', 'clearAvatar', 'createNce', 'createReagentComparison',
-    'getFirebaseSettings', 'getLabProfile', 'getLisSettings', 'getLoginBrand', 'getRangeCandidate',
+    'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
+    'attachNceRun', 'backupStatus', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
+    'completeNceAction', 'createNce', 'createReagentComparison', 'getFirebaseSettings', 'getLabProfile',
+    'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getRangeCandidate',
     'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importLisResult',
     'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listInstruments',
-    'listLotGroups', 'listLotTransitions', 'listLots', 'listNceRecords', 'listPanels',
-    'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets', 'listPreviousEntryLotSeries',
-    'listPreviousLotBlocks', 'listReagentComparisons', 'listReagentQuickValues', 'listRuleScopes',
-    'listRuleSettings', 'listSigmaCohorts', 'listSigmaPeriods', 'listTeaRefs', 'listTestLevels',
-    'listTestSummaries', 'listTests', 'listVoidedEntryPoints', 'markNceEffectiveness',
-    'previewLotRename', 'pullLisQueue', 'queryPoints', 'queryReport', 'rejectLisResult',
-    'removeReagentQuickValue', 'renameSigmaPeriod', 'reopenNce', 'returnNce', 'revertManufacturerRange',
-    'saveNceProtocol', 'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig',
-    'setAvatar', 'setDayNote', 'setNceCompletedDate', 'setNceReleaseDecision', 'setNceRerunEvidence',
-    'verifyOwnPassword', 'voidPoint',
+    'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
+    'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
+    'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listReagentComparisons',
+    'listReagentQuickValues', 'listRuleScopes', 'listRuleSettings', 'listSigmaCohorts',
+    'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
+    'listVoidedEntryPoints', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
+    'queryReport', 'recordNcePatientImpact', 'rejectLisResult', 'releaseNce', 'removeReagentQuickValue',
+    'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewNceEffectiveness',
+    'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',
+    'setDayNote', 'submitNce', 'updateNce', 'updateNceAction', 'verifyOwnPassword', 'voidPoint',
   ]);
 });
 
@@ -156,6 +163,7 @@ test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và t�
 
 test('LAN chạy bằng actor của phiên HTTP, cổng quyền vẫn áp dụng', async () => {
   const { lan, session, db } = setup();
+  addTech(db);
   session.set(admin);
   const saved = await lan('createNce', [NCE_INPUT], tech);
   assert.equal(saved.ok, true);
@@ -231,7 +239,8 @@ test('phục hồi backup chỉ dùng tệp main vừa kiểm tra, không nhận
 });
 
 test('bản xem trước gắn cùng bảng nghiệp vụ, đọc phiên tại thời điểm gọi', async () => {
-  const { business, session } = setup();
+  const { business, session, db } = setup();
+  addTech(db);
   const api = bindOperations(business, sessionContext(() => session.get()));
   assert.equal((await api.listUsers()).error.code, 'unauthenticated');
   await assert.rejects(api.getLisSettings(), /Chưa đăng nhập/, 'hàm đọc vẫn ném lỗi như trước');

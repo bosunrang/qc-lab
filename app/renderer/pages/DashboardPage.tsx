@@ -18,9 +18,9 @@ import {
 import { useAuthStore } from '../store/auth-store';
 import { isAdmin } from '../lib/permissions';
 
-// Kiểu read-model đã gắn sẵn hồ sơ NCE của store (`OverdueAction` = NceRecord
+// Kiểu read-model đã gắn sẵn hồ sơ NCE của store (`OverdueAction` = NceRecordRow
 // + `testName` đã join) — `ReturnType<typeof f>` trần sẽ suy generic về đúng
-// ràng buộc `NceRecord` và làm mất `testName`.
+// ràng buộc `NceRecordRow` và làm mất `testName`.
 type Model = ReturnType<typeof buildDashboardViewModel<OverdueAction>>;
 
 const STATUS_TABS: ReadonlyArray<readonly ['all' | 'missing' | DashboardStatus, string]> = [
@@ -92,7 +92,7 @@ function FollowupPanel({ model }: { model: Model }) {
       ))}
       {overdue.map((record) => (
         <ShiftItem key={`o${record.id}`} tone="rej"
-          title={<>{record.nce_id || 'Hồ sơ khắc phục'} · {record.testName || record.rule || 'Sự cố'}</>}
+          title={<>{record.nce_id || 'Hồ sơ khắc phục'} · {record.testName || record.description || 'Sự cố'}</>}
           meta={<>{record.overdueLabel} · hạn {dateText(record.due_date)} · phụ trách {record.owner || '—'}</>}
           action={<button className="btn ghost sm" onClick={() => navigate('/actions', { state: { recordId: record.id } })}>Tiếp tục hồ sơ</button>} />
       ))}

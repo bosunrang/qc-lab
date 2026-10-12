@@ -72,8 +72,8 @@ test('trang lỗi khi hiển thị chỉ thay vùng nội dung; lỗi không đ�
     await app.evaluate(({ ipcMain }) => {
       const handlers = ipcMain._invokeHandlers;
       if (!(handlers instanceof Map)) throw new Error('ipcMain._invokeHandlers không còn là Map.');
-      globalThis.__nceList = handlers.get('nce:listRecords');
-      handlers.set('nce:listRecords', () => null);
+      globalThis.__nceList = handlers.get('nce:list');
+      handlers.set('nce:list', () => null);
     });
     await openPage(page, 'Khắc phục sự cố');
     const alert = page.locator('[role=alert]', { hasText: 'Trang này gặp lỗi khi hiển thị' });
@@ -81,7 +81,7 @@ test('trang lỗi khi hiển thị chỉ thay vùng nội dung; lỗi không đ�
     assert.match(await alert.innerText(), /Dữ liệu đã lưu không bị ảnh hưởng/);
     assert.equal(await page.getByRole('navigation', { name: 'Điều hướng chính' }).count(), 1, 'thanh bên còn nguyên');
 
-    await app.evaluate(({ ipcMain }) => { ipcMain._invokeHandlers.set('nce:listRecords', globalThis.__nceList); });
+    await app.evaluate(({ ipcMain }) => { ipcMain._invokeHandlers.set('nce:list', globalThis.__nceList); });
     await openPage(page, 'Tổng quan');
     await page.locator('main .head').first().waitFor();
     assert.equal(await alert.count(), 0, 'đổi trang thì hết trạng thái lỗi');

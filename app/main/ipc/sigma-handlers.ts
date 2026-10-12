@@ -3,6 +3,7 @@ import type { Test } from '../../shared/qc-api';
 import { sigmaMetric, uncertaintyBudget, eqaRoundBias, eqaRoundsStats, sigmaQualityDesign, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
 import { buildSigmaCohorts, type SigmaCohort, type SigmaCohortPoint } from '../domain/sigma-cohort';
 import { countOperationalLevels } from '../db/operational-levels';
+import { nceResolvedPointIds } from '../db/nce-repository';
 import { resolveTea, type SigmaTeaSourceCore, type TeaRefCore } from '../domain/sigma-tea-core';
 import { TEA_CATALOG_WITH_CLIA_ABSOLUTE } from '../domain/tea-catalog';
 import { isoLocalDate } from '../domain/local-date';
@@ -125,13 +126,11 @@ export function createSigmaHandlers(db: Db) {
    * `app_meta.westgardRules`): cổng duy nhất của cohort là
    * |z| > 3 tính từ snapshot của chính điểm, nó KHÔNG đọc bảng luật. Hệ quả
    * Thay đổi luật không làm thay đổi dữ liệu của cohort. Ảnh hưởng THẬT của
-   * việc đổi luật (điểm
-   * bị loại → có người mở NCE) đi vào đây qua `actions`, đã có sẵn.
-   *
-   * `actions` cũng được thu hẹp về đúng các dòng gắn điểm QC: hồ sơ quản lý
-   * dải hay NCE không gắn điểm không đổi được kết luận của nhóm. */
+   * việc đổi luật (điểm bị loại → có người mở NCE) đi vào đây qua tập điểm
+   * đã được hồ sơ NCE xử lý trọn vẹn (D-11, `nceResolvedPointIds()`): hồ sơ
+   * không gắn lần chạy QC không đổi được kết luận của nhóm. */
   function resolvedActionsDigest(testId: string): string {
-    return JSON.stringify(db.prepare("SELECT point_id,approval_status,effectiveness_status,record_status FROM actions WHERE test_id=? AND point_id IS NOT NULL AND point_id<>'' ORDER BY point_id").all(testId));
+    return JSON.stringify(nceResolvedPointIds(db, testId));
   }
   /** `actionsDigest` truyền vào để một lượt đọc nhiều kỳ/nhiều mức chỉ truy
    * vấn bảng `actions` MỘT lần: `listPeriods()` gọi hàm này cho từng mức của
@@ -243,13 +242,11 @@ export function createSigmaHandlers(db: Db) {
     const safeLevels = normalizedLevels.filter((level) => Number.isInteger(level) && level > 0);
     if (!safeLevels.length) return [];
     const rows = db.prepare('SELECT id,level,date,lot,val,voided,qc_mean,qc_sd FROM qc_points WHERE test_id=? ORDER BY level,date,run_id').all(testId) as unknown as SigmaCohortPoint[];
-    // Điểm mất kiểm soát ĐÃ được xử lý trọn vẹn (hồ sơ NCE duyệt xong và kết
-    // luận hiệu quả) thì không còn chặn nhóm — đúng tinh thần ISO/TS 20914:
+    // Điểm mất kiểm soát ĐÃ được xử lý trọn vẹn (hồ sơ NCE đã đóng và xử lý
+    // xong — D-11) thì không còn chặn nhóm — đúng tinh thần ISO/TS 20914:
     // dữ liệu IQC phải đại diện cho hoạt động thường quy SAU khi quản lý QC.
-    // Hồ sơ đang mở/đã huỷ/kết luận không hiệu quả đều KHÔNG tính là đã xử lý.
-    const resolved = new Set((db.prepare(
-      "SELECT point_id FROM actions WHERE test_id=? AND point_id IS NOT NULL AND point_id<>'' AND record_status='active' AND approval_status='approved' AND effectiveness_status='effective'",
-    ).all(testId) as { point_id: string }[]).map((row) => String(row.point_id)));
+    // Hồ sơ đang mở, chờ duyệt hoặc đã huỷ đều KHÔNG tính là đã xử lý.
+    const resolved = new Set(nceResolvedPointIds(db, testId));
     const actionsDigest = resolvedActionsDigest(testId);
     return buildSigmaCohorts(rows, period, safeLevels, isoLocalDate(), resolved).map(cohort => ({
       ...cohort, fingerprint: cohortFingerprint(testId, period, cohort.level, cohort.lot, actionsDigest),

@@ -8,6 +8,7 @@ const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
 const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
+import { createIqcNce, ensureUser } from './helpers/nce-flow.mjs';
 
 const db = openDatabase(':memory:');
 const config = createConfigHandlers(db);
@@ -92,13 +93,23 @@ const voidAnalytical = entry.voidPoint({ data: { pointId: p3.data.id, kind: 'ana
 assert.equal(voidAnalytical.ok, true, JSON.stringify(voidAnalytical));
 assert.equal(voidAnalytical.data.reusedAction, false);
 assert.ok(voidAnalytical.data.nceId, 'kind analytical phai tu mo 1 ho so NCE moi');
-const nceRecords = nce.listRecords();
-const opened = nceRecords.find(r => r.nce_id === voidAnalytical.data.nceId);
+const opened = nce.listNce().find(r => r.nce_id === voidAnalytical.data.nceId);
 assert.ok(opened, 'ho so NCE vua mo phai doc lai duoc');
-assert.equal(opened.point_id, p3.data.id);
-assert.equal(opened.rule, '1-3s');
-assert.equal(opened.qc_verdict, 'rej');
-assert.equal(opened.error_type, 'RE');
+assert.equal(opened.source, 'iqc');
+assert.equal(opened.error_class, 'RE');
+assert.equal(opened.status, 'open');
+// Hồ sơ tự mở có người phụ trách (người hủy) và hạn, nên được tính quá hạn (sửa R-11).
+assert.equal(opened.owner_user_id, actor.userId);
+assert.match(opened.due_date, /^\d{4}-\d{2}-\d{2}$/);
+assert.equal(opened.hold_results, null, 'chưa biết có giữ kết quả hay không, phải ghi trước khi cho chạy lại');
+const openedDossier = nce.getNce(opened.id, actor);
+assert.equal(openedDossier.runs.length, 1);
+assert.equal(openedDossier.runs[0].role, 'trigger');
+assert.equal(openedDossier.runs[0].run_id, '2026-08-04-1');
+const triggerPoint = JSON.parse(openedDossier.runs[0].snapshot_json).points.find((p) => p.pointId === p3.data.id);
+assert.equal(triggerPoint.verdict, 'rej', 'snapshot chụp TRƯỚC khi hủy nên còn kết luận loại');
+assert.deepEqual(triggerPoint.rules, ['1-3s']);
+assert.equal(triggerPoint.voided, false);
 
 const p4 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-05', val: 14, runId: '2026-08-05-1' } }, actor);
 const voidDataEntry = entry.voidPoint({ data: { pointId: p4.data.id, kind: 'data-entry' } }, actor);
@@ -114,12 +125,12 @@ assert.equal(voidOtherOk.ok, true);
 assert.ok(voidOtherOk.data.nceId, "kind other tu chon openNce=true phai mo NCE");
 
 const p6 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-07', val: 14, runId: '2026-08-07-1' } }, actor);
-const manualNce = nce.create({ data: { testId: test.id, level: 1, date: '2026-08-07', pointId: p6.data.id, correction: 'Da kiem tra lai may truoc khi huy diem' } }, actor);
-assert.equal(manualNce.ok, true, JSON.stringify(manualNce));
+ensureUser(db, actor);
+const manualNce = createIqcNce(nce, actor, test.id, { date: '2026-08-07', runId: '2026-08-07-1' });
 const voidReuse = entry.voidPoint({ data: { pointId: p6.data.id, kind: 'analytical' } }, actor);
 assert.equal(voidReuse.ok, true);
-assert.equal(voidReuse.data.reusedAction, true, 'phai dung lai ho so NCE da gan san cho diem nay');
-assert.equal(voidReuse.data.nceId, manualNce.data.nce_id);
+assert.equal(voidReuse.data.reusedAction, true, 'phai dung lai ho so NCE dang xu ly cua chinh lan chay nay');
+assert.equal(voidReuse.data.nceId, manualNce.record.nce_id);
 
 const lotA = config.saveLot({ data: { lotNo: 'GRP-A', level: 1 } }, actor).data;
 const lotB = config.saveLot({ data: { lotNo: 'GRP-B', level: 1 } }, actor).data;

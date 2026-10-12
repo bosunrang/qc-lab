@@ -2,18 +2,20 @@ import type { Db } from './sqlite-like';
 import { readGlobalRules } from './rule-settings';
 import { combinedWestgardByPoint, type MultiLevelSet, type QcPointLike } from '../domain/westgard-engine';
 import { makeIsOnLayered, makeRuleActionLayered, makeScopeOf, parseRuleActions, parseRuleScopes } from '../domain/rule-config';
+import type { QcCut } from '../domain/qc-cuts';
 
-/** Khắc phục một sự cố của xét nghiệm mở giai đoạn vận hành mới cho run.
- * Ngày hoàn thành thuộc giai đoạn cũ (DB chưa có mốc theo giờ/run). */
-export function effectiveQcFixDates(db: Db, testId: string): string[] {
-  const rows = db.prepare(`SELECT DISTINCT action_completed_date FROM actions
-    WHERE test_id=? AND record_status<>'cancelled' AND approval_status='approved'
-      AND effectiveness_status='effective' AND action_completed_date<>''
-    ORDER BY action_completed_date`).all(testId) as { action_completed_date: string }[];
-  return rows.map(row => row.action_completed_date);
+/** Mốc bắt đầu lại chuỗi của một xét nghiệm (`domain/qc-cuts.ts`). Mốc được
+ * ghi khi cho phép hoạt động trở lại một hồ sơ NCE (lần chạy rerun), hoặc do
+ * migration chuyển từ hồ sơ phiên bản cũ đã duyệt và hiệu quả (mốc theo ngày).
+ * Hồ sơ đã cho chạy lại không hủy được, nên mốc không bị gỡ ngược. */
+export function qcCuts(db: Db, testId: string): QcCut[] {
+  const rows = db.prepare('SELECT date, run_id FROM nce_cuts WHERE test_id=? ORDER BY date, run_id').all(testId) as { date: string; run_id: string | null }[];
+  return rows.map((row) => ({ date: row.date, runId: row.run_id }));
 }
 
-export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], levelCount?: number) {
+/** `extraCuts`: mốc giả định chưa ghi, để đánh giá lần rerun ứng viên TRONG
+ * giai đoạn mới trước khi cho chạy lại (D-04). */
+export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], levelCount?: number, extraCuts: readonly QcCut[] = []) {
   const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as
     { rule_actions_json: string; rule_scopes_json: string } | undefined;
   const global = readGlobalRules(db), overrides = parseRuleActions(test?.rule_actions_json);
@@ -23,7 +25,5 @@ export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, se
   return combinedWestgardByPoint(sets,
     rule => on(rule) && ['within', 'both'].includes(scope(rule)),
     rule => on(rule) && ['across', 'both'].includes(scope(rule)),
-    actionOf, effectiveQcFixDates(db, testId));
+    actionOf, [...qcCuts(db, testId), ...extraCuts]);
 }
-
-

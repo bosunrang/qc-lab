@@ -104,16 +104,15 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
   assert.match(page, /const POINT_HEADERS = \['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'\];/);
   assert.match(page, /p\.level, p\.lot \|\| '—', p\.run_id/);
 
-  // Phụ lục NCE phải nói rõ hồ sơ đã huỷ — giữ dòng (nó là dấu vết) nhưng
-  // không để nó hiện y hệt hồ sơ đang chờ duyệt.
-  assert.match(page, /'Hạn xử lý', 'Trạng thái hồ sơ', 'Duyệt', 'Hiệu lực'/);
-  assert.match(page, /cancelled: 'Đã huỷ', active: 'Đang hiệu lực'/);
-  assert.match(page, /NCE_RECORD_STATUS\[r\.record_status\]/, 'nceRow() phải sinh ô trạng thái hồ sơ');
+  // Phụ lục NCE phải nói rõ trạng thái hồ sơ (kể cả đã huỷ — giữ dòng vì nó
+  // là dấu vết) bằng nhãn, không in mã máy.
+  assert.match(page, /'Tầng xử lý', 'Hạn xử lý', 'Trạng thái'\]/);
+  assert.match(page, /NCE_STATUS_LABEL\[r\.status\]/, 'nceRow() phải sinh ô trạng thái hồ sơ bằng nhãn');
   // Số ô `nceRow()` sinh ra phải khớp số cột tiêu đề, nếu không bảng lệch cột.
   const headerCount = (/const NCE_HEADERS = \[([^\]]+)\]/.exec(page)?.[1] || '').split(',').length;
-  const cellCount = (/function nceRow\(r: NceRecord\): string\[\] \{[\s\S]*?return \[([\s\S]*?)\];/.exec(page)?.[1] || '')
+  const cellCount = (/function nceRow\(r: NceRecordRow\): string\[\] \{[\s\S]*?return \[([\s\S]*?)\];/.exec(page)?.[1] || '')
     .split(/,(?![^[(]*[\])])/).length;
-  assert.equal(headerCount, 9);
+  assert.equal(headerCount, 8);
   assert.equal(cellCount, headerCount, 'số ô nceRow() phải khớp số cột NCE_HEADERS');
 
   // Khoảng ngày đảo ngược bị chặn ở nút xuất, kèm giải thích.

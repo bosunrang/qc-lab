@@ -445,8 +445,9 @@ export function createCatalogConfigHandlers(db: Db) {
       .get(...existingIds) as { n: number }).n);
     const sigmaCount = Number((db.prepare(`SELECT COUNT(*) AS n FROM sigma_data WHERE test_id IN (${existingPlaceholders})`)
       .get(...existingIds) as { n: number }).n);
-    const actionCount = Number((db.prepare(`SELECT COUNT(*) AS n FROM actions WHERE test_id IN (${existingPlaceholders})`)
-      .get(...existingIds) as { n: number }).n);
+    // Hồ sơ NCE (bảng mới và bảng `actions` cũ còn giữ hồ sơ đổi dải) là lịch sử phải giữ.
+    const actionCount = Number((db.prepare(`SELECT (SELECT COUNT(*) FROM actions WHERE test_id IN (${existingPlaceholders})) + (SELECT COUNT(*) FROM nce_records WHERE test_id IN (${existingPlaceholders})) AS n`)
+      .get(...existingIds, ...existingIds) as { n: number }).n);
     if (points.length || configuredLevels || sigmaCount || actionCount) {
       return {
         ok: false,

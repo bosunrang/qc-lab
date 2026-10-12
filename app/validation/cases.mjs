@@ -410,11 +410,11 @@ export const CUSUM_CASES = [
     basis: `${REF.cusum}; k và h lấy từ cấu hình xét nghiệm.`,
   },
   {
-    id: 'CU-05', title: 'Đặt lại C+ sau khi sự cố được khắc phục hiệu quả (NCE đã duyệt)',
+    id: 'CU-05', title: 'Đặt lại C+ từ lần chạy xác minh khi cho phép hoạt động trở lại (NCE)',
     levels: [L1], cusum: { k: 0.5, h: 4 }, rules: CUSUM_ONLY,
-    runs: [...seq([1.5, 1.5, 1.5]), { nceEffective: { completedRun: 3 } }, ...seq([1.5, 1.5, 1.5, 1.5])],
+    runs: [...seq([1.5, 1.5, 1.5, 1.5]), { nceRelease: { verifyRun: 4 } }, ...seq([1.5, 1.5, 1.5])],
     expect: { cPos: [1, 2, 3, 1, 2, 3, 4], signalRuns: [7], signal: 'CUSUM +h' },
-    basis: `${REF.cusum}. Chuỗi cộng dồn bắt đầu lại sau ngày hoàn thành khắc phục đã được duyệt và kết luận hiệu quả; ngày hoàn thành thuộc giai đoạn cũ.`,
+    basis: `${REF.cusum}. Sau khắc phục, chuỗi cộng dồn bắt đầu lại từ lần chạy QC xác minh được chấp nhận khi cho phép hoạt động trở lại; lần chạy đó là lần đầu của giai đoạn mới (quyết định 12/10/2026 trong WESTGARD-REVIEW-2026-09-22.md).`,
   },
 ];
 

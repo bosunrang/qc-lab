@@ -106,7 +106,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     return checked.ok ? { ok: true, data: row as FirebasePayload } : { ok: false, message: checked.message };
   }
   function localHasOperationalData(): boolean {
-    const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'period_locks'];
+    const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'nce_records', 'period_locks'];
     return tables.some((table) => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${quoteIdent(table)}`).get() as { n: number }).n) > 0)
       || hasEnteredReagentComparison()
       || !!(db.prepare('SELECT name FROM lab WHERE id=1').get() as { name: string }).name;
