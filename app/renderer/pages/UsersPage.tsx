@@ -16,9 +16,15 @@ import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { RowActionButton } from '../components/RowActionButton';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
-import { PAGE_DEFS, ROLE_LIST, rolePageIds, roleLabel } from '../lib/permissions';
+import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/permissions';
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
+
+/** Quyền nghiệp vụ NCE cấp riêng cho KTV (main kiểm ở `domain/nce/permissions.ts`). */
+const NCE_CAPABILITY_OPTIONS: readonly [string, string][] = [
+  ['nce.release', 'Cho phép hoạt động trở lại sau sự cố'],
+  ['nce.approve', 'Duyệt đóng hồ sơ NCE'],
+];
 
 /** Khi tạo tài khoản, chỉ hiện các màn hình của vai trò đã chọn. Hộp sửa quyền
  * vẫn hiện toàn bộ để quản trị viên thấy rõ những màn hình bị giới hạn. */
@@ -165,7 +171,9 @@ export function UsersPage() {
                 {users.map((user) => (
                   <tr key={user.id}>
                     <td><b>{user.name || user.username}</b><div className="hint">@{user.username}{user.initials ? ` · ${user.initials}` : ''}</div></td>
-                    <td>{roleLabel(user.role)}</td>
+                    <td>{roleLabel(user.role)}{user.role !== 'admin' && user.capabilities.length > 0 && (
+                      <div className="hint">{NCE_CAPABILITY_OPTIONS.filter(([id]) => user.capabilities.includes(id)).map(([, label]) => label).join(' · ')}</div>
+                    )}</td>
                     <td>{user.active === false ? <span className="tag rej">Khóa</span> : <span className="tag ok">Hoạt động</span>}</td>
                     <td><div className="user-row-actions">
                       <UserActions user={user} current={user.id === me?.id} onPerms={() => setPermsFor(user)} onReset={() => setResetFor(user)} />
@@ -187,8 +195,9 @@ export function UsersPage() {
 /** "Sửa quyền": 1 select vai trò + lưới thẻ. KHÔNG sửa được tên/mật khẩu ở
  * đây — modal này chỉ lo quyền. */
 function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
-  const { update } = useUsersStore(useShallow((s) => ({ update: s.update })));
+  const { update, setNceCapabilities } = useUsersStore(useShallow((s) => ({ update: s.update, setNceCapabilities: s.setNceCapabilities })));
   const [role, setRole] = useState<string>(user.role);
+  const [nceCaps, setNceCaps] = useState<Set<string>>(() => new Set(user.capabilities));
   // `pagePerms` null = chưa thu hẹp → tick sẵn toàn bộ thẻ của vai trò.
   const [selected, setSelected] = useState<Set<string>>(() => new Set(user.pagePerms ?? rolePageIds(user.role)));
 
@@ -197,6 +206,12 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
     if (!pagePerms.length) { await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return; }
     const result = await update(user.id, { name: user.name, role, active: user.active, pagePerms });
     if (!result.ok) { await infoDialog(result.error.message); return; }
+    // Người chỉ xem không giữ quyền NCE: đổi sang vai trò chỉ xem thì thu luôn.
+    const caps = canWrite(role) ? [...nceCaps].sort() : [];
+    if (caps.join(',') !== [...user.capabilities].sort().join(',')) {
+      const saved = await setNceCapabilities(user.id, caps);
+      if (!saved.ok) { await infoDialog(saved.error.message); return; }
+    }
     onClose();
   }
 
@@ -213,7 +228,24 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
         <PermGrid groupId="editUserPerms" labelledBy="editUserPermsLabel" role={role} selected={selected}
           onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
       </div>
-      <div className="hint">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
+      <div className="field">
+        <label id="editUserNceLabel">Quyền hồ sơ NCE</label>
+        {role === 'admin'
+          ? <div className="hint">Quản trị viên mặc nhiên được cho phép hoạt động trở lại và duyệt hồ sơ NCE.</div>
+          : !canWrite(role)
+            ? <div className="hint">Tài khoản chỉ xem không được cấp quyền NCE.</div>
+            : (
+              <div className="user-perm-grid" role="group" aria-labelledby="editUserNceLabel">
+                {NCE_CAPABILITY_OPTIONS.map(([id, label]) => (
+                  <label key={id} className={nceCaps.has(id) ? 'selected' : ''}>
+                    <input type="checkbox" checked={nceCaps.has(id)} onChange={(e) => setNceCaps((prev) => { const next = new Set(prev); if (e.target.checked) next.add(id); else next.delete(id); return next; })} />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+      </div>
+      <div className="hint">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào. Người duyệt hồ sơ NCE phải độc lập với người đã tham gia hồ sơ đó.</div>
     </Modal>
   );
 }

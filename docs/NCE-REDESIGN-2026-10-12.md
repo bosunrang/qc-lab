@@ -335,16 +335,30 @@ selector không còn dùng), giao diện cấp quyền NCE ở trang Người d�
 NCE ở Cài đặt. E2E `reload-count` hỏng từ trước giai đoạn 2 (đã kiểm trên
 commit `9017e96`), không thuộc phạm vi này.
 
-### Giai đoạn 3 — Giao diện
+### Giai đoạn 3 — Giao diện (xong 2026-10-12)
 
-- Hàng chờ, danh sách, trang hồ sơ; trang Người dùng cấp capability; Tổng quan
-  và Báo cáo theo dữ liệu mới.
-- E2E: IQC loại → hồ sơ → cho chạy lại với rerun → hành động → hiệu lực → người
-  khác duyệt; máy trạm LAN không có capability bị chặn; hai máy sửa cùng hồ sơ
-  nhận lỗi `stale`.
+- Trang Khắc phục sự cố viết lại (`renderer/pages/ActionsPage.tsx` và thư mục
+  `renderer/pages/actions/`): tổng quan gồm hàng chờ theo lần chạy (lập hồ sơ
+  ngay trên dòng, hoặc gắn vào hồ sơ đang mở) và danh sách hồ sơ có thẻ lọc
+  (đang xử lý, của tôi, chờ duyệt, quá hạn, đã đóng); `#/actions?id=…` mở một
+  hồ sơ với thanh bước, danh sách "còn thiếu" do main tính, tám phần theo quy
+  trình, dữ liệu phiên bản cũ (nếu có) và lịch sử.
+- Cho phép hoạt động trở lại có bước đánh giá thử lần rerun trong giai đoạn mới
+  trước khi ghi; xác nhận nói rõ mốc bắt đầu lại chuỗi Westgard/CUSUM.
+- Lỗi `stale` hiện kèm nút tải lại hồ sơ, không ghi đè.
+- Trang Người dùng cấp quyền `nce.release` / `nce.approve` cho KTV; trang Cài
+  đặt có khối cấu hình NCE (hạn theo tầng, cửa sổ tái diễn, ngoại lệ phân tách).
+- Hàm hiển thị thuần ở `main/domain/nce/presentation.ts` (test
+  `nce-presentation.test.mjs`); CSS cũ của trang được thay toàn bộ bằng
+  `pages/actions.css` mới, tiền tố `nce-`.
+- E2E: `nce-flow.e2e.mjs` chạy trọn vòng đời trên Electron (lập từ hàng chờ →
+  ảnh hưởng bệnh nhân → cho chạy lại bằng rerun → phân tầng, checklist → nộp
+  duyệt → người báo cáo bị chặn → KTV có quyền duyệt đóng); `entry-nce` lập hồ
+  sơ bằng nút trên hàng chờ.
 
-**Xong khi:** `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
-`npm run test:e2e` đạt.
+Chưa có e2e riêng cho máy trạm LAN thiếu quyền và hai máy cùng sửa một hồ sơ;
+hai ca này đã có test handler (`nce-handlers.test.mjs`, `ipc-operations`).
+E2E `reload-count` vẫn hỏng từ trước giai đoạn 2, không thuộc phạm vi này.
 
 ### Giai đoạn 4 — Thẩm định nghiệp vụ
 

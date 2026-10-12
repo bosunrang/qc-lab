@@ -94,7 +94,7 @@ function FollowupPanel({ model }: { model: Model }) {
         <ShiftItem key={`o${record.id}`} tone="rej"
           title={<>{record.nce_id || 'Hồ sơ khắc phục'} · {record.testName || record.description || 'Sự cố'}</>}
           meta={<>{record.overdueLabel} · hạn {dateText(record.due_date)} · phụ trách {record.owner || '—'}</>}
-          action={<button className="btn ghost sm" onClick={() => navigate('/actions', { state: { recordId: record.id } })}>Tiếp tục hồ sơ</button>} />
+          action={<button className="btn ghost sm" onClick={() => navigate(`/actions?id=${encodeURIComponent(record.id)}`)}>Mở hồ sơ</button>} />
       ))}
       {noTarget.map((item) => (
         <ShiftItem key={`m${item.key}`} tone="warn"

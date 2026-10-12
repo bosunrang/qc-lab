@@ -167,3 +167,10 @@
 }
 
 
+
+/* Cấu hình hồ sơ NCE: ba ô số trên một hàng, ngoại lệ phân tách xuống dòng. */
+.settings-nce-note{margin:var(--space-4) var(--space-4) 0;color:var(--text-tertiary);font-size:var(--text-sm);}
+.settings-nce-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--field-gap);margin:var(--space-4) var(--space-4) 0;}
+.settings-nce-wide{grid-column:1 / -1;}
+.settings-nce-wide>label{display:flex;align-items:center;gap:var(--space-2);}
+@media (max-width:900px){.settings-nce-fields{grid-template-columns:1fr;}}

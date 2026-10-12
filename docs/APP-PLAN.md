@@ -50,7 +50,7 @@ rộng hoặc chỉnh sửa mã nguồn.
 | Nhập QC | Ghi điểm, theo dõi lần chạy, ghi chú, huỷ điểm và dải vận hành |
 | Phân tích Westgard | Đánh giá luật, cảnh báo, lịch sử lô và biểu đồ |
 | Six Sigma & Sai số | Kỳ đánh giá, TEa, CV/Bias, MU, OPSpecs và xuất báo cáo |
-| Khắc phục sự cố | Hồ sơ sai lệch, nguyên nhân, hành động và phê duyệt |
+| Khắc phục sự cố | Hồ sơ NCE theo lần chạy: kiểm soát, cho phép hoạt động trở lại, CAPA, hiệu lực và duyệt độc lập |
 | Báo cáo & Biểu mẫu | Báo cáo dữ liệu, báo cáo Sigma, PDF/Excel và mẫu biểu |
 | Cài đặt & Đám mây | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
 

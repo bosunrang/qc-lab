@@ -8,6 +8,7 @@ import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
+import { NceConfigPanel } from './settings/NceConfigPanel';
 
 const LOGO_SIZE = 96;
 
@@ -403,6 +404,8 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
+
+      <NceConfigPanel />
 
       <div className="settings-cloud-grid">
         <div className="panel firebase-sync-panel">

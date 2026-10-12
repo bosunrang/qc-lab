@@ -1,8 +1,7 @@
 // Luồng nghiệp vụ chính trên app thật: nhập điểm QC ở bảng Nhập QC, điểm vi
 // phạm 1-3s hiện đúng cảnh báo, lần chạy bị loại vào hàng chờ của trang Khắc
-// phục sự cố, lập hồ sơ NCE theo lần chạy qua IPC thật, rồi huỷ một điểm theo
-// quy trình huỷ (không xoá cứng). Giao diện thao tác hồ sơ làm ở giai đoạn 3
-// của docs/NCE-REDESIGN-2026-10-12.md; khi đó bước lập hồ sơ chuyển sang bấm nút.
+// phục sự cố, lập hồ sơ NCE từ hàng chờ, rồi huỷ một điểm theo quy trình huỷ
+// (không xoá cứng). Vòng đời đầy đủ của hồ sơ ở `nce-flow.e2e.mjs`.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bootstrapAndLogin, enterValue, launchApp, openPage, seedOperationalTest, todayIn } from './helpers.mjs';
@@ -32,23 +31,19 @@ test('nhập điểm, điểm vi phạm, lập NCE, huỷ điểm', { timeout: 1
     const points = await page.evaluate((testId) => Promise.all([1, 2].map((level) => window.qcApi.queryPoints(testId, level))), seeded.testId);
     assert.deepEqual(points.map((list) => list.map((p) => p.val)), [[5.1], [17.1]], 'hai điểm đã lưu vào CSDL');
 
-    // Lần chạy bị loại vào hàng chờ, một dòng cho một lần chạy.
+    // Lần chạy bị loại vào hàng chờ, một dòng cho một lần chạy; lập hồ sơ ngay trên dòng đó.
     await openPage(page, 'Khắc phục sự cố');
-    const queueRow = page.locator('table.action-log-table tbody tr', { hasText: seeded.testName }).first();
+    const queueRow = page.locator('table.nce-table tbody tr', { hasText: seeded.testName }).first();
     await queueRow.waitFor();
     assert.match(await queueRow.innerText(), /M2 \(1-3s\)/);
-    const created = await page.evaluate(async ({ testId, day }) => {
-      const me = await window.qcApi.currentUser();
-      const row = (await window.qcApi.listNceQueue()).find((item) => item.test_id === testId);
-      return window.qcApi.createNce({ data: {
-        source: 'iqc', testId, trigger: { date: row.date, runId: row.run_id }, description: 'QC mức 2 vượt +3SD (1-3s)',
-        correction: 'Dừng trả kết quả mức 2, chạy lại QC với lọ mới.', holdResults: true, detectedAt: day, ownerUserId: me.id,
-      } });
-    }, { testId: seeded.testId, day: today });
-    assert.equal(created.ok, true, JSON.stringify(created.error));
-    const logRow = page.locator('.action-log-panel table.action-log-table tbody tr', { hasText: created.data.record.nce_id });
-    await logRow.waitFor();
-    assert.match(await logRow.innerText(), /Đang xử lý/);
+    await queueRow.getByRole('button', { name: 'Lập hồ sơ' }).click();
+    const modal = page.locator('.modal[role=dialog]', { hasText: 'Lập hồ sơ NCE' });
+    await modal.locator('#nceCorrection').fill('Dừng trả kết quả mức 2, chạy lại QC với lọ mới.');
+    await modal.getByLabel('Có, đã dừng/giữ').check();
+    await modal.getByRole('button', { name: 'Lập hồ sơ' }).click();
+    const heading = page.locator('.panel-head h2', { hasText: /Hồ sơ NCE-/ });
+    await heading.waitFor();
+    await page.locator('.tag', { hasText: 'Đang xử lý' }).first().waitFor();
 
     // Huỷ điểm mức 1 do nhập sai: điểm được giữ lại với dấu huỷ, không mở NCE.
     await openPage(page, 'Nhập QC & Biểu đồ');
