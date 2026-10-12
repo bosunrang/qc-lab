@@ -85,6 +85,28 @@ Xác minh sau sửa: **150/150 test đạt**, `npm run typecheck`, `npm run buil
 `npm run app:css-parity` đều đạt. `docs/sigma-review-probes-2026-09-22-lan2.cjs`
 nay PHẢI fail (nó khẳng định trạng thái lỗi), đúng như thiết kế.
 
+## Quyết định 12/10/2026 — điểm bị loại "đã xử lý" theo NCE mới
+
+Chốt cùng kế hoạch làm lại NCE (`docs/NCE-REDESIGN-2026-10-12.md`, D-11). Chưa
+triển khai; mã hiện hành vẫn đọc bảng `actions` cho tới giai đoạn 2 của kế
+hoạch đó.
+
+- **Hiện nay:** `listCohorts()` coi một điểm bị loại là đã xử lý khi có hồ sơ
+  `actions` gắn đúng `point_id`, `record_status='active'`,
+  `approval_status='approved'`, `effectiveness_status='effective'`.
+- **Sau khi đổi:** điểm bị loại là đã xử lý khi nó thuộc một lần chạy gắn với
+  hồ sơ NCE ở trạng thái `closed`. Hồ sơ NCE mới gắn theo **lần chạy** (mọi
+  mức hỏng trong lần chạy đó), không theo từng điểm.
+- Ý nghĩa giữ nguyên tinh thần ISO/TS 20914 đã chốt ở SG16: dữ liệu IQC chỉ
+  đại diện cho hoạt động thường quy khi sự cố đã được quản lý xong. Hồ sơ tầng
+  `capa` chỉ đóng được khi lần đánh giá hiệu lực cuối là "hiệu quả"; hồ sơ tầng
+  `low` (xử lý nhanh, không có hành động khắc phục để đánh giá) đóng sau khi
+  người có thẩm quyền duyệt. Hồ sơ đang mở, chờ duyệt hoặc đã hủy vẫn chặn
+  nhóm như hiện nay.
+- `resolvedActionsDigest()` / `cohortFingerprint()` chuyển sang băm tập lần
+  chạy đã đóng. Đổi công thức này sẽ làm các rà soát cohort đã lưu phải xác
+  nhận lại một lần, giống chi phí đã ghi ở cập nhật 23/09.
+
 Tiếp nối `SIGMA-REVIEW-2026-09-22.md` (SG01…SG12, đã sửa). Lần này rà phần
 **số mức QC đầu vào của gợi ý thiết kế, cổng cohort IQC, vòng đời snapshot TEa
 và biểu đồ MDC** — những chỗ lượt 1 chưa chạm tới, hoặc mới chỉ ghi ở mục

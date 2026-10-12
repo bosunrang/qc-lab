@@ -85,6 +85,11 @@ Các quyết định nghiệp vụ chuyên sâu của Westgard và Six Sigma đ�
 phù hợp trước khi thay đổi logic của hai khu vực này, đồng thời cập nhật kiểm
 thử hồi quy khi thay đổi quyết định nghiệp vụ.
 
+Kế hoạch làm lại hồ sơ sự không phù hợp (mô hình, trạng thái, cổng, lộ trình)
+nằm tại `docs/NCE-REDESIGN-2026-10-12.md`; căn cứ tiêu chuẩn, thuật ngữ và
+nguyên tắc vẫn ở `docs/NCE-PLAN-2026-09-27.md`. Phải đọc cả hai và đối chiếu
+SOP đã được phòng xét nghiệm phê duyệt trước khi sửa nghiệp vụ NCE.
+
 ## 7. Quy ước mã nguồn
 
 - Chú thích giải thích mã viết bằng tiếng Việt có đầy đủ dấu.
