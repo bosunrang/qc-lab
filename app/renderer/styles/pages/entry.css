@@ -166,7 +166,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 /* Nhãn phụ cạnh thẻ kết luận trong bảng "Điểm trong khoảng xem". Không dùng
    màu cảnh báo: điểm này KHÔNG vi phạm, nó chỉ không được tính. */
-.qc-run-excluded{display:block;max-width:180px;margin-top:2px;color:var(--text-tertiary);font-size:var(--text-xs);font-style:italic;line-height:var(--leading-snug);}
+.qc-run-excluded{display:block;max-width:180px;margin-top:2px;color:var(--text-tertiary);font-size:var(--text-xs);font-style:normal;line-height:var(--leading-snug);}
 
 /* ---- "Điểm trong khoảng xem" (panel gấp lại) ---- */
 .entry-secondary-panel{padding:0;overflow:hidden;}

@@ -16,6 +16,7 @@ import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
 import { vnDate } from '../../lib/format';
 import { todayIso } from '../../state/date-picker-store';
 import { EmptyState } from './shared';
+import { normalizeSearch } from '../../lib/useTestSelection';
 import type { LotTransition } from '../../../shared/qc-api';
 
 /** Giờ:phút + ngày dạng Việt Nam; giá trị không hợp lệ thì trả rỗng. */
@@ -36,6 +37,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   const { lotTransitions, panels, lots, tests, instruments, levelsByTestId, loadLevels, createLotTransition, removeLotTransition } = useManageStore(useShallow((s) => ({ lotTransitions: s.lotTransitions, panels: s.panels, lots: s.lots, tests: s.tests, instruments: s.instruments, levelsByTestId: s.levelsByTestId, loadLevels: s.loadLevels, createLotTransition: s.createLotTransition, removeLotTransition: s.removeLotTransition })));
   const instrumentName = (id: string) => instruments.find((i) => i.id === id)?.name || '';
   const [targetQuery, setTargetQuery] = useState('');
+  const targetNeedle = normalizeSearch(targetQuery);
 
 
   function transitionToNo(lotId: string): string {
@@ -90,7 +92,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   async function openNew() {
     if (!panels.length) { await infoDialog('Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.'); onGoPanels?.(); return; }
     if (lots.length < 2) { await infoDialog('Cần ít nhất 2 lô QC để tạo chuyển tiếp.'); onGoLots?.(); return; }
-    setErr(null); setDraftPanelId(panels[0]?.id || ''); setDraftFromLotId(''); setDraftToLotId(''); setCreating('new');
+    setErr(null); setDraftPanelId(panels[0]?.id || ''); setDraftFromLotId(''); setDraftToLotId(''); setTargetQuery(''); setCreating('new');
   }
 
   /** Lưu hồ sơ — MỘT hành động duy nhất: gửi kèm status + Mean/SD ứng viên
@@ -156,7 +158,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                 <td><div className="manage-actions">
                   <RowActionButton kind="edit" label={`Sửa hồ sơ chuyển lô ${fromLotLabel} sang ${toLotLabel}`} onClick={() => {
                     setErr(null); setDraftPanelId(tr.panel_id); setDraftFromLotId(tr.from_lot_id);
-                    setDraftToLotId(tr.to_lot_id); setCreating(tr);
+                    setDraftToLotId(tr.to_lot_id); setTargetQuery(''); setCreating(tr);
                   }} />
                   <RowActionButton kind="delete" label={`Xóa hồ sơ chuyển lô ${fromLotLabel} sang ${toLotLabel}`} onClick={() => removeTransition(tr)} />
                 </div></td>
@@ -201,8 +203,11 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                 {targetTableReady ? <div className="target-table lot-trans-target-table">
                   <div className="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>
                   {draftTests
-                    .filter((test) => !targetQuery.trim() || `${test.name} ${test.unit}`.toLowerCase().includes(targetQuery.trim().toLowerCase()))
                     .map((test) => {
+                      // Dòng không khớp ô tìm chỉ bị ẩn (CSS), không bị bỏ khỏi DOM: lúc
+                      // lưu, `submit()` đọc Mean/SD từ mọi dòng. Bỏ khỏi DOM thì hồ sơ
+                      // được ghi lại chỉ còn các dòng đang hiện và giá trị đã gõ bị mất.
+                      const matches = !targetNeedle || normalizeSearch(`${test.name} ${test.unit}`).includes(targetNeedle);
                       const levelNo = draftToLot?.level ?? 1;
                       // Ưu tiên Mean/SD ỨNG VIÊN đã lưu trong hồ sơ (khi sửa)
                       // — test_levels vẫn là số của lô CŨ cho tới khi "Chấp
@@ -217,9 +222,10 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                       const sd = saved ? saved.sd : live?.sd ?? null;
                       const ready = mean != null && sd != null && sd > 0;
                       const status = saved ? 'Đã nhập' : 'Chưa nhập';
-                      // Cùng lỗi "key không đổi theo level" đã sửa ở TargetsTab: đổi
-                      // "Lô mới" đổi cả `levelNo`/`target`, key phải đổi theo mới remount.
-                      return <div className="target-row" key={`${test.id}:${levelNo}:${saved ? '1' : '0'}`} data-test={test.id} data-level={levelNo} data-decimals={decimals} data-k={k}>
+                      // Giá trị các ô là `defaultValue`, nên phải dựng lại khi đổi BẤT
+                      // KỲ lô nào. Chỉ dùng mức QC trong key sẽ giữ số của lô cũ khi
+                      // người dùng đổi sang một lô khác cùng mức, rồi có thể lưu nhầm.
+                      return <div className={`target-row${matches ? '' : ' is-filtered-out'}`} key={`${test.id}:${draftFromLotId}:${draftToLotId}:${levelNo}:${saved ? '1' : '0'}`} data-test={test.id} data-level={levelNo} data-decimals={decimals} data-k={k}>
                         {/* checkbox chỉ trang trí, luôn đã chọn — mọi xét nghiệm
                             đang dùng lô cũ đều là ứng viên, không có nút bỏ
                             chọn từng dòng (`checked disabled readOnly`). */}

@@ -329,6 +329,8 @@ main:has(.config-shell){padding-bottom:16px;}
 
 .target-head>span,.target-row>span{display:flex;align-items:center;justify-content:center;text-align:center;}
 .target-row{min-height:var(--table-row-h);padding:4px 10px;border-bottom:1px solid var(--border-subtle);}
+/* Dòng bị ô tìm lọc ra vẫn nằm trong DOM để lúc lưu không mất Mean/SD đã nhập. */
+.target-row.is-filtered-out{display:none;}
 .target-row:last-child{border-bottom:0;}
 .target-row:hover{background:var(--surface-subtle);}
 .target-head>*,.target-row>*{min-width:0;}
@@ -523,16 +525,23 @@ main:has(.config-shell){padding-bottom:16px;}
 .lot-group-picker-label{display:block;margin:0;font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);}
 .lot-level-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:300px;overflow:auto;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);}
 /* Popup nhóm lô chia cột theo SỐ MỨC của nhóm lô (class `levels-2`/
-   `levels-3plus` trên chính modal), không phải auto-fit. */
-.rcfg-group-modal .lot-level-picker{grid-template-columns:1fr;gap:10px;max-height:none;overflow:visible;padding:10px;}
-.rcfg-group-modal.levels-2 .lot-level-picker{grid-template-columns:repeat(2,minmax(0,1fr));}
-.rcfg-group-modal.levels-3plus .lot-level-picker{grid-template-columns:repeat(3,minmax(0,1fr));}
+   `levels-3plus` trên chính modal), không phải auto-fit. Khung chọn không
+   cần thêm một lớp viền ngoài; mỗi cột giới hạn ở 320px để các ô lô gọn hơn. */
+.rcfg-group-modal .lot-level-picker{grid-template-columns:minmax(0,320px);justify-content:center;gap:var(--space-4);max-height:none;overflow:visible;padding:0;border:0;border-radius:0;background:transparent;}
+.rcfg-group-modal.levels-2 .lot-level-picker{grid-template-columns:repeat(2,minmax(0,320px));}
+.rcfg-group-modal.levels-3plus .lot-level-picker{grid-template-columns:repeat(3,minmax(0,320px));}
 .lot-level-col{display:grid;align-content:start;gap:6px;min-width:0;}
 
 .lot-level-title{letter-spacing:var(--title-overline-tracking);padding:2px 2px;color:var(--text-tertiary);font-size:var(--text-2xs);font-weight:var(--weight-bold);text-transform:none;letter-spacing:0;}
-.lot-level-col label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;}
-.lot-level-col label:hover{border-color:var(--accent-border-strong);}
-.lot-level-col input{width:17px;height:17px;accent-color:var(--accent);}
+/* Thẻ chọn lô cùng ngôn ngữ với bộ chọn xét nghiệm: khi đã chọn, cả thẻ
+   chuyển teal nhạt và dấu tick tròn cho phép nhận biết nhanh từng mức QC. */
+.lot-level-col label{display:flex;align-items:center;gap:8px;margin:0;padding:8px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);cursor:pointer;transition:border-color var(--motion-fast) ease,background var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
+.lot-level-col label:hover{border-color:var(--accent-border-strong);box-shadow:var(--shadow-control-hover);}
+.lot-level-col label:has(input:checked){border-color:var(--accent-border-hover);background:var(--accent-surface);box-shadow:none;}
+.lot-level-col input{display:grid;flex:0 0 17px;place-content:center;width:17px;height:17px;margin:0;border:1px solid var(--border);border-radius:var(--radius-full);appearance:none;-webkit-appearance:none;background:var(--surface);box-sizing:border-box;cursor:pointer;}
+.lot-level-col input::after{width:8px;height:4px;border:solid var(--on-accent);border-width:0 0 2px 2px;content:"";opacity:0;transform:rotate(-45deg);}
+.lot-level-col input:checked{border-color:var(--accent);background:var(--accent);}
+.lot-level-col input:checked::after{opacity:1;}
 .lot-level-col span{display:grid;gap:2px;}
 .lot-level-col b{color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .lot-level-col small{color:var(--text-tertiary);font-size:var(--text-xs);}
