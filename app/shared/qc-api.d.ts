@@ -590,7 +590,7 @@ export interface EqaImportPreview {
   round: EqaRoundDraft; round_errors: string[]; rows: EqaCheckedRowDraft[];
   pairs: { code: string; instrument: string; test_id: string | null; suggestions: string[]; rows: number }[];
   blocking: number;
-  counts: { total: number; ok: number; warn: number; rej: number; pt_score: number | null };
+  counts: { total: number; ok: number; warn: number; rej: number; accept_pct: number | null };
   /** Kỳ cùng chương trình/năm/đợt đã có trong CSDL: máy đang có kết quả,
    * máy mà lần nhập này thay kết quả, và có cần lý do nhập lại không. */
   existing: { id: string; version: number; row_version: number; status: string; instruments: string[]; replaces: string[]; needs_reason: boolean } | null;
@@ -600,7 +600,8 @@ export interface EqaRoundRow {
   year: number; round: string; round_no: number; report_code: string; received_date: string; report_date: string;
   assigned_level: string; entered_by: string; source: string; source_name: string; status: 'open' | 'cancelled';
   version: number; row_version: number; created_at: string; updated_at: string;
-  total: number; ok: number; warn: number; rej: number; pt_score: number | null; instruments: string[];
+  /** `accept_pct`: tỷ lệ kết quả chấp nhận — chỉ số tổng hợp, không phải tiêu chí đạt (N-06). */
+  total: number; ok: number; warn: number; rej: number; accept_pct: number | null; instruments: string[];
 }
 export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
 export interface EqaResultRow {
@@ -610,12 +611,27 @@ export interface EqaResultRow {
   class: EqaClassView; provider_check: EqaProviderCheckView; tolerance_pct: number | null; within_tolerance: number | null;
   run_date: string; reagent_lot: string; method: string; operator: string; iqc_note: string; peer_group: string;
   peer: EqaPeerComparisonView[]; warnings: string[];
+  /** Độ tin cậy giá trị ấn định từ N, SD của nhóm làm giá trị ấn định (N-05). */
+  assigned_check: { level: 'all' | 'method' | 'instrument'; n: number; u: number; ratio: number; uncertain: boolean; z_prime: number } | null;
+  /** TEa (%) của xét nghiệm trong danh mục và % lệch có nằm trong đó không — thông tin nội bộ. */
+  tea_pct: number | null; within_tea: boolean | null;
+  /** Tín hiệu của chuỗi xét nghiệm tính tới kết quả này (N-06, N-07). */
+  trend: { signals: EqaSignalView[]; unsuccessful: boolean; j: number; enough: boolean } | null;
+}
+export type EqaSignalView = 'reject' | 'two_of_three' | 'six_same_side' | 'j_score';
+export interface EqaSeriesView {
+  test_id: string; test_name: string; instrument_name: string; unit: string; enough: boolean; j_limit: number; min_points: number;
+  points: { result_id: string; round_id: string; year: number; round: string; sample: string; report_date: string; z: number; class: EqaClassView; pct: number | null; j: number; signals: EqaSignalView[]; unsuccessful: boolean }[];
+}
+export interface EqaAttentionRow {
+  test_id: string; test_name: string; instrument_name: string; points: number;
+  latest: { round_id: string; year: number; round: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
 }
 export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
 export interface EqaRoundView {
   round: EqaRoundRow; results: EqaResultRow[]; decisions: EqaDecisionRow[];
-  instruments: { instrument_id: string; instrument_name: string; total: number; ok: number; warn: number; rej: number; pt_score: number | null }[];
-  config: { z_warn: number; z_reject: number; pt_min: number };
+  instruments: { instrument_id: string; instrument_name: string; total: number; ok: number; warn: number; rej: number; accept_pct: number | null }[];
+  config: { z_warn: number; z_reject: number };
 }
 
 export interface QcApi {
@@ -763,6 +779,10 @@ export interface QcApi {
   // Ngoại kiểm
   listEqaRounds(): Promise<EqaRoundRow[]>;
   getEqaRound(id: string): Promise<EqaRoundView | null>;
+  /** Chuỗi z/J của một xét nghiệm qua các đợt. */
+  getEqaSeries(testId: string): Promise<EqaSeriesView | null>;
+  /** Xét nghiệm đang có tín hiệu hoặc không thành công ở đợt mới nhất. */
+  listEqaAttention(): Promise<EqaAttentionRow[]>;
   /** Kiểm và tính thử một lần nhập; không ghi gì. */
   previewEqaImport(input: { data: EqaImportInput }): Promise<IpcResult<EqaImportPreview>>;
   importEqaRound(input: { data: EqaImportInput }): Promise<IpcResult<EqaRoundView>>;

@@ -117,7 +117,7 @@ const DATA_API_NAMES = [
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
-  'listReagentComparisons', 'listEqaRounds', 'getEqaRound', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'listReagentComparisons', 'listEqaRounds', 'getEqaRound', 'getEqaSeries', 'listEqaAttention', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
@@ -253,6 +253,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     // Ngoại kiểm: đọc mở cho mọi vai trò đã đăng nhập; xem trước là bước của luồng nhập nên cần quyền ghi.
     listEqaRounds: { channel: 'eqa:listRounds', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaRounds(); } },
     getEqaRound: { channel: 'eqa:getRound', lan: true, run: (ctx, id) => { ctx.actor(); return eqa.getEqaRound(id); } },
+    getEqaSeries: { channel: 'eqa:getSeries', lan: true, run: (ctx, testId) => { ctx.actor(); return eqa.getEqaSeries(testId); } },
+    listEqaAttention: { channel: 'eqa:listAttention', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaAttention(); } },
     previewEqaImport: { channel: 'eqa:previewImport', lan: true, run: (ctx, input) => { nceReader(ctx); return eqa.previewEqaImport(input); } },
     importEqaRound: { channel: 'eqa:importRound', lan: true, run: (ctx, input) => eqa.importEqaRound(input, ctx.actor()) },
     cancelEqaRound: { channel: 'eqa:cancelRound', lan: true, run: (ctx, input) => eqa.cancelEqaRound(input, ctx.actor()) },

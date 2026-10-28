@@ -75,6 +75,28 @@ test('ca 1, 3: xem trước gợi ý ánh xạ; dòng z ngược dấu báo cáo
   assert.ok(next.pairs.every((p) => p.test_id));
 });
 
+test('N-06, N-07: chuỗi xét nghiệm qua các đợt, xét nghiệm cần chú ý, tỷ lệ chấp nhận', () => {
+  const { eqa, ids } = fixture();
+  const preview = must(eqa.previewEqaImport(draft({ rows: ROWS.slice(0, 2) })), 'xem trước');
+  const mappings = preview.pairs.map((p) => ({ code: p.code, instrument: p.instrument, testId: p.suggestions[0] }));
+  for (const [round, astZ] of [['ĐỢT 01', 3.33], ['ĐỢT 02', 3.1]]) {
+    const rows = [row('ALT(GPT)', 'AU5800', 55, 54.278, 4.917, 0.15), row('AST(GOT)', 'AU5800', 30 + astZ * 3, 30, 3, astZ)];
+    must(eqa.importEqaRound(draft({ round: { ...ROUND, round }, rows, mappings }), admin), `nhập ${round}`);
+  }
+  const series = eqa.getEqaSeries(ids['AST@AU5800']);
+  assert.deepEqual(series.points.map((p) => [p.round, p.class, p.unsuccessful]), [['ĐỢT 01', 'rej', false], ['ĐỢT 02', 'rej', true]]);
+  assert.equal(series.enough, false);
+  const attention = eqa.listEqaAttention();
+  assert.deepEqual(attention.map((a) => [a.test_name, a.latest.round, a.latest.unsuccessful, a.latest.signals]), [['AST', 'ĐỢT 02', true, ['reject', 'two_of_three', 'j_score']]]);
+  const latest = eqa.listEqaRounds().find((r) => r.round === 'ĐỢT 02');
+  assert.equal(latest.accept_pct, 50);
+  const view = eqa.getEqaRound(latest.id);
+  const ast = view.results.find((r) => r.code === 'AST(GOT)');
+  assert.deepEqual([ast.trend.unsuccessful, ast.trend.signals], [true, ['reject', 'two_of_three', 'j_score']]);
+  assert.equal(view.results.find((r) => r.code === 'ALT(GPT)').trend.signals.length, 0);
+  assert.equal(eqa.getEqaSeries('khong-co'), null);
+});
+
 test('ca 7: nhập lại cần lý do và tạo phiên bản mới, giữ phiên bản cũ; huỷ có lý do; khoá lạc quan', () => {
   const { db, eqa } = fixture();
   const preview = must(eqa.previewEqaImport(draft({ rows: ROWS.slice(0, 2) })), 'xem trước');

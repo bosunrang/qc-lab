@@ -8,10 +8,12 @@ import { canWrite } from '../../lib/permissions';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from '../../components/EmptyState';
 import { EqaImportModal } from './EqaImportModal';
-import { pctText, roundLabel, StatCard } from './shared';
+import { EqaSeriesModal } from './EqaSeriesModal';
+import { ClassTag, numText, pctText, roundLabel, StatCard, TrendTags } from './shared';
 
 export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
-  const { rounds, loading, error, load } = useEqaStore(useShallow((s) => ({ rounds: s.rounds, loading: s.loading, error: s.error, load: s.load })));
+  const { rounds, attention, loading, error, load } = useEqaStore(useShallow((s) => ({ rounds: s.rounds, attention: s.attention, loading: s.loading, error: s.error, load: s.load })));
+  const [seriesTest, setSeriesTest] = useState('');
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const [importing, setImporting] = useState(false);
   const [showCancelled, setShowCancelled] = useState(false);
@@ -42,6 +44,33 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
         <StatCard tone="danger" label="Không chấp nhận" value={totals.rej} detail="|z| ≥ 3,0 — cần điều tra" />
       </div>
 
+      {attention.length > 0 && (
+        <section className="panel" aria-label="Xét nghiệm cần chú ý">
+          <div className="panel-head"><h2>Xét nghiệm cần chú ý <span className="count">{attention.length}</span></h2></div>
+          <div className="eqa-section-body">
+            <p className="eqa-note">Tín hiệu ở đợt mới nhất của từng xét nghiệm: không chấp nhận, không thành công (2 đợt liên tiếp hoặc 2 trong 3 đợt không chấp nhận) hoặc xu hướng. Đây là việc cần xem xét, chưa phải kết luận nguyên nhân.</p>
+            <div className="eqa-table-wrap">
+              <table className="eqa-table">
+                <thead><tr><th>Xét nghiệm</th><th>Máy</th><th>Đợt mới nhất</th><th className="num">z</th><th>Đánh giá</th><th>Tín hiệu</th><th aria-label="Thao tác" /></tr></thead>
+                <tbody>
+                  {attention.map((a) => (
+                    <tr key={a.test_id} className={a.latest.unsuccessful || a.latest.class === 'rej' ? 'is-rej' : 'is-warn'}>
+                      <td><b className="eqa-strong">{a.test_name}</b></td>
+                      <td>{a.instrument_name}</td>
+                      <td>{a.latest.round} / {a.latest.year}</td>
+                      <td className="num">{numText(a.latest.z)}</td>
+                      <td><ClassTag cls={a.latest.class} /></td>
+                      <td><TrendTags signals={a.latest.signals} unsuccessful={a.latest.unsuccessful} /></td>
+                      <td><button type="button" className="btn ghost sm" onClick={() => setSeriesTest(a.test_id)}>Biểu đồ</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="panel" aria-label="Danh sách kỳ ngoại kiểm">
         <div className="panel-head">
           <h2>Danh sách kỳ</h2>
@@ -64,7 +93,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
                     <tr>
                       <th>Chương trình</th><th>Đợt / năm</th><th>Máy</th><th className="num">Kết quả</th>
                       <th className="num">Chấp nhận</th><th className="num">Cảnh báo</th><th className="num">Không CN</th>
-                      <th className="num">PT score</th><th>Ngày báo cáo</th><th>Trạng thái</th><th aria-label="Thao tác" />
+                      <th className="num">Tỷ lệ chấp nhận</th><th>Ngày báo cáo</th><th>Trạng thái</th><th aria-label="Thao tác" />
                     </tr>
                   </thead>
                   <tbody>
@@ -77,7 +106,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
                         <td className="num">{r.ok}</td>
                         <td className="num">{r.warn}</td>
                         <td className="num">{r.rej}</td>
-                        <td className="num">{pctText(r.pt_score)}</td>
+                        <td className="num">{pctText(r.accept_pct)}</td>
                         <td>{vnDate(r.report_date, '—')}</td>
                         <td>{r.status === 'open' ? <span className="tag ok">Đang dùng</span> : <span className="tag none">Đã huỷ</span>}</td>
                         <td><button type="button" className="btn ghost sm" onClick={() => onOpen(r.id)}>Xem</button></td>
@@ -90,6 +119,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
       </section>
 
+      {seriesTest && <EqaSeriesModal testId={seriesTest} onClose={() => setSeriesTest('')} />}
       {importing && <EqaImportModal onClose={() => setImporting(false)} onImported={(id) => { setImporting(false); onOpen(id); }} />}
     </div>
   );

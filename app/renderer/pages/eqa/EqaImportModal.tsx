@@ -239,7 +239,7 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported }: {
               <StatCard tone="neutral" label="Kết quả" value={preview.counts.total} />
               <StatCard tone="success" label="Chấp nhận" value={preview.counts.ok} />
               <StatCard tone="warning" label="Cảnh báo" value={preview.counts.warn} />
-              <StatCard tone="danger" label="Không chấp nhận" value={preview.counts.rej} detail={`PT score ${pctText(preview.counts.pt_score)}`} />
+              <StatCard tone="danger" label="Không chấp nhận" value={preview.counts.rej} detail={`Tỷ lệ chấp nhận ${pctText(preview.counts.accept_pct)}`} />
               <StatCard tone={preview.blocking ? 'danger' : 'success'} label="Lỗi chặn" value={preview.blocking} detail={preview.blocking ? 'Phải xử lý trước khi ghi' : 'Có thể ghi'} />
             </div>
 

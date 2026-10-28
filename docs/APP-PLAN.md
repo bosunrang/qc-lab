@@ -93,7 +93,8 @@ SOP đã được phòng xét nghiệm phê duyệt trước khi sửa nghiệp 
 
 Kế hoạch phân hệ Ngoại kiểm (EQA) — nhập báo cáo PDF của trung tâm ngoại
 kiểm và làm nguồn Bias cho Six Sigma — nằm tại
-`docs/EQA-PLAN-2026-10-28.md`.
+`docs/EQA-PLAN-2026-10-28.md`; nghiệp vụ chuẩn và căn cứ tiêu chuẩn ở
+`docs/EQA-REVIEW-2026-10-28.md`, phải đọc trước khi sửa nghiệp vụ ngoại kiểm.
 
 ## 7. Quy ước mã nguồn
 

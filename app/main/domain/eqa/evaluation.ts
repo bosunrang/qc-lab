@@ -5,10 +5,9 @@
 // đồng đẳng. Main gọi các hàm này khi xem trước và khi ghi; renderer chỉ
 // trình bày kết quả đã tính.
 
-/** Ngưỡng đánh giá. Mặc định theo ISO 13528:2022 (z 2/3); PT score tối thiểu
- * là giá trị tạm của công cụ cũ, chờ SOP của khoa. */
-export interface EqaConfig { zWarn: number; zReject: number; ptMin: number }
-export const EQA_DEFAULT_CONFIG: EqaConfig = { zWarn: 2, zReject: 3, ptMin: 70 };
+/** Ngưỡng đánh giá theo ISO 13528:2022 mục 9.4.2 (z 2/3). */
+export interface EqaConfig { zWarn: number; zReject: number }
+export const EQA_DEFAULT_CONFIG: EqaConfig = { zWarn: 2, zReject: 3 };
 
 /** Sai lệch cho phép khi so z của app với z nhà cung cấp: nhà cung cấp làm
  * tròn z tới 2 chữ số (sai số ≤ 0,005), cộng thêm làm tròn X và σp. */
@@ -75,13 +74,14 @@ export function eqaPeerComparison(result: number, peer: EqaPeer): EqaPeerCompari
   });
 }
 
-export interface EqaCounts { total: number; ok: number; warn: number; rej: number; ptScore: number | null }
+export interface EqaCounts { total: number; ok: number; warn: number; rej: number; acceptPct: number | null }
 
-/** Đếm theo xếp loại; PT score = % kết quả chấp nhận (đề xuất của công cụ cũ,
- * chờ SOP xác nhận cách tính). */
+/** Đếm theo xếp loại. Tỷ lệ chấp nhận chỉ là chỉ số tổng hợp của đợt/máy,
+ * không phải tiêu chí đạt/không đạt (EQA-REVIEW N-06: đánh giá theo từng xét
+ * nghiệm qua các đợt). */
 export function eqaCounts(classes: readonly EqaClass[]): EqaCounts {
   const ok = classes.filter((c) => c === 'ok').length, warn = classes.filter((c) => c === 'warn').length, rej = classes.filter((c) => c === 'rej').length;
-  return { total: classes.length, ok, warn, rej, ptScore: classes.length ? ok / classes.length * 100 : null };
+  return { total: classes.length, ok, warn, rej, acceptPct: classes.length ? ok / classes.length * 100 : null };
 }
 
 /** Bỏ dấu, chữ thường, chỉ giữ chữ và số — để so mã thông số/máy của chương

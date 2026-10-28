@@ -39,6 +39,8 @@
 .eqa-note{margin:0;color:var(--text-tertiary);font-size:var(--text-sm);}
 .eqa-list{margin:0;padding-left:var(--space-5);display:grid;gap:var(--space-1);}
 .eqa-pre{white-space:pre-line;}
+.eqa-tags{display:inline-flex;flex-wrap:wrap;gap:var(--space-1);}
+.eqa-series{display:grid;gap:var(--space-4);min-width:0;}
 
 /* Một kỳ */
 .eqa-round-bar{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4);}

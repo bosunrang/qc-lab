@@ -11,7 +11,8 @@ import { Modal } from '../../components/Modal';
 import type { EqaClassView, EqaResultRow, EqaRoundView } from '../../../shared/qc-api';
 import { EQA_PEER_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EqaImportModal } from './EqaImportModal';
-import { ClassTag, numText, pctText, rawNum, roundLabel, StatCard } from './shared';
+import { EqaSeriesModal } from './EqaSeriesModal';
+import { ClassTag, numText, pctText, rawNum, roundLabel, StatCard, TrendTags } from './shared';
 
 const DECISION_LABEL: Readonly<Record<string, string>> = {
   import: 'Nhập đợt', append: 'Bổ sung máy vào đợt', reimport: 'Nhập lại (phiên bản mới)', cancel: 'Huỷ đợt',
@@ -34,6 +35,8 @@ function decisionDetail(type: string, payloadJson: string): string {
 
 function notes(row: EqaResultRow): string[] {
   const out: string[] = [];
+  const check = row.assigned_check;
+  if (check?.uncertain) out.push(`Giá trị ấn định kém chắc chắn: u(x_pt) = ${check.ratio.toFixed(2)}·σp > 0,3·σp (N = ${check.n}); z′ = ${check.z_prime.toFixed(2)}`);
   if (row.provider_check === 'mismatch' || row.provider_check === 'swapped') out.push(EQA_PROVIDER_CHECK_LABEL[row.provider_check]);
   return [...out, ...row.warnings];
 }
@@ -47,6 +50,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
   const [filter, setFilter] = useState<ClassFilter>('all');
   const [reimport, setReimport] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [seriesTest, setSeriesTest] = useState('');
 
   const reload = useCallback(() => {
     get(id).then((data) => { setView(data); setError(''); }).catch((e) => setError(e instanceof Error ? e.message : 'Không tải được kỳ ngoại kiểm.'));
@@ -55,7 +59,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
   useStoreInvalidation(['eqa_rounds', 'tests', 'instruments'], undefined, reload);
 
   const results = useMemo(() => (view?.results ?? []).filter((r) => (!instrument || r.instrument_id === instrument)
-    && (filter === 'all' || (filter === 'attention' ? r.class !== 'ok' || r.provider_check === 'mismatch' : r.class === filter))), [view, instrument, filter]);
+    && (filter === 'all' || (filter === 'attention' ? r.class !== 'ok' || r.provider_check === 'mismatch' || !!r.trend?.signals.length || !!r.trend?.unsuccessful || !!r.assigned_check?.uncertain : r.class === filter))), [view, instrument, filter]);
 
   if (error) return <section className="panel"><EmptyState title="Không tải được kỳ ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={reload}>Thử lại</button>}>{error}</EmptyState></section>;
   if (view === undefined) return <section className="panel"><EmptyState title="Đang tải kỳ ngoại kiểm…" /></section>;
@@ -63,7 +67,6 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
 
   const { round, config } = view;
   const open = round.status === 'open';
-  const ptLow = round.pt_score !== null && round.pt_score < config.pt_min;
 
   return (
     <div className="eqa-round">
@@ -87,7 +90,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
         <StatCard tone="success" label="Chấp nhận" value={round.ok} detail={`|z| ≤ ${numText(config.z_warn, 1)}`} />
         <StatCard tone="warning" label="Cảnh báo" value={round.warn} detail={`${numText(config.z_warn, 1)} < |z| < ${numText(config.z_reject, 1)}`} />
         <StatCard tone="danger" label="Không chấp nhận" value={round.rej} detail={`|z| ≥ ${numText(config.z_reject, 1)}`} />
-        <StatCard tone={ptLow ? 'danger' : 'info'} label="PT score" value={pctText(round.pt_score)} detail={`% chấp nhận · ngưỡng tạm ${config.pt_min}%`} />
+        <StatCard tone="info" label="Tỷ lệ chấp nhận" value={pctText(round.accept_pct)} detail="Chỉ số tổng hợp, không phải tiêu chí đạt" />
       </div>
 
       <section className="panel" aria-label="Thông tin kỳ">
@@ -112,13 +115,13 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
           <div className="eqa-section-body">
             <div className="eqa-table-wrap">
               <table className="eqa-table">
-                <thead><tr><th>Máy</th><th className="num">Kết quả</th><th className="num">Chấp nhận</th><th className="num">Cảnh báo</th><th className="num">Không CN</th><th className="num">PT score</th></tr></thead>
+                <thead><tr><th>Máy</th><th className="num">Kết quả</th><th className="num">Chấp nhận</th><th className="num">Cảnh báo</th><th className="num">Không CN</th><th className="num">Tỷ lệ chấp nhận</th></tr></thead>
                 <tbody>
                   {view.instruments.map((i) => (
                     <tr key={i.instrument_id}>
                       <td><b className="eqa-strong">{i.instrument_name}</b></td>
                       <td className="num">{i.total}</td><td className="num">{i.ok}</td><td className="num">{i.warn}</td><td className="num">{i.rej}</td>
-                      <td className="num">{pctText(i.pt_score)}</td>
+                      <td className="num">{pctText(i.accept_pct)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -154,7 +157,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
                   <tr>
                     <th>Máy</th><th>Xét nghiệm</th><th>Mẫu</th><th className="num">KQ PXN</th><th className="num">Giá trị ấn định</th>
                     <th className="num">σp</th><th className="num">z</th><th className="num">z NCC</th><th className="num">% lệch</th>
-                    <th>Đánh giá</th><th>SSC</th><th>Nhóm đồng đẳng (SDI / % lệch)</th><th>Ghi chú</th>
+                    <th>Đánh giá</th><th>Xu hướng</th><th>So TEa PXN</th><th>Nhóm đồng đẳng (SDI / % lệch)</th><th>Ghi chú</th><th aria-label="Thao tác" />
                   </tr>
                 </thead>
                 <tbody>
@@ -172,9 +175,11 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
                         <td className="num">{numText(r.z_provider)}</td>
                         <td className="num">{pctText(r.pct)}</td>
                         <td><ClassTag cls={r.class} /></td>
-                        <td>{r.within_tolerance === null ? '—' : <span className={`tag ${r.within_tolerance ? 'ok' : 'rej'}`}>{r.within_tolerance ? 'Đạt' : 'Vượt'} {numText(r.tolerance_pct, 1)}%</span>}</td>
+                        <td>{r.trend ? <TrendTags signals={r.trend.signals} unsuccessful={r.trend.unsuccessful} /> : '—'}</td>
+                        <td>{r.within_tea === null ? '—' : <span className={`tag ${r.within_tea ? 'ok' : 'warn'}`}>{r.within_tea ? 'Trong' : 'Vượt'} TEa {numText(r.tea_pct, 1)}%</span>}</td>
                         <td className="eqa-wrap">{r.peer.length ? r.peer.map((p) => `${EQA_PEER_LABEL[p.level]}: ${numText(p.sdi)} / ${pctText(p.pct)}`).join(' · ') : '—'}</td>
                         <td className="eqa-wrap">{flags.length ? flags.join('; ') : '—'}</td>
+                        <td><button type="button" className="btn ghost sm" onClick={() => setSeriesTest(r.test_id)}>Biểu đồ</button></td>
                       </tr>
                     );
                   })}
@@ -182,7 +187,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
               </table>
             </div>
           )}
-          <p className="eqa-note">Đánh giá chính thức theo z của nhà cung cấp khi có (cột z NCC); z do app tính để kiểm tra chéo. SSC: sai số cho phép (%) của thông số nếu file có khai báo.</p>
+          <p className="eqa-note">Đánh giá chính thức theo z của nhà cung cấp (cột z NCC); z do app tính để kiểm tra chéo. Xu hướng tính trên chuỗi các đợt của xét nghiệm tới đợt này. So TEa PXN là thông tin nội bộ theo TEa trong Cấu hình chung, không thay tiêu chí của nhà cung cấp.</p>
         </div>
       </section>
 
@@ -201,6 +206,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
       </section>
 
       {reimport && <EqaImportModal onClose={() => setReimport(false)} onImported={() => setReimport(false)} />}
+      {seriesTest && <EqaSeriesModal testId={seriesTest} onClose={() => setSeriesTest('')} />}
       {cancelOpen && <CancelRoundModal view={view} onClose={() => setCancelOpen(false)} cancel={cancel} />}
     </div>
   );

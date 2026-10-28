@@ -34,7 +34,7 @@ test('E-03: đối chiếu z với z trên báo cáo', () => {
 test('so nhóm đồng đẳng, PT score, gợi ý xét nghiệm, số đợt', () => {
   const [peer] = eqaPeerComparison(105, { instrument: { mean: 100, sd: 2.5, cv: 2.5, n: 30 } });
   assert.deepEqual([peer.level, peer.sdi, peer.pct], ['instrument', 2, 5]);
-  assert.deepEqual(eqaCounts(['ok', 'ok', 'warn', 'rej']), { total: 4, ok: 2, warn: 1, rej: 1, ptScore: 50 });
+  assert.deepEqual(eqaCounts(['ok', 'ok', 'warn', 'rej']), { total: 4, ok: 2, warn: 1, rej: 1, acceptPct: 50 });
   const catalog = [
     { id: 'alt-au', name: 'ALT', display_name: '', standard_name: '', abbreviation: 'ALT', aliases: ['GPT'], instrument_id: 'au', instrument_name: 'AU5800', instrument_model: '', active: true },
     { id: 'alt-dxc', name: 'ALT', display_name: '', standard_name: '', abbreviation: 'ALT', aliases: [], instrument_id: 'dxc', instrument_name: 'DxC 700', instrument_model: 'DxC700', active: true },
