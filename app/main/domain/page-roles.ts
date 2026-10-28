@@ -34,6 +34,7 @@ export const PAGE_DEFS: readonly PageDef[] = [
   { id: 'westgard', path: '/westgard', label: 'Phân tích Westgard', roles: ALL },
   { id: 'sigma', path: '/sigma', label: 'Six Sigma & Sai số', roles: ALL },
   { id: 'reagent', path: '/reagent', label: 'So sánh hóa chất', roles: ALL },
+  { id: 'eqa', path: '/eqa', label: 'Phân tích ngoại kiểm', roles: ALL },
   { id: 'actions', path: '/actions', label: 'Khắc phục sự cố', roles: STAFF },
   { id: 'report', path: '/report', label: 'Báo cáo & Biểu mẫu', roles: ALL },
   { id: 'manage', path: '/manage', label: 'Cấu hình chung', roles: ADMIN_ONLY },

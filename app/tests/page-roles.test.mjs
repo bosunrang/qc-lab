@@ -10,16 +10,16 @@ import {
   selectUserPermissions, userPageIds, canAccessPage, canUserAccessPage, firstAccessPath, roleLabel,
 } from '../main/domain/page-roles.ts';
 
-// ── 1) Đúng 11 trang, đúng thứ tự/id/nhãn ─────────────────────────────────
+// ── 1) Đúng 12 trang, đúng thứ tự/id/nhãn ─────────────────────────────────
 assert.deepEqual(
   PAGE_DEFS.map((p) => p.id),
-  ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'actions', 'report', 'manage', 'users', 'audit', 'settings'],
+  ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'eqa', 'actions', 'report', 'manage', 'users', 'audit', 'settings'],
 );
 // Nhãn hiện ở 2 nơi nhìn thấy được (sidebar + lưới "Thẻ được phép dùng") nên
 // khoá luôn từng chuỗi — kể cả "Cài đặt & Đám mây".
 assert.deepEqual(PAGE_DEFS.map((p) => p.label), [
   'Tổng quan', 'Nhập QC & Biểu đồ', 'Phân tích Westgard', 'Six Sigma & Sai số', 'So sánh hóa chất',
-  'Khắc phục sự cố', 'Báo cáo & Biểu mẫu', 'Cấu hình chung', 'Người dùng', 'Nhật ký hoạt động', 'Cài đặt & Đám mây',
+  'Phân tích ngoại kiểm', 'Khắc phục sự cố', 'Báo cáo & Biểu mẫu', 'Cấu hình chung', 'Người dùng', 'Nhật ký hoạt động', 'Cài đặt & Đám mây',
 ]);
 assert.deepEqual([...ROLE_LIST], ['admin', 'technician', 'viewer']);
 
@@ -36,9 +36,9 @@ assert.equal(isAdminRole('admin'), true);
 assert.equal(isAdminRole('technician'), false);
 
 // ── 3) rolePageIds: trần trên theo vai trò ───────────────────────────────
-assert.equal(rolePageIds('admin').length, 11, 'admin thấy đủ 11 trang');
-assert.deepEqual(rolePageIds('technician'), ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'actions', 'report']);
-assert.deepEqual(rolePageIds('viewer'), ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'report']);
+assert.equal(rolePageIds('admin').length, 12, 'admin thấy đủ 12 trang');
+assert.deepEqual(rolePageIds('technician'), ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'eqa', 'actions', 'report']);
+assert.deepEqual(rolePageIds('viewer'), ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'eqa', 'report']);
 assert.equal(rolePageIds('viewer').includes('actions'), false, 'chỉ-xem không thấy Khắc phục sự cố');
 
 for (const id of ['manage', 'users', 'audit', 'settings']) {

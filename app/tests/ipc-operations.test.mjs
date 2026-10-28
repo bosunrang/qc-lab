@@ -102,7 +102,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 139);
+  assert.equal(handlers.size, 144);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -122,17 +122,18 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
   // chủ đích, kèm lý do ghi tại dòng tương ứng trong bảng.
   assert.deepEqual(open, [
     'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
-    'attachNceRun', 'backupStatus', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
-    'completeNceAction', 'createNce', 'createReagentComparison', 'getFirebaseSettings', 'getLabProfile',
+    'attachNceRun', 'backupStatus', 'cancelEqaRound', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
+    'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaRound', 'getFirebaseSettings', 'getLabProfile',
     'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getRangeCandidate',
-    'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importLisResult',
-    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listInstruments',
+    // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
+    'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
+    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaRounds', 'listInstruments',
     'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
     'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
     'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listReagentComparisons',
     'listReagentQuickValues', 'listRuleScopes', 'listRuleSettings', 'listSigmaCohorts',
     'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
-    'listVoidedEntryPoints', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
+    'listVoidedEntryPoints', 'previewEqaImport', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
     'queryReport', 'recordNcePatientImpact', 'recordNceTechnicalAssessment', 'rejectLisResult', 'releaseNce', 'removeReagentQuickValue',
     'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewNceEffectiveness',
     'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',

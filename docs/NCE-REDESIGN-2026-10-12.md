@@ -289,7 +289,7 @@ sửa theo D-19 đến D-22:
 
 Hồi quy: `nce-domain-rerun` (chuỗi vi phạm, bao phủ phạm vi),
 `nce-domain-technical` (SEobs), `nce-handlers` (thẩm quyền, phạm vi được
-chụp), `nce-hardening` H09–H10 (rerun muộn hơn phạm vi, luật 6x trên SQLite).
+chụp), `nce-hardening` H11–H12 (rerun muộn hơn phạm vi, luật 6x trên SQLite).
 Còn chờ PXN: một bộ TEa/Bias/SD cho cả hồ sơ dù nhiều mức, thông báo riêng
 khi ΔSEcrit ≤ 0, EQA được chọn "không liên quan kết quả bệnh nhân", tín hiệu
 vượt ngưỡng chưa là tiêu chí ép CAPA.

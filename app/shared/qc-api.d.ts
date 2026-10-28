@@ -556,6 +556,70 @@ export interface ReportPointRow {
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
 }
 
+// ── Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md) ──────────────────────────────
+// Bản nháp nhập (camelCase) là dữ liệu renderer đọc từ file; main kiểm lại
+// toàn bộ. Dòng đọc từ SQLite giữ snake_case.
+
+export interface EqaPeerStatsView { mean: number | null; sd: number | null; cv: number | null; n: number | null }
+export type EqaPeerView = Partial<Record<'all' | 'method' | 'instrument', EqaPeerStatsView>>;
+export interface EqaRoundDraft {
+  program: string; provider: string; programCode: string; unitCode: string; year: number | null; round: string;
+  reportCode: string; receivedDate: string; reportDate: string; assignedLevel: string; enteredBy: string;
+}
+export interface EqaRowDraft {
+  ref: string; code: string; instrument: string; level: string; sample: string; unit: string;
+  result: number | null; assigned: number | null; sigmaP: number | null; zProvider: number | null; tolerancePct: number | null;
+  runDate: string; reagentLot: string; method: string; operator: string; iqcNote: string; peerGroup: string; peer: EqaPeerView;
+}
+export type EqaClassView = 'ok' | 'warn' | 'rej';
+export type EqaProviderCheckView = 'match' | 'swapped' | 'mismatch' | 'none';
+export interface EqaCheckedRowDraft extends EqaRowDraft {
+  testId: string | null; z: number | null; pct: number | null; zOfficial: number | null; cls: EqaClassView | null;
+  providerCheck: EqaProviderCheckView; swapped: boolean; withinTolerance: boolean | null; errors: string[]; warnings: string[];
+}
+export interface EqaImportInput {
+  round: EqaRoundDraft; rows: EqaRowDraft[]; source: 'excel' | 'html-import'; sourceName?: string;
+  /** Ánh xạ người dùng chọn cho cặp mã thông số × tên máy chưa có. */
+  mappings?: { code: string; instrument: string; testId: string }[];
+  /** Máy được xác nhận đảo lại cột kết quả/giá trị ấn định, kèm lý do. */
+  swaps?: { instrument: string; reason: string }[];
+  /** Bắt buộc khi kỳ đã có: lý do nhập lại (tạo phiên bản mới). */
+  replaceReason?: string;
+  /** Phiên bản kỳ lúc xem trước, để không ghi đè lần nhập của người khác. */
+  expectedVersion?: number;
+}
+export interface EqaImportPreview {
+  round: EqaRoundDraft; round_errors: string[]; rows: EqaCheckedRowDraft[];
+  pairs: { code: string; instrument: string; test_id: string | null; suggestions: string[]; rows: number }[];
+  swaps: { instrument: string; rows: number; swapped_rows: number; flagged: boolean; confirmed: boolean }[];
+  blocking: number;
+  counts: { total: number; ok: number; warn: number; rej: number; pt_score: number | null };
+  /** Kỳ cùng chương trình/năm/đợt đã có trong CSDL. */
+  existing: { id: string; version: number; row_version: number; status: string } | null;
+}
+export interface EqaRoundRow {
+  id: string; program_id: string; program_name: string; provider: string; program_code: string; unit_code: string;
+  year: number; round: string; round_no: number; report_code: string; received_date: string; report_date: string;
+  assigned_level: string; entered_by: string; source: string; source_name: string; status: 'open' | 'cancelled';
+  version: number; row_version: number; created_at: string; updated_at: string;
+  total: number; ok: number; warn: number; rej: number; pt_score: number | null; swapped_rows: number; instruments: string[];
+}
+export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
+export interface EqaResultRow {
+  id: string; test_id: string; test_name: string; instrument_id: string; instrument_name: string;
+  code: string; instrument_label: string; level_label: string; sample: string; unit: string;
+  result: number; assigned: number; sigma_p: number; z: number; z_provider: number | null; z_official: number; pct: number | null;
+  class: EqaClassView; provider_check: EqaProviderCheckView; swapped: number; tolerance_pct: number | null; within_tolerance: number | null;
+  run_date: string; reagent_lot: string; method: string; operator: string; iqc_note: string; peer_group: string;
+  peer: EqaPeerComparisonView[]; warnings: string[];
+}
+export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
+export interface EqaRoundView {
+  round: EqaRoundRow; results: EqaResultRow[]; decisions: EqaDecisionRow[];
+  instruments: { instrument_id: string; instrument_name: string; total: number; ok: number; warn: number; rej: number; pt_score: number | null }[];
+  config: { z_warn: number; z_reject: number; pt_min: number };
+}
+
 export interface QcApi {
   hasAnyUsers(): Promise<boolean>;
   currentUser(): Promise<PublicUser | null>;
@@ -698,6 +762,13 @@ export interface QcApi {
   saveNceConfig(input: { data: NceConfigView }): Promise<IpcResult<NceConfigView>>;
   /** Đánh giá thử lần chạy rerun/xác minh trong giai đoạn mới, không ghi gì. */
   previewNceRelease(input: { data: { id: string; rerun: NceRunKeyView; lotChangeNote?: string } }): Promise<IpcResult<NceReleasePreview>>;
+  // Ngoại kiểm
+  listEqaRounds(): Promise<EqaRoundRow[]>;
+  getEqaRound(id: string): Promise<EqaRoundView | null>;
+  /** Kiểm và tính thử một lần nhập; không ghi gì. */
+  previewEqaImport(input: { data: EqaImportInput }): Promise<IpcResult<EqaImportPreview>>;
+  importEqaRound(input: { data: EqaImportInput }): Promise<IpcResult<EqaRoundView>>;
+  cancelEqaRound(input: { data: { id: string; expectedVersion: number; reason: string } }): Promise<IpcResult<EqaRoundView>>;
   /** IQC chỉ gửi khoá lần chạy; main tự đọc xét nghiệm, mức, lô, luật, verdict. */
   createNce(input: { data: { source: NceSource; phase?: 'pre' | 'exam' | 'post'; testId?: string; trigger?: NceRunKeyView; description: string; correction: string; holdResults: boolean; detectedAt: string; ownerUserId: string; dueDate?: string } }): Promise<IpcResult<NceDossierView>>;
   attachNceRun(input: { data: NceWriteBase & { run: NceRunKeyView } }): Promise<IpcResult<NceDossierView>>;

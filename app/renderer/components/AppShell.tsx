@@ -21,7 +21,7 @@ import { NavIcon } from './NavIcon';
 // Cấu trúc nhóm điều hướng; nhãn/route/vai trò đọc từ PAGE_DEFS, không khai lại.
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Theo dõi', ids: ['dash', 'entry', 'westgard', 'sigma'] },
-  { label: 'Vận hành', ids: ['reagent', 'actions', 'report'] },
+  { label: 'Vận hành', ids: ['reagent', 'eqa', 'actions', 'report'] },
   { label: 'Quản trị', ids: ['manage', 'users', 'audit', 'settings'] },
 ];
 

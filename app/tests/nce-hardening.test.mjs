@@ -254,7 +254,7 @@ test('NCE-H09: lưu phạm vi và diễn biến có lịch sử, migration schem
   const stored = nce.getNce(view.record.id, admin);
   assert.equal(stored.record.description, view.record.description);
   assert.equal(stored.record.containment_note, '');
-  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '4');
+  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '5');
 });
 
 test('NCE-H10: cảnh báo mức vận hành thiếu không bị trình bày như đã đủ mức theo SOP', () => {
@@ -267,7 +267,7 @@ test('NCE-H10: cảnh báo mức vận hành thiếu không bị trình bày nh�
   assert.equal(checkNceRerun({ testId: 'T1', trigger: null, repeatRejects: [], candidate: { testId: 'T1', ...rerun, points: [] }, lotChangeNote: '', requiredLevels: [1, 2] }).ok, false);
 });
 
-test('NCE-H09: quyết định ảnh hưởng ghi trước lần rerun muộn hơn thì chặn release', () => {
+test('NCE-H11: quyết định ảnh hưởng ghi trước lần rerun muộn hơn thì chặn release', () => {
   const { nce, create, addRun } = fixture();
   let view = create();
   view = must(nce.updateNce({ data: { ...ref(view), patch: {
@@ -289,7 +289,7 @@ test('NCE-H09: quyết định ảnh hưởng ghi trước lần rerun muộn h�
   assert.equal(must(release(), 'cho chạy lại').record.status, 'released');
 });
 
-test('NCE-H10: luật 6x kéo khoảng nghi ngờ về đầu chuỗi, không dừng ở lần đạt ngay trước', () => {
+test('NCE-H12: luật 6x kéo khoảng nghi ngờ về đầu chuỗi, không dừng ở lần đạt ngay trước', () => {
   const { nce, addRun, testId } = fixture();
   // Mức 1 lệch dương sáu lần liên tiếp; mức 2 lệch âm để không thành chuỗi gộp mức.
   for (const date of ['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']) addRun(date, 0.5, -0.5);

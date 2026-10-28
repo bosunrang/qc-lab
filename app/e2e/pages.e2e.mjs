@@ -17,7 +17,7 @@ test('mọi trang ở thanh điều hướng mở được không lỗi', { time
 
     const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
     const labels = await nav.getByRole('link').allInnerTexts();
-    assert.equal(labels.length, 11, `quản trị viên thấy đủ 11 trang: ${labels.join(', ')}`);
+    assert.equal(labels.length, 12, `quản trị viên thấy đủ 12 trang: ${labels.join(', ')}`);
     for (const label of labels) {
       await openPage(page, label.trim());
       await page.locator('main .head').first().waitFor();
@@ -28,6 +28,9 @@ test('mọi trang ở thanh điều hướng mở được không lỗi', { time
       if (label.trim() === 'Phân tích Westgard') {
         // Bảng điểm dùng chung (`WestgardPointTable`) hiện đúng điểm vừa nhập.
         await page.locator('.wg-table tbody tr', { hasText: '5.10' }).first().waitFor();
+      }
+      if (label.trim() === 'Phân tích ngoại kiểm') {
+        await page.getByText('Chưa có kỳ ngoại kiểm nào').waitFor();
       }
       if (label.trim() === 'Six Sigma & Sai số') {
         await page.getByRole('heading', { name: 'Tình trạng' }).waitFor();

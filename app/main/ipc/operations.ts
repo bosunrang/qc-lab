@@ -30,6 +30,7 @@ import type { createEntryHandlers } from './entry-handlers';
 import type { createLisHandlers } from './lis-handlers';
 import type { createNceHandlers } from './nce-handlers';
 import type { createReagentHandlers } from './reagent-handlers';
+import type { createEqaHandlers } from './eqa-handlers';
 import type { createReportHandlers } from './report-handlers';
 import type { createSettingsHandlers } from './settings-handlers';
 import type { createSigmaHandlers } from './sigma-handlers';
@@ -77,6 +78,7 @@ export interface BusinessHandlers {
   sigma: ReturnType<typeof createSigmaHandlers>;
   nce: ReturnType<typeof createNceHandlers>;
   reagent: ReturnType<typeof createReagentHandlers>;
+  eqa: ReturnType<typeof createEqaHandlers>;
   settings: ReturnType<typeof createSettingsHandlers>;
   report: ReturnType<typeof createReportHandlers>;
   lis: ReturnType<typeof createLisHandlers>;
@@ -115,7 +117,7 @@ const DATA_API_NAMES = [
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
-  'listReagentComparisons', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'listReagentComparisons', 'listEqaRounds', 'getEqaRound', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
@@ -148,7 +150,7 @@ async function invokeOperation(name: string, operation: AnyOperation, ctx: CallC
 /** Các thao tác nghiệp vụ chỉ gọi handler của `main/ipc`, giống nhau ở mọi
  * môi trường chạy. */
 export function createBusinessOperations(h: BusinessHandlers): OperationTable<BusinessApiName> {
-  const { auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis } = h;
+  const { auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis } = h;
   // Bản tóm tắt phục vụ Tổng quan/Báo cáo vẫn mở cho người chỉ xem đã đăng
   // nhập. Hồ sơ chi tiết, hàng chờ và danh sách nhân sự chỉ dành cho NCE.
   const nceReader = (ctx: CallContext) => {
@@ -248,6 +250,12 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     getNceConfig: { channel: 'nce:getConfig', lan: true, run: (ctx) => { nceReader(ctx); return nce.getNceConfig(); } },
     saveNceConfig: { channel: 'nce:saveConfig', lan: false, run: (ctx, input) => nce.saveNceConfig(input, ctx.actor()) },
     previewNceRelease: { channel: 'nce:previewRelease', lan: true, run: (ctx, input) => { nceReader(ctx); return nce.previewNceRelease(input); } },
+    // Ngoại kiểm: đọc mở cho mọi vai trò đã đăng nhập; xem trước là bước của luồng nhập nên cần quyền ghi.
+    listEqaRounds: { channel: 'eqa:listRounds', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaRounds(); } },
+    getEqaRound: { channel: 'eqa:getRound', lan: true, run: (ctx, id) => { ctx.actor(); return eqa.getEqaRound(id); } },
+    previewEqaImport: { channel: 'eqa:previewImport', lan: true, run: (ctx, input) => { nceReader(ctx); return eqa.previewEqaImport(input); } },
+    importEqaRound: { channel: 'eqa:importRound', lan: true, run: (ctx, input) => eqa.importEqaRound(input, ctx.actor()) },
+    cancelEqaRound: { channel: 'eqa:cancelRound', lan: true, run: (ctx, input) => eqa.cancelEqaRound(input, ctx.actor()) },
     createNce: { channel: 'nce:create', lan: true, run: (ctx, input) => nce.createNce(input, ctx.actor()) },
     attachNceRun: { channel: 'nce:attachRun', lan: true, run: (ctx, input) => nce.attachNceRun(input, ctx.actor()) },
     updateNce: { channel: 'nce:update', lan: true, run: (ctx, input) => nce.updateNce(input, ctx.actor()) },

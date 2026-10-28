@@ -8,6 +8,7 @@ import { WestgardPage } from './pages/WestgardPage';
 import { SigmaPage } from './pages/SigmaPage';
 import { ActionsPage } from './pages/ActionsPage';
 import { ReagentPage } from './pages/ReagentPage';
+import { EqaPage } from './pages/EqaPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditPage } from './pages/AuditPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -27,6 +28,7 @@ const PAGE_ELEMENTS: Record<string, ReactElement> = {
   westgard: <WestgardPage />,
   sigma: <SigmaPage />,
   reagent: <ReagentPage />,
+  eqa: <EqaPage />,
   actions: <ActionsPage />,
   report: <ReportPage />,
   manage: <ManagePage />,

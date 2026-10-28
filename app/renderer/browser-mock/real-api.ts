@@ -25,6 +25,7 @@ import { createWestgardHandlers } from '../../main/ipc/westgard-handlers';
 import { createSigmaHandlers } from '../../main/ipc/sigma-handlers';
 import { createNceHandlers } from '../../main/ipc/nce-handlers';
 import { createReagentHandlers } from '../../main/ipc/reagent-handlers';
+import { createEqaHandlers } from '../../main/ipc/eqa-handlers';
 import { createAuthHandlers, type PublicUser } from '../../main/ipc/auth-handlers';
 import { createAuditHandlers } from '../../main/ipc/audit-handlers';
 import { createSettingsHandlers } from '../../main/ipc/settings-handlers';
@@ -77,6 +78,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   const sigma = createSigmaHandlers(db);
   const nce = createNceHandlers(db);
   const reagent = createReagentHandlers(db);
+  const eqa = createEqaHandlers(db);
   const auth = createAuthHandlers(db);
   const audit = createAuditHandlers(db);
   const settings = createSettingsHandlers(db, PREVIEW_DB_PATH);
@@ -115,7 +117,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     };
   }
   const business = bindOperations(
-    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis }),
+    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis }),
     sessionContext(() => sessionActor),
   );
 

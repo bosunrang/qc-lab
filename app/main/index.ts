@@ -13,6 +13,7 @@ import { createWestgardHandlers } from './ipc/westgard-handlers';
 import { createSigmaHandlers } from './ipc/sigma-handlers';
 import { createNceHandlers } from './ipc/nce-handlers';
 import { createReagentHandlers } from './ipc/reagent-handlers';
+import { createEqaHandlers } from './ipc/eqa-handlers';
 import { createAuthHandlers, type PublicUser } from './ipc/auth-handlers';
 import { createAuditHandlers } from './ipc/audit-handlers';
 import { createSettingsHandlers } from './ipc/settings-handlers';
@@ -177,6 +178,7 @@ async function createWindow(): Promise<void> {
   const sigma = createSigmaHandlers(db);
   const nce = createNceHandlers(db);
   const reagent = createReagentHandlers(db);
+  const eqa = createEqaHandlers(db);
   const auth = createAuthHandlers(db);
   const audit = createAuditHandlers(db);
   const settings = createSettingsHandlers(db, dbPath);
@@ -228,7 +230,7 @@ async function createWindow(): Promise<void> {
   // Mọi kênh IPC và mọi tuyến RPC của LAN sinh từ CÙNG hai bảng này — xem
   // `ipc/operations.ts`. Không gọi `ipcMain.handle` trực tiếp ở nơi khác.
   const operationTables = [
-    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis }),
+    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis }),
     createDesktopOperations({ db, auth, backup, firebase }, {
       session: { get: () => sessionActor, set: (actor) => { sessionActor = actor; } },
       pickBackupSavePath: async (defaultName) => {

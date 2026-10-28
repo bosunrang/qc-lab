@@ -11,7 +11,7 @@ import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -410,6 +410,93 @@ CREATE TABLE IF NOT EXISTS nce_cuts (
 );
 CREATE INDEX IF NOT EXISTS idx_nce_cuts_test ON nce_cuts(test_id);
 
+-- Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md). Chương trình của một đơn vị tổ chức;
+-- ánh xạ mã thông số × tên máy của chương trình sang xét nghiệm trong danh
+-- mục, dùng lại cho các kỳ sau.
+CREATE TABLE IF NOT EXISTS eqa_programs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT '',
+  program_code TEXT NOT NULL DEFAULT '',
+  unit_code TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS eqa_test_map (
+  id TEXT PRIMARY KEY,
+  program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+  pair_key TEXT NOT NULL,
+  code TEXT NOT NULL,
+  instrument_label TEXT NOT NULL,
+  test_id TEXT NOT NULL REFERENCES tests(id),
+  UNIQUE(program_id, pair_key)
+);
+-- Một kỳ (đợt) của chương trình. Nhập lại tăng version; kết quả các phiên
+-- bản cũ vẫn giữ trong eqa_results. Không xoá cứng: huỷ có lý do.
+CREATE TABLE IF NOT EXISTS eqa_rounds (
+  id TEXT PRIMARY KEY,
+  program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+  year INTEGER NOT NULL,
+  round TEXT NOT NULL,
+  round_no INTEGER NOT NULL DEFAULT 0,
+  report_code TEXT NOT NULL DEFAULT '',
+  received_date TEXT NOT NULL DEFAULT '',
+  report_date TEXT NOT NULL DEFAULT '',
+  assigned_level TEXT NOT NULL DEFAULT '',
+  entered_by TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'excel',
+  source_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  version INTEGER NOT NULL DEFAULT 1,
+  row_version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  UNIQUE(program_id, year, round)
+);
+CREATE TABLE IF NOT EXISTS eqa_results (
+  id TEXT PRIMARY KEY,
+  round_id TEXT NOT NULL REFERENCES eqa_rounds(id),
+  version INTEGER NOT NULL,
+  test_id TEXT NOT NULL REFERENCES tests(id),
+  code TEXT NOT NULL,
+  instrument_label TEXT NOT NULL,
+  level_label TEXT NOT NULL DEFAULT '',
+  sample TEXT NOT NULL DEFAULT '',
+  unit TEXT NOT NULL DEFAULT '',
+  result REAL NOT NULL,
+  assigned REAL NOT NULL,
+  sigma_p REAL NOT NULL,
+  z REAL NOT NULL,
+  z_provider REAL,
+  z_official REAL NOT NULL,
+  pct REAL,
+  class TEXT NOT NULL,
+  provider_check TEXT NOT NULL DEFAULT 'none',
+  swapped INTEGER NOT NULL DEFAULT 0,
+  tolerance_pct REAL,
+  within_tolerance INTEGER,
+  run_date TEXT NOT NULL DEFAULT '',
+  reagent_lot TEXT NOT NULL DEFAULT '',
+  method TEXT NOT NULL DEFAULT '',
+  operator TEXT NOT NULL DEFAULT '',
+  iqc_note TEXT NOT NULL DEFAULT '',
+  peer_group TEXT NOT NULL DEFAULT '',
+  peer_json TEXT NOT NULL DEFAULT '{}',
+  warnings_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS idx_eqa_results_round ON eqa_results(round_id, version);
+CREATE INDEX IF NOT EXISTS idx_eqa_results_test ON eqa_results(test_id);
+-- Quyết định append-only của kỳ: nhập, nhập lại, xác nhận đảo cột, huỷ.
+CREATE TABLE IF NOT EXISTS eqa_decisions (
+  id TEXT PRIMARY KEY,
+  round_id TEXT NOT NULL REFERENCES eqa_rounds(id),
+  type TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  actor_user_id TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  decided_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_eqa_decisions_round ON eqa_decisions(round_id);
+
 -- Nhật ký audit — append-only, chuỗi hash tamper-evident. Xem
 -- app/main/domain/audit-chain.ts cho thuật toán hash.
 CREATE TABLE IF NOT EXISTS activity (
@@ -560,6 +647,13 @@ const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, 'nce_records', 'containment_note', "TEXT NOT NULL DEFAULT ''");
       addColumnIfMissing(db, 'nce_records', 'occurred_note', "TEXT NOT NULL DEFAULT ''");
     },
+  },
+  {
+    version: 5,
+    // Các bảng eqa_* do SCHEMA_SQL tạo (CREATE TABLE IF NOT EXISTS); bước này
+    // chỉ đánh dấu phiên bản để bản cũ hơn từ chối mở CSDL có dữ liệu ngoại kiểm.
+    name: 'Ngoại kiểm: bảng eqa_*',
+    up() { /* bảng đã tạo trong SCHEMA_SQL */ },
   },
 ];
 
