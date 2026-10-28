@@ -9,7 +9,7 @@ import { QcChart, type QcChartPoint } from '../../components/QcChart';
 import { vnDate } from '../../lib/format';
 import type { EqaSeriesView } from '../../../shared/qc-api';
 import { EQA_SIGNAL_LABEL } from '../../../main/domain/eqa/series';
-import { ClassTag, numText, pctText, TrendTags } from './shared';
+import { ClassTag, numText, pctText, roundLabel, rowTone, TrendTags } from './shared';
 
 export function EqaSeriesModal({ testId, onClose }: { testId: string; onClose: () => void }) {
   const series = useEqaStore((s) => s.series);
@@ -44,8 +44,8 @@ export function EqaSeriesModal({ testId, onClose }: { testId: string; onClose: (
                 <thead><tr><th>Đợt</th><th>Mẫu</th><th>Ngày báo cáo</th><th className="num">z</th><th className="num">% lệch</th><th>Đánh giá</th><th className="num">J</th><th>Tín hiệu</th></tr></thead>
                 <tbody>
                   {[...view.points].reverse().map((p) => (
-                    <tr key={p.result_id} className={p.class === 'rej' ? 'is-rej' : p.class === 'warn' ? 'is-warn' : undefined}>
-                      <td><b className="eqa-strong">{p.round} / {p.year}</b></td>
+                    <tr key={p.result_id} className={rowTone(p.class)}>
+                      <td><b className="eqa-strong">{roundLabel(p)}</b></td>
                       <td>{p.sample || '—'}</td>
                       <td>{vnDate(p.report_date, '—')}</td>
                       <td className="num">{numText(p.z)}</td>

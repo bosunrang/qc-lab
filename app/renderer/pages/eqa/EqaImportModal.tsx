@@ -15,12 +15,13 @@ import type { EqaImportInput, EqaImportPreview, Instrument } from '../../../shar
 import { eqaNormalize } from '../../../main/domain/eqa/evaluation';
 import { eqaPairKey, mergeEqaSources, type EqaParsedSource } from '../../../main/domain/eqa/import';
 import type { EqaPdfReport } from '../../../main/domain/eqa/pdf-report';
-import { pctText, roundLabel, StatCard } from './shared';
+import { Facts, pctText, roundLabel, StatCard } from './shared';
 
 const TITLE = 'Nhập báo cáo PDF của trung tâm ngoại kiểm';
 const ERROR_ROW_LIMIT = 50;
 /** Lỗi/cảnh báo về năm của bộ đọc đã được người dùng xử lý ở bước chọn file. */
 const YEAR_NOTICE = /không xác định được năm|không ghi năm/;
+const withoutYearNotice = (messages: readonly string[] = []) => messages.filter((m) => !YEAR_NOTICE.test(m));
 
 /** Gợi ý máy của PXN cho nhóm thiết bị ghi trên báo cáo ("Beckman DxC 700 AU"
  * → máy tên "DxC700"). Chỉ điền khi đúng một máy khớp. */
@@ -58,7 +59,8 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
   const yearValid = Number.isInteger(yearNumber) && yearNumber >= 2000 && yearNumber <= 2100;
   const chosen = reports.map((_, i) => instrumentFor[i] ?? '');
   const duplicateInstrument = chosen.some((id, i) => id && chosen.indexOf(id) !== i);
-  const readErrors = reports.flatMap((r) => r.errors.filter((e) => !YEAR_NOTICE.test(e)));
+  const fileErrors = reports.map((r) => withoutYearNotice(r.errors));
+  const readErrors = fileErrors.flat();
   const ready = reports.length > 0 && yearValid && chosen.every(Boolean) && !duplicateInstrument;
 
   function startReview() {
@@ -67,8 +69,8 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
       return {
         round: { ...report.round, year: yearNumber },
         rows: report.rows.map((row) => ({ ...row, instrument: instrument?.name ?? row.instrument })),
-        errors: report.errors.filter((e) => !YEAR_NOTICE.test(e)),
-        warnings: (report.warnings ?? []).filter((w) => !YEAR_NOTICE.test(w)),
+        errors: fileErrors[i],
+        warnings: withoutYearNotice(report.warnings),
       };
     });
     setReview(mergeEqaSources(named, reports.map((r) => r.fileName)));
@@ -117,7 +119,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
                           {instruments.filter((i) => i.active).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
                         </select>
                       </td>
-                      <td>{report.errors.some((e) => !YEAR_NOTICE.test(e)) ? <span className="tag rej">Có lỗi</span> : <span className="tag ok">Đọc được</span>}</td>
+                      <td>{fileErrors[index].length ? <span className="tag rej">Có lỗi</span> : <span className="tag ok">Đọc được</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -201,12 +203,10 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported }: {
       <div className="eqa-import-review">
         <section className="eqa-import-block" aria-label="Thông tin đợt trong báo cáo">
           <h3>{source.round.program || 'Chưa có tên chương trình'} · {roundLabel(source.round)}</h3>
-          <dl className="eqa-facts">
-            {([
-              ['Đơn vị tổ chức', source.round.provider], ['Mã chương trình', source.round.programCode], ['Mã đơn vị', source.round.unitCode],
-              ['Mã báo cáo', source.round.reportCode], ['Số kết quả', String(source.rows.length)], ['File', sourceName],
-            ] as [string, string][]).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || <span className="hint-inline">Chưa ghi nhận.</span>}</dd></div>)}
-          </dl>
+          <Facts items={[
+            ['Đơn vị tổ chức', source.round.provider], ['Mã chương trình', source.round.programCode], ['Mã đơn vị', source.round.unitCode],
+            ['Mã báo cáo', source.round.reportCode], ['Số kết quả', String(source.rows.length)], ['File', sourceName],
+          ]} />
           {source.errors.length > 0 && <div className="alert rej eqa-pre" role="alert">{source.errors.join('\n')}</div>}
           {!!source.warnings?.length && <div className="alert warn eqa-pre">{source.warnings.join('\n')}</div>}
           {preview?.existing && (

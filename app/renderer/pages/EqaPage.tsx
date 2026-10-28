@@ -1,4 +1,4 @@
-// Trang Phân tích ngoại kiểm (docs/EQA-PLAN-2026-10-28.md, giai đoạn 1).
+// Trang Phân tích ngoại kiểm (docs/EQA-PLAN-2026-10-28.md).
 // `#/eqa` là danh sách kỳ; `#/eqa?id=…` là một kỳ. Dùng tham số truy vấn như
 // trang Khắc phục sự cố để không phải đổi bảng route dùng chung `PAGE_DEFS`.
 import { useEffect } from 'react';

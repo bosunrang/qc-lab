@@ -5,7 +5,7 @@
 // Tín hiệu là "cần xem xét", không tự gán kiểu sai số (H-04). Bộ tín hiệu thu
 // gọn để hạn chế báo động giả trên hàng chục chuỗi (H-05); không dùng RSZ/SSZ
 // làm tiêu chí vì RSZ có thể che hai z lớn trái dấu (RSC AMC TB16).
-import { eqaClass, type EqaClass, type EqaConfig, type EqaPeer, EQA_PEER_LEVELS, EQA_DEFAULT_CONFIG } from './evaluation';
+import { eqaAssignedLevel, eqaClass, type EqaClass, type EqaConfig, type EqaPeer, type EqaPeerLevel, EQA_DEFAULT_CONFIG } from './evaluation';
 
 /** Giá trị tạm chờ SOP (EQA-REVIEW mục 6). */
 export interface EqaSeriesConfig { jLimit: number; minPoints: number }
@@ -52,12 +52,12 @@ export function eqaJPoint(z: number): number {
   return Math.sign(z) * p;
 }
 
-export function eqaSeriesOrder(a: EqaSeriesInput, b: EqaSeriesInput): number {
+function seriesOrder(a: EqaSeriesInput, b: EqaSeriesInput): number {
   return a.year - b.year || a.roundNo - b.roundNo || a.round.localeCompare(b.round, 'vi') || a.sample.localeCompare(b.sample, 'vi', { numeric: true });
 }
 
 export function eqaSeries(input: readonly EqaSeriesInput[], config: EqaConfig = EQA_DEFAULT_CONFIG, series: EqaSeriesConfig = EQA_SERIES_DEFAULTS): EqaSeriesResult {
-  const sorted = [...input].sort(eqaSeriesOrder);
+  const sorted = [...input].sort(seriesOrder);
   const points: EqaSeriesPoint[] = [];
   let cum = 0;
   sorted.forEach((item, i) => {
@@ -103,7 +103,7 @@ export function eqaSeries(input: readonly EqaSeriesInput[], config: EqaConfig = 
 
 export interface EqaAssignedUncertainty {
   /** Nhóm so sánh có trung bình trùng giá trị ấn định. */
-  level: (typeof EQA_PEER_LEVELS)[number];
+  level: EqaPeerLevel;
   n: number; u: number; ratio: number;
   /** u(x_pt) > 0,3·σ_pt: giá trị ấn định kém chắc chắn. */
   uncertain: boolean;
@@ -115,8 +115,7 @@ export interface EqaAssignedUncertainty {
  * bền vững, ISO 13528). `null` khi không xác định được nhóm hoặc thiếu N/SD. */
 export function eqaAssignedUncertainty(result: number, assigned: number, sigmaP: number, peer: EqaPeer): EqaAssignedUncertainty | null {
   if (!(sigmaP > 0)) return null;
-  const same = (m: number | null) => m !== null && Math.abs(m - assigned) <= Math.max(1e-9, Math.abs(assigned) * 1e-6);
-  const level = (['instrument', 'method', 'all'] as const).find((key) => same(peer[key]?.mean ?? null));
+  const level = eqaAssignedLevel(peer, assigned);
   const stats = level ? peer[level] : undefined;
   if (!level || !stats?.n || !stats.sd || stats.n < 1 || stats.sd <= 0) return null;
   const u = 1.25 * stats.sd / Math.sqrt(stats.n);

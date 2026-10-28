@@ -1,9 +1,8 @@
 // Đánh giá kết quả ngoại kiểm định lượng (docs/EQA-PLAN-2026-10-28.md).
 //
 // Hàm thuần, không phụ thuộc SQLite: điểm z, xếp loại theo ISO 13528, đối
-// chiếu z do nhà cung cấp báo, phát hiện dữ liệu đảo cột và so sánh nhóm
-// đồng đẳng. Main gọi các hàm này khi xem trước và khi ghi; renderer chỉ
-// trình bày kết quả đã tính.
+// chiếu z do nhà cung cấp báo và so sánh nhóm đồng đẳng. Main gọi các hàm này
+// khi xem trước và khi ghi; renderer chỉ trình bày kết quả đã tính.
 
 /** Ngưỡng đánh giá theo ISO 13528:2022 mục 9.4.2 (z 2/3). */
 export interface EqaConfig { zWarn: number; zReject: number }
@@ -15,8 +14,8 @@ export const EQA_PROVIDER_Z_TOLERANCE = 0.02;
 
 export type EqaClass = 'ok' | 'warn' | 'rej';
 /** `match` khớp; `swapped` trùng độ lớn nhưng ngược dấu (kết quả và giá trị
- * ấn định bị đọc đổi chỗ); `mismatch` lệch khác; `none` không có z nhà cung
- * cấp hoặc cả hai gần 0 nên không phân biệt được chiều. */
+ * ấn định bị đọc đổi chỗ, lỗi chặn khi nhập); `mismatch` lệch khác; `none`
+ * không có z nhà cung cấp hoặc cả hai gần 0 nên không phân biệt được chiều. */
 export type EqaProviderCheck = 'match' | 'swapped' | 'mismatch' | 'none';
 
 export const EQA_CLASS_LABEL: Readonly<Record<EqaClass, string>> = { ok: 'Chấp nhận', warn: 'Cảnh báo', rej: 'Không chấp nhận' };
@@ -27,7 +26,7 @@ export const EQA_PROVIDER_CHECK_LABEL: Readonly<Record<EqaProviderCheck, string>
 /** Ba cấp nhóm so sánh trong báo cáo của nhà cung cấp. */
 export const EQA_PEER_LEVELS = ['all', 'method', 'instrument'] as const;
 export type EqaPeerLevel = typeof EQA_PEER_LEVELS[number];
-export const EQA_PEER_LABEL: Readonly<Record<EqaPeerLevel, string>> = { all: 'Tất cả PP', method: 'Nhóm PP', instrument: 'Nhóm TB' };
+export const EQA_PEER_LABEL: Readonly<Record<EqaPeerLevel, string>> = { all: 'Tất cả phương pháp', method: 'Cùng phương pháp', instrument: 'Cùng thiết bị' };
 export interface EqaPeerStats { mean: number | null; sd: number | null; cv: number | null; n: number | null }
 export type EqaPeer = Partial<Record<EqaPeerLevel, EqaPeerStats>>;
 
@@ -54,6 +53,17 @@ export function eqaClass(z: number, config: EqaConfig = EQA_DEFAULT_CONFIG): Eqa
   return a > config.zWarn ? 'warn' : 'ok';
 }
 
+/** Hai số trên báo cáo bằng nhau (bỏ qua sai số dấu phẩy động). */
+export function eqaSameValue(a: number | null, b: number | null): boolean {
+  return a !== null && b !== null && Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 1e-6);
+}
+
+/** Nhóm so sánh có trung bình trùng giá trị ấn định; ưu tiên nhóm hẹp nhất
+ * khi nhiều nhóm trùng. `null` khi không nhóm nào trùng. */
+export function eqaAssignedLevel(peer: EqaPeer, assigned: number | null): EqaPeerLevel | null {
+  return (['instrument', 'method', 'all'] as const).find((level) => eqaSameValue(peer[level]?.mean ?? null, assigned)) ?? null;
+}
+
 export function eqaProviderCheck(z: number | null, zProvider: number | null, tolerance = EQA_PROVIDER_Z_TOLERANCE): EqaProviderCheck {
   if (z === null || zProvider === null) return 'none';
   if (Math.abs(z - zProvider) <= tolerance) return 'match';
@@ -61,7 +71,7 @@ export function eqaProviderCheck(z: number | null, zProvider: number | null, tol
   return 'mismatch';
 }
 
-export interface EqaPeerComparison { level: EqaPeerLevel; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
+export interface EqaPeerComparison { level: EqaPeerLevel; mean: number; sd: number | null; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
 
 /** SDI và % lệch của kết quả PXN so với trung bình từng nhóm đồng đẳng. */
 export function eqaPeerComparison(result: number, peer: EqaPeer): EqaPeerComparison[] {
@@ -70,7 +80,7 @@ export function eqaPeerComparison(result: number, peer: EqaPeer): EqaPeerCompari
     if (!stats || stats.mean === null) return [];
     const sdi = stats.sd && stats.sd > 0 ? (result - stats.mean) / stats.sd : null;
     const pct = stats.mean !== 0 ? (result - stats.mean) / Math.abs(stats.mean) * 100 : null;
-    return [{ level, sdi, pct, cv: stats.cv, n: stats.n }];
+    return [{ level, mean: stats.mean, sd: stats.sd, sdi, pct, cv: stats.cv, n: stats.n }];
   });
 }
 
@@ -84,15 +94,20 @@ export function eqaCounts(classes: readonly EqaClass[]): EqaCounts {
   return { total: classes.length, ok, warn, rej, acceptPct: classes.length ? ok / classes.length * 100 : null };
 }
 
+/** Bỏ dấu tiếng Việt và viết thường, giữ nguyên các ký tự khác. */
+export function eqaFold(value: unknown): string {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+}
+
 /** Bỏ dấu, chữ thường, chỉ giữ chữ và số — để so mã thông số/máy của chương
  * trình với danh mục mà không phụ thuộc cách viết. */
 export function eqaNormalize(value: unknown): string {
-  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return eqaFold(value).replace(/[^a-z0-9]+/g, '');
 }
 
 /** Các từ của một mã thông số: "ALT(GPT)" → alt, gpt. */
 function tokensOf(value: unknown): string[] {
-  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return eqaFold(value).split(/[^a-z0-9]+/).filter(Boolean);
 }
 
 export interface EqaCatalogTest {

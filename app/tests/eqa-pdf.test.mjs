@@ -25,7 +25,7 @@ test('đọc báo cáo thật: thông tin đợt, 16 thông số, nhóm so sánh
   assert.equal(report.instrumentGroup, 'Beckman DxC 700 AU');
   assert.deepEqual(report.round, {
     program: 'CHƯƠNG TRÌNH NGOẠI KIỂM TRA SINH HÓA', provider: 'TRUNG TÂM KIỂM CHUẨN XÉT NGHIỆM TP.HCM', programCode: 'BC20C', unitCode: '10026',
-    year: 2026, round: 'ĐỢT 09', reportCode: '200900161510', receivedDate: '', reportDate: '2026-10-15', assignedLevel: 'Nhóm thiết bị', enteredBy: '',
+    year: 2026, round: 'ĐỢT 09', reportCode: '200900161510', reportDate: '2026-10-15', assignedLevel: 'Nhóm thiết bị',
   });
   assert.match(report.warnings[0], /năm 2026 lấy theo ngày tạo file PDF/);
   assert.deepEqual(report.rows.map((r) => r.code), ['ALT (GPT)', 'ALB', 'AST (GOT)', 'BILI-D', 'BILI-T', 'Chloride', 'CHOL', 'CREA', 'GLUC', 'HDL', 'LDL', 'Potassium', 'Sodium', 'TRIG', 'URIC', 'GGT']);

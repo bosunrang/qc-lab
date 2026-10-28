@@ -439,6 +439,8 @@ CREATE TABLE IF NOT EXISTS eqa_rounds (
   round TEXT NOT NULL,
   round_no INTEGER NOT NULL DEFAULT 0,
   report_code TEXT NOT NULL DEFAULT '',
+  -- received_date, entered_by: cột của luồng nhập Excel đã bỏ; báo cáo PDF
+  -- không ghi nên bản ghi mới để trống, app không đọc.
   received_date TEXT NOT NULL DEFAULT '',
   report_date TEXT NOT NULL DEFAULT '',
   assigned_level TEXT NOT NULL DEFAULT '',
@@ -471,7 +473,9 @@ CREATE TABLE IF NOT EXISTS eqa_results (
   pct REAL,
   class TEXT NOT NULL,
   provider_check TEXT NOT NULL DEFAULT 'none',
-  -- Cờ của luồng nhập Excel đã bỏ (đảo cột khi nhập); bản ghi mới luôn 0.
+  -- swapped, tolerance_pct, within_tolerance, run_date, reagent_lot, operator,
+  -- iqc_note, level_label: cột của luồng nhập Excel đã bỏ; báo cáo PDF không
+  -- có các thông tin này nên bản ghi mới để mặc định, app không đọc.
   swapped INTEGER NOT NULL DEFAULT 0,
   tolerance_pct REAL,
   within_tolerance INTEGER,

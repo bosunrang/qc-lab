@@ -1,5 +1,6 @@
 // Phần dùng chung của trang Phân tích ngoại kiểm: định dạng số, nhãn xếp
-// loại, tín hiệu chuỗi và ô tổng hợp. Kết luận (z, xếp loại, tín hiệu) do main tính.
+// loại, trạng thái kỳ, tín hiệu chuỗi, ô tổng hợp và khối thông tin. Kết luận
+// (z, xếp loại, tín hiệu) do main tính.
 import type { ReactNode } from 'react';
 import type { EqaClassView, EqaSignalView } from '../../../shared/qc-api';
 import { EQA_CLASS_LABEL } from '../../../main/domain/eqa/evaluation';
@@ -22,6 +23,15 @@ export function ClassTag({ cls }: { cls: EqaClassView | null }) {
   return cls ? <span className={`tag ${cls}`}>{EQA_CLASS_LABEL[cls]}</span> : <span className="tag none">Chưa đánh giá</span>;
 }
 
+/** Viền trái của dòng bảng theo xếp loại. */
+export function rowTone(cls: EqaClassView | null): string | undefined {
+  return cls === 'rej' ? 'is-rej' : cls === 'warn' ? 'is-warn' : undefined;
+}
+
+export function RoundStatusTag({ status }: { status: string }) {
+  return status === 'open' ? <span className="tag ok">Đang dùng</span> : <span className="tag none">Đã huỷ</span>;
+}
+
 /** Tín hiệu chuỗi của xét nghiệm (N-07) và trạng thái không thành công (N-06). */
 export function TrendTags({ signals, unsuccessful }: { signals: readonly EqaSignalView[]; unsuccessful: boolean }) {
   if (!signals.length && !unsuccessful) return <span className="hint-inline">Không có tín hiệu</span>;
@@ -35,6 +45,15 @@ export function TrendTags({ signals, unsuccessful }: { signals: readonly EqaSign
 
 export function roundLabel(round: { round: string; year: number | null }): string {
   return `${round.round} / ${round.year ?? '—'}`;
+}
+
+/** Khối nhãn – giá trị; giá trị trống hiện "Chưa ghi nhận.". */
+export function Facts({ items }: { items: readonly (readonly [string, string])[] }) {
+  return (
+    <dl className="eqa-facts">
+      {items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || <span className="hint-inline">Chưa ghi nhận.</span>}</dd></div>)}
+    </dl>
+  );
 }
 
 export function StatCard({ tone, label, value, detail }: { tone: 'info' | 'success' | 'warning' | 'danger' | 'neutral'; label: string; value: ReactNode; detail?: string }) {

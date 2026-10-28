@@ -29,10 +29,10 @@ function fixture() {
   return { db, eqa, ids };
 }
 
-const ROUND = { program: 'CHƯƠNG TRÌNH SINH HÓA', provider: 'TTKCXN TP. HCM', programCode: 'BC20C', unitCode: '10026', year: 2026, round: 'ĐỢT 01', reportCode: '', receivedDate: '2026-02-01', reportDate: '2026-02-20', assignedLevel: '', enteredBy: '' };
+const ROUND = { program: 'CHƯƠNG TRÌNH SINH HÓA', provider: 'TTKCXN TP. HCM', programCode: 'BC20C', unitCode: '10026', year: 2026, round: 'ĐỢT 01', reportCode: '', reportDate: '2026-02-20', assignedLevel: '' };
 const row = (code, instrument, result, assigned, sigmaP, zProvider, over = {}) => ({
-  ref: `${code}@${instrument}`, code, instrument, level: '', sample: 'M1', unit: 'U/L', result, assigned, sigmaP, zProvider, tolerancePct: null,
-  runDate: '', reagentLot: '', method: '', operator: '', iqcNote: '', peerGroup: '', peer: {}, ...over,
+  ref: `${code}@${instrument}`, code, instrument, sample: 'M1', unit: 'U/L', result, assigned, sigmaP, zProvider,
+  method: '', peerGroup: '', peer: {}, ...over,
 });
 const ROWS = [
   row('ALT(GPT)', 'AU5800', 55, 54.278, 4.917, 0.15),

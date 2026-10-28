@@ -13,7 +13,7 @@
 //   - trang tổng hợp: mỗi thông số một dòng (mã, đơn vị, kết quả, giá trị ấn
 //     định, σp, z) — dùng để đối chiếu, lệch trang chi tiết là lỗi chặn.
 // Báo cáo không ghi năm: lấy theo ngày tạo file PDF và cho người dùng sửa.
-import type { EqaPeer, EqaPeerLevel, EqaPeerStats } from './evaluation';
+import { eqaAssignedLevel, eqaFold, eqaSameValue, type EqaPeer, type EqaPeerLevel, type EqaPeerStats } from './evaluation';
 import type { EqaParsedSource, EqaRowInput } from './import';
 
 export interface EqaPdfTextItem { str: string; x: number; y: number }
@@ -35,7 +35,7 @@ interface Line { y: number; items: EqaPdfTextItem[]; text: string }
 
 /** Bỏ dấu, chữ thường, gộp khoảng trắng — để so nhãn cố định của báo cáo
  * (báo cáo có chỗ gõ thiếu dấu như "Tât cả phương pháp"). */
-const fold = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/\s+/g, ' ').trim().toLowerCase();
+const fold = (value: string) => eqaFold(value).replace(/\s+/g, ' ').trim();
 
 /** Gom chữ cùng hàng (lệch y ≤ 3 điểm) thành dòng, trên xuống dưới, trái sang phải. */
 function linesOf(items: readonly EqaPdfTextItem[]): Line[] {
@@ -120,10 +120,6 @@ export function splitVeqasTitle(title: string): { name: string; code: string; un
 
 const ASSIGNED_LEVEL_TEXT: Readonly<Record<EqaPeerLevel, string>> = { all: 'Tất cả phương pháp', method: 'Nhóm phương pháp', instrument: 'Nhóm thiết bị' };
 
-function sameValue(a: number | null, b: number | null): boolean {
-  return a !== null && b !== null && Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 1e-6);
-}
-
 interface DetailRow { page: number; name: string; code: string; unit: string; result: number | null; assigned: number | null; sigmaP: number | null; z: number | null; peer: EqaPeer; methodGroup: string; level: EqaPeerLevel | null }
 
 /** Đọc một trang thông số; `null` nếu trang không phải trang thông số. */
@@ -152,15 +148,13 @@ function parseDetailPage(lines: readonly Line[], page: number, instrumentGroup: 
     rows.forEach((row, index) => {
       const folded = fold(row.label);
       const level: EqaPeerLevel = folded.startsWith('tat ca') ? 'all'
-        : fold(row.label) === fold(instrumentGroup) || index === rows.length - 1 ? 'instrument' : 'method';
+        : folded === fold(instrumentGroup) || index === rows.length - 1 ? 'instrument' : 'method';
       const [n, mean, sd, cv] = row.nums;
       peer[level] = { n, mean, sd, cv } satisfies EqaPeerStats;
       if (level === 'method') methodGroup = row.label;
     });
   }
-  // Ưu tiên nhóm hẹp nhất khi hai nhóm trùng giá trị ấn định.
-  const level = (['instrument', 'method', 'all'] as const).find((key) => sameValue(peer[key]?.mean ?? null, assigned)) ?? null;
-  return { page, name, code, unit, result, assigned, sigmaP, z, peer, methodGroup, level };
+  return { page, name, code, unit, result, assigned, sigmaP, z, peer, methodGroup, level: eqaAssignedLevel(peer, assigned) };
 }
 
 /** Bảng tổng hợp: mã → [kết quả, giá trị ấn định, σp, z]. */
@@ -220,7 +214,7 @@ export function parseVeqasReport(doc: EqaPdfDocument): EqaPdfReport {
       const values = summary.get(key);
       if (!values) { errors.push(`${doc.fileName}: thông số ${row.code} (trang ${row.page}) không có trong trang tổng hợp.`); continue; }
       const [result, assigned, sigmaP, z] = values;
-      if (!sameValue(row.result, result) || !sameValue(row.assigned, assigned) || !sameValue(row.sigmaP, sigmaP) || (row.z !== null && !sameValue(row.z, z))) {
+      if (!eqaSameValue(row.result, result) || !eqaSameValue(row.assigned, assigned) || !eqaSameValue(row.sigmaP, sigmaP) || (row.z !== null && !eqaSameValue(row.z, z))) {
         errors.push(`${doc.fileName}: thông số ${row.code} — số liệu trang ${row.page} khác trang tổng hợp.`);
       }
     }
@@ -236,16 +230,15 @@ export function parseVeqasReport(doc: EqaPdfDocument): EqaPdfReport {
   const sample = doc.fileName.match(/_(\d{1,3}-\d{1,3})_/)?.[1] ?? '';
 
   const rows: EqaRowInput[] = details.map((row) => ({
-    ref: `${doc.fileName} · trang ${row.page}`, code: row.code, instrument: instrumentGroup, level: '', sample, unit: row.unit,
-    result: row.result, assigned: row.assigned, sigmaP: row.sigmaP, zProvider: row.z, tolerancePct: null,
-    runDate: '', reagentLot: '', method: row.methodGroup, operator: '', iqcNote: '',
-    peerGroup: instrumentGroup, peer: row.peer,
+    ref: `${doc.fileName} · trang ${row.page}`, code: row.code, instrument: instrumentGroup, sample, unit: row.unit,
+    result: row.result, assigned: row.assigned, sigmaP: row.sigmaP, zProvider: row.z,
+    method: row.methodGroup, peerGroup: instrumentGroup, peer: row.peer,
   }));
   return {
     fileName: doc.fileName, instrumentGroup,
     round: {
       program, provider, programCode, unitCode, year: year && year >= 2000 ? year : null, round: roundNo ? `ĐỢT ${roundNo.padStart(2, '0')}` : '',
-      reportCode, receivedDate: '', reportDate: doc.creationDate, assignedLevel, enteredBy: '',
+      reportCode, reportDate: doc.creationDate, assignedLevel,
     },
     rows, errors, warnings,
   };

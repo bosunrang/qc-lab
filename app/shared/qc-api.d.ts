@@ -564,18 +564,18 @@ export interface EqaPeerStatsView { mean: number | null; sd: number | null; cv: 
 export type EqaPeerView = Partial<Record<'all' | 'method' | 'instrument', EqaPeerStatsView>>;
 export interface EqaRoundDraft {
   program: string; provider: string; programCode: string; unitCode: string; year: number | null; round: string;
-  reportCode: string; receivedDate: string; reportDate: string; assignedLevel: string; enteredBy: string;
+  reportCode: string; reportDate: string; assignedLevel: string;
 }
 export interface EqaRowDraft {
-  ref: string; code: string; instrument: string; level: string; sample: string; unit: string;
-  result: number | null; assigned: number | null; sigmaP: number | null; zProvider: number | null; tolerancePct: number | null;
-  runDate: string; reagentLot: string; method: string; operator: string; iqcNote: string; peerGroup: string; peer: EqaPeerView;
+  ref: string; code: string; instrument: string; sample: string; unit: string;
+  result: number | null; assigned: number | null; sigmaP: number | null; zProvider: number | null;
+  method: string; peerGroup: string; peer: EqaPeerView;
 }
 export type EqaClassView = 'ok' | 'warn' | 'rej';
 export type EqaProviderCheckView = 'match' | 'swapped' | 'mismatch' | 'none';
 export interface EqaCheckedRowDraft extends EqaRowDraft {
   testId: string | null; z: number | null; pct: number | null; zOfficial: number | null; cls: EqaClassView | null;
-  providerCheck: EqaProviderCheckView; withinTolerance: boolean | null; errors: string[]; warnings: string[];
+  providerCheck: EqaProviderCheckView; errors: string[]; warnings: string[];
 }
 export interface EqaImportInput {
   round: EqaRoundDraft; rows: EqaRowDraft[]; source: 'pdf'; sourceName?: string;
@@ -597,19 +597,18 @@ export interface EqaImportPreview {
 }
 export interface EqaRoundRow {
   id: string; program_id: string; program_name: string; provider: string; program_code: string; unit_code: string;
-  year: number; round: string; round_no: number; report_code: string; received_date: string; report_date: string;
-  assigned_level: string; entered_by: string; source: string; source_name: string; status: 'open' | 'cancelled';
+  year: number; round: string; round_no: number; report_code: string; report_date: string;
+  assigned_level: string; source: string; source_name: string; status: 'open' | 'cancelled';
   version: number; row_version: number; created_at: string; updated_at: string;
   /** `accept_pct`: tỷ lệ kết quả chấp nhận — chỉ số tổng hợp, không phải tiêu chí đạt (N-06). */
   total: number; ok: number; warn: number; rej: number; accept_pct: number | null; instruments: string[];
 }
-export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
+export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; mean: number; sd: number | null; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
 export interface EqaResultRow {
   id: string; test_id: string; test_name: string; instrument_id: string; instrument_name: string;
-  code: string; instrument_label: string; level_label: string; sample: string; unit: string;
+  code: string; instrument_label: string; sample: string; unit: string;
   result: number; assigned: number; sigma_p: number; z: number; z_provider: number | null; z_official: number; pct: number | null;
-  class: EqaClassView; provider_check: EqaProviderCheckView; tolerance_pct: number | null; within_tolerance: number | null;
-  run_date: string; reagent_lot: string; method: string; operator: string; iqc_note: string; peer_group: string;
+  class: EqaClassView; provider_check: EqaProviderCheckView; method: string; peer_group: string;
   peer: EqaPeerComparisonView[]; warnings: string[];
   /** Độ tin cậy giá trị ấn định từ N, SD của nhóm làm giá trị ấn định (N-05). */
   assigned_check: { level: 'all' | 'method' | 'instrument'; n: number; u: number; ratio: number; uncertain: boolean; z_prime: number } | null;

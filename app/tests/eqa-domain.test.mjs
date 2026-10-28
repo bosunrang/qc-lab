@@ -62,7 +62,7 @@ const TESTS = [
   { id: 'ast-au', name: 'AST', display_name: '', standard_name: '', abbreviation: 'AST', aliases: [], instrument_id: 'au', instrument_name: 'AU5800', instrument_model: '', active: true },
 ];
 const ROUND = { program: 'SINH HÓA', provider: 'TTKCXN', year: 2026, round: 'ĐỢT 01' };
-const row = (over) => ({ ref: 'r', code: 'ALT', instrument: 'AU5800', level: '', sample: 'S1', unit: 'U/L', result: 55, assigned: 54.278, sigmaP: 4.917, zProvider: 0.15, tolerancePct: null, peer: {}, ...over });
+const row = (over) => ({ ref: 'r', code: 'ALT', instrument: 'AU5800', sample: 'S1', unit: 'U/L', result: 55, assigned: 54.278, sigmaP: 4.917, zProvider: 0.15, peer: {}, ...over });
 const ctx = (over = {}) => ({ tests: TESTS, mapping: new Map([[eqaPairKey('ALT', 'AU5800'), 'alt-au'], [eqaPairKey('AST', 'AU5800'), 'ast-au']]), ...over });
 
 test('kiểm một lần nhập: ánh xạ, trùng mẫu, z và xếp loại theo z nhà cung cấp (E-04)', () => {

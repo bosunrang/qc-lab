@@ -11,16 +11,16 @@ import {
 
 export interface EqaRoundInput {
   program: string; provider: string; programCode: string; unitCode: string;
-  year: number | null; round: string; reportCode: string;
-  receivedDate: string; reportDate: string; assignedLevel: string; enteredBy: string;
+  year: number | null; round: string; reportCode: string; reportDate: string; assignedLevel: string;
 }
 
 export interface EqaRowInput {
   /** Vị trí trong nguồn ("tệp · trang 5"), để báo lỗi đúng chỗ. */
   ref: string;
-  code: string; instrument: string; level: string; sample: string; unit: string;
-  result: number | null; assigned: number | null; sigmaP: number | null; zProvider: number | null; tolerancePct: number | null;
-  runDate: string; reagentLot: string; method: string; operator: string; iqcNote: string; peerGroup: string;
+  code: string; instrument: string; sample: string; unit: string;
+  result: number | null; assigned: number | null; sigmaP: number | null; zProvider: number | null;
+  /** Nhóm phương pháp và nhóm thiết bị ghi trên báo cáo. */
+  method: string; peerGroup: string;
   peer: EqaPeer;
 }
 
@@ -74,7 +74,7 @@ export function mergeEqaSources(sources: readonly EqaParsedSource[], names: read
 export interface EqaCheckedRow extends EqaRowInput {
   testId: string | null;
   z: number | null; pct: number | null; zOfficial: number | null; cls: EqaClass | null;
-  providerCheck: EqaProviderCheck; withinTolerance: boolean | null;
+  providerCheck: EqaProviderCheck;
   errors: string[]; warnings: string[];
 }
 
@@ -99,8 +99,8 @@ function cleanRound(raw: unknown): EqaRoundInput {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   return {
     program: text(r.program), provider: text(r.provider), programCode: text(r.programCode, 60), unitCode: text(r.unitCode, 60),
-    year: year(r.year), round: text(r.round, 40), reportCode: text(r.reportCode, 60), receivedDate: eqaDate(r.receivedDate),
-    reportDate: eqaDate(r.reportDate), assignedLevel: text(r.assignedLevel, 60), enteredBy: text(r.enteredBy, 120),
+    year: year(r.year), round: text(r.round, 40), reportCode: text(r.reportCode, 60),
+    reportDate: eqaDate(r.reportDate), assignedLevel: text(r.assignedLevel, 60),
   };
 }
 
@@ -117,11 +117,9 @@ function cleanPeer(raw: unknown): EqaPeer {
 function cleanRow(raw: unknown, index: number): EqaRowInput {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   return {
-    ref: text(r.ref, 120) || `dòng ${index + 1}`, code: text(r.code, 80), instrument: text(r.instrument, 120), level: text(r.level, 40),
+    ref: text(r.ref, 120) || `dòng ${index + 1}`, code: text(r.code, 80), instrument: text(r.instrument, 120),
     sample: text(r.sample, 40), unit: text(r.unit, 40), result: num(r.result), assigned: num(r.assigned), sigmaP: num(r.sigmaP),
-    zProvider: num(r.zProvider), tolerancePct: num(r.tolerancePct), runDate: eqaDate(r.runDate), reagentLot: text(r.reagentLot, 80),
-    method: text(r.method, 120), operator: text(r.operator, 120), iqcNote: text(r.iqcNote, 200), peerGroup: text(r.peerGroup, 120),
-    peer: cleanPeer(r.peer),
+    zProvider: num(r.zProvider), method: text(r.method, 120), peerGroup: text(r.peerGroup, 120), peer: cleanPeer(r.peer),
   };
 }
 
@@ -158,16 +156,13 @@ export function checkEqaImport(input: { round?: unknown; rows?: unknown }, ctx: 
     if (providerCheck === 'swapped') errors.push('z tính lại ngược dấu z trên báo cáo: đối chiếu kết quả và giá trị ấn định với báo cáo gốc');
     if (providerCheck === 'mismatch') warnings.push(`z (${z?.toFixed(2)}) lệch z trên báo cáo (${row.zProvider?.toFixed(2)}): đối chiếu giá trị ấn định, σp và kết quả với báo cáo gốc`);
     if (row.code && row.instrument && !testId) errors.push('chưa ánh xạ sang xét nghiệm trong danh mục');
-    return {
-      ...row, testId, z, pct, zOfficial, cls: zOfficial === null ? null : eqaClass(zOfficial, config), providerCheck,
-      withinTolerance: row.tolerancePct !== null && pct !== null ? Math.abs(pct) <= row.tolerancePct : null, errors, warnings,
-    };
+    return { ...row, testId, z, pct, zOfficial, cls: zOfficial === null ? null : eqaClass(zOfficial, config), providerCheck, errors, warnings };
   });
 
-  // Trùng mẫu của cùng thông số × máy (× mức) trong một đợt.
+  // Trùng mẫu của cùng thông số × máy trong một đợt.
   const seen = new Map<string, string>();
   for (const row of rows) {
-    const key = `${eqaPairKey(row.code, row.instrument)}|${eqaNormalize(row.level)}|${eqaNormalize(row.sample)}`;
+    const key = `${eqaPairKey(row.code, row.instrument)}|${eqaNormalize(row.sample)}`;
     if (seen.has(key)) row.errors.push(`trùng mẫu ${row.sample || '(trống)'} với ${seen.get(key)}`);
     else seen.set(key, row.ref);
   }

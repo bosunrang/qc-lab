@@ -34,6 +34,23 @@
 .eqa-wrap{min-width:180px;white-space:normal;overflow-wrap:anywhere;}
 .eqa-table tbody tr.is-rej td:first-child{box-shadow:inset 3px 0 0 var(--danger-accent);}
 .eqa-table tbody tr.is-warn td:first-child{box-shadow:inset 3px 0 0 var(--warning-accent);}
+.eqa-table td.num{white-space:nowrap;}
+.eqa-test-cell{min-width:200px;}
+.eqa-row-actions{display:flex;justify-content:center;gap:var(--space-1);white-space:nowrap;}
+/* Bảng kết quả kỳ: căn giữa mọi cột trừ Xét nghiệm và dòng mở rộng. */
+.eqa-results-table th,.eqa-results-table td{text-align:center;}
+.eqa-results-table th.eqa-test-cell,.eqa-results-table td.eqa-test-cell,.eqa-results-table tr.eqa-detail-row>td{text-align:left;}
+.eqa-results-table .eqa-peer th,.eqa-results-table .eqa-peer td{text-align:left;}
+.eqa-results-table .eqa-peer .num{text-align:center;}
+
+/* Dòng mở rộng của bảng kết quả: nhóm đồng đẳng và lưu ý. */
+.eqa-table tbody tr.eqa-detail-row>td{padding-top:0;background:var(--surface-sunken);}
+.eqa-detail{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:var(--space-5);padding:var(--space-3) 0;}
+.eqa-detail .eqa-note{margin-top:var(--space-2);font-size:var(--text-xs);}
+.eqa-detail h3{margin:0 0 var(--space-2);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-secondary);}
+.eqa-peer{width:auto;min-width:min(100%,560px);}
+.eqa-peer th,.eqa-peer td{padding:var(--space-1-5) var(--space-3);background:transparent;}
+.eqa-peer-name{display:inline-flex;align-items:center;gap:var(--space-2);color:var(--text-primary);font-weight:var(--weight-semibold);white-space:nowrap;}
 
 .eqa-toggle{display:inline-flex;align-items:center;gap:var(--space-2);color:var(--text-secondary);font-size:var(--text-sm);cursor:pointer;}
 .eqa-note{margin:0;color:var(--text-tertiary);font-size:var(--text-sm);}

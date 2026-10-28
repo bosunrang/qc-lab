@@ -9,7 +9,7 @@ import { vnDate } from '../../lib/format';
 import { EmptyState } from '../../components/EmptyState';
 import { EqaImportModal } from './EqaImportModal';
 import { EqaSeriesModal } from './EqaSeriesModal';
-import { ClassTag, numText, pctText, roundLabel, StatCard, TrendTags } from './shared';
+import { ClassTag, numText, pctText, roundLabel, RoundStatusTag, StatCard, TrendTags } from './shared';
 
 export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
   const { rounds, attention, loading, error, load } = useEqaStore(useShallow((s) => ({ rounds: s.rounds, attention: s.attention, loading: s.loading, error: s.error, load: s.load })));
@@ -57,7 +57,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
                     <tr key={a.test_id} className={a.latest.unsuccessful || a.latest.class === 'rej' ? 'is-rej' : 'is-warn'}>
                       <td><b className="eqa-strong">{a.test_name}</b></td>
                       <td>{a.instrument_name}</td>
-                      <td>{a.latest.round} / {a.latest.year}</td>
+                      <td>{roundLabel(a.latest)}</td>
                       <td className="num">{numText(a.latest.z)}</td>
                       <td><ClassTag cls={a.latest.class} /></td>
                       <td><TrendTags signals={a.latest.signals} unsuccessful={a.latest.unsuccessful} /></td>
@@ -108,7 +108,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
                         <td className="num">{r.rej}</td>
                         <td className="num">{pctText(r.accept_pct)}</td>
                         <td>{vnDate(r.report_date, '—')}</td>
-                        <td>{r.status === 'open' ? <span className="tag ok">Đang dùng</span> : <span className="tag none">Đã huỷ</span>}</td>
+                        <td><RoundStatusTag status={r.status} /></td>
                         <td><button type="button" className="btn ghost sm" onClick={() => onOpen(r.id)}>Xem</button></td>
                       </tr>
                     ))}

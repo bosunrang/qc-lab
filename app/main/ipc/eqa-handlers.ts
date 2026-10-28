@@ -1,7 +1,7 @@
-// Handler phân hệ Ngoại kiểm, giai đoạn 1 (docs/EQA-PLAN-2026-10-28.md):
-// xem trước và nhập một kỳ, huỷ kỳ, đọc danh sách và chi tiết. Mọi phép tính
-// (z, xếp loại, đối chiếu nhà cung cấp, đảo cột) chạy lại ở đây bằng
-// `domain/eqa/*`; renderer chỉ gửi dữ liệu thô đã đọc từ file.
+// Handler phân hệ Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md): xem trước và nhập
+// một kỳ, huỷ kỳ, đọc danh sách, chi tiết và chuỗi theo xét nghiệm. Mọi phép
+// tính (z, xếp loại, đối chiếu nhà cung cấp, tín hiệu chuỗi) chạy lại ở đây
+// bằng `domain/eqa/*`; renderer chỉ gửi dữ liệu thô đã đọc từ báo cáo PDF.
 import type { Db } from '../db/sqlite-like';
 import type {
   EqaAttentionRow, EqaDecisionRow, EqaImportInput, EqaImportPreview, EqaResultRow, EqaRoundRow, EqaRoundView, EqaSeriesView,
@@ -51,9 +51,8 @@ export function createEqaHandlers(db: Db) {
     }));
   }
 
-  /** Chương trình nhận diện theo mã chương trình + mã đơn vị khi có cả hai
-   * (báo cáo PDF và file Excel ghi tên đơn vị tổ chức khác nhau), nếu không
-   * thì theo tên + đơn vị tổ chức, không phân biệt cách viết. */
+  /** Chương trình nhận diện theo mã chương trình + mã đơn vị khi có cả hai,
+   * nếu không thì theo tên + đơn vị tổ chức, không phân biệt cách viết. */
   function findProgram(round: Record<string, unknown>): { id: string } | undefined {
     const rows = db.prepare('SELECT id, name, provider, program_code, unit_code FROM eqa_programs').all() as { id: string; name: string; provider: string; program_code: string; unit_code: string }[];
     const code = eqaNormalize(round.programCode), unit = eqaNormalize(round.unitCode);
@@ -162,33 +161,30 @@ export function createEqaHandlers(db: Db) {
         ON CONFLICT(program_id,pair_key) DO UPDATE SET test_id=excluded.test_id, code=excluded.code, instrument_label=excluded.instrument_label`);
       for (const pair of check.pairs) if (pair.testId) upsertMap.run(uid(), pid, eqaPairKey(pair.code, pair.instrument), pair.code, pair.instrument, pair.testId);
       if (existing) {
-        db.prepare(`UPDATE eqa_rounds SET report_code=?,received_date=?,report_date=?,assigned_level=?,entered_by=?,source=?,source_name=?,status='open',
+        db.prepare(`UPDATE eqa_rounds SET report_code=?,report_date=?,assigned_level=?,source=?,source_name=?,status='open',
           version=?,row_version=row_version+1,updated_at=? WHERE id=?`)
-          .run(round.reportCode, round.receivedDate, round.reportDate, round.assignedLevel, round.enteredBy, source, sourceName, version, now, roundId);
+          .run(round.reportCode, round.reportDate, round.assignedLevel, source, sourceName, version, now, roundId);
       } else {
-        db.prepare(`INSERT INTO eqa_rounds(id,program_id,year,round,round_no,report_code,received_date,report_date,assigned_level,entered_by,source,source_name,status,version,row_version,created_at,updated_at)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'open',1,1,?,?)`)
-          .run(roundId, pid, round.year, round.round, eqaRoundNumber(round.round), round.reportCode, round.receivedDate, round.reportDate, round.assignedLevel, round.enteredBy, source, sourceName, now, now);
+        db.prepare(`INSERT INTO eqa_rounds(id,program_id,year,round,round_no,report_code,report_date,assigned_level,source,source_name,status,version,row_version,created_at,updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,'open',1,1,?,?)`)
+          .run(roundId, pid, round.year, round.round, eqaRoundNumber(round.round), round.reportCode, round.reportDate, round.assignedLevel, source, sourceName, now, now);
       }
-      const insert = db.prepare(`INSERT INTO eqa_results(id,round_id,version,test_id,code,instrument_label,level_label,sample,unit,result,assigned,sigma_p,z,z_provider,z_official,pct,class,
-        provider_check,swapped,tolerance_pct,within_tolerance,run_date,reagent_lot,method,operator,iqc_note,peer_group,peer_json,warnings_json)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      const insert = db.prepare(`INSERT INTO eqa_results(id,round_id,version,test_id,code,instrument_label,sample,unit,result,assigned,sigma_p,z,z_provider,z_official,pct,class,
+        provider_check,method,peer_group,peer_json,warnings_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
       // Giữ kết quả hiện hành của các máy không có trong lần nhập này.
       if (existing && prepared.present.size) {
         const previous = db.prepare('SELECT e.*, t.instrument_id FROM eqa_results e JOIN tests t ON t.id=e.test_id WHERE e.round_id=? AND e.version=?')
           .all(existing.id, existing.version) as Record<string, unknown>[];
         for (const old of previous) {
           if (prepared.incoming.has(String(old.instrument_id))) continue;
-          insert.run(uid(), roundId, version, old.test_id, old.code, old.instrument_label, old.level_label, old.sample, old.unit, old.result, old.assigned, old.sigma_p,
-            old.z, old.z_provider, old.z_official, old.pct, old.class, old.provider_check, old.swapped, old.tolerance_pct, old.within_tolerance, old.run_date,
-            old.reagent_lot, old.method, old.operator, old.iqc_note, old.peer_group, old.peer_json, old.warnings_json);
+          insert.run(uid(), roundId, version, old.test_id, old.code, old.instrument_label, old.sample, old.unit, old.result, old.assigned, old.sigma_p,
+            old.z, old.z_provider, old.z_official, old.pct, old.class, old.provider_check, old.method, old.peer_group, old.peer_json, old.warnings_json);
         }
       }
       for (const row of check.rows) {
-        insert.run(uid(), roundId, version, row.testId, row.code, row.instrument, row.level, row.sample, row.unit, row.result, row.assigned, row.sigmaP,
-          row.z, row.zProvider, row.zOfficial, row.pct, row.cls, row.providerCheck, 0, row.tolerancePct,
-          row.withinTolerance === null ? null : row.withinTolerance ? 1 : 0, row.runDate, row.reagentLot, row.method, row.operator,
-          row.iqcNote, row.peerGroup, JSON.stringify(row.peer), JSON.stringify(row.warnings));
+        insert.run(uid(), roundId, version, row.testId, row.code, row.instrument, row.sample, row.unit, row.result, row.assigned, row.sigmaP,
+          row.z, row.zProvider, row.zOfficial, row.pct, row.cls, row.providerCheck, row.method, row.peerGroup, JSON.stringify(row.peer), JSON.stringify(row.warnings));
       }
       const decide = db.prepare('INSERT INTO eqa_decisions(id,round_id,type,payload_json,actor_user_id,actor_name,decided_at) VALUES (?,?,?,?,?,?,?)');
       const actorName = w.actor.name || w.actor.username;
@@ -229,7 +225,9 @@ export function createEqaHandlers(db: Db) {
 
   // Đọc dữ liệu
 
-  const ROUND_SQL = `SELECT r.*, p.name AS program_name, p.provider, p.program_code, p.unit_code FROM eqa_rounds r JOIN eqa_programs p ON p.id=r.program_id`;
+  const ROUND_SQL = `SELECT r.id, r.program_id, r.year, r.round, r.round_no, r.report_code, r.report_date, r.assigned_level, r.source, r.source_name,
+    r.status, r.version, r.row_version, r.created_at, r.updated_at, p.name AS program_name, p.provider, p.program_code, p.unit_code
+    FROM eqa_rounds r JOIN eqa_programs p ON p.id=r.program_id`;
 
   /** Chuỗi z của một xét nghiệm qua các đợt đang dùng (phiên bản hiện hành). */
   function seriesOf(testId: string): EqaSeriesResult & { meta: Map<string, { round_id: string; report_date: string; pct: number | null }> } {
@@ -240,16 +238,19 @@ export function createEqaHandlers(db: Db) {
     return { ...result, meta: new Map(rows.map((r) => [r.id, { round_id: r.round_id, report_date: r.report_date, pct: r.pct }])) };
   }
 
-  /** `withTrend`: tính tín hiệu chuỗi cho từng dòng (chỉ cần ở trang chi tiết đợt). */
-  function resultRows(roundId: string, version: number, withTrend = false): EqaResultRow[] {
-    const rows = db.prepare(`SELECT e.*, COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.instrument_id, t.tea AS test_tea, i.name AS instrument_name
+  /** Kết quả hiện hành của một kỳ kèm so sánh nhóm, độ tin cậy giá trị ấn định
+   * và tín hiệu chuỗi — chỉ trang chi tiết kỳ cần. */
+  function resultRows(roundId: string, version: number): EqaResultRow[] {
+    const rows = db.prepare(`SELECT e.id, e.test_id, e.code, e.instrument_label, e.sample, e.unit, e.result, e.assigned, e.sigma_p, e.z, e.z_provider,
+      e.z_official, e.pct, e.class, e.provider_check, e.method, e.peer_group, e.peer_json, e.warnings_json,
+      COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.instrument_id, t.tea AS test_tea, i.name AS instrument_name
       FROM eqa_results e JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id
-      WHERE e.round_id=? AND e.version=? ORDER BY i.name, test_name, e.level_label, e.sample`).all(roundId, version) as unknown as (Omit<EqaResultRow, 'peer' | 'warnings' | 'assigned_check' | 'tea_pct' | 'within_tea' | 'trend'> & { peer_json: string; warnings_json: string; test_tea: number | null })[];
+      WHERE e.round_id=? AND e.version=? ORDER BY i.name, test_name, e.sample`).all(roundId, version) as unknown as (Omit<EqaResultRow, 'peer' | 'warnings' | 'assigned_check' | 'tea_pct' | 'within_tea' | 'trend'> & { peer_json: string; warnings_json: string; test_tea: number | null })[];
     const series = new Map<string, EqaSeriesResult>();
     return rows.map(({ peer_json, warnings_json, test_tea, ...row }) => {
       const peer = parseJson<EqaPeer>(peer_json, {});
       const check = eqaAssignedUncertainty(row.result, row.assigned, row.sigma_p, peer);
-      if (withTrend && !series.has(row.test_id)) series.set(row.test_id, seriesOf(row.test_id));
+      if (!series.has(row.test_id)) series.set(row.test_id, seriesOf(row.test_id));
       const point = series.get(row.test_id)?.points.find((p) => p.id === row.id);
       const tea = test_tea !== null && Number(test_tea) > 0 ? Number(test_tea) : null;
       return {
@@ -291,7 +292,9 @@ export function createEqaHandlers(db: Db) {
     }).sort((a, b) => Number(b.latest.unsuccessful) - Number(a.latest.unsuccessful) || a.instrument_name.localeCompare(b.instrument_name, 'vi') || a.test_name.localeCompare(b.test_name, 'vi'));
   }
 
-  function toRoundRow(row: Record<string, unknown>, results: readonly EqaResultRow[]): EqaRoundRow {
+  interface ResultBrief { class: EqaClass; instrument_name: string }
+
+  function toRoundRow(row: Record<string, unknown>, results: readonly ResultBrief[]): EqaRoundRow {
     const counts = eqaCounts(results.map((r) => r.class));
     return {
       ...(row as unknown as EqaRoundRow),
@@ -300,15 +303,20 @@ export function createEqaHandlers(db: Db) {
     };
   }
 
+  /** Danh sách chỉ cần đếm xếp loại và tên máy, không dựng lại từng kết quả. */
   function listEqaRounds(): EqaRoundRow[] {
     const rounds = db.prepare(`${ROUND_SQL} ORDER BY r.year DESC, r.round_no DESC, p.name`).all() as Record<string, unknown>[];
-    return rounds.map((row) => toRoundRow(row, resultRows(String(row.id), Number(row.version))));
+    const briefs = db.prepare(`SELECT e.round_id, e.class, i.name AS instrument_name FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version
+      JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id`).all() as (ResultBrief & { round_id: string })[];
+    const byRound = new Map<string, ResultBrief[]>();
+    for (const b of briefs) byRound.set(b.round_id, [...(byRound.get(b.round_id) ?? []), b]);
+    return rounds.map((row) => toRoundRow(row, byRound.get(String(row.id)) ?? []));
   }
 
   function getEqaRound(id: unknown): EqaRoundView | null {
     const row = db.prepare(`${ROUND_SQL} WHERE r.id=?`).get(cleanId(id)) as Record<string, unknown> | undefined;
     if (!row) return null;
-    const results = resultRows(String(row.id), Number(row.version), true);
+    const results = resultRows(String(row.id), Number(row.version));
     const byInstrument = new Map<string, EqaResultRow[]>();
     for (const r of results) byInstrument.set(r.instrument_id, [...(byInstrument.get(r.instrument_id) ?? []), r]);
     const config = readEqaConfig(db);
