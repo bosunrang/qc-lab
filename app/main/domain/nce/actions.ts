@@ -53,7 +53,17 @@ export function latestActionDoneDate(actions: readonly Pick<NceAction, 'status' 
   return actions.filter((action) => action.status === 'done' && action.doneAt).map((action) => localDateOf(action.doneAt)).sort().at(-1) ?? '';
 }
 
-export type NceEffectivenessDraft = Omit<NceEffectivenessReview, 'reviewerUserId'>;
+export type NceEffectivenessDraft = Omit<NceEffectivenessReview, 'reviewerUserId' | 'basis'>;
+
+/** Chốt tiêu chí, nguy cơ và hành động để sửa sau đó không kế thừa hiệu lực cũ. */
+export function nceEffectivenessBasis(dossier: Pick<NceDossier, 'effectivenessCriteria' | 'actions' | 'riskSeverity' | 'riskProbability' | 'riskLevel' | 'riskBasis' | 'causeStatus' | 'causeCategory' | 'causeText' | 'causeCheckPlan'>): string {
+  return JSON.stringify({
+    criteria: dossier.effectivenessCriteria,
+    risk: [dossier.riskSeverity, dossier.riskProbability, dossier.riskLevel, dossier.riskBasis],
+    cause: [dossier.causeStatus, dossier.causeCategory, dossier.causeText, dossier.causeCheckPlan],
+    actions: [...dossier.actions].sort((a, b) => a.id.localeCompare(b.id)).map((a) => [a.id, a.kind, a.description, a.ownerUserId, a.dueDate, a.status, a.doneAt, a.doneByUserId, a.evidence, a.cancelReason]),
+  });
+}
 
 /** Kiểm một lần đánh giá hiệu lực mới. Phải có tiêu chí đặt TRƯỚC (D-08,
  * NCE-PLAN bước 7), ít nhất một hành động khắc phục đã xong, và ngày đánh giá

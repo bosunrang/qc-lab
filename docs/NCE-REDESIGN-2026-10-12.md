@@ -70,13 +70,20 @@ Các quyết định dưới đây chọn theo chuẩn. Chỉ đổi khi SOP ph�
 | D-06 | **Phân tầng**: `low` (xử lý nhanh, không bắt RCA/CAPA, phải ghi lý do) và `capa` (bắt buộc nguyên nhân, hành động, đánh giá hiệu lực). Main ép `capa` khi có một tiêu chí kích hoạt (mục 5.3) | ISO 15189:2022 8.7.1 (hành động tương xứng với ảnh hưởng); QĐ 2429 Chương X |
 | D-07 | Nguy cơ dùng ma trận **mức độ nghiêm trọng × khả năng xảy ra** (1–5 × 1–5), cùng thang cho nguy cơ ban đầu và còn lại. Bỏ bắt buộc FMEA S×O×D | ISO 22367:2020 (quản lý rủi ro PXN y học: nguy cơ là kết hợp xác suất xảy ra tác hại và mức độ nghiêm trọng) |
 | D-08 | Kết luận "không hiệu quả" thì bổ sung hành động và đánh giá lại **trong cùng hồ sơ**; không đóng hồ sơ khi lần đánh giá cuối không phải "hiệu quả". Tái diễn sau khi đã đóng mở hồ sơ mới có liên kết | ISO 15189:2022 8.7.1 e–f |
-| D-09 | Duyệt đóng hồ sơ cần capability `nce.approve` và người duyệt không phải người báo cáo, người phụ trách, người cho chạy lại, người hoàn thành hành động hay người đánh giá hiệu lực | ISO 15189:2022 5.4 (trách nhiệm, thẩm quyền), 8.7; NCE-PLAN mục 10 |
+| D-09 | Duyệt đóng hồ sơ cần capability `nce.approve` và người duyệt không phải người báo cáo, người phụ trách, người xác minh kỹ thuật, người đánh giá ảnh hưởng bệnh nhân, người cho chạy lại, người hoàn thành hành động hay người đánh giá hiệu lực | ISO 15189:2022 5.4 (trách nhiệm, thẩm quyền), 8.7; NCE-PLAN mục 10 |
 | D-10 | Hồ sơ đã cho chạy lại không được hủy (hủy sẽ làm đổi mốc cắt Westgard); chỉ hủy được khi còn ở `open` | Toàn vẹn hồ sơ QC |
 | D-11 | Sigma coi điểm bị loại "đã xử lý" khi hồ sơ chứa điểm đó ở trạng thái `closed` (thay cho "duyệt + hiệu quả"; hồ sơ tầng `capa` chỉ đóng được khi hiệu quả) | ISO/TS 20914 như đã chốt ở `SIGMA-REVIEW-2026-09-22-lan2.md` |
 | D-12 | Đổi dải QC không phải NCE: thôi ghi vào bảng NCE (lịch sử đã có ở `test_levels.mean_sd_history_json` và audit). Cổng an toàn đổi dải chỉ bật khi có NCE sai số hệ thống **chưa đóng** hoặc gắn **lô đang dùng** của mức đó | Kiểm soát thay đổi khác với sự không phù hợp (ISO 15189:2022 8.5 so với 7.5) |
 | D-13 | Mọi ngày "hôm nay" ở main lấy theo giờ địa phương của máy chính (`isoLocalDate()`); thời điểm lưu ISO đầy đủ | Thống nhất với quy tắc quá hạn hiện có |
 | D-14 | Hàng chờ NCE chỉ gồm lần chạy bị **loại**; cảnh báo (1-2s và mọi luật đặt hành động "Cảnh báo") không vào hàng chờ, vẫn hiện ở Nhập QC và Tổng quan. Người dùng vẫn có thể tự mở NCE từ nguồn khác khi cần. Người dùng xác nhận ngày 2026-10-12 | Westgard: 1-2s là quy tắc cảnh báo, không loại lần chạy |
 | D-15 | Hồ sơ không phải IQC có xét nghiệm được kèm một lần chạy QC xác minh khi cho chạy lại (từ ngày phát hiện, đủ mức đang vận hành, không bị loại trong giai đoạn mới) và lần chạy đó cũng là mốc cắt. Thêm ngày 2026-10-12 khi làm giai đoạn 2 | Westgard bài 18 như D-03; tín hiệu CUSUM không loại lần chạy nào nên cần đường này để bắt đầu lại chuỗi |
+| D-16 | Ngày phát hiện thực tế khác ngày lập hồ sơ. Khi ghi sai, chỉ đính chính ở `open` với quyền `nce.release`, lý do có căn cứ và lịch sử trước–sau. Không đổi ngày QC, mã NCE, thời điểm lập/quyết định; không đính chính sau release | Người dùng yêu cầu ưu tiên xử lý hồi cứu ngày 15/10/2026; toàn vẹn hồ sơ, không tự lùi ngày để nhận bằng chứng cũ |
+| D-17 | Tại thời điểm 15/10/2026 chỉ dùng checklist hiện hành, chưa thêm ngưỡng khi thiếu SOP. Phần “không thêm” được **D-18 thay thế** sau khi người dùng cung cấp hướng dẫn ngày 27/10/2026; nguyên tắc không đòi CAPA xong trước release vẫn giữ nguyên | Lịch sử quyết định trước khi có tài liệu nguồn; D-18 ghi phạm vi bổ sung |
+| D-18 | IQC ngoài kiểm soát có bước xác minh kỹ thuật riêng, bổ sung môi trường, TEa/Bias/SD và nhánh xem xét Mean/SD; mọi phép tính chỉ là tín hiệu kỹ thuật, quyết định lâm sàng vẫn do người có thẩm quyền ghi riêng | Hướng dẫn người dùng cung cấp ngày 27/10/2026; chi tiết và công thức ở phụ lục D-18 phía dưới |
+| D-19 | Quyết định ảnh hưởng bệnh nhân lưu **phạm vi đã rà soát** do main chụp (lần đạt cuối, lần đầu chuỗi vi phạm, lần chạy QC mới nhất lúc ghi). Cho chạy lại, nộp và duyệt bị chặn khi phạm vi đó không bao phủ khoảng nghi ngờ hiện tính: bắt đầu muộn hơn, hoặc chưa tới lần rerun. Quyết định cũ không có phạm vi phải ghi lại | ISO 15189:2022 7.3.7.2 (đánh giá kết quả bệnh nhân từ lần IQC thành công cuối), 7.5; sửa hạng mục "chưa ràng buộc phạm vi" ghi ở đợt 16/10 |
+| D-20 | `SEobs = \|Bias sự cố − Bias ổn định\| / SD` — cùng mốc với ΔSEcrit. Bias sau khắc phục chỉ bắt buộc ở nhánh xây lại Mean/SD, không chặn cho chạy lại | Westgard, sai số hệ thống tới hạn: ΔSEcrit tính từ Bias nền nên dịch chuyển phải đo từ cùng mốc; D-02 (một lần rerun đạt là đủ để hoạt động trở lại). Rà soát 28/10/2026, thay công thức cũ của hướng dẫn 27/10 |
+| D-21 | Ghi quyết định ảnh hưởng bệnh nhân cần capability `nce.release` (cùng thẩm quyền cho hoạt động trở lại); thẩm quyền theo mức độ vẫn chờ SOP | ISO 15189:2022 5.4, 7.5; nguyên tắc ở D-18 "quyết định lâm sàng do người có thẩm quyền ghi" |
+| D-22 | Khoảng nghi ngờ bắt đầu sau lần đạt cuối **trước lần chạy đầu tiên của chuỗi vi phạm**. Luật loại bỏ đếm nhiều lần chạy (2-2s, 4-1s, 6x, 8x, 9x, 10x, 12x, 7T…) lần ngược theo điểm làm bằng chứng của engine; luật cảnh báo không kéo dài khoảng. Khoảng tính trên đúng lô của lần khởi đầu | Các lần chạy trong chuỗi từng được chấp nhận nhưng đã mang sai số; ISO 15189:2022 7.3.7.2 nêu mốc "lần IQC thành công cuối", nhìn lại sau khi luật nổ thì các lần đó không còn là lần thành công |
 
 **Cấu hình có giá trị mặc định tạm, chờ SOP** (lưu `app_meta`, sửa ở Cài đặt):
 
@@ -126,6 +133,8 @@ trạng thái từ dữ liệu đã nhập. Mỗi lượt đọc hồ sơ trả 
 ### 5.2. Cho chạy lại (`open → released`)
 
 - Capability `nce.release`.
+- Checklist theo nguồn đã đánh giá; mục bất thường/không áp dụng phải có
+  bằng chứng/lý do. Mục này được đưa lên trước release theo D-17.
 - IQC: rerun đạt D-04; quyết định ảnh hưởng bệnh nhân đạt D-05; nếu kết luận là
   "đã trả kết quả và phải sửa/thông báo" thì bắt buộc mô tả và mã tham chiếu.
 - Có đọc thử `previewNceRelease` trả kết quả đánh giá từng mức của lần chạy
@@ -246,7 +255,267 @@ nhiệm vụ) nằm ở `app/main/domain/nce/` để test trực tiếp, không 
 - Không còn ô gõ tên người cho phép, người duyệt; danh tính lấy từ phiên.
 - Thuật ngữ đúng mục 3 NCE-PLAN: "xử lý tức thời" ≠ "hành động khắc phục".
 
+### Cập nhật giao diện 2026-10-14
+
+- Tổng quan có bốn mục ưu tiên (QC chưa có hồ sơ, đang xử lý, chờ duyệt,
+  quá hạn), thẻ từng sự cố, tìm hồ sơ không dấu và bảng hồ sơ năm cột.
+- Tám phần của hồ sơ được gom vào bốn bước điều hướng: ghi nhận, cho hoạt
+  động trở lại, điều tra/CAPA, phê duyệt/lịch sử. Mở bước theo `next_step`
+  và `missing[]` của main; danh sách điều kiện còn thiếu được thu gọn và
+  từng mục dẫn tới phần cần hoàn thiện. Hồ sơ chờ duyệt mở toàn bộ bằng chứng.
+- Chuyển bước giữ bản nháp. Bản nháp nội dung và hành động giữ phiên bản lúc
+  mở form; thông báo thay đổi không nâng phiên bản của bản nháp. Khi `stale`,
+  tải dữ liệu mới cần xác nhận bỏ bản nháp. Hồi quy Electron ở
+  `app/e2e/nce-workspace.e2e.mjs` kiểm tìm kiếm, chuyển bước và xung đột sửa.
+- Đợt này thay giao diện và bảo vệ bản nháp; không đổi các cổng nghiệp vụ NCE.
+
 ## 10. Lộ trình
+
+### Bổ sung 28/10/2026 — rà soát nghiệp vụ khoảng nghi ngờ và đánh giá kỹ thuật
+
+Rà soát đối chiếu ISO 15189:2022 và Westgard phát hiện bốn chỗ chưa chặt; đã
+sửa theo D-19 đến D-22:
+
+- Quyết định ảnh hưởng bệnh nhân không gắn với khoảng nghi ngờ: có thể ghi
+  khi khoảng còn ngắn rồi cho chạy lại bằng lần rerun muộn hơn. Nay main chụp
+  phạm vi khi ghi; xem trước rerun trả `impact_problems` và nút cho hoạt động
+  trở lại bị khóa khi phạm vi không bao phủ (D-19).
+- SEobs so với Bias sau khắc phục thay vì Bias ổn định, và việc bắt buộc Bias
+  sau khắc phục chặn release của mọi sai số hệ thống (D-20).
+- Ai có quyền ghi cũng ghi được quyết định ảnh hưởng bệnh nhân (D-21).
+- Luật nhiều lần chạy làm khoảng nghi ngờ bắt đầu quá muộn: 10x nổ ở lần
+  thứ 10 thì chỉ lần đó được rà soát (D-22). Khoảng tính trên lô của lần khởi
+  đầu, nên đổi lô sau sự cố không làm mất lịch sử.
+
+Hồi quy: `nce-domain-rerun` (chuỗi vi phạm, bao phủ phạm vi),
+`nce-domain-technical` (SEobs), `nce-handlers` (thẩm quyền, phạm vi được
+chụp), `nce-hardening` H09–H10 (rerun muộn hơn phạm vi, luật 6x trên SQLite).
+Còn chờ PXN: một bộ TEa/Bias/SD cho cả hồ sơ dù nhiều mức, thông báo riêng
+khi ΔSEcrit ≤ 0, EQA được chọn "không liên quan kết quả bệnh nhân", tín hiệu
+vượt ngưỡng chưa là tiêu chí ép CAPA.
+
+### Bổ sung 22/10/2026 — tinh gọn phần ghi nhận sự cố
+
+- Chế độ xem của “Ghi nhận và xử lý tức thời” ưu tiên hai thẻ Sự cố / Xử lý
+  tức thời; phạm vi và diễn biến là thông tin phụ, bốn trạng thái vận hành
+  được gom thành một hàng ngắn để quét nhanh.
+- Mốc phát hiện/lập hồ sơ được trình bày thành khối gọn, chỉ hiện cảnh báo hồi
+  cứu khi người dùng thực sự mở chức năng đính chính. Bằng chứng lần chạy QC
+  mặc định thu gọn, phần tóm tắt vẫn cho biết số mức đạt và bị loại.
+- Bỏ khối “Hướng dẫn kết hợp 6 bước” khỏi đầu hồ sơ để tránh lặp lại thanh
+  quy trình và làm loãng thông tin vận hành; các cổng nghiệp vụ vẫn giữ nguyên.
+- Kiểm tra nhanh đổi từ bảng ba cột sang lưới thẻ hai cột. Mỗi thẻ ưu tiên
+  tên và trạng thái; bằng chứng chỉ chiếm chỗ khi có nội dung hoặc đang sửa,
+  giúp sáu mục ngắn hơn mà vẫn giữ đầy đủ nhãn và trường nghiệp vụ.
+- Các bảng snapshot QC căn giữa cả tiêu đề và nội dung sáu cột để giá trị,
+  kết luận và luật thẳng hàng; không tác động các bảng dữ liệu NCE khác.
+- Nút mở bằng chứng QC dùng chevron SVG trong khung bo tròn ở mép phải, thay
+  tam giác mặc định của trình duyệt và xoay theo trạng thái mở/đóng.
+- Không đổi trường dữ liệu, quyền, cổng nghiệp vụ hoặc chế độ sửa; toàn bộ
+  bằng chứng chi tiết vẫn mở xem được bằng bàn phím và chuột.
+- Kiểm chứng: 410/410 test, typecheck, lint, CSS parity, build và E2E NCE
+  đạt; checklist được đo ở năm độ rộng trong cả chế độ xem/sửa, ảnh Electron
+  xác nhận bố cục gọn và nội dung dài không tràn.
+
+### Bổ sung 21/10/2026 — màu viền các ô tổng quan
+
+- Bốn ô QC cần lập hồ sơ / Đang xử lý / Chờ duyệt / Quá hạn lần lượt dùng
+  vạch viền trái 3px xanh dương, cam, teal, đỏ qua token `info-accent`,
+  `warning-accent`, `success-accent`, `danger-accent`. Theo đính chính của
+  người dùng, chỉ cạnh trái có màu; ba cạnh còn lại giữ viền trung tính 1px,
+  kể cả khi rê chuột.
+- Chỉ đổi cách trình bày; giữ số liệu, cảnh báo và thao tác lọc/điều hướng.
+  Hồi quy Electron kiểm đủ bốn cạnh ở trạng thái thường và hover.
+- Kiểm chứng: 410/410 test, typecheck, lint, CSS parity, build và E2E chọn
+  lọc đạt; đã xem ảnh bốn ô và kiểm dev 5174 trả HTTP 200.
+
+### Bổ sung 21/10/2026 — căn cột danh sách hồ sơ
+
+- Căn giữa tiêu đề và nội dung các cột Phụ trách, Tiến độ, Hạn hoàn thành,
+  Thao tác; cột Hồ sơ / sự kiện giữ căn trái. Chỉ áp dụng bảng danh sách NCE,
+  không đổi bảng hành động, checklist hoặc lịch sử chi tiết trong hồ sơ.
+- Bỏ dòng đếm "N hồ sơ trong mục đang chọn" dưới bộ lọc vì số lượng đã hiển
+  thị ngay trên từng nút lọc; giữ nguyên số liệu, tìm kiếm và trạng thái rỗng.
+- Hồi quy ở 1366/1647px kiểm cả kiểu căn ô và vị trí giữa của nhãn trạng thái,
+  nút mở hồ sơ. Không thay đổi dữ liệu, quyền hoặc nghiệp vụ.
+- Kiểm chứng: 410/410 test, typecheck, lint, CSS parity và build đạt; E2E
+  chọn lọc có ca đo căn cột đạt. Đã xem ảnh bảng và kiểm dev 5174 trả HTTP 200.
+
+### Bổ sung 16/10/2026 — trình bày bảng Kiểm tra nhanh
+
+- Bỏ tình trạng bảng co cụm bên trái: đặt bảng ba cột thật trong khung cuộn
+  riêng, phủ đủ chiều ngang. Tên mục, mô tả phụ, kết quả và bằng chứng có
+  phân cấp rõ; giữ nguyên nhãn nghiệp vụ và tên truy cập cho ô nhập.
+- Bổ sung tiến độ **số mục đã đánh giá**, không đồng nghĩa đủ điều kiện
+  release: bất thường/không áp dụng thiếu lý do vẫn bị cổng hiện hành chặn.
+  Trạng thái có nhãn chữ, không chỉ phân biệt bằng màu.
+- Bằng chứng nhập nhiều dòng, xuống dòng cả chuỗi tham chiếu dài. Hướng dẫn
+  chi tiết thu trong mục có thể mở bằng bàn phím; cảnh báo không chỉ chạy lặp
+  QC tới khi đạt vẫn luôn hiển thị. Không đổi danh mục hoặc tiêu chí kiểm tra.
+- Hồi quy hình học bảng ở 1647/1366/1265/1110/1000px, chế độ xem/sửa, lưu/mở lại ghi
+  chú dài và lý do bắt buộc ở `app/e2e/nce-workspace.e2e.mjs`. Chỉ dùng
+  dữ liệu/profile tạm, không chỉnh hồ sơ thực tế của người dùng.
+
+Kiểm chứng giao diện: 410/410 test đạt; typecheck, lint, build, CSS parity và
+kiểm tra khoảng trắng đạt. Sáu ca E2E liên quan NCE đều đạt, gồm ca bố cục
+và nhập bằng chứng mới. Đã xem ảnh chế độ đọc/sửa, xác nhận bảng phủ khung
+và không cắt trạng thái khi hẹp. Đây là kiểm thử chọn lọc, không phải chạy
+lại toàn bộ E2E của app; lỗi `reload-count` ghi nhận bên dưới không bị sửa.
+
+### Bổ sung 16/10/2026 — gia cố phiên làm việc và phục hồi lỗi NCE
+
+Phạm vi đợt này là ba rủi ro kỹ thuật vừa rà soát: phiên bản của xác nhận
+hoàn thành/hủy hành động, lỗi đọc/ghi qua IPC/LAN và phản hồi đọc cũ làm lùi
+dữ liệu đang xem. Không đổi schema, hợp đồng IPC, quyền hay cổng nghiệp vụ.
+
+- Tách bộ điều phối một hồ sơ vào `renderer/pages/actions/dossier-session.ts`.
+  Mỗi yêu cầu đọc có thế hệ; bắt đầu ghi hoặc rời trang vô hiệu hóa các phản
+  hồi cũ. Khóa ghi đồng bộ, gom thông báo trong lúc ghi thành một lần đọc mới.
+- Modal hoàn thành/hủy giữ `row_version` và mô tả hành động tại lúc mở, gửi
+  đúng phiên bản đó; cập nhật nền không nâng phiên bản của bản nháp. Lỗi được
+  hiển thị cả trong modal, không nằm khuất sau hộp thoại khóa tiêu điểm.
+- Lỗi đọc có thông báo và nút thử lại; đọc nền lỗi không xóa dữ liệu đã xem.
+  Mỗi yêu cầu có giới hạn chờ giao diện 30 giây, không phải thời hạn nghiệp vụ.
+- Lỗi transport, phản hồi hỏng, `internal-error` hoặc hết thời gian khi ghi
+  được coi là **chưa rõ kết quả**, không khẳng định máy chính đã hoàn nguyên.
+  Giữ bản nháp, khóa gửi lại và không tự lặp lệnh. Người dùng cần chủ động tải
+  mới để đối chiếu; chỉ bỏ bản nháp/gỡ cảnh báo sau khi đọc thành công.
+- Giới hạn chờ không hủy giao dịch phía máy chính; lệnh đến muộn vẫn chịu
+  `expectedVersion` ở backend. Phản hồi cũ không được cập nhật lại giao diện.
+- Ghi chú duyệt/hủy và xác nhận hủy hồ sơ giữ phiên bản đang rà soát. Chỉ sau
+  quyết định thành công mới xóa ghi chú/phiên bản nháp để vòng duyệt kế tiếp
+  bắt đầu sạch; lỗi/xung đột vẫn giữ nội dung. Không reset theo cập nhật nền.
+- Hồi quy bộ điều phối ở `app/tests/nce-dossier-session.test.mjs`; Electron
+  kiểm modal cạnh tranh và vòng trả lại/nộp lại/duyệt. E2E máy trạm HTTPS làm
+  mất phản hồi **sau khi main đã commit**, kiểm không tự ghi lặp, không mất
+  nháp khi đối chiếu lỗi và không nhận phản hồi đọc cũ sau lần ghi thành công.
+  Tất cả dùng SQLite bộ nhớ hoặc profile tạm, không sửa dữ liệu vận hành.
+
+Kiểm chứng cuối đợt 16/10: 410/410 test đạt (19 ca mới cho bộ điều phối);
+typecheck, lint, CSS parity, build và `git diff --check` đạt. E2E toàn app
+22/23 đạt; toàn bộ ca NCE đạt, gồm vòng trả lại/nộp lại/duyệt không rời trang.
+Ca duy nhất còn lỗi là `reload-count.e2e.mjs:32` của Nhập QC: 4 lần
+`entry:queryPoints` thay vì 2, `westgard:listTestSummaries` vẫn đúng 1;
+đây là lỗi đã ghi nhận từ trước, không sửa hoặc nới assertion trong đợt này.
+Ca hai vòng duyệt đã thất bại đúng ở ghi chú/phiên bản cũ trên build trước khi
+sửa, rồi đạt trên build mới. Đã xem ảnh phục hồi LAN khi đọc đối chiếu lỗi;
+dev `http://localhost:5174/` trả HTTP 200 lúc kiểm tra.
+
+Phân biệt với thẩm định nghiệp vụ: đợt này chưa giải quyết việc chụp/ràng
+buộc phạm vi quyết định ảnh hưởng bệnh nhân theo lần rerun đã chọn. Hạng mục
+đó cần một đợt sửa domain/handler và kiểm thử riêng, không được coi là đã
+hoàn thành nhờ các test phục hồi giao diện. (Đã làm ngày 28/10/2026, D-19.) Các quyết định phụ thuộc SOP ở
+bên dưới vẫn chờ PXN phê duyệt; chưa thể xác nhận toàn bộ quy trình đạt chuẩn.
+
+### Bổ sung 15/10/2026 — ưu tiên hồ sơ hồi cứu và cổng xác minh
+
+Người dùng yêu cầu thực hiện theo thứ tự sau (đã triển khai kỹ thuật):
+
+1. Phân biệt ngày lập hồ sơ với ngày phát hiện thực tế. Không tự lấy ngày
+   QC cũ làm ngày phát hiện và không đổi ngày điểm QC. Thêm đính chính ngày
+   phát hiện khi còn `open`, cần quyền `nce.release`, lý do và lịch sử
+   trước–sau; khóa sau release, không ghi lùi thời điểm lập/quyết định.
+2. Giữ chặn rerun trước ngày phát hiện, nhưng hiển thị các lần bị loại khỏi
+   lựa chọn cùng lý do. Danh sách tự cập nhật khi QC/cấu hình thay đổi.
+3. Checklist theo nguồn hiện có phải đủ ngay trước release, vẫn kiểm lại khi
+   nộp/duyệt. Không thêm mục hay ngưỡng lâm sàng mới, không bắt CAPA xong
+   trước release. Hồ sơ đã release không bị tự đổi trạng thái.
+4. Hồi quy ngày không hợp lệ, quyền, trạng thái, xung đột, nguyên tử, lịch sử,
+   dữ liệu hồi cứu, giải thích lựa chọn và cập nhật QC ngay khi hồ sơ đang mở.
+
+Đính chính chỉ dành cho dữ liệu ghi sai có căn cứ; nếu thực sự phát hiện sự
+cố tháng 10 thì QC tháng 9 không tự trở thành bằng chứng sau phát hiện.
+Chưa có SOP được cung cấp; thay đổi này không thay cho thẩm định của PXN.
+
+Chi tiết hiện thực:
+
+- Tạo hồ sơ có lựa chọn nhập hồi cứu; khi bật phải tự chọn ngày thực tế,
+  không tự gán ngày QC. Hiện cảnh báo khi QC trước ngày phát hiện đang chọn.
+- Bước Ghi nhận có đính chính riêng qua `updateNce` với
+  `detectedAtCorrection`, không cho gửi ngày qua patch nội dung. Kiểm ngày có
+  thật, không ở tương lai/sau ngày lập/trước trigger/sau hạn hoặc hoàn thành
+  liên quan; giữ `expectedVersion`, transaction, revision, audit và notify.
+- Bước release giải thích các lần bị lọc (ngày, thứ tự, toàn điểm đã hủy),
+  hiển thị 20 lần bị lọc gần nhất khi danh sách dài; ứng viên còn lại vẫn phải
+  qua preview và cổng main, không tự được coi là QC đạt. Có trạng thái tải,
+  lỗi, nút cập nhật và tự tải lại khi dữ liệu QC/cấu hình thay đổi.
+- Preview loại phản hồi cũ, tính lại khi QC đổi; nút release khóa khi preview
+  chưa đạt, còn thiếu checklist/quyết định ảnh hưởng hoặc thiếu căn cứ.
+- Câu "chưa chọn rerun" ở banner được đổi thành "chưa chốt bằng chứng bằng
+  quyết định" vì main không coi lựa chọn nháp trên giao diện là quyết định.
+- Kiểm thử trên SQLite bộ nhớ/profile Electron tạm, không sửa dữ liệu vận
+  hành của người dùng. Có ca đính chính thành công, sai quyền/ngày/trạng thái,
+  xung đột phiên bản, lỗi ghi lịch sử hoàn nguyên, checklist chặn tại main,
+  QC mới xuất hiện khi hồ sơ đang mở và điểm bị hủy làm preview đánh giá lại.
+
+E2E toàn app: 20/21 đạt; toàn bộ ca NCE đạt. Ca duy nhất còn lỗi là
+`reload-count` của Nhập QC (4 query thay vì 2), đã xác nhận có từ mã gốc ở
+đợt trước. Ảnh đã kiểm: danh sách QC bị lọc, form đính chính ngày và preview
+sau hủy điểm, ở profile tạm `qclab-e2e-iurmjR`.
+Kiểm chứng cuối đợt: 391/391 test đạt; typecheck, lint, CSS parity và build
+đạt. Không sửa ngày/hồ sơ thực tế của người dùng thay cho việc xác nhận căn cứ.
+
+### Bổ sung 15/10/2026 — kết hợp hướng dẫn IQC sáu bước
+
+Người dùng yêu cầu đối chiếu và kết hợp `IQC-Dashboard(4).html` với app, sau
+đó xác nhận **không có** hai SOP `BMSH-QLCL-IQC-02` và `BMSH-QLCL-TEa-01`
+mà biểu mẫu viện dẫn. Vì vậy bản này là phần mềm/hướng dẫn **chờ thẩm định**,
+không phải SOP đã phê duyệt hay chứng nhận ISO.
+
+**Phạm vi đã triển khai, không áp chính sách lâm sàng mới:**
+
+- Sáu bước giao diện: ghi nhận/kiểm soát → kiểm tra nhanh → ảnh hưởng bệnh
+  nhân → xác minh/cho hoạt động trở lại → nguyên nhân/CAPA/hiệu lực → duyệt.
+  Giữ các cổng của mô hình hiện hành; việc tách bước không tự tăng thẩm quyền.
+- Checklist hiện hành chuyển sang kiểm tra nhanh. Hướng dẫn môi trường là
+  nội dung tham khảo; chưa thêm mục bắt buộc khi chưa có SOP. Có trường phạm
+  vi kiểm soát/thông báo và diễn biến/mốc thời gian, lưu lịch sử từng sửa đổi.
+- Schema 4 thêm `containment_note`, `occurred_note`; không tự bịa thời gian
+  hay thông báo của hồ sơ cũ. Backup cũ được migration khi phục hồi.
+- Rerun không trước ngày phát hiện, kể cả khi đã sau trigger. Lần hỏng mới
+  chưa gắn hồ sơ cũng chặn lựa chọn mốc khôi phục cũ; khi kiểm phải xét trong
+  giai đoạn mới để không nhầm hậu quả chuỗi trước khắc phục là lỗi mới.
+- Lần QC thiếu mức cấu hình/chưa đánh giá không được dùng làm mốc đạt cuối
+  cùng để thu hẹp khoảng bệnh nhân nghi ngờ. Cổng rerun IQC vẫn giữ D-04
+  (mức của trigger); nếu thiếu mức đang vận hành, xem trước và quyết định
+  release lưu cảnh báo phải đối chiếu SOP. Chưa tự đặt số mức bắt buộc mới.
+- Ghi mốc cắt bị chặn nếu mốc hoặc các điểm phía sau thuộc kỳ đã khóa.
+  Không ghi dở quyết định/mốc/audit khi bị chặn.
+- Khi duyệt lại, tính rerun trên đúng lô/Mean/SD của bằng chứng đã chốt và
+  dữ liệu điểm hiện tại, không phụ thuộc lô hiện đang gán. Điểm hủy vẫn chặn;
+  hồ sơ chưa đóng không biến mất khỏi hàng chờ chỉ vì đổi lô.
+- Đánh giá hiệu lực lưu snapshot tiêu chí/nguy cơ/nguyên nhân/hành động do
+  main dựng. Sửa căn cứ sau đó phải đánh giá lại; kiểm nguy cơ còn lại ở cổng
+  nộp/duyệt. Không tự gắn snapshot hiện tại cho đánh giá cũ chưa có căn cứ.
+- Đọc tóm tắt qua API cần đăng nhập. Chi tiết, hàng chờ, nhân sự và xem trước
+  chỉ mở cho vai trò được dùng NCE; quyền tóm tắt ở Tổng quan/Báo cáo giữ nguyên.
+
+**Không sao chép từ HTML:** phép so `|Bias|/CV` với cả ΔSEcrit và ΔREcrit,
+tự kết luận nguy cơ lâm sàng, yêu cầu đo Bias giống nhau cho mọi sự cố, chữ
+ký gõ tay thay xác thực, hoặc xóa vĩnh viễn hồ sơ. ΔREcrit là hệ số tăng
+SD/CV; không phải độ lệch Bias chuẩn hóa. Nếu sau này xây công cụ hỗ trợ,
+phải phân biệt Bias nền, dịch chuyển quan sát và độ phân tán, đồng nhất đơn
+vị, lấy trị tuyệt đối Bias trong mô hình và thẩm định riêng.
+
+**Còn chờ quyết định của PXN:** ngưỡng Bias (TEa/4 hiện vẫn là chính sách
+cũ ở đổi dải, đã thêm cảnh báo), mức QC bắt buộc, thời điểm xử lý có bằng
+chứng máy, tiêu chí/cỡ mẫu hiệu lực, ma trận rủi ro, thẩm quyền theo mức độ
+và thời hạn lưu hồ sơ. App không tự khóa máy/LIS hoặc phát hành kết quả.
+Không được suy từ các test đạt rằng quy trình đã đủ điều kiện vận hành y tế.
+
+Căn cứ đối chiếu:
+
+- [VSQI — TCVN ISO 15189:2025 tương đương ISO 15189:2022](https://tieuchuan.vsqi.gov.vn/tieuchuan/view?sohieu=TCVN+ISO+15189%3A2025).
+- [NATA — bảng đối chiếu ISO 15189:2022](https://nata.com.au/files/2023/06/15189-Assessment-Worksheet-2022.pdf), 7.3.7.2, 7.5 và 8.7.
+- [Westgard — Critical-Error Graphs](https://www.westgard.com/lessons/quality-management/lesson5.html).
+
+Hồi quy bổ sung: `nce-hardening.test.mjs`, `ipc-operations.test.mjs` và
+`nce-workspace.e2e.mjs`. Chạy trên SQLite bộ nhớ hoặc profile Electron tạm.
+Kiểm chứng 15/10: 383/383 test đạt; typecheck, lint, build và CSS parity đạt.
+E2E toàn app đạt 19/20, mọi ca NCE đạt; ca còn lỗi là `reload-count` ở Nhập
+QC (4 lần query thay vì 2), đã có từ mã gốc và không sửa trong phạm vi này.
+Đã xem ảnh workspace sáu bước ở 1366×768 và kiểm căn hàng ở 1366/1647px,
+menu mở/thu gọn, cùng bố cục xếp dọc ở 1000px.
 
 Giai đoạn 2 và 3 đổi hợp đồng IPC, nên làm trên cùng một nhánh và hợp nhất một
 lần (không thêm lớp tương thích tạm, theo quy ước APP-PLAN mục 7). Không vá mã
@@ -330,6 +599,38 @@ Bổ sung so với kế hoạch ban đầu:
 - `hold_results` có thể là "chưa xác định" (hồ sơ tự mở khi hủy điểm); phải
   ghi trước khi cho chạy lại.
 
+#### D-18. Bổ sung SOP xử lý IQC ngoài kiểm soát (2026-10-27)
+
+Áp dụng nội dung phù hợp từ tài liệu
+`HƯỚNG DẪN HÀNH ĐỘNG KHẮC PHỤC KHI KẾT QUẢ NỘI KIỂM NẰM NGOÀI KIỂM SOÁT VÀ RÀ SOÁT KẾT QUẢ BỆNH NHÂN.docx`
+vào protocol 4, nhưng giữ nguyên D-02: cho hoạt động trở lại không chờ hoàn tất
+CAPA dài hạn và đánh giá hiệu lực.
+
+- Hồ sơ IQC phải ghi rõ đã dừng/giữ kết quả liên quan, phạm vi kiểm soát,
+  người được thông báo và diễn biến theo mốc thời gian trước khi cho hoạt động
+  trở lại. Không chấp nhận lựa chọn “không giữ kết quả” cho IQC ngoài kiểm
+  soát.
+- Checklist IQC bổ sung điều kiện môi trường: nhiệt độ phòng, điện và nước cấp.
+- Sau kiểm tra nhanh có quyết định append-only `technical_assessment`: bản chất
+  sai số, phương pháp xác minh, xử lý và bằng chứng, kết luận kỹ thuật. Sai số
+  hệ thống phải có đánh giá định lượng; loại khác được ghi không áp dụng kèm
+  lý do.
+- Khi đủ dữ liệu cùng đơn vị, app tính snapshot:
+  `ΔSEcrit = (TEa − |Bias ổn định|) / SD − 1,65`,
+  `ΔREcrit = (TEa − |Bias ổn định|) / (1,65 × SD)`,
+  `SEobs = |Bias sự cố − Bias ổn định| / SD` (D-20, thay công thức cũ dùng
+  Bias sau khắc phục),
+  `REobs = độ phân tán quan sát / SD`. Kết quả chỉ là **tín hiệu kỹ thuật** để
+  hỗ trợ người có thẩm quyền đánh giá ảnh hưởng bệnh nhân; không tự kết luận
+  một kết quả bệnh nhân hợp lệ hay cần sửa.
+- Luật dịch chuyển dài `8x`, `9x`, `10x`, `12x` bắt buộc quyết định riêng về
+  Mean/SD. Chỉ ghi “đủ điều kiện xem xét Mean/SD mới” khi có thay đổi hợp lệ,
+  dữ liệu độc lập, đã tính chỉ số và `|Bias sau khắc phục| ≤ TEa/4`.
+- Quyết định ảnh hưởng bệnh nhân của hồ sơ IQC phải ghi số kết quả đã rà soát;
+  nếu sửa báo cáo thì số bị ảnh hưởng phải lớn hơn 0, có mã tham chiếu và thông
+  tin đã thông báo. Việc này vẫn tách khỏi quyết định kỹ thuật và quyết định
+  cho hoạt động trở lại.
+
 Còn lại cho giai đoạn 3: dọn CSS `pages/actions.css` của trang cũ (phần lớn
 selector không còn dùng), giao diện cấp quyền NCE ở trang Người dùng, cấu hình
 NCE ở Cài đặt. E2E `reload-count` hỏng từ trước giai đoạn 2 (đã kiểm trên
@@ -355,6 +656,12 @@ commit `9017e96`), không thuộc phạm vi này.
   ảnh hưởng bệnh nhân → cho chạy lại bằng rerun → phân tầng, checklist → nộp
   duyệt → người báo cáo bị chặn → KTV có quyền duyệt đóng); `entry-nce` lập hồ
   sơ bằng nút trên hàng chờ.
+- Tinh gọn không gian làm việc hồ sơ (22/10/2026): bỏ banner "Việc cần làm
+  tiếp" vốn lặp lại thanh sáu bước; mỗi thẻ bước hiển thị trực tiếp số điều
+  kiện còn thiếu hoặc trạng thái sẵn sàng/chờ duyệt. Danh sách thông báo đầy
+  đủ của main vẫn được giữ trong mục thu gọn ngay dưới thanh bước và mỗi mục
+  tiếp tục dẫn tới đúng phần cần xử lý; giao diện không tự suy đoán bước hoàn
+  tất từ thứ tự hiển thị.
 
 Chưa có e2e riêng cho máy trạm LAN thiếu quyền và hai máy cùng sửa một hồ sơ;
 hai ca này đã có test handler (`nce-handlers.test.mjs`, `ipc-operations`).

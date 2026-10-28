@@ -7,7 +7,7 @@ import { goodRerun, point, run, triggerRun } from './helpers/nce-fixture.mjs';
 const require = createRequire(import.meta.url);
 
 const { checkNceRerun, nceTriggerMissing } = require('../../app-dist/main/domain/nce/rerun.js');
-const { nceSuspectWindow, validateNcePatientImpact, ncePatientImpactMissing } = require('../../app-dist/main/domain/nce/patient-impact.js');
+const { nceSuspectWindow, validateNcePatientImpact, ncePatientImpactMissing, ncePatientImpactCoverage, ncePatientImpactCoverageMissing } = require('../../app-dist/main/domain/nce/patient-impact.js');
 
 const check = (candidate, extra = {}) => checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate, lotChangeNote: '', ...extra });
 const codes = (result) => result.problems.map((p) => p.code);
@@ -92,6 +92,7 @@ test('khoảng nghi ngờ: từ sau lần đạt cuối trước sự cố tới
     { date: '2026-10-01', runId: '3', rejected: false },
     { date: '2026-10-02', runId: '1', rejected: false },
   ];
+  for (const item of runs) item.complete = true;
   const window = nceSuspectWindow(runs, { date: '2026-10-01', runId: '1' }, { date: '2026-10-01', runId: '3' });
   assert.deepEqual(window.lastAccepted, { date: '2026-09-30', runId: '1' });
   assert.deepEqual(window.runs, [
@@ -100,6 +101,44 @@ test('khoảng nghi ngờ: từ sau lần đạt cuối trước sự cố tới
   const open = nceSuspectWindow(runs, { date: '2026-10-01', runId: '1' }, null);
   assert.equal(open.runs.length, 5, 'chưa cho chạy lại thì khoảng còn mở tới lần chạy mới nhất');
   assert.equal(nceSuspectWindow([], { date: '2026-10-01', runId: '1' }, null).lastAccepted, null);
+});
+
+test('khoảng nghi ngờ lùi về lần chạy đầu tiên của chuỗi vi phạm nhiều lần chạy', () => {
+  const r = (date, rejected, marks) => ({ date, runId: '1', rejected, complete: true, marks });
+  const runs = [
+    r('2026-09-01', false, [{ level: 1, rules: [] }, { level: 2, rules: [] }]),
+    r('2026-09-02', false, [{ level: 1, rules: ['10x'] }, { level: 2, rules: [] }]),
+    // Lần chạy không đo mức 1: chuỗi đếm theo mức 1 bỏ qua, không dừng.
+    r('2026-09-03', false, [{ level: 2, rules: [] }]),
+    r('2026-09-04', false, [{ level: 1, rules: ['1-2s', '10x'] }, { level: 2, rules: [] }]),
+    r('2026-09-05', true, [{ level: 1, rules: ['10x'] }, { level: 2, rules: [] }]),
+  ];
+  const trigger = { date: '2026-09-05', runId: '1' };
+  const chained = nceSuspectWindow(runs, trigger, null, { rules: ['10x'], levels: [1] });
+  assert.deepEqual(chained.onset, { date: '2026-09-02', runId: '1' });
+  assert.deepEqual(chained.onsetRules, ['10x']);
+  assert.deepEqual(chained.lastAccepted, { date: '2026-09-01', runId: '1' }, 'các lần từng đạt trong chuỗi thuộc khoảng nghi ngờ');
+  assert.equal(chained.runs.length, 4);
+  const single = nceSuspectWindow(runs, trigger, null, { rules: ['1-3s'], levels: [1] });
+  assert.deepEqual(single.lastAccepted, { date: '2026-09-04', runId: '1' }, 'luật một lần chạy giữ mốc lần đạt cuối');
+  assert.deepEqual(single.onsetRules, []);
+});
+
+test('quyết định ảnh hưởng bệnh nhân phải bao phủ khoảng nghi ngờ hiện hành', () => {
+  const r = (date, rejected) => ({ date, runId: '1', rejected, complete: true });
+  const runs = [r('2026-09-01', false), r('2026-09-02', true), r('2026-09-03', false), r('2026-09-04', false)];
+  const trigger = { date: '2026-09-02', runId: '1' };
+  const open = nceSuspectWindow(runs, trigger, null);
+  const coverage = ncePatientImpactCoverage(open, { date: '2026-09-03', runId: '1' });
+  assert.deepEqual(coverage.through, { date: '2026-09-03', runId: '1' });
+  const impact = { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 3, coverage };
+  const codes = (missing) => missing.map((item) => item.code);
+  assert.deepEqual(ncePatientImpactCoverageMissing(impact, nceSuspectWindow(runs, trigger, { date: '2026-09-03', runId: '1' })), []);
+  assert.deepEqual(codes(ncePatientImpactCoverageMissing(impact, nceSuspectWindow(runs, trigger, { date: '2026-09-04', runId: '1' }))), ['patient-impact-end'], 'rerun muộn hơn phạm vi đã rà');
+  const earlier = { ...open, lastAccepted: null };
+  assert.deepEqual(codes(ncePatientImpactCoverageMissing(impact, earlier)), ['patient-impact-start'], 'khoảng lùi về trước');
+  assert.deepEqual(codes(ncePatientImpactCoverageMissing({ ...impact, coverage: undefined }, open)), ['patient-impact-scope'], 'quyết định cũ chưa có phạm vi');
+  assert.deepEqual(ncePatientImpactCoverageMissing(impact, null), [], 'không phải IQC');
 });
 
 test('quyết định ảnh hưởng bệnh nhân', () => {

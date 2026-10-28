@@ -5,11 +5,11 @@
 // để ghi lịch sử sửa đổi (sửa R-15).
 import type { NceChecklistItem, NceDossier, NcePhase, NceValidation } from './types';
 import { isOneOf, NCE_CAUSE_CATEGORIES, NCE_CAUSE_STATUSES, NCE_PHASES, NCE_RISK_LEVELS, NCE_TIERS } from './types';
-import { cleanDate } from './format';
+import { cleanDate, localDateOf } from './format';
 import { prepareChecklist } from './checklist';
 
 export const NCE_EDITABLE_FIELDS = [
-  'description', 'correction', 'holdResults', 'phase', 'ownerUserId', 'dueDate',
+  'description', 'correction', 'holdResults', 'containmentNote', 'occurredNote', 'phase', 'ownerUserId', 'dueDate',
   'tier', 'tierReason', 'riskSeverity', 'riskProbability', 'riskLevel', 'riskBasis', 'checklist',
   'causeStatus', 'causeCategory', 'causeText', 'causeCheckPlan', 'effectivenessCriteria', 'effectivenessReviewDue',
 ] as const;
@@ -36,6 +36,8 @@ export function prepareNcePatch(raw: unknown, context: Pick<NceDossier, 'source'
 
   if (has('description')) { out.description = text(input.description, 4000); if (out.description.length < 10) return fail('missing-description', 'Mô tả sự kiện ít nhất 10 ký tự.'); }
   if (has('correction')) { out.correction = text(input.correction, 4000); if (out.correction.length < 5) return fail('missing-correction', 'Xử lý tức thời ít nhất 5 ký tự.'); }
+  if (has('containmentNote')) out.containmentNote = text(input.containmentNote, 4000);
+  if (has('occurredNote')) out.occurredNote = text(input.occurredNote, 2000);
   if (has('holdResults')) { if (typeof input.holdResults !== 'boolean') return fail('invalid-hold', 'Chọn có dừng/giữ kết quả liên quan hay không.'); out.holdResults = input.holdResults; }
   if (has('phase')) { if (!isOneOf(NCE_PHASES, input.phase)) return fail('invalid-phase', 'Giai đoạn quá trình không hợp lệ.'); out.phase = input.phase; }
   if (has('ownerUserId')) { out.ownerUserId = text(input.ownerUserId, 80); if (!out.ownerUserId) return fail('missing-owner', 'Chọn người phụ trách hồ sơ.'); }
@@ -84,3 +86,19 @@ export function nceFieldChanges(current: Partial<NceEditable>, patch: NcePatch):
 
 /** Checklist rỗng theo nguồn, dùng khi lập hồ sơ. */
 export function emptyChecklist(source: NceDossier['source']): Record<string, NceChecklistItem> { return prepareChecklist(source, {}); }
+
+/** Đính chính hành chính riêng, không cho sửa ngày qua patch nội dung chung.
+ * Thời điểm lập/quyết định và ngày QC gốc tuyệt đối không đổi. */
+export function prepareNceDetectedAtCorrection(raw: unknown, dossier: NceDossier, createdAt: string, today: string): NceValidation<{ detectedAt: string; reason: string }> {
+  const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const detectedAt = cleanDate(input.detectedAt), reason = text(input.reason, 2000);
+  const fail = (code: string, message: string): NceValidation<never> => ({ ok: false, code, message });
+  if (dossier.status !== 'open' || dossier.release) return fail('status', 'Chỉ đính chính ngày phát hiện khi hồ sơ chưa được cho hoạt động trở lại.');
+  if (!detectedAt || detectedAt > today || (localDateOf(createdAt) && detectedAt > localDateOf(createdAt))) return fail('invalid-detected', 'Ngày phát hiện phải có thật, không sau ngày lập hồ sơ hoặc ở tương lai.');
+  if (reason.length < 10) return fail('missing-date-correction-reason', 'Ghi lý do và căn cứ đính chính ngày phát hiện (ít nhất 10 ký tự).');
+  const trigger = dossier.runs.find((run) => run.role === 'trigger');
+  if (trigger && detectedAt < trigger.snapshot.date) return fail('detected-before-run', 'Ngày phát hiện không được trước ngày chạy QC gây sự cố.');
+  const boundaries = [dossier.dueDate, dossier.effectivenessReviewDue, ...dossier.actions.flatMap((action) => action.status === 'cancelled' ? [] : [action.dueDate, localDateOf(action.doneAt)])].filter(Boolean);
+  if (boundaries.some((date) => date < detectedAt)) return fail('detected-after-related-date', 'Ngày phát hiện mới sau hạn hoặc ngày hoàn thành đang có. Rà soát các mốc liên quan trước khi đính chính.');
+  return { ok: true, data: { detectedAt, reason } };
+}

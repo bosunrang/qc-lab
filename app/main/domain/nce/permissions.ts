@@ -57,13 +57,15 @@ export function canReturnNce(actor: NceActorLike): NceDecision {
 }
 
 /** Những vai trò của một người trong hồ sơ làm họ mất tính độc lập khi duyệt. */
-export function nceParticipantRoles(userId: string, dossier: Pick<NceDossier, 'reportedByUserId' | 'ownerUserId' | 'release' | 'actions' | 'effectivenessReviews'>): string[] {
+export function nceParticipantRoles(userId: string, dossier: Pick<NceDossier, 'reportedByUserId' | 'ownerUserId' | 'release' | 'actions' | 'technicalAssessments' | 'patientImpacts' | 'effectivenessReviews'>): string[] {
   if (!userId) return [];
   const roles: string[] = [];
   if (dossier.reportedByUserId === userId) roles.push('người báo cáo');
   if (dossier.ownerUserId === userId) roles.push('người phụ trách');
   if (dossier.release?.actorUserId === userId) roles.push('người cho chạy lại');
   if (dossier.actions.some((action) => action.status === 'done' && action.doneByUserId === userId)) roles.push('người hoàn thành hành động');
+  if (dossier.technicalAssessments.some((assessment) => assessment.actorUserId === userId)) roles.push('người xác minh kỹ thuật');
+  if (dossier.patientImpacts.some((impact) => impact.actorUserId === userId)) roles.push('người đánh giá ảnh hưởng bệnh nhân');
   if (dossier.effectivenessReviews.some((review) => review.reviewerUserId === userId)) roles.push('người đánh giá hiệu lực');
   return roles;
 }
@@ -76,7 +78,7 @@ export type NceApprovalDecision = { ok: true; usedException: boolean; conflicts:
 
 export function canApproveNce(
   actor: NceActorLike,
-  dossier: Pick<NceDossier, 'reportedByUserId' | 'ownerUserId' | 'release' | 'actions' | 'effectivenessReviews'>,
+  dossier: Pick<NceDossier, 'reportedByUserId' | 'ownerUserId' | 'release' | 'actions' | 'technicalAssessments' | 'patientImpacts' | 'effectivenessReviews'>,
   exception: NceSeparationException = { enabled: false, sopRef: '' },
 ): NceApprovalDecision {
   const denied = canReturnNce(actor); if (!denied.ok) return denied;

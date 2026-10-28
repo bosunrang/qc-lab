@@ -5,6 +5,7 @@ export { NCE_STATUS_LABEL } from './state';
 export { NCE_CHECK_LABELS } from './checklist';
 export { NCE_ACTION_KIND_LABEL } from './actions';
 export { NCE_PATIENT_OUTCOME_LABEL } from './patient-impact';
+export { NCE_MEAN_RESET_LABEL, NCE_TECHNICAL_ERROR_LABEL, NCE_TECHNICAL_SIGNAL_LABEL } from './technical-assessment';
 
 export const NCE_SOURCE_LABEL: Readonly<Record<string, string>> = {
   iqc: 'Nội kiểm (IQC)', eqa: 'Ngoại kiểm (EQA)', instrument: 'Thiết bị', reagent: 'Hóa chất / vật tư', calibration: 'Hiệu chuẩn', other: 'Nguồn khác',
@@ -26,6 +27,6 @@ export const NCE_CAUSE_CATEGORY_LABEL: Readonly<Record<string, string>> = {
 export const NCE_EFFECTIVENESS_RESULT_LABEL: Readonly<Record<string, string>> = { effective: 'Hiệu quả', ineffective: 'Không hiệu quả', extend: 'Cần theo dõi thêm' };
 
 export const NCE_DECISION_LABEL: Readonly<Record<string, string>> = {
-  release: 'Cho phép hoạt động trở lại', patient_impact: 'Đánh giá ảnh hưởng bệnh nhân', effectiveness: 'Đánh giá hiệu lực',
+  release: 'Cho phép hoạt động trở lại', technical_assessment: 'Xác minh kỹ thuật IQC', patient_impact: 'Đánh giá ảnh hưởng bệnh nhân', effectiveness: 'Đánh giá hiệu lực',
   submit: 'Nộp duyệt', approve: 'Duyệt đóng hồ sơ', return: 'Trả lại', cancel: 'Hủy hồ sơ',
 };

@@ -29,6 +29,7 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
   const [correction, setCorrection] = useState('');
   const [hold, setHold] = useState<'' | 'yes' | 'no'>('');
   const [detectedAt, setDetectedAt] = useState(todayIso());
+  const [retrospective, setRetrospective] = useState(false);
   const [ownerUserId, setOwnerUserId] = useState(users.some((u) => u.id === me?.id) ? me!.id : '');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState('');
@@ -78,7 +79,13 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
             <label><input type="radio" name="nceHold" checked={hold === 'no'} onChange={() => setHold('no')} /> Không cần</label>
           </div>
         </div>
-        <DateField label="Ngày phát hiện" id="nceDetected" value={detectedAt} onChange={setDetectedAt} />
+        <div className="nce-field-wide">
+          <p className="nce-note">Ngày lập hồ sơ được hệ thống ghi tại lúc lưu, tách biệt với ngày phát hiện thực tế. QC xác minh không được trước ngày phát hiện.</p>
+          <label className="nce-check"><input type="checkbox" checked={retrospective} onChange={(e) => { setRetrospective(e.target.checked); setDetectedAt(e.target.checked ? '' : todayIso()); }} /> Nhập hồi cứu: sự cố đã được phát hiện trước đây, nay mới lập hồ sơ</label>
+          {retrospective && <p className="nce-note">Chọn ngày phát hiện thực tế theo nhật ký. Không tự lấy ngày QC làm ngày phát hiện; quyết định cho hoạt động trở lại vẫn ghi ở thời điểm hiện tại.</p>}
+          {prefill && prefill.date < detectedAt && <div className="alert warn">Lần QC gây sự cố là {nceRunLabel(prefill)}, trước ngày phát hiện đang chọn. Các lần QC trước {detectedAt.split('-').reverse().join('/')} sẽ không dùng làm bằng chứng xác minh. Nếu chỉ mới phát hiện hôm nay, giữ đúng ngày này.</div>}
+        </div>
+        <DateField label="Ngày phát hiện thực tế" id="nceDetected" value={detectedAt} onChange={setDetectedAt} />
         <Field label="Người phụ trách" htmlFor="nceOwner"><UserSelect id="nceOwner" value={ownerUserId} users={users} onChange={setOwnerUserId} /></Field>
         <DateField label="Hạn hoàn thành (để trống: theo cấu hình)" id="nceDue" value={dueDate} onChange={setDueDate} />
       </div>

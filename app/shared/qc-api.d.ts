@@ -396,6 +396,7 @@ export type NceNextStepName = 'release' | 'submit' | 'approve' | null;
 export interface NceRecordRow {
   id: string; nce_id: string; source: NceSource; phase: 'pre' | 'exam' | 'post';
   test_id: string | null; detected_at: string; description: string; correction: string;
+  containment_note: string; occurred_note: string;
   /** 1 có giữ kết quả, 0 không, null chưa xác định. */
   hold_results: 0 | 1 | null;
   status: NceStatus; tier: 'low' | 'capa' | ''; tier_reason: string;
@@ -427,7 +428,7 @@ export interface NceActionRow {
 
 export interface NceDecisionRow {
   id: string; nce_record_id: string;
-  type: 'release' | 'patient_impact' | 'effectiveness' | 'submit' | 'approve' | 'return' | 'cancel';
+  type: 'release' | 'technical_assessment' | 'patient_impact' | 'effectiveness' | 'submit' | 'approve' | 'return' | 'cancel';
   payload_json: string; actor_user_id: string; actor_name: string; decided_at: string;
 }
 
@@ -445,9 +446,11 @@ export interface NceDossierView {
   capa_triggers: NceMissingItem[];
   recurrence: boolean;
   /** Khoảng nghi ngờ ảnh hưởng kết quả bệnh nhân (chỉ hồ sơ có lần chạy khởi đầu). */
-  suspect_window: { last_accepted: NceRunKeyView | null; trigger: NceRunKeyView; rerun: NceRunKeyView | null; runs: NceRunKeyView[] } | null;
+  /** `onset`: lần chạy đầu tiên của chuỗi vi phạm (khác `trigger` khi luật
+   * đếm nhiều lần chạy làm khoảng lùi về trước); `onset_rules`: các luật đó. */
+  suspect_window: { last_accepted: NceRunKeyView | null; onset: NceRunKeyView; onset_rules: string[]; trigger: NceRunKeyView; rerun: NceRunKeyView | null; runs: NceRunKeyView[] } | null;
   /** Thao tác người đang xem được phép làm, để giao diện ẩn/hiện nút; main vẫn chặn thật. */
-  can: { edit: boolean; release: boolean; submit: boolean; approve: boolean; return: boolean; cancel: boolean; review_effectiveness: boolean };
+  can: { edit: boolean; release: boolean; patient_impact: boolean; submit: boolean; approve: boolean; return: boolean; cancel: boolean; review_effectiveness: boolean };
   /** Lý do người đang xem không được duyệt (không độc lập…); rỗng nếu được. */
   approve_block: string;
 }
@@ -461,6 +464,10 @@ export interface NceQueueRowView {
 
 export interface NceReleasePreview {
   ok: boolean; problems: NceMissingItem[]; lot_changed_levels: number[];
+  warnings: NceMissingItem[];
+  /** Quyết định ảnh hưởng bệnh nhân hiện hành chưa bao phủ khoảng nghi ngờ
+   * kết thúc ở lần chạy ứng viên; chặn cho phép hoạt động trở lại. */
+  impact_problems: NceMissingItem[];
   points: { level: number; lot: string; val: number; z: number | null; verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[]; voided: boolean }[];
 }
 
@@ -474,6 +481,17 @@ export interface NceConfigView {
 /** Mọi lệnh sửa một hồ sơ gửi kèm `expectedVersion` (= `row_version` đang
  * xem); lệch thì main trả lỗi `stale`. */
 export interface NceWriteBase { id: string; expectedVersion: number }
+
+export interface NceTechnicalAssessmentInput {
+  errorNature: 'systematic' | 'random' | 'mixed' | 'undetermined';
+  verificationMethod: string; correctiveEvidence: string; technicalConclusion: string;
+  metricMode: 'calculated' | 'not_applicable'; metricReason: string; unit: string;
+  tea: number | null; teaSource: string; stableBias: number | null; incidentBias: number | null;
+  postCorrectionBias: number | null; sd: number | null; sdSource: string;
+  observedDispersion: number | null; sampleCount: number | null;
+  meanResetDecision: 'not_applicable' | 'not_allowed' | 'eligible';
+  meanResetReason: string; meanResetEvidence: string;
+}
 
 export interface ReagentComparisonFit { a: number; b: number; r2: number }
 export interface ReagentComparisonResult {
@@ -683,11 +701,13 @@ export interface QcApi {
   /** IQC chỉ gửi khoá lần chạy; main tự đọc xét nghiệm, mức, lô, luật, verdict. */
   createNce(input: { data: { source: NceSource; phase?: 'pre' | 'exam' | 'post'; testId?: string; trigger?: NceRunKeyView; description: string; correction: string; holdResults: boolean; detectedAt: string; ownerUserId: string; dueDate?: string } }): Promise<IpcResult<NceDossierView>>;
   attachNceRun(input: { data: NceWriteBase & { run: NceRunKeyView } }): Promise<IpcResult<NceDossierView>>;
-  updateNce(input: { data: NceWriteBase & { patch: Record<string, unknown> } }): Promise<IpcResult<NceDossierView>>;
+  /** Đính chính ngày lưu riêng, cần nce.release, chỉ khi open; giữ lịch sử và lý do. */
+  updateNce(input: { data: NceWriteBase & { patch: Record<string, unknown>; detectedAtCorrection?: { detectedAt: string; reason: string } } }): Promise<IpcResult<NceDossierView>>;
   addNceAction(input: { data: NceWriteBase & { action: { kind: string; description: string; ownerUserId: string; dueDate: string } } }): Promise<IpcResult<NceDossierView>>;
   updateNceAction(input: { data: NceWriteBase & { actionId: string; action: { kind: string; description: string; ownerUserId: string; dueDate: string } } }): Promise<IpcResult<NceDossierView>>;
   completeNceAction(input: { data: NceWriteBase & { actionId: string; doneAt: string; evidence: string } }): Promise<IpcResult<NceDossierView>>;
   cancelNceAction(input: { data: NceWriteBase & { actionId: string; reason: string } }): Promise<IpcResult<NceDossierView>>;
+  recordNceTechnicalAssessment(input: { data: NceWriteBase & { assessment: NceTechnicalAssessmentInput } }): Promise<IpcResult<NceDossierView>>;
   recordNcePatientImpact(input: { data: NceWriteBase & { impact: { outcome: string; description: string; resultCount?: number | null; reference?: string; notified?: string } } }): Promise<IpcResult<NceDossierView>>;
   releaseNce(input: { data: NceWriteBase & { release: { reason: string; rerun?: NceRunKeyView | null; lotChangeNote?: string; notApplicable?: boolean } } }): Promise<IpcResult<NceDossierView>>;
   reviewNceEffectiveness(input: { data: NceWriteBase & { review: { result: string; reviewedAt: string; evidence: string; residualSeverity?: number; residualProbability?: number; residualLevel?: string; residualBasis?: string } } }): Promise<IpcResult<NceDossierView>>;

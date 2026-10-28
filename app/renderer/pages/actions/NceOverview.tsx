@@ -1,6 +1,5 @@
-// Tổng quan trang Khắc phục sự cố: hàng chờ lần chạy bị loại (main tính, mỗi
-// dòng một lần chạy) và danh sách hồ sơ có thẻ lọc.
-import { useMemo, useState } from 'react';
+// Tổng quan ưu tiên việc cần làm; kết luận và số ngày quá hạn do main tính.
+import { useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNceStore } from '../../store/nce-store';
 import { useAuthStore } from '../../store/auth-store';
@@ -13,19 +12,94 @@ import type { NceDossierView, NceQueueRowView } from '../../../shared/qc-api';
 import { filterNceRecords, nceFilterCounts, nceRunLabel, NCE_LIST_FILTERS, type NceListFilter } from '../../../main/domain/nce/presentation';
 import { CreateNceModal, type NceCreatePrefill } from './CreateNceModal';
 import { dateText } from './shared';
+import { nceSearchText, NEXT_STEP_TEXT } from './workflow';
 
 function queueSummary(row: NceQueueRowView): string {
-  return row.rejected_levels.map((l) => `M${l.level} (${l.rules.join(', ')})`).join('; ');
+  return row.rejected_levels.map(queueLevelLabel).join('; ');
+}
+
+function queueLevelLabel(level: NceQueueRowView['rejected_levels'][number]): string {
+  const rules = level.rules.length ? ` (${level.rules.join(', ')})` : '';
+  return `M${level.level}${rules}`;
+}
+
+function SummaryCard({ tone, urgent = false, label, value, detail, onClick }: {
+  tone: 'info' | 'warning' | 'success' | 'danger';
+  urgent?: boolean;
+  label: string;
+  value: number;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className={`nce-summary-card is-${tone}${urgent ? ' is-urgent' : ''}`} onClick={onClick}>
+      <span>{label}</span>
+      <b>{value}</b>
+      <small>{detail}</small>
+    </button>
+  );
+}
+
+function QueueCard({ row, writable, onOpen, onAttach, onCreate }: {
+  row: NceQueueRowView;
+  writable: boolean;
+  onOpen: (id: string) => void;
+  onAttach: (row: NceQueueRowView) => void;
+  onCreate: (row: NceQueueRowView) => void;
+}) {
+  const dossier = row.record;
+  const attachTo = row.attach_to;
+
+  return (
+    <article className={`nce-queue-item${dossier ? ' is-tracked' : ''}`} aria-label={`Sự cố ${row.test_name} ${row.date} ${row.run_id}`}>
+      <div className="nce-queue-content">
+        <div className="nce-queue-title">
+          <h3>{row.test_name}</h3>
+          <span className={`tag ${dossier ? 'warn' : 'rej'}`}>{dossier ? 'Đã có hồ sơ' : 'Chưa có hồ sơ'}</span>
+        </div>
+        <p className="nce-note">{nceRunLabel({ date: row.date, runId: row.run_id })}</p>
+        <div className="nce-queue-levels">
+          {row.rejected_levels.map((level) => <span className="tag rej" key={`${level.level}:${level.point_id}`}>{queueLevelLabel(level)}</span>)}
+        </div>
+        {dossier
+          ? <p className="nce-note">Đang xử lý trong {dossier.nce_id}</p>
+          : attachTo && <p className="nce-note">Cùng xét nghiệm có hồ sơ {attachTo.nce_id} đang mở.</p>}
+      </div>
+      <div className="nce-queue-actions">
+        {dossier && <button type="button" className="btn ghost sm" onClick={() => onOpen(dossier.id)}>Mở hồ sơ</button>}
+        {!dossier && attachTo && writable && <button type="button" className="btn sm" onClick={() => onAttach(row)}>Gắn vào {attachTo.nce_id}</button>}
+        {!dossier && writable && <button type="button" className={`btn sm${attachTo ? ' ghost' : ''}`} onClick={() => onCreate(row)}>Lập hồ sơ</button>}
+      </div>
+    </article>
+  );
 }
 
 export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
-  const { records, queue, attachRun, get } = useNceStore(useShallow((s) => ({ records: s.records, queue: s.queue, attachRun: s.attachRun, get: s.get })));
+  const { records, queue, attachRun, get, loading, error, load } = useNceStore(useShallow((s) => ({ records: s.records, queue: s.queue, attachRun: s.attachRun, get: s.get, loading: s.loading, error: s.error, load: s.load })));
   const user = useAuthStore((s) => s.user);
   const writable = canWrite(user?.role);
   const [filter, setFilter] = useState<NceListFilter>('active');
+  const [query, setQuery] = useState('');
+  const [showTracked, setShowTracked] = useState(false);
   const [creating, setCreating] = useState<{ prefill: NceCreatePrefill | null } | null>(null);
+  const queueRef = useRef<HTMLElement>(null);
+  const recordsRef = useRef<HTMLElement>(null);
   const counts = useMemo(() => nceFilterCounts(records, user?.id ?? ''), [records, user?.id]);
-  const shown = useMemo(() => filterNceRecords(records, filter, user?.id ?? ''), [records, filter, user?.id]);
+  const untracked = queue.filter((row) => !row.record);
+  const visibleQueue = showTracked ? queue : untracked;
+  const shown = useMemo(() => {
+    const search = nceSearchText(query);
+    return filterNceRecords(records, filter, user?.id ?? '')
+      .filter((record) => !search || nceSearchText([record.nce_id, record.description, record.test_name, record.owner_name, NCE_SOURCE_LABEL[record.source]].join(' ')).includes(search))
+      // Danh sách hồ sơ là nhật ký tạo mới; hồ sơ quá hạn vẫn được nhận diện
+      // ở cột hạn và thẻ tổng quan, không được đẩy hồ sơ mới xuống cuối bảng.
+      .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.updated_at.localeCompare(a.updated_at) || b.nce_id.localeCompare(a.nce_id));
+  }, [records, filter, query, user?.id]);
+
+  function selectFilter(next: NceListFilter) {
+    setFilter(next);
+    recordsRef.current?.scrollIntoView({ block: 'start' });
+  }
 
   async function attach(row: NceQueueRowView) {
     if (!row.attach_to) return;
@@ -37,81 +111,68 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
     onOpen(result.data.record.id);
   }
 
-  function created(dossier: NceDossierView) {
-    setCreating(null);
-    onOpen(dossier.record.id);
+  function createFromRun(row: NceQueueRowView) {
+    setCreating({ prefill: { testId: row.test_id, testName: row.test_name, date: row.date, runId: row.run_id, summary: `Lần chạy bị loại: ${queueSummary(row)}.` } });
   }
 
+  function created(dossier: NceDossierView) { setCreating(null); onOpen(dossier.record.id); }
+
+  if (loading && !records.length && !queue.length) return <div className="panel"><EmptyState title="Đang tải sự cố và hồ sơ xử lý…" /></div>;
+  if (error && !records.length && !queue.length) return <div className="panel"><EmptyState title="Không tải được danh sách sự cố" action={<button type="button" className="btn" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState></div>;
+
   return (
-    <>
-      <div className="panel">
-        <div className="panel-head">
-          <h2>Lần chạy bị loại cần xử lý {queue.length > 0 && <span className="count">{queue.length}</span>}</h2>
-          {writable && <button type="button" className="btn ghost sm" onClick={() => setCreating({ prefill: null })}>Lập hồ sơ từ nguồn khác</button>}
-        </div>
-        <div className="nce-section-body">
-          {!queue.length
-            ? <EmptyState size="compact" title="Không có lần chạy bị loại nào cần lập hồ sơ">Cảnh báo (ví dụ 1-2s) không loại lần chạy nên không vào danh sách này.</EmptyState>
-            : (
-              <table className="nce-table">
-                <thead><tr><th scope="col">Lần chạy</th><th scope="col">Xét nghiệm</th><th scope="col">Mức bị loại</th><th scope="col">Hồ sơ</th><th scope="col" className="nce-col-action">Thao tác</th></tr></thead>
-                <tbody>{queue.map((row) => (
-                  <tr key={`${row.test_id}:${row.date}:${row.run_id}`}>
-                    <td>{nceRunLabel({ date: row.date, runId: row.run_id })}</td>
-                    <td>{row.test_name}</td>
-                    <td>{queueSummary(row)}</td>
-                    <td>{row.record ? row.record.nce_id : row.attach_to ? <span className="hint-inline">Có thể gắn vào {row.attach_to.nce_id}</span> : <span className="tag rej">Chưa có hồ sơ</span>}</td>
-                    <td className="nce-col-action"><div className="nce-row-actions">
-                      {row.record && <button type="button" className="btn ghost sm" onClick={() => onOpen(row.record!.id)}>Mở hồ sơ</button>}
-                      {!row.record && row.attach_to && writable && <button type="button" className="btn ghost sm" onClick={() => void attach(row)}>Gắn vào {row.attach_to.nce_id}</button>}
-                      {!row.record && writable && <button type="button" className="btn sm" onClick={() => setCreating({ prefill: { testId: row.test_id, testName: row.test_name, date: row.date, runId: row.run_id, summary: `Lần chạy bị loại: ${queueSummary(row)}.` } })}>Lập hồ sơ</button>}
-                    </div></td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            )}
-        </div>
+    <div className="nce-overview">
+      <div className="nce-overview-intro">
+        <div><h2>Việc cần xử lý</h2><p>Lập hồ sơ cho sự cố mới hoặc tiếp tục công việc đang phụ trách.</p></div>
+        {writable && <button type="button" className="btn" onClick={() => setCreating({ prefill: null })}>+ Lập hồ sơ từ nguồn khác</button>}
+      </div>
+      {error && <div className="alert rej" role="alert">{error}<button type="button" className="btn ghost sm" onClick={() => void load()}>Thử lại</button></div>}
+      <div className="nce-summary" aria-label="Tình hình xử lý sự cố">
+        <SummaryCard tone="info" urgent={untracked.length > 0} label="QC cần lập hồ sơ" value={untracked.length} detail="Lần chạy bị loại chưa có hồ sơ" onClick={() => queueRef.current?.scrollIntoView({ block: 'start' })} />
+        <SummaryCard tone="warning" label="Đang xử lý" value={counts.active} detail="Hồ sơ chưa đóng" onClick={() => selectFilter('active')} />
+        <SummaryCard tone="success" label="Chờ duyệt" value={counts.approve} detail="Cần người duyệt độc lập" onClick={() => selectFilter('approve')} />
+        <SummaryCard tone="danger" urgent={counts.overdue > 0} label="Quá hạn" value={counts.overdue} detail="Hồ sơ hoặc hành động quá hạn" onClick={() => selectFilter('overdue')} />
       </div>
 
-      <div className="panel">
+      <section className="panel nce-overview-section" aria-label="Lần chạy QC cần xử lý" ref={queueRef}>
         <div className="panel-head">
-          <h2>Hồ sơ NCE</h2>
-          <div className="nce-filters" role="group" aria-label="Lọc hồ sơ">
-            {NCE_LIST_FILTERS.map(([key, label]) => (
-              <button type="button" key={key} className={filter === key ? 'on' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}<b className="count">{counts[key]}</b></button>
-            ))}
-          </div>
+          <h2>Lần chạy QC cần xử lý <span className="count">{visibleQueue.length}</span></h2>
+          {queue.some((row) => row.record) && <button type="button" className="btn ghost sm" aria-pressed={showTracked} onClick={() => setShowTracked((value) => !value)}>{showTracked ? 'Chỉ xem lần chưa có hồ sơ' : `Xem cả lần đã có hồ sơ (${queue.length - untracked.length})`}</button>}
         </div>
         <div className="nce-section-body">
+          {!visibleQueue.length
+            ? <EmptyState size="compact" title="Không có lần chạy QC mới cần lập hồ sơ">{queue.length ? 'Các lần chạy bị loại đã có hồ sơ. Tiếp tục xử lý trong danh sách bên dưới.' : 'Các sự cố đã ghi nhận vẫn được theo dõi trong danh sách hồ sơ bên dưới.'}</EmptyState>
+            : <div className="nce-queue-list">{visibleQueue.map((row) => (
+              <QueueCard key={`${row.test_id}:${row.date}:${row.run_id}`} row={row} writable={writable} onOpen={onOpen} onAttach={(selected) => void attach(selected)} onCreate={createFromRun} />
+            ))}</div>}
+        </div>
+      </section>
+
+      <section className="panel nce-overview-section" aria-label="Danh sách hồ sơ NCE" ref={recordsRef}>
+        <div className="panel-head">
+          <h2>Hồ sơ NCE <span className="count">{records.length}</span></h2>
+          <div className="nce-record-search"><input type="search" aria-label="Tìm hồ sơ NCE" placeholder="Tìm mã hồ sơ, xét nghiệm, người phụ trách…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        </div>
+        <div className="nce-section-body">
+          <div className="nce-filters" role="group" aria-label="Lọc hồ sơ">{NCE_LIST_FILTERS.map(([key, label]) => <button type="button" key={key} className={filter === key ? 'on' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}<b className="count">{counts[key]}</b></button>)}</div>
           {!shown.length
-            ? <EmptyState size="compact" title="Không có hồ sơ nào ở mục này" />
-            : (
-              <table className="nce-table">
-                <thead><tr><th scope="col">Mã hồ sơ</th><th scope="col">Phát hiện</th><th scope="col">Nguồn / xét nghiệm</th><th scope="col">Mô tả</th><th scope="col">Phụ trách / hạn</th><th scope="col">Trạng thái</th><th scope="col" className="nce-col-action">Thao tác</th></tr></thead>
-                <tbody>{shown.map((record) => {
-                  const badge = nceStatusBadge(record);
-                  return (
-                    <tr key={record.id} className={record.status === 'cancelled' ? 'nce-row-muted' : undefined}>
-                      <td><b>{record.nce_id}</b>{record.protocol_version < 4 && <div className="nce-sub">Phiên bản cũ</div>}</td>
-                      <td>{dateText(record.detected_at)}</td>
-                      <td>{NCE_SOURCE_LABEL[record.source] ?? record.source}{record.test_name ? <div className="nce-sub">{record.test_name}</div> : null}</td>
-                      <td className="nce-col-text">{record.description}</td>
-                      <td>{record.owner_name || '—'}<div className="nce-sub">hạn {dateText(record.due_date)}</div></td>
-                      <td>
-                        <span className={`tag ${badge.tone}`}>{badge.label}</span>
-                        {record.overdue_days > 0 && <div className="nce-sub nce-overdue">Quá hạn {record.overdue_days} ngày</div>}
-                        {record.overdue_actions > 0 && <div className="nce-sub nce-overdue">{record.overdue_actions} hành động quá hạn</div>}
-                      </td>
-                      <td className="nce-col-action"><button type="button" className="btn ghost sm" onClick={() => onOpen(record.id)}>Mở hồ sơ</button></td>
-                    </tr>
-                  );
-                })}</tbody>
-              </table>
-            )}
+            ? <EmptyState size="compact" title={query.trim() ? 'Không tìm thấy hồ sơ phù hợp' : 'Không có hồ sơ nào ở mục này'} action={(query || filter !== 'all') && records.length > 0 ? <button type="button" className="btn ghost sm" onClick={() => { setQuery(''); setFilter('all'); }}>Xem tất cả hồ sơ</button> : undefined} />
+            : <div className="nce-record-table"><table className="nce-table">
+              <thead><tr><th scope="col">Hồ sơ / sự kiện</th><th scope="col">Phụ trách</th><th scope="col">Tiến độ</th><th scope="col">Hạn hoàn thành</th><th scope="col" className="nce-col-action">Thao tác</th></tr></thead>
+              <tbody>{shown.map((record) => {
+                const badge = nceStatusBadge(record);
+                return <tr key={record.id} className={record.status === 'cancelled' ? 'nce-row-muted' : undefined}>
+                  <td className="nce-record-description"><b>{record.nce_id}</b><div className="nce-record-copy" title={record.description}>{record.description}</div><div className="nce-sub">{record.test_name || NCE_SOURCE_LABEL[record.source]} · {dateText(record.detected_at)}{record.protocol_version < 4 && ' · Phiên bản cũ'}</div></td>
+                  <td>{record.owner_name || 'Chưa có người phụ trách'}</td>
+                  <td><span className={`tag ${badge.tone}`}>{badge.label}</span><div className="nce-sub">{record.next_step ? NEXT_STEP_TEXT[record.next_step] : record.status === 'closed' ? 'Đã hoàn tất hồ sơ' : 'Hồ sơ được lưu để truy vết'}</div></td>
+                  <td>{dateText(record.due_date)}{record.overdue_days > 0 && <div className="nce-sub nce-overdue">Quá hạn {record.overdue_days} ngày</div>}{record.overdue_actions > 0 && <div className="nce-sub nce-overdue">{record.overdue_actions} hành động quá hạn</div>}</td>
+                  <td className="nce-col-action"><button type="button" className="btn ghost sm" onClick={() => onOpen(record.id)}>Mở hồ sơ</button></td>
+                </tr>;
+              })}</tbody>
+            </table></div>}
         </div>
-      </div>
-
+      </section>
       {creating && <CreateNceModal prefill={creating.prefill} onClose={() => setCreating(null)} onCreated={created} />}
-    </>
+    </div>
   );
 }

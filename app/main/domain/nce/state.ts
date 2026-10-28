@@ -24,7 +24,7 @@ export function nextNceStatus(status: NceStatus, transition: NceTransition): Nce
 /** Các thao tác ghi KHÔNG đổi trạng thái, và trạng thái cho phép chúng. */
 export type NceEditOperation =
   | 'update' | 'attachRun' | 'addAction' | 'updateAction' | 'completeAction' | 'cancelAction'
-  | 'recordPatientImpact' | 'reviewEffectiveness';
+  | 'recordTechnicalAssessment' | 'recordPatientImpact' | 'reviewEffectiveness';
 
 const EDIT_STATES: Readonly<Record<NceEditOperation, readonly NceStatus[]>> = {
   update: ['open', 'released'],
@@ -35,6 +35,8 @@ const EDIT_STATES: Readonly<Record<NceEditOperation, readonly NceStatus[]>> = {
   updateAction: ['open', 'released'],
   completeAction: ['open', 'released'],
   cancelAction: ['open', 'released'],
+  // Hồ sơ cũ đã release vẫn được bổ sung đánh giá kỹ thuật trước khi nộp duyệt.
+  recordTechnicalAssessment: ['open', 'released'],
   // Thông tin về kết quả đã trả có thể đến muộn, nên vẫn ghi thêm được sau khi
   // cho chạy lại; quyết định là append-only, không sửa quyết định cũ.
   recordPatientImpact: ['open', 'released'],

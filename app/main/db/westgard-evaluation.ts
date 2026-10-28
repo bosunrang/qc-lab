@@ -13,11 +13,21 @@ export function qcCuts(db: Db, testId: string): QcCut[] {
   return rows.map((row) => ({ date: row.date, runId: row.run_id }));
 }
 
+function testRuleRow(db: Db, testId: string) {
+  return db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as
+    { rule_actions_json: string; rule_scopes_json: string } | undefined;
+}
+
+/** Hành động của từng luật cho một xét nghiệm (mặc định chung + ghi đè), cùng
+ * phép phân giải mà `evaluateQcSets()` dùng để kết luận loại bỏ. */
+export function testRuleActionOf(db: Db, testId: string) {
+  return makeRuleActionLayered(readGlobalRules(db), parseRuleActions(testRuleRow(db, testId)?.rule_actions_json));
+}
+
 /** `extraCuts`: mốc giả định chưa ghi, để đánh giá lần rerun ứng viên TRONG
  * giai đoạn mới trước khi cho chạy lại (D-04). */
 export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], levelCount?: number, extraCuts: readonly QcCut[] = []) {
-  const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as
-    { rule_actions_json: string; rule_scopes_json: string } | undefined;
+  const test = testRuleRow(db, testId);
   const global = readGlobalRules(db), overrides = parseRuleActions(test?.rule_actions_json);
   const on = makeIsOnLayered(global, overrides), actionOf = makeRuleActionLayered(global, overrides);
   const configuredLevelCount = Number.isInteger(levelCount) && levelCount! > 0 ? levelCount! : new Set(sets.map(set => set.level)).size;

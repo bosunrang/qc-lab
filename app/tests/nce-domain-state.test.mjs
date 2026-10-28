@@ -55,9 +55,17 @@ test('ca 9: KTV không có capability bị chặn; quản trị viên mặc nhi�
 });
 
 test('ca 10: mọi người đã tham gia hồ sơ đều không được duyệt', () => {
-  const d = dossier({ status: 'pending_approval' });
+  const d = dossier({
+    status: 'pending_approval',
+    technicalAssessments: [{ ...dossier().technicalAssessments[0], actorUserId: 'u-technical' }],
+    patientImpacts: [{ ...dossier().patientImpacts[0], actorUserId: 'u-impact' }],
+  });
   const approver = (userId) => ({ userId, role: 'technician', capabilities: ['nce.approve'] });
-  for (const [userId, role] of [['u-reporter', 'người báo cáo'], ['u-owner', 'người phụ trách'], ['u-releaser', 'người cho chạy lại'], ['u-tech', 'người hoàn thành hành động'], ['u-reviewer', 'người đánh giá hiệu lực']]) {
+  for (const [userId, role] of [
+    ['u-reporter', 'người báo cáo'], ['u-owner', 'người phụ trách'], ['u-releaser', 'người cho chạy lại'],
+    ['u-tech', 'người hoàn thành hành động'], ['u-technical', 'người xác minh kỹ thuật'],
+    ['u-impact', 'người đánh giá ảnh hưởng bệnh nhân'], ['u-reviewer', 'người đánh giá hiệu lực'],
+  ]) {
     const result = canApproveNce(approver(userId), d);
     assert.equal(result.ok, false, userId);
     assert.equal(result.code, 'not-independent');
@@ -80,7 +88,7 @@ test('ngoại lệ phân tách nhiệm vụ chỉ dùng được khi bật và c
   const result = canApproveNce(owner, d, { enabled: true, sopRef: 'SOP-QM-02' });
   assert.equal(result.ok, true);
   assert.equal(result.usedException, true);
-  assert.deepEqual(result.conflicts, ['người phụ trách']);
+  assert.deepEqual(result.conflicts, ['người phụ trách', 'người xác minh kỹ thuật', 'người đánh giá ảnh hưởng bệnh nhân']);
 });
 
 test('nộp duyệt và hủy theo vai trò trong hồ sơ', () => {

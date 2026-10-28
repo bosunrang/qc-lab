@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
-  filterNceRecords, nceFilterCounts, nceHistory, nceRerunOptions, nceRiskText, nceRunLabel, nceSteps,
+  filterNceRecords, nceFilterCounts, nceHistory, nceRerunOptions, nceRerunChoices, nceRiskText, nceRunLabel, nceSteps,
 } = require('../../app-dist/main/domain/nce/presentation.js');
 
 const rec = (over) => ({ id: over.id, status: 'open', owner_user_id: 'u-o', reported_by_user_id: 'u-r', overdue_days: 0, overdue_actions: 0, ...over });
@@ -45,6 +45,22 @@ test('thanh bước theo trạng thái', () => {
   assert.equal(states('cancelled'), 'todo,todo,todo,todo');
 });
 
+test('giải thích lần QC bị lọc: trước ngày phát hiện, không sau lần hỏng cuối và toàn điểm đã hủy', () => {
+  const choices = nceRerunChoices([
+    { date: '2026-09-01', run_id: '1', level: 1, voided: 0 },
+    { date: '2026-09-01', run_id: '2', level: 1, voided: 0 },
+    { date: '2026-10-14', run_id: '1', level: 1, voided: 1 },
+    { date: '2026-10-14', run_id: '2', level: 1, voided: 1 },
+    { date: '2026-10-14', run_id: '2', level: 2, voided: 0 },
+  ], [{ date: '2026-09-01', runId: '1' }], '2026-10-14');
+  assert.deepEqual(choices.map((r) => `${r.date}/${r.runId}`), ['2026-10-14/2', '2026-10-14/1', '2026-09-01/2', '2026-09-01/1']);
+  assert.deepEqual(choices[0].exclusionReasons, []);
+  assert.deepEqual(choices[0].levels, [2]);
+  assert.match(choices[1].exclusionReasons.join(), /đã hủy/);
+  assert.match(choices[2].exclusionReasons.join(), /Trước ngày phát hiện 14\/10\/2026/);
+  assert.equal(choices[3].exclusionReasons.length, 2);
+});
+
 test('lịch sử hồ sơ: quyết định và lần sửa, mới nhất trước, đọc ra nhãn', () => {
   const history = nceHistory({
     decisions: [
@@ -64,4 +80,10 @@ test('nhãn lần chạy và điểm nguy cơ', () => {
   assert.equal(nceRunLabel({ date: '2026-10-12', runId: '' }), '12/10/2026');
   assert.equal(nceRiskText(3, 2), '6');
   assert.equal(nceRiskText(0, 2), '—');
+});
+
+test('lịch sử đính chính bị thiếu dữ liệu trong backup không làm hỏng trang hồ sơ', () => {
+  const history = nceHistory({ decisions: [], revisions: [{ changes_json: '{"detectedAt":[]}', actor_name: 'Tài khoản thử', at: '2026-10-15T01:00:00Z' }] });
+  assert.equal(history.length, 1);
+  assert.equal(typeof history[0].detail, 'string');
 });

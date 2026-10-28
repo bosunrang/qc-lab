@@ -20,10 +20,11 @@ export const NCE_CHECK_LABELS: Readonly<Record<string, string>> = {
   maintenance: 'Nhật ký bảo trì, sửa chữa',
   storage: 'Điều kiện bảo quản',
   calibrator: 'Calibrator (lô, hạn dùng, giá trị gán)',
+  environment: 'Môi trường (nhiệt độ phòng, điện, nước cấp)',
 };
 
 const BY_SOURCE: Readonly<Record<NceSource, readonly string[]>> = {
-  iqc: ['qcMaterial', 'reagent', 'calibration', 'instrument', 'operator', 'lotChange'],
+  iqc: ['qcMaterial', 'reagent', 'calibration', 'instrument', 'environment', 'operator', 'lotChange'],
   eqa: ['sampleHandling', 'transcription', 'method', 'iqcHistory', 'calibration'],
   instrument: ['maintenance', 'instrument', 'iqcHistory'],
   reagent: ['storage', 'lotChange', 'iqcHistory'],

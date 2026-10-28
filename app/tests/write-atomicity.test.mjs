@@ -18,7 +18,7 @@ const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handler
 const { createAuthHandlers } = require('../../app-dist/main/ipc/auth-handlers.js');
 const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
-import { ensureUser } from './helpers/nce-flow.mjs';
+import { ensureUser, must, validTechnicalAssessment } from './helpers/nce-flow.mjs';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 const { createReagentHandlers } = require('../../app-dist/main/ipc/reagent-handlers.js');
 const { createReportHandlers } = require('../../app-dist/main/ipc/report-handlers.js');
@@ -100,6 +100,15 @@ test('NCE: tạo, sửa, hành động, quyết định, cho chạy lại, hủy
   makeOperationalQc(db, { testId: assay.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
   entry.addPoint({ data: { testId: assay.id, level: 1, date: '2026-09-03', runId: '2026-09-03-1', val: 100 } }, admin);
   const TABLES = ['nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions', 'nce_cuts'];
+  entry.addPoint({ data: { testId: assay.id, level: 1, date: '2026-09-04', runId: '2026-09-04-bad', val: 107 } }, admin);
+  const iqc = must(nce.createNce({ data: {
+    source: 'iqc', testId: assay.id, trigger: { date: '2026-09-04', runId: '2026-09-04-bad' },
+    description: 'QC vượt giới hạn cần xác minh kỹ thuật', correction: 'Dừng trả kết quả và kiểm tra máy',
+    holdResults: true, detectedAt: '2026-09-04', ownerUserId: admin.userId,
+  } }, admin), 'tạo hồ sơ IQC');
+  assertAtomic(db, TABLES, 'nce.recordTechnicalAssessment', () => nce.recordNceTechnicalAssessment({ data: {
+    id: iqc.record.id, expectedVersion: iqc.record.row_version, assessment: validTechnicalAssessment,
+  } }, admin));
   const input = { data: { source: 'calibration', testId: assay.id, description: 'Lệch hiệu chuẩn sau bảo trì', correction: 'Hiệu chuẩn lại', holdResults: true, detectedAt: '2026-09-03', ownerUserId: admin.userId } };
   const first = nce.createNce(input, admin).data;
   assertAtomic(db, TABLES, 'nce.create', () => nce.createNce(input, admin));
@@ -109,6 +118,7 @@ test('NCE: tạo, sửa, hành động, quyết định, cho chạy lại, hủy
   const impact = { outcome: 'not_reported', description: 'Đã giữ kết quả' };
   assertAtomic(db, TABLES, 'nce.recordPatientImpact', () => nce.recordNcePatientImpact({ data: { ...base(), impact } }, admin));
   nce.recordNcePatientImpact({ data: { ...base(), impact } }, admin);
+  must(nce.updateNce({ data: { ...base(), patch: { checklist: Object.fromEntries(['calibrator', 'calibration', 'iqcHistory'].map((key) => [key, { status: 'ok', note: '' }])) } } }, admin), 'kiểm tra nhanh trước release');
   // Cho chạy lại ghi bản ghi, lần chạy rerun, quyết định VÀ mốc cắt trong cùng một transaction.
   assertAtomic(db, TABLES, 'nce.release', () => nce.releaseNce({ data: { ...base(), release: { reason: 'QC xác minh đạt sau hiệu chuẩn', rerun: { date: '2026-09-03', runId: '2026-09-03-1' } } } }, admin));
   const second = nce.createNce(input, admin).data;

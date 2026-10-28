@@ -4,15 +4,27 @@
 // cuối cùng trước sự cố cho tới lần rerun được chấp nhận (NCE-PLAN 7.5; ISO
 // 15189:2022 7.5). QC chạy lại đạt không làm các kết quả trong khoảng đó mặc
 // nhiên hợp lệ, nên phải có một quyết định có người chịu trách nhiệm.
-import type { NceMissing, NcePatientImpact, NceRunKey, NceSource, NceValidation } from './types';
+import type { NceMissing, NcePatientImpact, NcePatientImpactCoverage, NceRunKey, NceSource, NceValidation } from './types';
 import { isOneOf, NCE_PATIENT_OUTCOMES } from './types';
-import { compareRun } from './format';
+import { compareRun, runLabel } from './format';
 
-export interface NceRunOutcome extends NceRunKey { rejected: boolean }
+/** Luật Westgard đã đánh dấu trên một mức của lần chạy: luật nổ tại điểm đó
+ * và luật mà điểm đó là bằng chứng (điểm trước trong cùng chuỗi đếm). */
+export interface NceRunMark { level: number; rules: readonly string[] }
+
+export interface NceRunOutcome extends NceRunKey { rejected: boolean; complete: boolean; marks?: readonly NceRunMark[] }
+
+/** Luật LOẠI BỎ của lần chạy khởi đầu và các mức mang luật đó — dùng để lần
+ * ngược chuỗi đếm nhiều lần chạy (10x, 4-1s, 2-2s…) về lần chạy đầu tiên. */
+export interface NceSuspectChain { rules: readonly string[]; levels: readonly number[] }
 
 export interface NceSuspectWindow {
-  /** Lần chạy đạt cuối cùng trước sự cố; `null` khi không có lần đạt nào trước đó. */
+  /** Lần chạy đạt cuối cùng trước khi sai số bắt đầu; `null` khi không có lần đạt nào trước đó. */
   lastAccepted: NceRunKey | null;
+  /** Lần chạy đầu tiên thuộc chuỗi vi phạm; bằng `trigger` khi luật chỉ xét một lần chạy. */
+  onset: NceRunKey;
+  /** Luật làm khoảng mở rộng về trước lần khởi đầu (rỗng nếu không mở rộng). */
+  onsetRules: string[];
   trigger: NceRunKey;
   /** Lần rerun; `null` khi chưa cho chạy lại (khoảng còn mở). */
   rerun: NceRunKey | null;
@@ -20,14 +32,67 @@ export interface NceSuspectWindow {
   runs: NceRunKey[];
 }
 
-export function nceSuspectWindow(allRuns: readonly NceRunOutcome[], trigger: NceRunKey, rerun: NceRunKey | null): NceSuspectWindow {
+const keyOf = (run: NceRunKey): NceRunKey => ({ date: run.date, runId: run.runId });
+
+/** Lần chạy đầu tiên của chuỗi vi phạm. Luật đếm nhiều lần chạy (10x, 8x,
+ * 4-1s, 2-2s qua lần chạy…) nổ ở lần chạy cuối, nhưng các lần trước trong
+ * chuỗi đã mang sai số dù từng được chấp nhận; lấy "lần đạt cuối" ngay trước
+ * lần khởi đầu sẽ bỏ sót kết quả bệnh nhân của các lần đó. Đi ngược từ lần
+ * khởi đầu: lần chạy có điểm mang luật của chuỗi thì thuộc chuỗi; lần chạy có
+ * điểm ở mức của chuỗi mà không mang luật thì chuỗi đã dừng; lần chạy không
+ * đo mức đó thì bỏ qua (chuỗi đếm theo mức không tính lần chạy ấy). */
+function chainOnset(sorted: readonly NceRunOutcome[], trigger: NceRunKey, chain: NceSuspectChain | undefined): { onset: NceRunKey; rules: string[] } {
+  if (!chain?.rules.length) return { onset: keyOf(trigger), rules: [] };
+  const chainRules = new Set(chain.rules), chainLevels = new Set(chain.levels);
+  let onset = keyOf(trigger);
+  const used = new Set<string>();
+  const before = sorted.filter((run) => compareRun(run, trigger) < 0);
+  for (let i = before.length - 1; i >= 0; i--) {
+    const marks = before[i].marks ?? [];
+    const hits = marks.flatMap((mark) => mark.rules.filter((rule) => chainRules.has(rule)));
+    if (hits.length) { onset = keyOf(before[i]); hits.forEach((rule) => used.add(rule)); continue; }
+    if (marks.some((mark) => chainLevels.has(mark.level))) break;
+  }
+  return { onset, rules: [...used].sort() };
+}
+
+export function nceSuspectWindow(allRuns: readonly NceRunOutcome[], trigger: NceRunKey, rerun: NceRunKey | null, chain?: NceSuspectChain): NceSuspectWindow {
   const sorted = [...allRuns].sort(compareRun);
-  const before = sorted.filter((run) => compareRun(run, trigger) < 0 && !run.rejected);
-  const lastAccepted = before.length ? { date: before.at(-1)!.date, runId: before.at(-1)!.runId } : null;
+  const { onset, rules: onsetRules } = chainOnset(sorted, trigger, chain);
+  const before = sorted.filter((run) => compareRun(run, onset) < 0 && !run.rejected && run.complete);
+  const lastAccepted = before.length ? keyOf(before.at(-1)!) : null;
   const runs = sorted
     .filter((run) => (!lastAccepted || compareRun(run, lastAccepted) > 0) && (!rerun || compareRun(run, rerun) < 0))
-    .map((run) => ({ date: run.date, runId: run.runId }));
-  return { lastAccepted, trigger, rerun, runs };
+    .map(keyOf);
+  return { lastAccepted, onset, onsetRules, trigger: keyOf(trigger), rerun, runs };
+}
+
+/** Phạm vi một quyết định ảnh hưởng bệnh nhân đã rà soát, chụp tại lúc ghi:
+ * khoảng nghi ngờ hiện hành và lần chạy QC mới nhất khi đó. Khi đã cho chạy
+ * lại, quyết định rà soát đúng tới lần rerun. */
+export function ncePatientImpactCoverage(window: NceSuspectWindow, latestRun: NceRunKey | null): NcePatientImpactCoverage {
+  const through = window.rerun ?? latestRun ?? window.trigger;
+  return { lastAccepted: window.lastAccepted, onset: window.onset, through: keyOf(through), runCount: window.runs.length };
+}
+
+/** Quyết định ảnh hưởng hiện hành có bao phủ khoảng nghi ngờ hiện tại không.
+ * Bắt đầu: không muộn hơn lần đạt cuối hiện tính (dữ liệu QC đổi, chuỗi vi
+ * phạm dài hơn đều làm khoảng lùi về trước). Kết thúc: đã rà tới ít nhất lần
+ * rerun. `window` = `null` khi hồ sơ không có khoảng nghi ngờ (không phải IQC). */
+export function ncePatientImpactCoverageMissing(impact: NcePatientImpact | undefined, window: NceSuspectWindow | null): NceMissing[] {
+  if (!window || !impact) return [];
+  const coverage = impact.coverage;
+  if (!coverage?.through) return [{ code: 'patient-impact-scope', message: 'Quyết định ảnh hưởng bệnh nhân chưa ghi phạm vi khoảng nghi ngờ đã rà soát: ghi lại quyết định.' }];
+  const missing: NceMissing[] = [];
+  const startCovered = !coverage.lastAccepted || (!!window.lastAccepted && compareRun(coverage.lastAccepted, window.lastAccepted) <= 0);
+  if (!startCovered) {
+    const now = window.lastAccepted ? `sau lần đạt ${runLabel(window.lastAccepted)}` : 'từ lần chạy đầu tiên đang có';
+    missing.push({ code: 'patient-impact-start', message: `Khoảng nghi ngờ hiện bắt đầu ${now}, sớm hơn phạm vi quyết định ảnh hưởng bệnh nhân đã rà soát (sau lần đạt ${runLabel(coverage.lastAccepted!)}): ghi lại quyết định.` });
+  }
+  if (window.rerun && compareRun(coverage.through, window.rerun) < 0) {
+    missing.push({ code: 'patient-impact-end', message: `Quyết định ảnh hưởng bệnh nhân chỉ rà soát tới lần chạy ${runLabel(coverage.through)}, chưa tới lần rerun ${runLabel(window.rerun)}: ghi lại quyết định.` });
+  }
+  return missing;
 }
 
 export const NCE_PATIENT_OUTCOME_LABEL: Readonly<Record<string, string>> = {
@@ -52,9 +117,11 @@ export function validateNcePatientImpact(raw: unknown, source: NceSource): NceVa
     if (!Number.isInteger(n) || n < 0) return { ok: false, code: 'invalid-count', message: 'Số kết quả cần rà soát phải là số nguyên không âm.' };
     resultCount = n;
   }
+  if (source === 'iqc' && resultCount === null) return { ok: false, code: 'missing-count', message: 'Ghi số kết quả bệnh nhân đã rà soát trong khoảng nghi ngờ.' };
   const reference = String(input.reference ?? '').trim().slice(0, 200);
   const notified = String(input.notified ?? '').trim().slice(0, 1000);
   if (input.outcome === 'reported_corrected') {
+    if (!resultCount) return { ok: false, code: 'missing-affected-count', message: 'Kết luận có sửa báo cáo phải ghi số kết quả bị ảnh hưởng lớn hơn 0.' };
     if (reference.length < 2) return { ok: false, code: 'missing-reference', message: 'Ghi mã phiếu sửa báo cáo / tham chiếu kết quả đã sửa.' };
     if (notified.length < 5) return { ok: false, code: 'missing-notified', message: 'Ghi người sử dụng đã được thông báo, thời điểm và kênh thông báo.' };
   }

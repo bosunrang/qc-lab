@@ -23,7 +23,7 @@ export interface NceRerunInput {
   lotChangeNote: string;
   /** Mức phải có. Mặc định: các mức có mặt trong lần chạy khởi đầu. */
   requiredLevels?: readonly number[];
-  /** Ngày sớm nhất được nhận (ngày phát hiện), dùng khi không có lần khởi đầu. */
+  /** Ngày sớm nhất được nhận (ngày phát hiện), áp dụng cả khi có lần khởi đầu. */
   notBeforeDate?: string;
 }
 
@@ -50,7 +50,8 @@ export function checkNceRerun(input: NceRerunInput): NceRerunResult {
   if (failures.length) {
     const latestFailure = failures.reduce<NceRunKey>((latest, run) => compareRun(run, latest) > 0 ? run : latest, failures[0]);
     if (compareRun(candidate, latestFailure) <= 0) add('rerun-too-early', `Lần chạy rerun phải sau lần chạy bị loại gần nhất của hồ sơ (${runLabel(latestFailure)}).`);
-  } else if (input.notBeforeDate && candidate.date < input.notBeforeDate) {
+  }
+  if (input.notBeforeDate && candidate.date < input.notBeforeDate && !problems.some((p) => p.code === 'rerun-too-early')) {
     add('rerun-too-early', 'Lần chạy xác minh phải từ ngày phát hiện sự cố trở đi.');
   }
 

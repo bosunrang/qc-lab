@@ -6,8 +6,9 @@ import { isOneOf, NCE_PHASES, NCE_SOURCES } from './types';
 import { cleanDate, compareRun, textLength } from './format';
 import { checklistMissing } from './checklist';
 import { nceRiskScore, nceTierMissing } from './tier';
-import { ncePatientImpactMissing } from './patient-impact';
-import { latestActionDoneDate } from './actions';
+import { ncePatientImpactCoverageMissing, ncePatientImpactMissing, type NceSuspectWindow } from './patient-impact';
+import { nceTechnicalAssessmentMissing } from './technical-assessment';
+import { latestActionDoneDate, nceEffectivenessBasis } from './actions';
 import type { NceRerunResult } from './rerun';
 
 // ---------------------------------------------------------------- 5.1 Tạo
@@ -77,26 +78,40 @@ export function validateNceReleaseInput(raw: unknown, source: NceSource): NceVal
 }
 
 /** Còn thiếu gì để cho chạy lại. `rerun` là kết quả `checkNceRerun()` cho lần
- * chạy ứng viên (chỉ với IQC; `null` khi chưa chọn). Không đòi hành động khắc
- * phục đã xong (D-02, sửa R-01). */
-export function nceReleaseMissing(dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'runs' | 'holdResults'>, rerun: NceRerunResult | null): NceMissing[] {
+ * chạy ứng viên (chỉ với IQC; `null` khi chưa chọn). `suspect` là khoảng nghi
+ * ngờ main tính tới lần rerun ứng viên, để kiểm quyết định ảnh hưởng bệnh nhân
+ * bao phủ đúng khoảng đó (`undefined` chỉ dùng trong test thuần không có dữ
+ * liệu QC). Không đòi hành động khắc phục đã xong (D-02, sửa R-01). */
+export function nceReleaseMissing(
+  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'occurredNote' | 'checklist'>,
+  rerun: NceRerunResult | null,
+  suspect?: NceSuspectWindow | null,
+): NceMissing[] {
   if (dossier.status !== 'open') return [{ code: 'status', message: 'Chỉ cho chạy lại hồ sơ đang xử lý.' }];
   const missing: NceMissing[] = [];
   if (dossier.holdResults === null) missing.push({ code: 'hold', message: 'Chưa ghi có dừng/giữ kết quả liên quan hay không.' });
+  missing.push(...checklistMissing(dossier.source, dossier.checklist));
   if (dossier.source === 'iqc') {
+    if (dossier.holdResults === false) missing.push({ code: 'hold-iqc', message: 'Nội kiểm ngoài kiểm soát phải dừng/giữ kết quả liên quan cho đến khi đánh giá xong.' });
+    if (textLength(dossier.containmentNote) < 10) missing.push({ code: 'containment', message: 'Ghi phạm vi kết quả đã giữ, thiết bị/khu vực bị ảnh hưởng và người đã được thông báo.' });
+    if (textLength(dossier.occurredNote) < 10) missing.push({ code: 'occurred', message: 'Ghi diễn biến và các mốc thời gian xử lý sự cố.' });
     if (!dossier.runs.some((run) => run.role === 'trigger')) missing.push({ code: 'no-trigger', message: 'Hồ sơ nội kiểm chưa gắn lần chạy bị loại.' });
-    if (!rerun) missing.push({ code: 'missing-rerun', message: 'Chưa chọn lần chạy QC rerun làm bằng chứng.' });
+    missing.push(...nceTechnicalAssessmentMissing(dossier));
+    if (!rerun) missing.push({ code: 'missing-rerun', message: 'Chưa chốt bằng chứng QC rerun bằng quyết định cho hoạt động trở lại.' });
     else missing.push(...rerun.problems);
   } else if (rerun) missing.push(...rerun.problems);
   missing.push(...ncePatientImpactMissing(dossier.patientImpacts, dossier.source));
+  missing.push(...ncePatientImpactCoverageMissing(dossier.patientImpacts.at(-1), suspect ?? null));
   return missing;
 }
 
 // ------------------------------------------------------- 5.4 Nộp duyệt
 
 /** Nội dung hồ sơ có đủ để nộp duyệt không — dùng cho cả nộp (5.4) lẫn kiểm
- * lại khi duyệt (5.5). Không kiểm trạng thái. */
-export function nceContentMissing(dossier: NceDossier): NceMissing[] {
+ * lại khi duyệt (5.5). Không kiểm trạng thái. `suspect`: khoảng nghi ngờ tính
+ * trên dữ liệu QC hiện tại tới lần rerun đã chốt; dữ liệu đổi sau khi cho
+ * chạy lại thì quyết định ảnh hưởng bệnh nhân phải được ghi lại. */
+export function nceContentMissing(dossier: NceDossier, suspect?: NceSuspectWindow | null): NceMissing[] {
   const missing: NceMissing[] = [];
   const add = (code: string, message: string) => missing.push({ code, message });
   if (!dossier.ownerUserId) add('owner', 'Chưa có người phụ trách.');
@@ -105,7 +120,9 @@ export function nceContentMissing(dossier: NceDossier): NceMissing[] {
   if (!nceRiskScore(dossier.riskSeverity, dossier.riskProbability) || !dossier.riskLevel) add('risk', 'Chưa đánh giá nguy cơ ban đầu (mức độ, khả năng xảy ra, phân loại).');
   else if (textLength(dossier.riskBasis) < 5) add('risk-basis', 'Ghi căn cứ phân loại nguy cơ theo SOP.');
   missing.push(...checklistMissing(dossier.source, dossier.checklist));
+  missing.push(...nceTechnicalAssessmentMissing(dossier));
   missing.push(...nceTierMissing(dossier));
+  missing.push(...ncePatientImpactCoverageMissing(dossier.patientImpacts.at(-1), suspect ?? null));
 
   const live = dossier.actions.filter((action) => action.status !== 'cancelled');
   const open = live.filter((action) => action.status === 'open');
@@ -124,22 +141,26 @@ export function nceContentMissing(dossier: NceDossier): NceMissing[] {
       ? 'Lần đánh giá gần nhất kết luận không hiệu quả: bổ sung hành động và đánh giá lại.'
       : 'Lần đánh giá gần nhất cần theo dõi thêm: đánh giá lại khi đủ dữ liệu.');
     else if (last.reviewedAt < latestActionDoneDate(dossier.actions)) add('effectiveness-stale', 'Có hành động hoàn thành sau lần đánh giá hiệu lực gần nhất: phải đánh giá lại.');
+    else if (last.basis !== nceEffectivenessBasis(dossier)) add('effectiveness-basis-changed', 'Tiêu chí, nguy cơ, nguyên nhân hoặc hành động đã thay đổi so với bằng chứng hiệu lực: phải đánh giá lại.');
+    if (last?.result === 'effective' && nceRiskScore(last.residualSeverity, last.residualProbability) > nceRiskScore(dossier.riskSeverity, dossier.riskProbability)) {
+      add('residual-above-initial', 'Nguy cơ còn lại cao hơn nguy cơ ban đầu hiện hành: phải rà soát và đánh giá lại.');
+    }
   }
   return missing;
 }
 
-export function nceSubmitMissing(dossier: NceDossier): NceMissing[] {
+export function nceSubmitMissing(dossier: NceDossier, suspect?: NceSuspectWindow | null): NceMissing[] {
   if (dossier.status !== 'released') return [{ code: 'status', message: 'Chỉ nộp duyệt hồ sơ đã cho chạy lại.' }];
-  return nceContentMissing(dossier);
+  return nceContentMissing(dossier, suspect);
 }
 
 // ---------------------------------------------------------- 5.5 Duyệt
 
 /** `releaseRecheck`: kết quả kiểm lại lần rerun trên dữ liệu hiện tại (ví dụ
  * điểm rerun bị hủy sau khi cho chạy lại); `null` với hồ sơ không phải IQC. */
-export function nceApproveMissing(dossier: NceDossier, releaseRecheck: NceRerunResult | null): NceMissing[] {
+export function nceApproveMissing(dossier: NceDossier, releaseRecheck: NceRerunResult | null, suspect?: NceSuspectWindow | null): NceMissing[] {
   if (dossier.status !== 'pending_approval') return [{ code: 'status', message: 'Chỉ duyệt hồ sơ đang chờ duyệt.' }];
-  const missing = nceContentMissing(dossier);
+  const missing = nceContentMissing(dossier, suspect);
   if (releaseRecheck && !releaseRecheck.ok) missing.push(...releaseRecheck.problems.map((p) => ({ code: `recheck-${p.code}`, message: `Bằng chứng rerun không còn hợp lệ: ${p.message}` })));
   return missing;
 }
@@ -149,11 +170,11 @@ export function nceApproveMissing(dossier: NceDossier, releaseRecheck: NceRerunR
 export interface NceNextStep { step: 'release' | 'submit' | 'approve' | null; missing: NceMissing[] }
 
 /** Bước kế tiếp và những gì còn thiếu, để giao diện hiển thị "còn thiếu gì". */
-export function nceNextStep(dossier: NceDossier, rerunPreview: NceRerunResult | null = null): NceNextStep {
+export function nceNextStep(dossier: NceDossier, rerunPreview: NceRerunResult | null = null, suspect?: NceSuspectWindow | null): NceNextStep {
   switch (dossier.status) {
-    case 'open': return { step: 'release', missing: nceReleaseMissing(dossier, rerunPreview) };
-    case 'released': return { step: 'submit', missing: nceSubmitMissing(dossier) };
-    case 'pending_approval': return { step: 'approve', missing: nceContentMissing(dossier) };
+    case 'open': return { step: 'release', missing: nceReleaseMissing(dossier, rerunPreview, suspect) };
+    case 'released': return { step: 'submit', missing: nceSubmitMissing(dossier, suspect) };
+    case 'pending_approval': return { step: 'approve', missing: nceContentMissing(dossier, suspect) };
     default: return { step: null, missing: [] };
   }
 }

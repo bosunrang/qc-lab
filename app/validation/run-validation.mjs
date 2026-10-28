@@ -107,7 +107,10 @@ function releaseNceAt(nce, testId, date, runId) {
   const impact = must(nce.recordNcePatientImpact({ data: { id: record.record.id, expectedVersion: record.record.row_version, impact: {
     outcome: 'not_reported', description: 'Đã giữ toàn bộ kết quả trong khoảng nghi ngờ',
   } } }, ADMIN), 'NCE ảnh hưởng bệnh nhân');
-  must(nce.releaseNce({ data: { id: record.record.id, expectedVersion: impact.record.row_version, release: {
+  const checked = must(nce.updateNce({ data: { id: record.record.id, expectedVersion: impact.record.row_version, patch: {
+    checklist: Object.fromEntries(['calibrator', 'calibration', 'iqcHistory'].map((key) => [key, { status: 'ok', note: '' }])),
+  } } }, ADMIN), 'NCE kiểm tra nhanh');
+  must(nce.releaseNce({ data: { id: record.record.id, expectedVersion: checked.record.row_version, release: {
     reason: 'Hiệu chuẩn lại, QC xác minh đạt', rerun: { date, runId },
   } } }, ADMIN), 'NCE cho chạy lại');
 }

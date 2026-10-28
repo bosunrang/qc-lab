@@ -28,7 +28,7 @@ export function ActionsPage() {
 
   return (
     <div className="nce-page">
-      <PageHeader title="Khắc phục sự cố" subtitle="Hồ sơ sự không phù hợp: kiểm soát, cho phép hoạt động trở lại, CAPA và duyệt độc lập" />
+      <PageHeader title="Khắc phục sự cố" subtitle="Ghi nhận sự cố, xử lý và theo dõi hồ sơ theo từng bước" />
       {id ? <DossierPage key={id} id={id} onBack={back} /> : <NceOverview onOpen={open} />}
     </div>
   );

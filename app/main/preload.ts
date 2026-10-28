@@ -98,6 +98,7 @@ const api = {
   updateNceAction: (input: unknown) => ipcRenderer.invoke('nce:updateAction', input),
   completeNceAction: (input: unknown) => ipcRenderer.invoke('nce:completeAction', input),
   cancelNceAction: (input: unknown) => ipcRenderer.invoke('nce:cancelAction', input),
+  recordNceTechnicalAssessment: (input: unknown) => ipcRenderer.invoke('nce:recordTechnicalAssessment', input),
   recordNcePatientImpact: (input: unknown) => ipcRenderer.invoke('nce:recordPatientImpact', input),
   releaseNce: (input: unknown) => ipcRenderer.invoke('nce:release', input),
   reviewNceEffectiveness: (input: unknown) => ipcRenderer.invoke('nce:reviewEffectiveness', input),

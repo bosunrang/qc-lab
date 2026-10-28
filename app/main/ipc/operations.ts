@@ -22,6 +22,7 @@
 import type { QcApi } from '../../shared/qc-api';
 import { describeError, logEvent } from '../logging/log-sink';
 import type { Actor } from './shared';
+import { canWriteRole } from '../domain/page-roles';
 import type { createAuditHandlers } from './audit-handlers';
 import type { createAuthHandlers } from './auth-handlers';
 import type { createConfigHandlers } from './config-handlers';
@@ -148,6 +149,13 @@ async function invokeOperation(name: string, operation: AnyOperation, ctx: CallC
  * môi trường chạy. */
 export function createBusinessOperations(h: BusinessHandlers): OperationTable<BusinessApiName> {
   const { auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis } = h;
+  // Bản tóm tắt phục vụ Tổng quan/Báo cáo vẫn mở cho người chỉ xem đã đăng
+  // nhập. Hồ sơ chi tiết, hàng chờ và danh sách nhân sự chỉ dành cho NCE.
+  const nceReader = (ctx: CallContext) => {
+    const actor = ctx.actor();
+    if (!canWriteRole(actor.role)) throw new Error('Bạn không có quyền xem hồ sơ chi tiết khắc phục sự cố.');
+    return actor;
+  };
   return {
     hasAnyUsers: { channel: 'auth:hasAnyUsers', lan: true, run: () => auth.hasAnyUsers() },
     listUsers: { channel: 'auth:listUsers', lan: false, run: (ctx) => auth.listUsers(ctx.actor()) },
@@ -233,13 +241,13 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     renameSigmaPeriod: { channel: 'sigma:renamePeriod', lan: true, run: (ctx, input) => sigma.renamePeriod(input, ctx.actor()) },
     removeSigmaPeriod: { channel: 'sigma:removePeriod', lan: false, run: (ctx, input) => sigma.removePeriod(input, ctx.actor()) },
 
-    listNce: { channel: 'nce:list', lan: true, run: () => nce.listNce() },
-    listNceQueue: { channel: 'nce:listQueue', lan: true, run: () => nce.listNceQueue() },
-    getNce: { channel: 'nce:get', lan: true, run: (ctx, id) => nce.getNce(id, ctx.actor()) },
-    listNceUsers: { channel: 'nce:listUsers', lan: true, run: () => nce.listNceUsers() },
-    getNceConfig: { channel: 'nce:getConfig', lan: true, run: () => nce.getNceConfig() },
+    listNce: { channel: 'nce:list', lan: true, run: (ctx) => { ctx.actor(); return nce.listNce(); } },
+    listNceQueue: { channel: 'nce:listQueue', lan: true, run: (ctx) => { nceReader(ctx); return nce.listNceQueue(); } },
+    getNce: { channel: 'nce:get', lan: true, run: (ctx, id) => nce.getNce(id, nceReader(ctx)) },
+    listNceUsers: { channel: 'nce:listUsers', lan: true, run: (ctx) => { nceReader(ctx); return nce.listNceUsers(); } },
+    getNceConfig: { channel: 'nce:getConfig', lan: true, run: (ctx) => { nceReader(ctx); return nce.getNceConfig(); } },
     saveNceConfig: { channel: 'nce:saveConfig', lan: false, run: (ctx, input) => nce.saveNceConfig(input, ctx.actor()) },
-    previewNceRelease: { channel: 'nce:previewRelease', lan: true, run: (_ctx, input) => nce.previewNceRelease(input) },
+    previewNceRelease: { channel: 'nce:previewRelease', lan: true, run: (ctx, input) => { nceReader(ctx); return nce.previewNceRelease(input); } },
     createNce: { channel: 'nce:create', lan: true, run: (ctx, input) => nce.createNce(input, ctx.actor()) },
     attachNceRun: { channel: 'nce:attachRun', lan: true, run: (ctx, input) => nce.attachNceRun(input, ctx.actor()) },
     updateNce: { channel: 'nce:update', lan: true, run: (ctx, input) => nce.updateNce(input, ctx.actor()) },
@@ -247,6 +255,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     updateNceAction: { channel: 'nce:updateAction', lan: true, run: (ctx, input) => nce.updateNceAction(input, ctx.actor()) },
     completeNceAction: { channel: 'nce:completeAction', lan: true, run: (ctx, input) => nce.completeNceAction(input, ctx.actor()) },
     cancelNceAction: { channel: 'nce:cancelAction', lan: true, run: (ctx, input) => nce.cancelNceAction(input, ctx.actor()) },
+    recordNceTechnicalAssessment: { channel: 'nce:recordTechnicalAssessment', lan: true, run: (ctx, input) => nce.recordNceTechnicalAssessment(input, ctx.actor()) },
     recordNcePatientImpact: { channel: 'nce:recordPatientImpact', lan: true, run: (ctx, input) => nce.recordNcePatientImpact(input, ctx.actor()) },
     releaseNce: { channel: 'nce:release', lan: true, run: (ctx, input) => nce.releaseNce(input, ctx.actor()) },
     reviewNceEffectiveness: { channel: 'nce:reviewEffectiveness', lan: true, run: (ctx, input) => nce.reviewNceEffectiveness(input, ctx.actor()) },

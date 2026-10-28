@@ -41,7 +41,7 @@ nav a{position:relative;display:flex;align-items:center;width:100%;text-align:le
 nav a:hover{background:color-mix(in srgb,var(--sidebar-active-accent) 5%,transparent);color:var(--sidebar-active-ink);}
 nav a.active{background:linear-gradient(90deg,var(--sidebar-active-bg),color-mix(in srgb,var(--sidebar-active-bg) 34%,transparent));color:var(--on-accent);box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
 nav .ic{display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;width:32px;height:var(--control-h-compact);border-radius:var(--radius-md);color:var(--sidebar-icon);}
-nav .ic svg{width:var(--icon);height:var(--icon);}
+nav .ic svg{width:var(--icon-nav);height:var(--icon-nav);}
 nav a.active .ic{color:var(--sidebar-active-accent);}
 .app-shell.nav-collapsed nav{padding-top:12px;gap:10px;}
 .app-shell.nav-collapsed nav a{justify-content:center;padding:0;}

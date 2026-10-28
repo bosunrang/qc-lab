@@ -14,6 +14,8 @@ interface NceState {
   records: NceRecordRow[];
   queue: NceQueueRowView[];
   users: NceUserOption[];
+  loading: boolean;
+  error: string | null;
   load: () => Promise<void>;
   get: (id: string) => Promise<NceDossierView | null>;
   previewRelease: (id: string, rerun: NceRunKeyView, lotChangeNote?: string) => Promise<IpcResult<NceReleasePreview>>;
@@ -24,6 +26,7 @@ interface NceState {
   updateAction: (data: Input<'updateNceAction'>) => Promise<Write>;
   completeAction: (data: Input<'completeNceAction'>) => Promise<Write>;
   cancelAction: (data: Input<'cancelNceAction'>) => Promise<Write>;
+  recordTechnicalAssessment: (data: Input<'recordNceTechnicalAssessment'>) => Promise<Write>;
   recordPatientImpact: (data: Input<'recordNcePatientImpact'>) => Promise<Write>;
   release: (data: Input<'releaseNce'>) => Promise<Write>;
   reviewEffectiveness: (data: Input<'reviewNceEffectiveness'>) => Promise<Write>;
@@ -37,9 +40,16 @@ export const useNceStore = create<NceState>((set) => ({
   records: [],
   queue: [],
   users: [],
+  loading: true,
+  error: null,
   load: async () => {
-    const [records, queue, users] = await Promise.all([window.qcApi.listNce(), window.qcApi.listNceQueue(), window.qcApi.listNceUsers()]);
-    set({ records, queue, users });
+    set({ loading: true, error: null });
+    try {
+      const [records, queue, users] = await Promise.all([window.qcApi.listNce(), window.qcApi.listNceQueue(), window.qcApi.listNceUsers()]);
+      set({ records, queue, users, loading: false });
+    } catch (error) {
+      set({ loading: false, error: error instanceof Error ? error.message : 'Không tải được danh sách sự cố.' });
+    }
   },
   get: (id) => window.qcApi.getNce(id),
   previewRelease: (id, rerun, lotChangeNote) => window.qcApi.previewNceRelease({ data: { id, rerun, lotChangeNote } }),
@@ -50,6 +60,7 @@ export const useNceStore = create<NceState>((set) => ({
   updateAction: (data) => window.qcApi.updateNceAction({ data }),
   completeAction: (data) => window.qcApi.completeNceAction({ data }),
   cancelAction: (data) => window.qcApi.cancelNceAction({ data }),
+  recordTechnicalAssessment: (data) => window.qcApi.recordNceTechnicalAssessment({ data }),
   recordPatientImpact: (data) => window.qcApi.recordNcePatientImpact({ data }),
   release: (data) => window.qcApi.releaseNce({ data }),
   reviewEffectiveness: (data) => window.qcApi.reviewNceEffectiveness({ data }),

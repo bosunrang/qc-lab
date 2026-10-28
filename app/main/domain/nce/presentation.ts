@@ -37,6 +37,8 @@ export interface NceRunOption extends NceRunKeyView {
   levels: number[];
 }
 
+export interface NceRunChoice extends NceRunOption { exclusionReasons: string[] }
+
 /** "12/10/2026 · lần 3". */
 export function nceRunLabel(run: { date: string; runId: string }): string {
   const [y, m, d] = run.date.split('-');
@@ -44,22 +46,29 @@ export function nceRunLabel(run: { date: string; runId: string }): string {
   return run.runId ? `${day} · lần ${run.runId}` : day;
 }
 
-/** Lần chạy có thể làm rerun/xác minh: sau lần hỏng muộn nhất của hồ sơ (hoặc
- * từ ngày phát hiện với hồ sơ không có lần hỏng), mới nhất lên trước. Main vẫn
+/** Lần chạy có thể làm rerun/xác minh: từ ngày phát hiện và sau lần hỏng
+ * muộn nhất của hồ sơ, mới nhất lên trước. Main vẫn
  * kiểm đầy đủ khi đánh giá thử và khi cho chạy lại. */
 export function nceRerunOptions(points: readonly Pick<QcPointView, 'date' | 'run_id' | 'level' | 'voided'>[], failures: readonly NceRunKeyView[], notBeforeDate: string): NceRunOption[] {
+  return nceRerunChoices(points, failures, notBeforeDate).filter((run) => !run.exclusionReasons.length).map(({ exclusionReasons: _reasons, ...option }) => option);
+}
+
+/** Giữ cả các lần không được chọn để giải thích bộ lọc, không tự kết luận QC đạt. */
+export function nceRerunChoices(points: readonly Pick<QcPointView, 'date' | 'run_id' | 'level' | 'voided'>[], failures: readonly NceRunKeyView[], notBeforeDate: string): NceRunChoice[] {
   const latest = failures.map((run) => qcRunKey(run)).sort(compareQcRunKey).at(-1);
-  const byRun = new Map<string, NceRunOption>();
+  const byRun = new Map<string, NceRunChoice>();
   for (const point of points) {
-    if (point.voided) continue;
     const run = { date: point.date, runId: point.run_id };
     const key = qcRunKey(run);
-    if (latest ? compareQcRunKey(key, latest) <= 0 : point.date < notBeforeDate) continue;
-    const option = byRun.get(key) ?? { ...run, key, label: nceRunLabel(run), levels: [] };
-    if (!option.levels.includes(point.level)) option.levels.push(point.level);
+    const option = byRun.get(key) ?? { ...run, key, label: nceRunLabel(run), levels: [], exclusionReasons: [] };
+    if (!point.voided && !option.levels.includes(point.level)) option.levels.push(point.level);
     byRun.set(key, option);
   }
-  return [...byRun.values()].map((o) => ({ ...o, levels: o.levels.sort((a, b) => a - b) })).sort((a, b) => compareQcRunKey(b.key, a.key));
+  return [...byRun.values()].map((o) => ({ ...o, levels: o.levels.sort((a, b) => a - b), exclusionReasons: [
+    ...(o.date < notBeforeDate ? [`Trước ngày phát hiện ${nceRunLabel({ date: notBeforeDate, runId: '' })}`] : []),
+    ...(latest && compareQcRunKey(o.key, latest) <= 0 ? ['Không sau lần chạy bị loại gần nhất đã gắn hồ sơ'] : []),
+    ...(!o.levels.length ? ['Tất cả điểm của lần chạy đã hủy'] : []),
+  ] })).sort((a, b) => compareQcRunKey(b.key, a.key));
 }
 
 export type NceStepState = 'done' | 'current' | 'todo';
@@ -90,6 +99,7 @@ export interface NceHistoryItem { at: string; actor: string; title: string; deta
 
 const FIELD_LABEL: Readonly<Record<string, string>> = {
   description: 'mô tả', correction: 'xử lý tức thời', holdResults: 'giữ kết quả', phase: 'giai đoạn', ownerUserId: 'người phụ trách', dueDate: 'hạn',
+  containmentNote: 'phạm vi, kiểm soát và thông báo', occurredNote: 'diễn biến và mốc thời gian',
   tier: 'tầng xử lý', tierReason: 'lý do tầng', riskSeverity: 'mức độ nghiêm trọng', riskProbability: 'khả năng xảy ra', riskLevel: 'mức nguy cơ', riskBasis: 'căn cứ nguy cơ',
   checklist: 'checklist', causeStatus: 'kết luận nguyên nhân', causeCategory: 'nhóm nguyên nhân', causeText: 'nguyên nhân', causeCheckPlan: 'kế hoạch kiểm tra nguyên nhân',
   effectivenessCriteria: 'tiêu chí hiệu lực', effectivenessReviewDue: 'ngày dự kiến đánh giá hiệu lực',
@@ -113,6 +123,11 @@ function decisionDetail(row: NceDecisionRow): string {
 
 function revisionDetail(row: NceRevisionRow): string {
   const changes = parse(row.changes_json);
+  if (Array.isArray(changes.detectedAt) && typeof changes.detectedAt[0] === 'string' && typeof changes.detectedAt[1] === 'string') {
+    const dates = changes.detectedAt as string[];
+    const reason = Array.isArray(changes.dateCorrectionReason) ? changes.dateCorrectionReason[1] : '';
+    return `Ngày phát hiện: ${nceRunLabel({ date: dates[0], runId: '' })} → ${nceRunLabel({ date: dates[1], runId: '' })} · Căn cứ: ${String(reason ?? '')}`;
+  }
   return Object.keys(changes).map((key) => {
     if (key === 'legacy') return 'chuyển từ hồ sơ phiên bản cũ';
     if (key.startsWith('action:')) return key.endsWith(':done') ? 'hoàn thành hành động' : key.endsWith(':cancel') ? 'hủy hành động' : Array.isArray(changes[key]) && (changes[key] as unknown[])[0] === null ? 'thêm hành động' : 'sửa hành động';

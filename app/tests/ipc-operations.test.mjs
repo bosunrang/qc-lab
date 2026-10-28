@@ -87,12 +87,22 @@ test('preload khớp đúng bảng thao tác: cùng tên hàm, cùng kênh, khô
   assert.deepEqual(fromPreload, fromTables);
 });
 
+test('NCE: đọc tóm tắt cần đăng nhập; người chỉ xem không đọc hồ sơ chi tiết hay xem trước', async () => {
+  const { business, lan } = setup();
+  assert.throws(() => business.listNce.run(sessionContext(() => null)), /Chưa đăng nhập/);
+  assert.deepEqual(business.listNce.run(sessionContext(() => viewer)), [], 'giữ quyền xem tóm tắt của Tổng quan và Báo cáo');
+  for (const name of ['getNce', 'listNceQueue', 'listNceUsers', 'getNceConfig', 'previewNceRelease']) {
+    assert.throws(() => business[name].run(sessionContext(() => viewer), 'không-tồn-tại'), /không có quyền xem hồ sơ chi tiết/, name);
+    if (name !== 'previewNceRelease') await assert.rejects(lan(name, ['không-tồn-tại'], viewer), /không có quyền xem hồ sơ chi tiết/, name);
+  }
+});
+
 test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng phiên máy chính', async () => {
   const { tables, session, db } = setup();
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 138);
+  assert.equal(handlers.size, 139);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -123,7 +133,7 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
     'listReagentQuickValues', 'listRuleScopes', 'listRuleSettings', 'listSigmaCohorts',
     'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
     'listVoidedEntryPoints', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
-    'queryReport', 'recordNcePatientImpact', 'rejectLisResult', 'releaseNce', 'removeReagentQuickValue',
+    'queryReport', 'recordNcePatientImpact', 'recordNceTechnicalAssessment', 'rejectLisResult', 'releaseNce', 'removeReagentQuickValue',
     'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewNceEffectiveness',
     'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',
     'setDayNote', 'submitNce', 'updateNce', 'updateNceAction', 'verifyOwnPassword', 'voidPoint',

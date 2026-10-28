@@ -43,6 +43,15 @@ export type NceEffectivenessResult = typeof NCE_EFFECTIVENESS_RESULTS[number];
 export const NCE_CHECK_STATUSES = ['ok', 'abnormal', 'na'] as const;
 export type NceCheckStatus = typeof NCE_CHECK_STATUSES[number];
 
+export const NCE_TECHNICAL_ERROR_NATURES = ['systematic', 'random', 'mixed', 'undetermined'] as const;
+export type NceTechnicalErrorNature = typeof NCE_TECHNICAL_ERROR_NATURES[number];
+
+export const NCE_TECHNICAL_METRIC_MODES = ['calculated', 'not_applicable'] as const;
+export type NceTechnicalMetricMode = typeof NCE_TECHNICAL_METRIC_MODES[number];
+
+export const NCE_MEAN_RESET_DECISIONS = ['not_applicable', 'not_allowed', 'eligible'] as const;
+export type NceMeanResetDecision = typeof NCE_MEAN_RESET_DECISIONS[number];
+
 export const NCE_CAPABILITIES = ['nce.release', 'nce.approve'] as const;
 export type NceCapability = typeof NCE_CAPABILITIES[number];
 
@@ -68,9 +77,49 @@ export interface NceAction {
   status: NceActionStatus; doneAt: string; doneByUserId: string; evidence: string; cancelReason: string;
 }
 
+/** Phạm vi khoảng nghi ngờ mà một quyết định ảnh hưởng bệnh nhân đã rà soát
+ * (main chụp lúc ghi, không nhận từ client). */
+export interface NcePatientImpactCoverage {
+  lastAccepted: NceRunKey | null; onset: NceRunKey; through: NceRunKey; runCount: number;
+}
+
 export interface NcePatientImpact {
   outcome: NcePatientOutcome; description: string; resultCount: number | null;
   reference: string; notified: string; decidedAt: string; actorUserId: string;
+  /** Không có ở quyết định ghi trước khi ràng buộc phạm vi: phải ghi lại. */
+  coverage?: NcePatientImpactCoverage | null;
+}
+
+/** Đánh giá kỹ thuật IQC được lưu append-only. Các đại lượng định lượng phải
+ * dùng cùng đơn vị; kết quả so ngưỡng chỉ là tín hiệu kỹ thuật, không tự thay
+ * quyết định ảnh hưởng lâm sàng của người có thẩm quyền. */
+export interface NceTechnicalAssessment {
+  errorNature: NceTechnicalErrorNature;
+  verificationMethod: string;
+  correctiveEvidence: string;
+  technicalConclusion: string;
+  metricMode: NceTechnicalMetricMode;
+  metricReason: string;
+  unit: string;
+  tea: number | null;
+  teaSource: string;
+  stableBias: number | null;
+  incidentBias: number | null;
+  postCorrectionBias: number | null;
+  sd: number | null;
+  sdSource: string;
+  observedDispersion: number | null;
+  sampleCount: number | null;
+  deltaSeCrit: number | null;
+  deltaReCrit: number | null;
+  seObs: number | null;
+  reObs: number | null;
+  technicalSignal: 'below_threshold' | 'exceeds_threshold' | 'not_calculated';
+  meanResetDecision: NceMeanResetDecision;
+  meanResetReason: string;
+  meanResetEvidence: string;
+  decidedAt: string;
+  actorUserId: string;
 }
 
 export interface NceRelease {
@@ -81,6 +130,8 @@ export interface NceRelease {
 export interface NceEffectivenessReview {
   result: NceEffectivenessResult; evidence: string; reviewedAt: string; reviewerUserId: string;
   residualSeverity: number; residualProbability: number; residualLevel: NceRiskLevel | ''; residualBasis: string;
+  /** Nội dung thực sự được đánh giá; không lấy dấu vân tay do client gửi. */
+  basis: string;
 }
 
 /** Toàn bộ hồ sơ ở dạng miền: bản ghi chính + các tập nhiều dòng. Các mảng
@@ -90,6 +141,7 @@ export interface NceDossier {
   reportedByUserId: string; ownerUserId: string; detectedAt: string; dueDate: string;
   /** `null` = chưa xác định (hồ sơ tự mở khi hủy điểm); phải chọn trước khi cho chạy lại. */
   description: string; correction: string; holdResults: boolean | null;
+  containmentNote: string; occurredNote: string;
   tier: NceTier | ''; tierReason: string;
   riskSeverity: number; riskProbability: number; riskLevel: NceRiskLevel | ''; riskBasis: string;
   checklist: Readonly<Record<string, NceChecklistItem>>;
@@ -98,6 +150,7 @@ export interface NceDossier {
   runs: readonly { role: NceRunRole; snapshot: NceRunSnapshot }[];
   actions: readonly NceAction[];
   patientImpacts: readonly NcePatientImpact[];
+  technicalAssessments: readonly NceTechnicalAssessment[];
   release: NceRelease | null;
   effectivenessReviews: readonly NceEffectivenessReview[];
   /** Có hồ sơ cùng xét nghiệm, cùng loại sai số trong cửa sổ tái diễn (tính ở `tier.ts`). */

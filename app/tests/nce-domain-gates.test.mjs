@@ -14,6 +14,7 @@ const { nceCapaTriggers, nceTierMissing, nceErrorClass, nceRiskScore } = require
 const { checkNceRerun } = require('../../app-dist/main/domain/nce/rerun.js');
 const {
   validateNceActionDraft, validateNceActionCompletion, validateNceActionCancel, validateNceEffectivenessReview,
+  nceEffectivenessBasis,
 } = require('../../app-dist/main/domain/nce/actions.js');
 const { checklistMissing, prepareChecklist, checklistKeys } = require('../../app-dist/main/domain/nce/checklist.js');
 
@@ -78,7 +79,7 @@ test('hồ sơ IQC chưa gắn lần chạy bị loại thì chưa cho chạy l�
   const rerun = checkNceRerun({ testId: 'T1', trigger: triggerRun(), repeatRejects: [], candidate: goodRerun(), lotChangeNote: '' });
   assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', runs: [] }), rerun)), ['no-trigger']);
   // Nguồn khác IQC không cần lần chạy, chỉ cần quyết định ảnh hưởng bệnh nhân.
-  assert.deepEqual(nceReleaseMissing(dossier({ status: 'open', source: 'instrument', runs: [] }), null), []);
+  assert.deepEqual(nceReleaseMissing(dossier({ status: 'open', source: 'instrument', runs: [], checklist: Object.fromEntries(checklistKeys('instrument').map((key) => [key, { status: 'ok', note: '' }])) }), null), []);
 });
 
 test('chưa ghi có giữ kết quả hay không thì chưa cho chạy lại', () => {
@@ -93,7 +94,7 @@ test('hồ sơ không phải IQC có thể kèm lần chạy QC xác minh', () =
   assert.equal(withRun.data.notApplicable, false, 'đã có lần chạy xác minh thì không phải "không cần dừng dịch vụ"');
   assert.equal(validateNceReleaseInput({ reason: 'Đã hiệu chuẩn lại, QC xác minh đạt', rerun: { date: 'x' } }, 'calibration').code, 'invalid-rerun');
   const bad = checkNceRerun({ testId: 'T1', trigger: null, repeatRejects: [], candidate: run('2026-10-02', '1', [point(1)]), lotChangeNote: '', requiredLevels: [1, 2] });
-  assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', source: 'calibration', runs: [] }), bad)), ['rerun-missing-level']);
+  assert.deepEqual(codes(nceReleaseMissing(dossier({ status: 'open', source: 'calibration', runs: [], checklist: Object.fromEntries(checklistKeys('calibration').map((key) => [key, { status: 'ok', note: '' }])) }), bad)), ['rerun-missing-level']);
 });
 
 test('ca 8: cho chạy lại được khi hành động khắc phục chưa xong (sửa R-01)', () => {
@@ -165,6 +166,7 @@ test('ca 11: lần đánh giá cuối không hiệu quả thì không nộp đư
 
   const extraAction = { ...base.actions[0], id: 'a2', description: 'Đào tạo lại KTV về lịch hiệu chuẩn', doneAt: '2026-10-22' };
   const reviewedAgain = dossier({ actions: [...base.actions, extraAction], effectivenessReviews: [ineffective, { ...base.effectivenessReviews[0], reviewedAt: '2026-10-28' }] });
+  reviewedAgain.effectivenessReviews.at(-1).basis = nceEffectivenessBasis(reviewedAgain);
   assert.deepEqual(nceSubmitMissing(reviewedAgain), []);
   // Hành động hoàn thành SAU lần đánh giá hiệu quả → phải đánh giá lại.
   const stale = dossier({ actions: [...base.actions, { ...extraAction, doneAt: '2026-10-29' }] });

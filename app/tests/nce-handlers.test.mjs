@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
-import { ensureUser, must } from './helpers/nce-flow.mjs';
+import { ensureUser, must, recordTechnicalAssessment } from './helpers/nce-flow.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -24,7 +24,7 @@ const reviewer = { userId: 'u-rev', username: 'rev', name: 'Người đánh giá
 const approver = { userId: 'u-app', username: 'app', name: 'Quản lý chất lượng', role: 'technician', clientId: 't' };
 const viewer = { userId: 'u-view', username: 'view', name: 'Người xem', role: 'viewer', clientId: 't' };
 
-const CHECKLIST_OK = Object.fromEntries(['qcMaterial', 'reagent', 'calibration', 'instrument', 'operator', 'lotChange'].map((key) => [key, { status: 'ok', note: '' }]));
+const CHECKLIST_OK = Object.fromEntries(['qcMaterial', 'reagent', 'calibration', 'instrument', 'environment', 'operator', 'lotChange'].map((key) => [key, { status: 'ok', note: '' }]));
 
 /** Glucose hai mức, Mean 100 SD 2. Các lần chạy:
  * A 09-01 lần 1: đạt · B 09-02 lần 1: R4s loại cả hai mức · W 09-02 lần 2:
@@ -60,10 +60,16 @@ const D = { date: '2026-09-03', runId: '2026-09-03-1' };
 const ref = (dossier) => ({ id: dossier.record.id, expectedVersion: dossier.record.row_version });
 
 function createFromB(nce, testId) {
-  return must(nce.createNce({ data: {
+  const created = must(nce.createNce({ data: {
     source: 'iqc', testId, trigger: B, description: 'R4s loại cả hai mức', correction: 'Dừng trả kết quả, kiểm tra máy',
     holdResults: true, detectedAt: '2026-09-02', ownerUserId: owner.userId,
   } }, admin), 'tạo hồ sơ');
+  const checked = must(nce.updateNce({ data: { ...ref(created), patch: {
+    checklist: CHECKLIST_OK,
+    containmentNote: 'Đã giữ kết quả trong khoảng nghi ngờ và báo phụ trách ca',
+    occurredNote: '08:00 phát hiện, 08:15 dừng trả kết quả, 09:00 xử lý xong',
+  } } }, admin), 'kiểm tra nhanh');
+  return recordTechnicalAssessment(nce, admin, checked);
 }
 
 test('ca 1, 20: hàng chờ một dòng cho một lần chạy hỏng hai mức, bỏ cảnh báo; gợi ý gắn lần hỏng sau', () => {
@@ -128,7 +134,13 @@ test('ca 3, 5, 8, 9: cho chạy lại cần quyền, quyết định ảnh hư�
   const release = (actor, rerun) => nce.releaseNce({ data: { ...ref(dossier), release: { reason: 'QC chạy lại đạt', rerun } } }, actor);
   assert.equal(release(tech, D).error.code, 'forbidden-release', 'KTV chưa được cấp nce.release');
   assert.match(release(releaser, D).error.message, /ảnh hưởng kết quả bệnh nhân/);
-  dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ toàn bộ kết quả từ lần đạt trước' } } }, owner), 'ảnh hưởng');
+  const impact = { outcome: 'not_reported', description: 'Đã giữ toàn bộ kết quả từ lần đạt trước', resultCount: 12 };
+  assert.equal(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact } }, owner).error.code, 'forbidden-patient-impact', 'quyết định lâm sàng cần thẩm quyền nce.release');
+  dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact } }, releaser), 'ảnh hưởng');
+  // Main chụp phạm vi đã rà soát: sau lần đạt A tới lần QC mới nhất lúc ghi (D).
+  assert.deepEqual(JSON.parse(dossier.decisions.at(-1).payload_json).coverage, {
+    lastAccepted: { date: '2026-09-01', runId: '2026-09-01-1' }, onset: B, through: D, runCount: 4,
+  });
   assert.match(release(releaser, B).error.message, /không dùng điểm QC gây sự cố/i);
   assert.match(release(releaser, W).error.message, /sau lần chạy bị loại gần nhất/, 'cùng ngày nhưng trước lần hỏng cuối');
   const preview = must(nce.previewNceRelease({ data: { id: dossier.record.id, rerun: D } }), 'xem trước');
@@ -146,7 +158,7 @@ test('ca 3, 5, 8, 9: cho chạy lại cần quyền, quyết định ảnh hư�
 test('ca 10, 11, 19: nộp duyệt, phân tách nhiệm vụ, đóng hồ sơ và Sigma coi điểm đã xử lý', () => {
   const { db, nce, testId, ids } = fixture();
   let dossier = must(nce.attachNceRun({ data: { ...ref(createFromB(nce, testId)), run: C } }, admin), 'gắn C');
-  dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả' } } }, owner), 'ảnh hưởng');
+  dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
   dossier = must(nce.releaseNce({ data: { ...ref(dossier), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại');
   assert.match(nce.submitNce({ data: ref(dossier) }, owner).error.message, /chưa đủ điều kiện nộp duyệt/);
   assert.equal(nce.submitNce({ data: ref(dossier) }, tech).error.code, 'forbidden-submit');
@@ -187,7 +199,7 @@ test('duyệt kiểm lại bằng chứng rerun: điểm rerun bị hủy sau kh
   dossier = must(nce.updateNce({ data: { ...ref(dossier), patch: {
     tier: 'low', tierReason: 'Lỗi đơn lẻ, khôi phục ngay sau hiệu chuẩn', riskSeverity: 2, riskProbability: 1, riskLevel: 'low', riskBasis: 'SOP-QC-07', checklist: CHECKLIST_OK,
   } } }, owner), 'điền hồ sơ');
-  dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả' } } }, owner), 'ảnh hưởng');
+  dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
   dossier = must(nce.releaseNce({ data: { ...ref(dossier), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại');
   dossier = must(nce.submitNce({ data: ref(dossier) }, owner), 'nộp duyệt');
   must(entry.voidPoint({ data: { pointId: ids['2026-09-03-1:2'], kind: 'data-entry', reason: 'Nhập nhầm' } }, admin), 'hủy điểm rerun');
@@ -205,8 +217,9 @@ test('ca 12: chỉ hủy hồ sơ chưa cho chạy lại, có lý do; trả lạ
   assert.ok(nce.listNce().some((r) => r.id === open.record.id), 'hồ sơ hủy vẫn tìm thấy');
   // Lần chạy B được giải phóng: lập hồ sơ mới cho nó được.
   let again = createFromB(nce, testId);
-  again = must(nce.recordNcePatientImpact({ data: { ...ref(again), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả' } } }, owner), 'ảnh hưởng');
-  again = must(nce.releaseNce({ data: { ...ref(again), release: { reason: 'QC chạy lại đạt', rerun: { date: '2026-09-02', runId: '2026-09-02-2' } } } }, releaser), 'cho chạy lại bằng W');
+  again = must(nce.recordNcePatientImpact({ data: { ...ref(again), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
+  // W đứng trước lần hỏng C nên không còn là bằng chứng khôi phục hiện hành.
+  again = must(nce.releaseNce({ data: { ...ref(again), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại bằng D sau lần hỏng cuối');
   assert.equal(nce.cancelNce({ data: { ...ref(again), reason: 'Muốn hủy sau khi đã cho chạy lại' } }, owner).error.code, 'status');
 });
 

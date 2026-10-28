@@ -6,6 +6,7 @@ import { uid } from '../domain/text-utils';
 import type { NceActionRow, NceDecisionRow, NceRecordRow, NceRevisionRow, NceRunRow } from '../../shared/qc-api';
 import type {
   NceAction, NceChecklistItem, NceDossier, NceEffectivenessReview, NcePatientImpact, NceRelease, NceRunRole, NceRunSnapshot,
+  NceTechnicalAssessment,
 } from '../domain/nce/types';
 import { nceIsRecurrence, nceErrorClass } from '../domain/nce/tier';
 import { nceActionOverdueDays, nceRecordOverdueDays } from '../domain/nce/overdue';
@@ -104,6 +105,8 @@ export function toDossier(row: RecordColumns, runs: readonly NceRunRow[], action
   const of = <T>(type: NceDecisionRow['type']) => decisions.filter((d) => d.type === type).map((d) => ({ decision: d, payload: parseJson<T>(d.payload_json, {} as T) }));
   const patientImpacts: NcePatientImpact[] = of<Omit<NcePatientImpact, 'decidedAt' | 'actorUserId'>>('patient_impact')
     .map(({ decision, payload }) => ({ ...payload, decidedAt: decision.decided_at, actorUserId: decision.actor_user_id }));
+  const technicalAssessments: NceTechnicalAssessment[] = of<Omit<NceTechnicalAssessment, 'decidedAt' | 'actorUserId'>>('technical_assessment')
+    .map(({ decision, payload }) => ({ ...payload, decidedAt: decision.decided_at, actorUserId: decision.actor_user_id }));
   const releases = of<Omit<NceRelease, 'decidedAt' | 'actorUserId'>>('release');
   const lastRelease = releases.at(-1);
   const release: NceRelease | null = lastRelease ? { ...lastRelease.payload, decidedAt: lastRelease.decision.decided_at, actorUserId: lastRelease.decision.actor_user_id } : null;
@@ -113,6 +116,7 @@ export function toDossier(row: RecordColumns, runs: readonly NceRunRow[], action
     status: row.status, source: row.source, testId: row.test_id,
     reportedByUserId: row.reported_by_user_id, ownerUserId: row.owner_user_id, detectedAt: row.detected_at, dueDate: row.due_date,
     description: row.description, correction: row.correction, holdResults: row.hold_results === null ? null : !!row.hold_results,
+    containmentNote: row.containment_note, occurredNote: row.occurred_note,
     tier: row.tier, tierReason: row.tier_reason,
     riskSeverity: row.risk_severity, riskProbability: row.risk_probability, riskLevel: row.risk_level, riskBasis: row.risk_basis,
     checklist: parseJson<Record<string, NceChecklistItem>>(row.checklist_json, {}),
@@ -123,7 +127,7 @@ export function toDossier(row: RecordColumns, runs: readonly NceRunRow[], action
       id: a.id, kind: a.kind, description: a.description, ownerUserId: a.owner_user_id, dueDate: a.due_date,
       status: a.status, doneAt: a.done_at, doneByUserId: a.done_by_user_id, evidence: a.evidence, cancelReason: a.cancel_reason,
     })),
-    patientImpacts, release, effectivenessReviews, recurrence,
+    patientImpacts, technicalAssessments, release, effectivenessReviews, recurrence,
   };
 }
 
@@ -131,6 +135,7 @@ export function toDossier(row: RecordColumns, runs: readonly NceRunRow[], action
 export function editableOf(dossier: NceDossier, phase: NceRecordRow['phase']): NceEditable {
   return {
     description: dossier.description, correction: dossier.correction, holdResults: dossier.holdResults, phase,
+    containmentNote: dossier.containmentNote, occurredNote: dossier.occurredNote,
     ownerUserId: dossier.ownerUserId, dueDate: dossier.dueDate, tier: dossier.tier, tierReason: dossier.tierReason,
     riskSeverity: dossier.riskSeverity, riskProbability: dossier.riskProbability, riskLevel: dossier.riskLevel, riskBasis: dossier.riskBasis,
     checklist: dossier.checklist, causeStatus: dossier.causeStatus, causeCategory: dossier.causeCategory, causeText: dossier.causeText,
@@ -140,6 +145,7 @@ export function editableOf(dossier: NceDossier, phase: NceRecordRow['phase']): N
 
 const COLUMN_OF: Readonly<Record<NceEditableField, keyof RecordColumns>> = {
   description: 'description', correction: 'correction', holdResults: 'hold_results', phase: 'phase', ownerUserId: 'owner_user_id', dueDate: 'due_date',
+  containmentNote: 'containment_note', occurredNote: 'occurred_note',
   tier: 'tier', tierReason: 'tier_reason', riskSeverity: 'risk_severity', riskProbability: 'risk_probability', riskLevel: 'risk_level', riskBasis: 'risk_basis',
   checklist: 'checklist_json', causeStatus: 'cause_status', causeCategory: 'cause_category', causeText: 'cause_text', causeCheckPlan: 'cause_check_plan',
   effectivenessCriteria: 'effectiveness_criteria', effectivenessReviewDue: 'effectiveness_review_due',

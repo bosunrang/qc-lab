@@ -11,7 +11,7 @@ import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -301,6 +301,8 @@ CREATE TABLE IF NOT EXISTS nce_records (
   correction TEXT NOT NULL DEFAULT '',
   -- NULL = chưa xác định (hồ sơ tự mở khi hủy điểm).
   hold_results INTEGER,
+  containment_note TEXT NOT NULL DEFAULT '',
+  occurred_note TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'open',
   tier TEXT NOT NULL DEFAULT '',
   tier_reason TEXT NOT NULL DEFAULT '',
@@ -549,6 +551,14 @@ const MIGRATIONS: Migration[] = [
     up(db) {
       addColumnIfMissing(db, 'users', 'capabilities_json', "TEXT NOT NULL DEFAULT '[]'");
       migrateLegacyNce(db);
+    },
+  },
+  {
+    version: 4,
+    name: 'NCE: phạm vi kiểm soát, thông báo và diễn biến thời gian',
+    up(db) {
+      addColumnIfMissing(db, 'nce_records', 'containment_note', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'nce_records', 'occurred_note', "TEXT NOT NULL DEFAULT ''");
     },
   },
 ];
