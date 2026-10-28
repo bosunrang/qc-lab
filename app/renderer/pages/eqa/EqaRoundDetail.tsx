@@ -14,9 +14,9 @@ import { EqaImportModal } from './EqaImportModal';
 import { ClassTag, numText, pctText, rawNum, roundLabel, StatCard } from './shared';
 
 const DECISION_LABEL: Readonly<Record<string, string>> = {
-  import: 'Nhập kỳ', reimport: 'Nhập lại (phiên bản mới)', column_swap: 'Đảo lại cột kết quả / giá trị ấn định', cancel: 'Huỷ kỳ',
+  import: 'Nhập đợt', append: 'Bổ sung máy vào đợt', reimport: 'Nhập lại (phiên bản mới)', cancel: 'Huỷ đợt',
 };
-const SOURCE_LABEL: Readonly<Record<string, string>> = { excel: 'File Excel theo mẫu', 'html-import': 'Công cụ phân tích ngoại kiểm cũ' };
+const SOURCE_LABEL: Readonly<Record<string, string>> = { pdf: 'Báo cáo PDF của trung tâm ngoại kiểm' };
 
 type ClassFilter = 'all' | 'attention' | EqaClassView;
 const CLASS_FILTERS: { key: ClassFilter; label: string }[] = [
@@ -26,15 +26,14 @@ const CLASS_FILTERS: { key: ClassFilter; label: string }[] = [
 function decisionDetail(type: string, payloadJson: string): string {
   let p: Record<string, unknown> = {};
   try { p = JSON.parse(payloadJson || '{}') as Record<string, unknown>; } catch { /* hiển thị trống */ }
-  if (type === 'column_swap') return `${String(p.instrument ?? '')}: ${String(p.reason ?? '')}`;
   if (type === 'cancel') return String(p.reason ?? '');
-  const head = `${String(p.rows ?? 0)} kết quả, phiên bản ${String(p.version ?? 1)}`;
+  const replaced = Array.isArray(p.replaces) && p.replaces.length ? ` · thay kết quả ${p.replaces.join(', ')}` : '';
+  const head = `${String(p.rows ?? 0)} kết quả nhập, phiên bản ${String(p.version ?? 1)}${replaced}`;
   return p.reason ? `${head} · ${String(p.reason)}` : head;
 }
 
 function notes(row: EqaResultRow): string[] {
   const out: string[] = [];
-  if (row.swapped) out.push('Đã đảo lại cột khi nhập');
   if (row.provider_check === 'mismatch' || row.provider_check === 'swapped') out.push(EQA_PROVIDER_CHECK_LABEL[row.provider_check]);
   return [...out, ...row.warnings];
 }
@@ -77,7 +76,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
         </div>
         {writable && open && (
           <div className="eqa-intro-actions">
-            <button type="button" className="btn ghost sm" onClick={() => setReimport(true)}>Nhập lại</button>
+            <button type="button" className="btn ghost sm" onClick={() => setReimport(true)}>Bổ sung / nhập lại PDF</button>
             <button type="button" className="btn ghost sm" onClick={() => setCancelOpen(true)}>Huỷ kỳ</button>
           </div>
         )}
@@ -97,8 +96,8 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
           <dl className="eqa-facts">
             {([
               ['Đơn vị tổ chức', round.provider], ['Mã chương trình', round.program_code], ['Mã đơn vị', round.unit_code],
-              ['Mã báo cáo', round.report_code], ['Ngày nhận mẫu', vnDate(round.received_date, '')], ['Ngày báo cáo', vnDate(round.report_date, '')],
-              ['Cấp nhóm làm giá trị ấn định', round.assigned_level], ['Người nhập dữ liệu (theo file)', round.entered_by],
+              ['Mã báo cáo', round.report_code], ['Cấp nhóm làm giá trị ấn định', round.assigned_level], ['Ngày nhận mẫu', vnDate(round.received_date, '')], ['Ngày báo cáo', vnDate(round.report_date, '')],
+              ['Người nhập dữ liệu (theo file)', round.entered_by],
               ['Nguồn', `${SOURCE_LABEL[round.source] ?? round.source}${round.source_name ? ` · ${round.source_name}` : ''}`],
             ] as [string, string][]).map(([label, value]) => (
               <div key={label}><dt>{label}</dt><dd>{value || <span className="hint-inline">Chưa ghi nhận.</span>}</dd></div>
@@ -201,7 +200,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
         </div>
       </section>
 
-      {reimport && <EqaImportModal mode="excel" onClose={() => setReimport(false)} onImported={() => setReimport(false)} />}
+      {reimport && <EqaImportModal onClose={() => setReimport(false)} onImported={() => setReimport(false)} />}
       {cancelOpen && <CancelRoundModal view={view} onClose={() => setCancelOpen(false)} cancel={cancel} />}
     </div>
   );

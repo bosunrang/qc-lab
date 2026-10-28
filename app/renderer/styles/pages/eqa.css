@@ -61,7 +61,7 @@
 .eqa-import-block h3{margin:0;font-size:var(--title-sub);font-weight:var(--weight-semibold);color:var(--text-primary);}
 .eqa-import-review .eqa-stats{margin-bottom:0;}
 .eqa-replace{display:grid;gap:var(--space-3);}
-.eqa-swap{display:grid;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--warning-border);border-radius:var(--radius-md);background:var(--warning-surface);}
+.eqa-import-grid{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr);gap:var(--field-gap);align-items:end;}
 .eqa-details summary{cursor:pointer;color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
 
 @media (max-width:1100px){

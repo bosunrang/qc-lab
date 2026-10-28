@@ -1,5 +1,5 @@
-// Danh sách kỳ ngoại kiểm và lối vào hai cách nhập (Excel theo mẫu, dữ liệu
-// của công cụ phân tích cũ). Số liệu từng kỳ do main tính.
+// Danh sách đợt ngoại kiểm và lối vào nhập báo cáo PDF của trung tâm ngoại
+// kiểm. Số liệu từng đợt do main tính.
 import { useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useEqaStore } from '../../store/eqa-store';
@@ -7,13 +7,13 @@ import { useAuthStore } from '../../store/auth-store';
 import { canWrite } from '../../lib/permissions';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from '../../components/EmptyState';
-import { EqaImportModal, type EqaImportMode } from './EqaImportModal';
+import { EqaImportModal } from './EqaImportModal';
 import { pctText, roundLabel, StatCard } from './shared';
 
 export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
   const { rounds, loading, error, load } = useEqaStore(useShallow((s) => ({ rounds: s.rounds, loading: s.loading, error: s.error, load: s.load })));
   const writable = canWrite(useAuthStore((s) => s.user?.role));
-  const [importMode, setImportMode] = useState<EqaImportMode | null>(null);
+  const [importing, setImporting] = useState(false);
   const [showCancelled, setShowCancelled] = useState(false);
 
   const active = useMemo(() => rounds.filter((r) => r.status === 'open'), [rounds]);
@@ -30,8 +30,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
         {writable && (
           <div className="eqa-intro-actions">
-            <button type="button" className="btn ghost" onClick={() => setImportMode('legacy')}>Nhập từ công cụ cũ</button>
-            <button type="button" className="btn" onClick={() => setImportMode('excel')}>Nhập kỳ từ Excel</button>
+            <button type="button" className="btn" onClick={() => setImporting(true)}>Nhập báo cáo PDF</button>
           </div>
         )}
       </div>
@@ -55,8 +54,8 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
             : loading && !rounds.length ? <EmptyState title="Đang tải các kỳ ngoại kiểm…" />
             : !visible.length ? (
               <EmptyState title="Chưa có kỳ ngoại kiểm nào"
-                action={writable ? <button type="button" className="btn sm" onClick={() => setImportMode('excel')}>Nhập kỳ từ Excel</button> : undefined}>
-                Nhập file Excel theo mẫu <b>Mau_nhap_du_lieu_EQA.xlsx</b>, hoặc nhập dữ liệu đã lưu của công cụ phân tích ngoại kiểm cũ.
+                action={writable ? <button type="button" className="btn sm" onClick={() => setImporting(true)}>Nhập báo cáo PDF</button> : undefined}>
+                Nhập file PDF <b>Bản phân tích kết quả ngoại kiểm tra</b> do trung tâm ngoại kiểm gửi; app tự lấy kết quả, giá trị ấn định, σp, z-score và nhóm so sánh.
               </EmptyState>
             ) : (
               <div className="eqa-table-wrap">
@@ -91,7 +90,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
       </section>
 
-      {importMode && <EqaImportModal mode={importMode} onClose={() => setImportMode(null)} onImported={(id) => { if (importMode === 'excel') { setImportMode(null); onOpen(id); } }} />}
+      {importing && <EqaImportModal onClose={() => setImporting(false)} onImported={(id) => { setImporting(false); onOpen(id); }} />}
     </div>
   );
 }

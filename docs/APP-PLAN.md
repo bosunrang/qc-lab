@@ -50,7 +50,7 @@ rộng hoặc chỉnh sửa mã nguồn.
 | Nhập QC | Ghi điểm, theo dõi lần chạy, ghi chú, huỷ điểm và dải vận hành |
 | Phân tích Westgard | Đánh giá luật, cảnh báo, lịch sử lô và biểu đồ |
 | Six Sigma & Sai số | Kỳ đánh giá, TEa, CV/Bias, MU, OPSpecs và xuất báo cáo |
-| Phân tích ngoại kiểm | Kỳ ngoại kiểm: nhập Excel/dữ liệu công cụ cũ, ánh xạ sang xét nghiệm, z-score theo ISO 13528, đối chiếu nhà cung cấp, chặn dữ liệu đảo cột |
+| Phân tích ngoại kiểm | Đợt ngoại kiểm nhập từ báo cáo PDF của trung tâm ngoại kiểm: ánh xạ sang xét nghiệm, z-score theo ISO 13528, đối chiếu z trên báo cáo, nhóm so sánh, bổ sung theo từng máy |
 | Khắc phục sự cố | Hồ sơ NCE theo lần chạy: kiểm soát, cho phép hoạt động trở lại, CAPA, hiệu lực và duyệt độc lập |
 | Báo cáo & Biểu mẫu | Báo cáo dữ liệu, báo cáo Sigma, PDF/Excel và mẫu biểu |
 | Cài đặt & Đám mây | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
@@ -91,8 +91,8 @@ nằm tại `docs/NCE-REDESIGN-2026-10-12.md`; căn cứ tiêu chuẩn, thuật 
 nguyên tắc vẫn ở `docs/NCE-PLAN-2026-09-27.md`. Phải đọc cả hai và đối chiếu
 SOP đã được phòng xét nghiệm phê duyệt trước khi sửa nghiệp vụ NCE.
 
-Kế hoạch phân hệ Ngoại kiểm (EQA) — đưa công cụ phân tích ngoại kiểm độc
-lập của khoa vào app và làm nguồn Bias cho Six Sigma — nằm tại
+Kế hoạch phân hệ Ngoại kiểm (EQA) — nhập báo cáo PDF của trung tâm ngoại
+kiểm và làm nguồn Bias cho Six Sigma — nằm tại
 `docs/EQA-PLAN-2026-10-28.md`.
 
 ## 7. Quy ước mã nguồn

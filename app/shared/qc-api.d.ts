@@ -557,7 +557,7 @@ export interface ReportPointRow {
 }
 
 // ── Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md) ──────────────────────────────
-// Bản nháp nhập (camelCase) là dữ liệu renderer đọc từ file; main kiểm lại
+// Bản nháp nhập (camelCase) là dữ liệu renderer đọc từ báo cáo PDF; main kiểm lại
 // toàn bộ. Dòng đọc từ SQLite giữ snake_case.
 
 export interface EqaPeerStatsView { mean: number | null; sd: number | null; cv: number | null; n: number | null }
@@ -575,15 +575,13 @@ export type EqaClassView = 'ok' | 'warn' | 'rej';
 export type EqaProviderCheckView = 'match' | 'swapped' | 'mismatch' | 'none';
 export interface EqaCheckedRowDraft extends EqaRowDraft {
   testId: string | null; z: number | null; pct: number | null; zOfficial: number | null; cls: EqaClassView | null;
-  providerCheck: EqaProviderCheckView; swapped: boolean; withinTolerance: boolean | null; errors: string[]; warnings: string[];
+  providerCheck: EqaProviderCheckView; withinTolerance: boolean | null; errors: string[]; warnings: string[];
 }
 export interface EqaImportInput {
-  round: EqaRoundDraft; rows: EqaRowDraft[]; source: 'excel' | 'html-import'; sourceName?: string;
+  round: EqaRoundDraft; rows: EqaRowDraft[]; source: 'pdf'; sourceName?: string;
   /** Ánh xạ người dùng chọn cho cặp mã thông số × tên máy chưa có. */
   mappings?: { code: string; instrument: string; testId: string }[];
-  /** Máy được xác nhận đảo lại cột kết quả/giá trị ấn định, kèm lý do. */
-  swaps?: { instrument: string; reason: string }[];
-  /** Bắt buộc khi kỳ đã có: lý do nhập lại (tạo phiên bản mới). */
+  /** Bắt buộc khi thay kết quả của máy đã có trong kỳ hoặc mở lại kỳ đã huỷ. */
   replaceReason?: string;
   /** Phiên bản kỳ lúc xem trước, để không ghi đè lần nhập của người khác. */
   expectedVersion?: number;
@@ -591,25 +589,25 @@ export interface EqaImportInput {
 export interface EqaImportPreview {
   round: EqaRoundDraft; round_errors: string[]; rows: EqaCheckedRowDraft[];
   pairs: { code: string; instrument: string; test_id: string | null; suggestions: string[]; rows: number }[];
-  swaps: { instrument: string; rows: number; swapped_rows: number; flagged: boolean; confirmed: boolean }[];
   blocking: number;
   counts: { total: number; ok: number; warn: number; rej: number; pt_score: number | null };
-  /** Kỳ cùng chương trình/năm/đợt đã có trong CSDL. */
-  existing: { id: string; version: number; row_version: number; status: string } | null;
+  /** Kỳ cùng chương trình/năm/đợt đã có trong CSDL: máy đang có kết quả,
+   * máy mà lần nhập này thay kết quả, và có cần lý do nhập lại không. */
+  existing: { id: string; version: number; row_version: number; status: string; instruments: string[]; replaces: string[]; needs_reason: boolean } | null;
 }
 export interface EqaRoundRow {
   id: string; program_id: string; program_name: string; provider: string; program_code: string; unit_code: string;
   year: number; round: string; round_no: number; report_code: string; received_date: string; report_date: string;
   assigned_level: string; entered_by: string; source: string; source_name: string; status: 'open' | 'cancelled';
   version: number; row_version: number; created_at: string; updated_at: string;
-  total: number; ok: number; warn: number; rej: number; pt_score: number | null; swapped_rows: number; instruments: string[];
+  total: number; ok: number; warn: number; rej: number; pt_score: number | null; instruments: string[];
 }
 export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
 export interface EqaResultRow {
   id: string; test_id: string; test_name: string; instrument_id: string; instrument_name: string;
   code: string; instrument_label: string; level_label: string; sample: string; unit: string;
   result: number; assigned: number; sigma_p: number; z: number; z_provider: number | null; z_official: number; pct: number | null;
-  class: EqaClassView; provider_check: EqaProviderCheckView; swapped: number; tolerance_pct: number | null; within_tolerance: number | null;
+  class: EqaClassView; provider_check: EqaProviderCheckView; tolerance_pct: number | null; within_tolerance: number | null;
   run_date: string; reagent_lot: string; method: string; operator: string; iqc_note: string; peer_group: string;
   peer: EqaPeerComparisonView[]; warnings: string[];
 }

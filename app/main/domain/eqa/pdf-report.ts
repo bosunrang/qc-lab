@@ -1,0 +1,252 @@
+// Đọc "Bản phân tích kết quả ngoại kiểm tra" dạng PDF của Trung tâm Kiểm chuẩn
+// Xét nghiệm TP.HCM (VEQAS). Hàm thuần: renderer trích chữ kèm toạ độ bằng
+// pdf.js rồi gọi `parseVeqasReport`; main vẫn kiểm lại toàn bộ khi xem trước
+// và khi ghi (`checkEqaImport`).
+//
+// Bố cục một báo cáo (một đơn vị × một nhóm thiết bị × một đợt):
+//   - trang bìa: mã đơn vị, tên nhóm thiết bị, chương trình, mã chương trình,
+//     đợt, mã vạch báo cáo;
+//   - mỗi thông số một trang: tiêu đề "THÔNG SỐ: Tên (MÃ) đơn vị", bảng nhóm
+//     so sánh (Tất cả phương pháp / nhóm phương pháp / nhóm thiết bị: N, giá
+//     trị ấn định, SD, %CV, số KQ loại), rồi Kết quả đơn vị, Giá trị ấn định
+//     so sánh, σp, z-score;
+//   - trang tổng hợp: mỗi thông số một dòng (mã, đơn vị, kết quả, giá trị ấn
+//     định, σp, z) — dùng để đối chiếu, lệch trang chi tiết là lỗi chặn.
+// Báo cáo không ghi năm: lấy theo ngày tạo file PDF và cho người dùng sửa.
+import type { EqaPeer, EqaPeerLevel, EqaPeerStats } from './evaluation';
+import type { EqaParsedSource, EqaRowInput } from './import';
+
+export interface EqaPdfTextItem { str: string; x: number; y: number }
+export interface EqaPdfDocument {
+  fileName: string;
+  /** Chữ của từng trang, toạ độ PDF (y tăng lên trên). */
+  pages: readonly (readonly EqaPdfTextItem[])[];
+  /** Ngày tạo file `YYYY-MM-DD` (siêu dữ liệu PDF), rỗng nếu không có. */
+  creationDate: string;
+}
+
+export interface EqaPdfReport extends EqaParsedSource {
+  fileName: string;
+  /** Nhóm thiết bị đồng đẳng ghi trên báo cáo (không phải tên máy của PXN). */
+  instrumentGroup: string;
+}
+
+interface Line { y: number; items: EqaPdfTextItem[]; text: string }
+
+/** Bỏ dấu, chữ thường, gộp khoảng trắng — để so nhãn cố định của báo cáo
+ * (báo cáo có chỗ gõ thiếu dấu như "Tât cả phương pháp"). */
+const fold = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** Gom chữ cùng hàng (lệch y ≤ 3 điểm) thành dòng, trên xuống dưới, trái sang phải. */
+function linesOf(items: readonly EqaPdfTextItem[]): Line[] {
+  const rows: { y: number; items: EqaPdfTextItem[] }[] = [];
+  for (const item of items) {
+    if (!item.str.trim()) continue;
+    const row = rows.find((r) => Math.abs(r.y - item.y) <= 3);
+    if (row) row.items.push(item); else rows.push({ y: item.y, items: [item] });
+  }
+  return rows.sort((a, b) => b.y - a.y).map((row) => {
+    const sorted = row.items.sort((a, b) => a.x - b.x);
+    return { y: row.y, items: sorted, text: sorted.map((i) => i.str.trim()).join(' ') };
+  });
+}
+
+/** Số trong báo cáo: dấu chấm thập phân; chấp nhận dấu phẩy thập phân nếu
+ * không có dấu chấm, và dấu phẩy phân nghìn khi có cả hai. */
+function reportNumber(value: string | undefined): number | null {
+  let raw = String(value ?? '').replace(/\s+/g, '').replace('−', '-');
+  if (!raw) return null;
+  if (raw.includes(',') && raw.includes('.')) raw = raw.replace(/,/g, '');
+  else if (raw.includes(',')) raw = raw.replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Tách đuôi số của một dòng: pdf.js có thể gộp hoặc tách các đoạn chữ tuỳ
+ * khoảng cách trong file, nên đọc theo từ của cả dòng thay vì theo mục chữ.
+ * `count` giới hạn số lấy từ cuối; phần còn lại là nhãn. */
+function splitTrailingNumbers(text: string, count = Infinity): { label: string; nums: number[] } {
+  const tokens = text.trim().split(/\s+/);
+  const nums: number[] = [];
+  while (tokens.length && nums.length < count) {
+    const n = reportNumber(tokens[tokens.length - 1]);
+    if (n === null) break;
+    nums.unshift(n);
+    tokens.pop();
+  }
+  return { label: tokens.join(' '), nums };
+}
+
+/** Nhãn ở đầu dòng ("Kết quả đơn vị:", "σp", "z-score") có khớp không. */
+const startsWithLabel = (line: Line, label: string) => fold(line.text).startsWith(fold(label));
+
+/** Bỏ phần "Mã đơn vị: 10026" ở cuối dòng tiêu đề thông số. So theo từ đã bỏ
+ * dấu vì pdf.js có thể trả dấu tiếng Việt ở dạng tổ hợp. */
+function withoutUnitCode(text: string): string {
+  const tokens = text.trim().split(/\s+/);
+  const at = tokens.findIndex((token, i) => fold(token) === 'ma' && fold(tokens[i + 1] ?? '') === 'don' && fold(tokens[i + 2] ?? '').startsWith('vi'));
+  return (at < 0 ? tokens : tokens.slice(0, at)).join(' ');
+}
+
+/** Giá trị đứng sau một nhãn trên cùng dòng ("Mã đơn vị: 10026", "Đợt: 09"). */
+function valueAfter(lines: readonly Line[], label: string): string {
+  const key = fold(label);
+  for (const line of lines) {
+    const i = line.items.findIndex((item) => fold(item.str).startsWith(key));
+    if (i < 0) continue;
+    const inline = line.items[i].str.slice(line.items[i].str.indexOf(':') + 1).trim();
+    if (line.items[i].str.includes(':') && inline) return inline;
+    const next = line.items[i + 1];
+    if (next) return next.str.trim();
+  }
+  return '';
+}
+
+/** "Alanine Aminotransferase (ALT (GPT)) U/L" → tên, mã "ALT (GPT)", đơn vị "U/L".
+ * Mã là cụm ngoặc CUỐI (cân ngoặc), đơn vị là phần sau nó. */
+export function splitVeqasTitle(title: string): { name: string; code: string; unit: string } {
+  const text = title.trim();
+  const close = text.lastIndexOf(')');
+  if (close < 0) return { name: text, code: text, unit: '' };
+  let depth = 0, open = -1;
+  for (let i = close; i >= 0; i--) {
+    if (text[i] === ')') depth++;
+    else if (text[i] === '(' && --depth === 0) { open = i; break; }
+  }
+  if (open < 0) return { name: text, code: text, unit: '' };
+  return { name: text.slice(0, open).trim(), code: text.slice(open + 1, close).trim(), unit: text.slice(close + 1).trim() };
+}
+
+const ASSIGNED_LEVEL_TEXT: Readonly<Record<EqaPeerLevel, string>> = { all: 'Tất cả phương pháp', method: 'Nhóm phương pháp', instrument: 'Nhóm thiết bị' };
+
+function sameValue(a: number | null, b: number | null): boolean {
+  return a !== null && b !== null && Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 1e-6);
+}
+
+interface DetailRow { page: number; name: string; code: string; unit: string; result: number | null; assigned: number | null; sigmaP: number | null; z: number | null; peer: EqaPeer; methodGroup: string; level: EqaPeerLevel | null }
+
+/** Đọc một trang thông số; `null` nếu trang không phải trang thông số. */
+function parseDetailPage(lines: readonly Line[], page: number, instrumentGroup: string): DetailRow | { page: number; error: string } | null {
+  const titleLine = lines.find((line) => startsWithLabel(line, 'thong so:'));
+  if (!titleLine) return null;
+  const title = withoutUnitCode(titleLine.text.slice(titleLine.text.indexOf(':') + 1));
+  const { name, code, unit } = splitVeqasTitle(title);
+  const at = (label: string) => {
+    const line = lines.find((l) => startsWithLabel(l, label));
+    return line ? splitTrailingNumbers(line.text, 1).nums[0] ?? null : null;
+  };
+  const result = at('Kết quả đơn vị'), assigned = at('Giá trị ấn định so sánh'), sigmaP = at('σp'), z = at('z-score');
+  if (result === null || assigned === null || sigmaP === null) return { page, error: `trang ${page} (${code || 'không rõ mã'}): không đọc được kết quả, giá trị ấn định hoặc σp` };
+
+  // Bảng nhóm so sánh: các dòng giữa tiêu đề cột "N … Số KQ loại" và "Kết quả đơn vị".
+  const head = lines.findIndex((l) => /so kq loai/.test(fold(l.text)));
+  const end = lines.findIndex((l) => startsWithLabel(l, 'ket qua don vi'));
+  const peer: EqaPeer = {};
+  let methodGroup = '';
+  if (head >= 0 && end > head) {
+    // Mỗi dòng: tên nhóm, rồi N, giá trị ấn định, SD, %CV, số KQ loại. Chỉ lấy
+    // đúng 5 số cuối để tên nhóm có số (ví dụ "AU 680") không bị ăn mất.
+    const rows = lines.slice(head + 1, end).map((line) => splitTrailingNumbers(line.text, 5))
+      .filter((row) => row.label && row.nums.length >= 4);
+    rows.forEach((row, index) => {
+      const folded = fold(row.label);
+      const level: EqaPeerLevel = folded.startsWith('tat ca') ? 'all'
+        : fold(row.label) === fold(instrumentGroup) || index === rows.length - 1 ? 'instrument' : 'method';
+      const [n, mean, sd, cv] = row.nums;
+      peer[level] = { n, mean, sd, cv } satisfies EqaPeerStats;
+      if (level === 'method') methodGroup = row.label;
+    });
+  }
+  // Ưu tiên nhóm hẹp nhất khi hai nhóm trùng giá trị ấn định.
+  const level = (['instrument', 'method', 'all'] as const).find((key) => sameValue(peer[key]?.mean ?? null, assigned)) ?? null;
+  return { page, name, code, unit, result, assigned, sigmaP, z, peer, methodGroup, level };
+}
+
+/** Bảng tổng hợp: mã → [kết quả, giá trị ấn định, σp, z]. */
+function parseSummary(lines: readonly Line[]): Map<string, number[]> | null {
+  const head = lines.findIndex((l) => { const t = fold(l.text); return t.startsWith('thong so') && t.includes('don vi do') && t.includes('z-score'); });
+  if (head < 0) return null;
+  const out = new Map<string, number[]>();
+  for (const line of lines.slice(head + 1)) {
+    // Mã, đơn vị đo, kết quả, giá trị ấn định, σp, z: đơn vị là từ cuối của phần nhãn.
+    const { label, nums } = splitTrailingNumbers(line.text, 4);
+    if (nums.length < 4 || !label) continue;
+    const code = label.split(/\s+/).slice(0, -1).join(' ') || label;
+    out.set(fold(code).replace(/[^a-z0-9]/g, ''), nums);
+  }
+  return out;
+}
+
+/** Đọc một báo cáo PDF. Hàng trả về mang `instrument` = nhóm thiết bị của báo
+ * cáo; renderer thay bằng máy của PXN mà người dùng chọn trước khi gửi main. */
+export function parseVeqasReport(doc: EqaPdfDocument): EqaPdfReport {
+  const pages = doc.pages.map(linesOf);
+  const all = pages.flat();
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const cover = pages[0] ?? [];
+
+  // Tiêu đề lặp ở mỗi trang thông số: "CHƯƠNG TRÌNH … - MÃ CHƯƠNG TRÌNH:BC20C - ĐỢT 09".
+  const header = all.find((line) => /ma chuong trinh\s*:/.test(fold(line.text)) && /dot\s*\d+/.test(fold(line.text)))?.text ?? '';
+  const headerMatch = header.match(/^(.*?)\s*-\s*MÃ CHƯƠNG TRÌNH\s*:\s*([^\s-]+)\s*-\s*(ĐỢT\s*\d+)/i);
+  const roundNo = (headerMatch?.[3] ?? '').match(/\d+/)?.[0] || valueAfter(cover, 'Đợt').match(/\d+/)?.[0] || '';
+  const program = (headerMatch?.[1] ?? '').trim() || (valueAfter(cover, 'Chương trình ngoại kiểm tra') ? `CHƯƠNG TRÌNH NGOẠI KIỂM TRA ${valueAfter(cover, 'Chương trình ngoại kiểm tra').toUpperCase()}` : '');
+  const programCode = (headerMatch?.[2] ?? '').trim() || valueAfter(cover, 'Mã chương trình');
+  const unitCode = valueAfter(all, 'Mã đơn vị').replace(/\D+/g, '');
+  const provider = all.find((line) => /^trung tam kiem chuan xet nghiem/.test(fold(line.text)))?.text ?? '';
+  const reportCode = cover.find((line) => /^\d{8,}$/.test(line.text.replace(/\s+/g, '')))?.text.replace(/\s+/g, '') ?? '';
+  // Tên nhóm thiết bị: dòng ngay dưới "Mã đơn vị" ở trang bìa.
+  const unitLine = cover.findIndex((line) => fold(line.text).startsWith('ma don vi'));
+  const instrumentGroup = unitLine >= 0 ? cover[unitLine + 1]?.text.trim() ?? '' : '';
+
+  const details: DetailRow[] = [];
+  pages.forEach((lines, index) => {
+    const parsed = parseDetailPage(lines, index + 1, instrumentGroup);
+    if (!parsed) return;
+    if ('error' in parsed) errors.push(`${doc.fileName}: ${parsed.error}.`);
+    else details.push(parsed);
+  });
+  if (!details.length) errors.push(`${doc.fileName}: không tìm thấy trang thông số nào — file không phải bản phân tích kết quả ngoại kiểm của TTKCXN TP.HCM.`);
+
+  // Đối chiếu trang tổng hợp: lệch là lỗi chặn (đọc nhầm cột hoặc báo cáo sai).
+  const summary = pages.map(parseSummary).find((s) => s && s.size) ?? null;
+  if (!summary) warnings.push(`${doc.fileName}: không có trang tổng hợp để đối chiếu.`);
+  else {
+    const seen = new Set<string>();
+    for (const row of details) {
+      const key = fold(row.code).replace(/[^a-z0-9]/g, '');
+      seen.add(key);
+      const values = summary.get(key);
+      if (!values) { errors.push(`${doc.fileName}: thông số ${row.code} (trang ${row.page}) không có trong trang tổng hợp.`); continue; }
+      const [result, assigned, sigmaP, z] = values;
+      if (!sameValue(row.result, result) || !sameValue(row.assigned, assigned) || !sameValue(row.sigmaP, sigmaP) || (row.z !== null && !sameValue(row.z, z))) {
+        errors.push(`${doc.fileName}: thông số ${row.code} — số liệu trang ${row.page} khác trang tổng hợp.`);
+      }
+    }
+    for (const key of summary.keys()) if (!seen.has(key)) errors.push(`${doc.fileName}: trang tổng hợp có thông số "${key}" nhưng không có trang chi tiết.`);
+  }
+
+  const levels = new Set(details.map((row) => row.level));
+  const assignedLevel = levels.size === 1 && details[0]?.level ? ASSIGNED_LEVEL_TEXT[details[0].level] : levels.size > 1 ? 'Theo từng thông số' : '';
+  if (details.some((row) => row.level === null)) warnings.push(`${doc.fileName}: có thông số mà giá trị ấn định so sánh không trùng nhóm nào trong bảng so sánh.`);
+  const year = doc.creationDate ? Number(doc.creationDate.slice(0, 4)) : null;
+  if (year) warnings.push(`Báo cáo không ghi năm: năm ${year} lấy theo ngày tạo file PDF (${doc.creationDate.split('-').reverse().join('/')}). Sửa lại nếu báo cáo thuộc năm khác.`);
+  else errors.push(`${doc.fileName}: không xác định được năm của báo cáo; nhập năm trước khi ghi.`);
+  const sample = doc.fileName.match(/_(\d{1,3}-\d{1,3})_/)?.[1] ?? '';
+
+  const rows: EqaRowInput[] = details.map((row) => ({
+    ref: `${doc.fileName} · trang ${row.page}`, code: row.code, instrument: instrumentGroup, level: '', sample, unit: row.unit,
+    result: row.result, assigned: row.assigned, sigmaP: row.sigmaP, zProvider: row.z, tolerancePct: null,
+    runDate: '', reagentLot: '', method: row.methodGroup, operator: '', iqcNote: '',
+    peerGroup: instrumentGroup, peer: row.peer,
+  }));
+  return {
+    fileName: doc.fileName, instrumentGroup,
+    round: {
+      program, provider, programCode, unitCode, year: year && year >= 2000 ? year : null, round: roundNo ? `ĐỢT ${roundNo.padStart(2, '0')}` : '',
+      reportCode, receivedDate: '', reportDate: doc.creationDate, assignedLevel, enteredBy: '',
+    },
+    rows, errors, warnings,
+  };
+}

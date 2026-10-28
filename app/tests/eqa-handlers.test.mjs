@@ -37,13 +37,12 @@ const row = (code, instrument, result, assigned, sigmaP, zProvider, over = {}) =
 const ROWS = [
   row('ALT(GPT)', 'AU5800', 55, 54.278, 4.917, 0.15),
   row('AST(GOT)', 'AU5800', 40, 30, 3, 3.33),
-  // DxC700 đảo cột như dữ liệu thật của công cụ cũ.
-  row('ALT(GPT)', 'DxC 700', 54.1, 52, 4, -0.53),
-  row('AST(GOT)', 'DxC 700', 30.6, 31.5, 2, 0.45),
+  row('ALT(GPT)', 'DxC 700', 52, 54.1, 4, -0.53),
+  row('AST(GOT)', 'DxC 700', 31.5, 30.6, 2, 0.45),
 ];
-const draft = (over = {}) => ({ data: { round: ROUND, rows: ROWS, source: 'excel', sourceName: 'dot01.xlsx', ...over } });
+const draft = (over = {}) => ({ data: { round: ROUND, rows: ROWS, source: 'pdf', sourceName: 'VEQAS_BC20C_01.pdf', ...over } });
 
-test('ca 1, 3: xem trước gợi ý ánh xạ và chặn máy đảo cột; ghi khi đã ánh xạ và xác nhận đảo có lý do', () => {
+test('ca 1, 3: xem trước gợi ý ánh xạ; dòng z ngược dấu báo cáo bị chặn; ghi khi đã ánh xạ', () => {
   const { db, eqa, ids } = fixture();
   const preview = must(eqa.previewEqaImport(draft()), 'xem trước');
   assert.equal(preview.existing, null);
@@ -51,21 +50,23 @@ test('ca 1, 3: xem trước gợi ý ánh xạ và chặn máy đảo cột; ghi
     ['ALT(GPT)', 'AU5800', null, [ids['ALT@AU5800']]], ['AST(GOT)', 'AU5800', null, [ids['AST@AU5800']]],
     ['ALT(GPT)', 'DxC 700', null, [ids['ALT@DxC700']]], ['AST(GOT)', 'DxC 700', null, [ids['AST@DxC700']]],
   ], 'gợi ý theo mã viết tắt và tên máy, không tự ánh xạ');
-  assert.deepEqual(preview.swaps.map((s) => [s.instrument, s.flagged]), [['AU5800', false], ['DxC 700', true]]);
-  assert.equal(preview.blocking, 4);
+  assert.equal(preview.blocking, 4, 'chưa ánh xạ');
   assert.equal(eqa.importEqaRound(draft(), admin).error.code, 'blocking');
 
   const mappings = preview.pairs.map((p) => ({ code: p.code, instrument: p.instrument, testId: p.suggestions[0] }));
-  assert.equal(eqa.importEqaRound(draft({ mappings, swaps: [{ instrument: 'DxC 700', reason: 'ngắn' }] }), tech).error.code, 'swap-reason');
-  assert.equal(eqa.importEqaRound(draft({ mappings, swaps: [{ instrument: 'DxC 700', reason: 'Đối chiếu báo cáo gốc, file đổi chỗ hai cột' }] }), viewer).error.code, 'forbidden', 'người chỉ xem không nhập được');
-  const view = must(eqa.importEqaRound(draft({ mappings, swaps: [{ instrument: 'DxC 700', reason: 'Đối chiếu báo cáo gốc, file đổi chỗ hai cột' }] }), tech), 'nhập');
-  assert.deepEqual([view.round.total, view.round.ok, view.round.warn, view.round.rej, view.round.version, view.round.swapped_rows], [4, 3, 0, 1, 1, 2]);
-  const dxc = view.results.filter((r) => r.instrument_name === 'DxC700');
-  assert.deepEqual(dxc.map((r) => [r.result, r.assigned, r.provider_check]), [[52, 54.1, 'match'], [31.5, 30.6, 'match']], 'đảo lại rồi mới tính z');
-  assert.deepEqual(view.decisions.map((d) => d.type), ['import', 'column_swap']);
+  // Kết quả và giá trị ấn định bị đọc đổi chỗ: z ngược dấu z báo cáo, chặn ghi.
+  const flipped = [...ROWS.slice(0, 2), row('ALT(GPT)', 'DxC 700', 54.1, 52, 4, -0.53)];
+  const bad = must(eqa.previewEqaImport(draft({ rows: flipped, mappings })), 'xem trước dòng đảo');
+  assert.match(bad.rows[2].errors.join(';'), /ngược dấu z trên báo cáo/);
+  assert.equal(eqa.importEqaRound(draft({ rows: flipped, mappings }), admin).error.code, 'blocking');
+
+  assert.equal(eqa.importEqaRound(draft({ mappings }), viewer).error.code, 'forbidden', 'người chỉ xem không nhập được');
+  const view = must(eqa.importEqaRound(draft({ mappings }), tech), 'nhập');
+  assert.deepEqual([view.round.total, view.round.ok, view.round.warn, view.round.rej, view.round.version, view.round.source], [4, 3, 0, 1, 1, 'pdf']);
+  assert.ok(view.results.every((r) => r.provider_check === 'match'));
+  assert.deepEqual(view.decisions.map((d) => d.type), ['import']);
   assert.deepEqual(view.instruments.map((i) => [i.instrument_name, i.total, i.rej]), [['AU5800', 2, 1], ['DxC700', 2, 0]]);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM eqa_test_map').get().n, 4, 'ánh xạ được lưu');
-  assert.ok(db.prepare("SELECT COUNT(*) n FROM activity WHERE type='Đảo cột dữ liệu ngoại kiểm'").get().n === 1);
   assert.equal(eqa.listEqaRounds().length, 1);
 
   // Kỳ sau của cùng chương trình tự dùng ánh xạ đã lưu.
@@ -94,4 +95,32 @@ test('ca 7: nhập lại cần lý do và tạo phiên bản mới, giữ phiên
   assert.equal(cancelled.round.status, 'cancelled');
   assert.equal(eqa.cancelEqaRound({ data: { id: second.round.id, expectedVersion: cancelled.round.row_version, reason: 'Nhập nhầm chương trình' } }, admin).error.code, 'status');
   assert.equal(eqa.getEqaRound('khong-co'), null);
+});
+
+test('báo cáo PDF từng máy: nhận chương trình theo mã, bổ sung máy không cần lý do, thay máy đã có thì cần lý do và giữ máy khác', () => {
+  const { eqa } = fixture();
+  const au = [row('ALT(GPT)', 'AU5800', 55, 54.278, 4.917, 0.15), row('AST(GOT)', 'AU5800', 31, 30, 2, 0.5)];
+  const auPreview = must(eqa.previewEqaImport(draft({ rows: au })), 'xem trước AU5800');
+  const map = (p) => p.pairs.map((pair) => ({ code: pair.code, instrument: pair.instrument, testId: pair.suggestions[0] }));
+  must(eqa.importEqaRound(draft({ rows: au, mappings: map(auPreview) }), admin), 'nhập báo cáo AU5800');
+
+  // Báo cáo sau ghi tên đơn vị tổ chức khác nhưng cùng mã chương trình + mã đơn vị.
+  const pdfRound = { ...ROUND, provider: 'TRUNG TÂM KIỂM CHUẨN XÉT NGHIỆM TP.HCM' };
+  const dxc = [row('ALT (GPT)', 'DxC700', 141, 141.069, 9.405, -0.01), row('AST (GOT)', 'DxC700', 138, 139.222, 9.281, -0.13)];
+  const pdf = (over = {}) => ({ data: { round: pdfRound, rows: dxc, source: 'pdf', sourceName: 'VEQAS_BC20C_09.pdf', ...over } });
+  const dxcPreview = must(eqa.previewEqaImport(pdf()), 'xem trước PDF DxC700');
+  assert.deepEqual(dxcPreview.existing && [dxcPreview.existing.instruments, dxcPreview.existing.replaces, dxcPreview.existing.needs_reason], [['AU5800'], [], false]);
+  const appended = must(eqa.importEqaRound(pdf({ mappings: map(dxcPreview) }), admin), 'bổ sung DxC700');
+  assert.deepEqual([appended.round.version, appended.round.total, appended.round.source, appended.round.instruments], [2, 4, 'pdf', ['AU5800', 'DxC700']]);
+  assert.deepEqual(appended.decisions.map((d) => d.type), ['import', 'append']);
+  assert.equal(eqa.listEqaRounds().length, 1, 'không tạo chương trình/kỳ thứ hai');
+
+  // Nhập lại báo cáo DxC700: chỉ thay máy đó, giữ kết quả AU5800.
+  const again = must(eqa.previewEqaImport(pdf()), 'xem trước lần 2');
+  assert.deepEqual([again.existing.replaces, again.existing.needs_reason], [['DxC700'], true]);
+  assert.equal(eqa.importEqaRound(pdf(), admin).error.code, 'replace-reason');
+  const replaced = must(eqa.importEqaRound(pdf({ replaceReason: 'Trung tâm gửi lại báo cáo đã sửa', expectedVersion: appended.round.row_version }), admin), 'nhập lại DxC700');
+  assert.deepEqual([replaced.round.version, replaced.round.total], [3, 4]);
+  assert.deepEqual(replaced.results.filter((r) => r.instrument_name === 'AU5800').map((r) => r.result), [55, 31]);
+  assert.equal(replaced.decisions.at(-1).type, 'reimport');
 });

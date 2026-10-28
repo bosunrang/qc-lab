@@ -50,10 +50,21 @@ export function createEqaHandlers(db: Db) {
     }));
   }
 
-  /** Chương trình nhận diện theo tên + đơn vị tổ chức, không phân biệt cách viết. */
-  function findProgram(name: string, provider: string): { id: string } | undefined {
-    const rows = db.prepare('SELECT id, name, provider FROM eqa_programs').all() as { id: string; name: string; provider: string }[];
-    return rows.find((row) => eqaNormalize(row.name) === eqaNormalize(name) && eqaNormalize(row.provider) === eqaNormalize(provider));
+  /** Chương trình nhận diện theo mã chương trình + mã đơn vị khi có cả hai
+   * (báo cáo PDF và file Excel ghi tên đơn vị tổ chức khác nhau), nếu không
+   * thì theo tên + đơn vị tổ chức, không phân biệt cách viết. */
+  function findProgram(round: Record<string, unknown>): { id: string } | undefined {
+    const rows = db.prepare('SELECT id, name, provider, program_code, unit_code FROM eqa_programs').all() as { id: string; name: string; provider: string; program_code: string; unit_code: string }[];
+    const code = eqaNormalize(round.programCode), unit = eqaNormalize(round.unitCode);
+    const byCode = code && unit ? rows.find((row) => eqaNormalize(row.program_code) === code && eqaNormalize(row.unit_code) === unit) : undefined;
+    return byCode ?? rows.find((row) => eqaNormalize(row.name) === eqaNormalize(round.program) && eqaNormalize(row.provider) === eqaNormalize(round.provider));
+  }
+
+  /** Máy của các kết quả đang hiện hành trong một kỳ (id → tên). */
+  function currentInstruments(round: RoundRecord): Map<string, string> {
+    const rows = db.prepare(`SELECT DISTINCT t.instrument_id, i.name FROM eqa_results e JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id
+      WHERE e.round_id=? AND e.version=?`).all(round.id, round.version) as { instrument_id: string; name: string }[];
+    return new Map(rows.map((row) => [row.instrument_id, row.name]));
   }
 
   function findRound(programId: string | undefined, year: number | null, round: string): RoundRecord | undefined {
@@ -73,42 +84,63 @@ export function createEqaHandlers(db: Db) {
     return map;
   }
 
-  function prepare(raw: unknown): { input: EqaImportInput; check: EqaImportCheck; programId: string | undefined; existing: RoundRecord | undefined } {
+  interface Prepared {
+    input: EqaImportInput; check: EqaImportCheck; programId: string | undefined; existing: RoundRecord | undefined;
+    /** Máy đang có kết quả hiện hành trong kỳ (id → tên) và tên các máy mà lần nhập này thay kết quả. */
+    present: Map<string, string>; replaces: string[];
+    /** Máy (id) của các dòng trong lần nhập này. */
+    incoming: Set<string>;
+  }
+
+  function prepare(raw: unknown): Prepared {
     const input = objectInput(objectInput(raw).data) as unknown as EqaImportInput;
     const tests = catalogTests();
     const testIds = new Set(tests.map((t) => t.id));
-    const round = objectInput(input.round);
-    const programId = findProgram(text(round.program, 200), text(round.provider, 200))?.id;
-    const confirmedSwaps = new Set((Array.isArray(input.swaps) ? input.swaps : []).map((s) => eqaNormalize(objectInput(s).instrument)).filter(Boolean));
-    const check = checkEqaImport({ round: input.round, rows: input.rows }, { tests, mapping: mappingFor(programId, input, testIds), confirmedSwaps, config: readEqaConfig(db) });
-    return { input, check, programId, existing: findRound(programId, check.round.year, check.round.round) };
+    const programId = findProgram(objectInput(input.round))?.id;
+    const check = checkEqaImport({ round: input.round, rows: input.rows }, { tests, mapping: mappingFor(programId, input, testIds), config: readEqaConfig(db) });
+    const existing = findRound(programId, check.round.year, check.round.round);
+    // Một kỳ gom kết quả của nhiều máy (báo cáo PDF: mỗi máy một file). Nhập
+    // máy mới là bổ sung; chỉ kết quả của máy đã có mới bị thay.
+    const present = existing && existing.status === 'open' ? currentInstruments(existing) : new Map<string, string>();
+    const instrumentOf = new Map(tests.map((t) => [t.id, t.instrument_id]));
+    const incoming = new Set(check.rows.map((row) => (row.testId ? instrumentOf.get(row.testId) : undefined)).filter((id): id is string => !!id));
+    const replaces = [...present].filter(([id]) => incoming.has(id)).map(([, name]) => name);
+    return { input, check, programId, existing, present, replaces, incoming };
   }
 
+  /** Nhập vào kỳ đã có cần lý do khi thay kết quả của máy đã có hoặc mở lại kỳ đã huỷ. */
+  const needsReason = (p: Prepared) => !!p.existing && (p.existing.status !== 'open' || p.replaces.length > 0);
+
   function previewEqaImport(raw: unknown): IpcResult<EqaImportPreview> {
-    const { check, existing } = prepare(raw);
+    const prepared = prepare(raw);
+    const { check, existing } = prepared;
     const counts = eqaCounts(check.rows.filter((row) => row.cls).map((row) => row.cls as EqaClass));
     return { ok: true, data: {
       round: check.round, round_errors: check.roundErrors, rows: check.rows, blocking: check.blocking,
       pairs: check.pairs.map((p) => ({ code: p.code, instrument: p.instrument, test_id: p.testId, suggestions: p.suggestions, rows: p.rows })),
-      swaps: check.swaps.map((s) => ({ instrument: s.instrument, rows: s.rows, swapped_rows: s.swappedRows, flagged: s.flagged, confirmed: s.confirmed })),
       counts: { total: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej, pt_score: counts.ptScore },
-      existing: existing ? { id: existing.id, version: existing.version, row_version: existing.row_version, status: existing.status } : null,
+      existing: existing ? {
+        id: existing.id, version: existing.version, row_version: existing.row_version, status: existing.status,
+        instruments: [...prepared.present.values()].sort((a, b) => a.localeCompare(b, 'vi')), replaces: prepared.replaces, needs_reason: needsReason(prepared),
+      } : null,
     } };
   }
 
   const importEqaRound = writeCommand(db, 'importEqaRound', 'write', (w, raw: unknown): IpcResult<EqaRoundView> => {
-    const { input, check, programId, existing } = prepare(raw);
+    const prepared = prepare(raw);
+    const { input, check, programId, existing } = prepared;
     if (check.blocking) return fail('blocking', `Còn ${check.blocking} lỗi chặn trong dữ liệu nhập. Xem trước để sửa trước khi ghi.`);
-    const swapReasons = new Map((Array.isArray(input.swaps) ? input.swaps : []).map((s) => [eqaNormalize(objectInput(s).instrument), text(objectInput(s).reason, 1000)]));
-    for (const swap of check.swaps.filter((s) => s.confirmed)) {
-      if ((swapReasons.get(eqaNormalize(swap.instrument)) ?? '').length < 10) return fail('swap-reason', `Ghi lý do đảo cột cho máy ${swap.instrument} (ít nhất 10 ký tự).`);
-    }
     const replaceReason = text(input.replaceReason, 1000);
+    const replacing = needsReason(prepared);
     if (existing) {
-      if (replaceReason.length < 10) return fail('replace-reason', 'Kỳ này đã được nhập. Ghi lý do nhập lại (ít nhất 10 ký tự); phiên bản cũ vẫn được giữ.');
+      if (replacing && replaceReason.length < 10) {
+        return fail('replace-reason', existing.status !== 'open'
+          ? 'Kỳ này đã bị huỷ. Ghi lý do nhập lại (ít nhất 10 ký tự).'
+          : `Kỳ này đã có kết quả của ${prepared.replaces.join(', ')}. Ghi lý do nhập lại (ít nhất 10 ký tự); phiên bản cũ vẫn được giữ.`);
+      }
       if (input.expectedVersion !== undefined && Number(input.expectedVersion) !== existing.row_version) return fail('stale', 'Kỳ ngoại kiểm vừa được người khác cập nhật, hãy xem trước lại.');
     }
-    const source = input.source === 'html-import' ? 'html-import' : 'excel';
+    const source = 'pdf';
     const sourceName = text(input.sourceName, 200);
     const round = check.round;
     const counts = eqaCounts(check.rows.map((row) => row.cls as EqaClass));
@@ -140,24 +172,33 @@ export function createEqaHandlers(db: Db) {
       const insert = db.prepare(`INSERT INTO eqa_results(id,round_id,version,test_id,code,instrument_label,level_label,sample,unit,result,assigned,sigma_p,z,z_provider,z_official,pct,class,
         provider_check,swapped,tolerance_pct,within_tolerance,run_date,reagent_lot,method,operator,iqc_note,peer_group,peer_json,warnings_json)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      // Giữ kết quả hiện hành của các máy không có trong lần nhập này.
+      if (existing && prepared.present.size) {
+        const previous = db.prepare('SELECT e.*, t.instrument_id FROM eqa_results e JOIN tests t ON t.id=e.test_id WHERE e.round_id=? AND e.version=?')
+          .all(existing.id, existing.version) as Record<string, unknown>[];
+        for (const old of previous) {
+          if (prepared.incoming.has(String(old.instrument_id))) continue;
+          insert.run(uid(), roundId, version, old.test_id, old.code, old.instrument_label, old.level_label, old.sample, old.unit, old.result, old.assigned, old.sigma_p,
+            old.z, old.z_provider, old.z_official, old.pct, old.class, old.provider_check, old.swapped, old.tolerance_pct, old.within_tolerance, old.run_date,
+            old.reagent_lot, old.method, old.operator, old.iqc_note, old.peer_group, old.peer_json, old.warnings_json);
+        }
+      }
       for (const row of check.rows) {
         insert.run(uid(), roundId, version, row.testId, row.code, row.instrument, row.level, row.sample, row.unit, row.result, row.assigned, row.sigmaP,
-          row.z, row.zProvider, row.zOfficial, row.pct, row.cls, row.providerCheck, row.swapped ? 1 : 0, row.tolerancePct,
+          row.z, row.zProvider, row.zOfficial, row.pct, row.cls, row.providerCheck, 0, row.tolerancePct,
           row.withinTolerance === null ? null : row.withinTolerance ? 1 : 0, row.runDate, row.reagentLot, row.method, row.operator,
           row.iqcNote, row.peerGroup, JSON.stringify(row.peer), JSON.stringify(row.warnings));
       }
       const decide = db.prepare('INSERT INTO eqa_decisions(id,round_id,type,payload_json,actor_user_id,actor_name,decided_at) VALUES (?,?,?,?,?,?,?)');
       const actorName = w.actor.name || w.actor.username;
-      decide.run(uid(), roundId, existing ? 'reimport' : 'import', JSON.stringify({
-        source, sourceName, version, rows: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej, reason: existing ? replaceReason : '',
+      const kind = !existing ? 'import' : replacing ? 'reimport' : 'append';
+      decide.run(uid(), roundId, kind, JSON.stringify({
+        source, sourceName, version, rows: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej,
+        replaces: prepared.replaces, reason: replacing ? replaceReason : '',
       }), w.actor.userId, actorName, now);
-      for (const swap of check.swaps.filter((s) => s.confirmed)) {
-        decide.run(uid(), roundId, 'column_swap', JSON.stringify({ instrument: swap.instrument, rows: swap.rows, swappedRows: swap.swappedRows, reason: swapReasons.get(eqaNormalize(swap.instrument)), version }), w.actor.userId, actorName, now);
-      }
       const label = `${round.program} · ${round.round}/${round.year}`;
-      tx.audit(existing ? 'Nhập lại kỳ ngoại kiểm' : 'Nhập kỳ ngoại kiểm',
-        `${label} · ${counts.total} kết quả (${counts.ok} ${EQA_CLASS_LABEL.ok.toLowerCase()}, ${counts.warn} cảnh báo, ${counts.rej} không chấp nhận)${existing ? ` · phiên bản ${version}: ${replaceReason}` : ''}`, label);
-      for (const swap of check.swaps.filter((s) => s.confirmed)) tx.audit('Đảo cột dữ liệu ngoại kiểm', `${label} · ${swap.instrument}: ${swapReasons.get(eqaNormalize(swap.instrument))}`, label);
+      tx.audit(kind === 'import' ? 'Nhập kỳ ngoại kiểm' : kind === 'append' ? 'Bổ sung máy vào kỳ ngoại kiểm' : 'Nhập lại kỳ ngoại kiểm',
+        `${label} · ${counts.total} kết quả (${counts.ok} ${EQA_CLASS_LABEL.ok.toLowerCase()}, ${counts.warn} cảnh báo, ${counts.rej} không chấp nhận)${existing ? ` · phiên bản ${version}` : ''}${replacing ? `: ${replaceReason}` : ''}`, label);
       tx.changed(EQA_TABLES);
     });
     return { ok: true, data: getEqaRound(roundId)! };
@@ -203,7 +244,6 @@ export function createEqaHandlers(db: Db) {
     return {
       ...(row as unknown as EqaRoundRow),
       total: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej, pt_score: counts.ptScore,
-      swapped_rows: results.filter((r) => r.swapped).length,
       instruments: [...new Set(results.map((r) => r.instrument_name))].sort((a, b) => a.localeCompare(b, 'vi')),
     };
   }

@@ -15,9 +15,9 @@ export const EQA_DEFAULT_CONFIG: EqaConfig = { zWarn: 2, zReject: 3, ptMin: 70 }
 export const EQA_PROVIDER_Z_TOLERANCE = 0.02;
 
 export type EqaClass = 'ok' | 'warn' | 'rej';
-/** `match` khớp; `swapped` trùng độ lớn nhưng ngược dấu (đảo cột kết quả với
- * giá trị ấn định); `mismatch` lệch khác; `none` không có z nhà cung cấp hoặc
- * cả hai gần 0 nên không phân biệt được chiều. */
+/** `match` khớp; `swapped` trùng độ lớn nhưng ngược dấu (kết quả và giá trị
+ * ấn định bị đọc đổi chỗ); `mismatch` lệch khác; `none` không có z nhà cung
+ * cấp hoặc cả hai gần 0 nên không phân biệt được chiều. */
 export type EqaProviderCheck = 'match' | 'swapped' | 'mismatch' | 'none';
 
 export const EQA_CLASS_LABEL: Readonly<Record<EqaClass, string>> = { ok: 'Chấp nhận', warn: 'Cảnh báo', rej: 'Không chấp nhận' };
@@ -62,14 +62,6 @@ export function eqaProviderCheck(z: number | null, zProvider: number | null, tol
   return 'mismatch';
 }
 
-/** Một máy bị coi là đảo cột cả lô dữ liệu khi quá nửa số dòng phân biệt được
- * chiều (có z nhà cung cấp, không gần 0) có z ngược dấu nhà cung cấp. */
-export function eqaInstrumentSwapped(checks: readonly EqaProviderCheck[]): boolean {
-  const decisive = checks.filter((check) => check !== 'none');
-  const swapped = decisive.filter((check) => check === 'swapped').length;
-  return decisive.length > 0 && swapped * 2 > decisive.length;
-}
-
 export interface EqaPeerComparison { level: EqaPeerLevel; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
 
 /** SDI và % lệch của kết quả PXN so với trung bình từng nhóm đồng đẳng. */
@@ -95,12 +87,12 @@ export function eqaCounts(classes: readonly EqaClass[]): EqaCounts {
 /** Bỏ dấu, chữ thường, chỉ giữ chữ và số — để so mã thông số/máy của chương
  * trình với danh mục mà không phụ thuộc cách viết. */
 export function eqaNormalize(value: unknown): string {
-  return String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 /** Các từ của một mã thông số: "ALT(GPT)" → alt, gpt. */
 function tokensOf(value: unknown): string[] {
-  return String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 }
 
 export interface EqaCatalogTest {

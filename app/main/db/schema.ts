@@ -443,7 +443,7 @@ CREATE TABLE IF NOT EXISTS eqa_rounds (
   report_date TEXT NOT NULL DEFAULT '',
   assigned_level TEXT NOT NULL DEFAULT '',
   entered_by TEXT NOT NULL DEFAULT '',
-  source TEXT NOT NULL DEFAULT 'excel',
+  source TEXT NOT NULL DEFAULT 'pdf',
   source_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'open',
   version INTEGER NOT NULL DEFAULT 1,
@@ -471,6 +471,7 @@ CREATE TABLE IF NOT EXISTS eqa_results (
   pct REAL,
   class TEXT NOT NULL,
   provider_check TEXT NOT NULL DEFAULT 'none',
+  -- Cờ của luồng nhập Excel đã bỏ (đảo cột khi nhập); bản ghi mới luôn 0.
   swapped INTEGER NOT NULL DEFAULT 0,
   tolerance_pct REAL,
   within_tolerance INTEGER,
@@ -485,7 +486,7 @@ CREATE TABLE IF NOT EXISTS eqa_results (
 );
 CREATE INDEX IF NOT EXISTS idx_eqa_results_round ON eqa_results(round_id, version);
 CREATE INDEX IF NOT EXISTS idx_eqa_results_test ON eqa_results(test_id);
--- Quyết định append-only của kỳ: nhập, nhập lại, xác nhận đảo cột, huỷ.
+-- Quyết định append-only của kỳ: nhập, bổ sung máy, nhập lại, huỷ.
 CREATE TABLE IF NOT EXISTS eqa_decisions (
   id TEXT PRIMARY KEY,
   round_id TEXT NOT NULL REFERENCES eqa_rounds(id),
