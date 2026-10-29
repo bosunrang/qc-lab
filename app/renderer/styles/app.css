@@ -200,7 +200,7 @@ label.field>span:first-child{display:block;margin-bottom:var(--field-label-gap);
    Cùng một hình dạng: cao tối thiểu `--badge-h`, chữ 12px đậm, bo tròn.
    CSS trang chỉ chỉnh bố cục quanh badge (margin, max-width, white-space,
    căn giữa), không đổi kích thước, chữ hay màu. */
-.tag,.pill{box-sizing:border-box;display:inline-flex;align-items:center;min-height:var(--badge-h);padding:var(--space-0-5) var(--space-2);border:1px solid transparent;border-radius:var(--radius-full);font-family:var(--font-sans);font-size:var(--text-xs);font-weight:var(--weight-bold);line-height:var(--leading-snug);letter-spacing:0;white-space:nowrap;font-variant-numeric:tabular-nums;vertical-align:middle;}
+.tag,.pill{box-sizing:border-box;display:inline-flex;align-items:center;min-height:var(--badge-h);padding:var(--space-0-5) var(--space-2);border:1px solid transparent;border-radius:var(--radius-full);font-family:var(--font-sans);font-size:var(--text-xs);font-weight:var(--weight-bold);line-height:var(--leading-none);letter-spacing:0;white-space:nowrap;font-variant-numeric:tabular-nums;vertical-align:middle;}
 .tag.ok{color:var(--success-text);background:var(--success-surface);border-color:var(--success-border);}
 .tag.warn{color:var(--warning-text);background:var(--warning-surface);border-color:var(--warning-border);}
 .tag.rej{color:var(--danger-text);background:var(--danger-surface);border-color:var(--danger-border);}

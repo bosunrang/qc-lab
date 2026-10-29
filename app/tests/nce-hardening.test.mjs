@@ -254,7 +254,7 @@ test('NCE-H09: lưu phạm vi và diễn biến có lịch sử, migration schem
   const stored = nce.getNce(view.record.id, admin);
   assert.equal(stored.record.description, view.record.description);
   assert.equal(stored.record.containment_note, '');
-  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '5');
+  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '7');
 });
 
 test('NCE-H10: cảnh báo mức vận hành thiếu không bị trình bày như đã đủ mức theo SOP', () => {

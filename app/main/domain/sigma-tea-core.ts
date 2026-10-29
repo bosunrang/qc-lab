@@ -3,7 +3,8 @@
  * kiểu dữ liệu ứng dụng. */
 export type SigmaTeaSourceCore = 'lab' | 'eflm' | 'clia' | 'ricos';
 export type TeaCatalogCore = { id: string; name: string; abbr: string; aliases?: readonly string[]; unit: string; section?: string; clia: number | null; ricos: number | null; cliaAbsolute?: number; cliaAbsoluteUnit?: string };
-export type TeaRefCore = { name: string; analyte_id?: string; aliases_json?: string; lab: number | null; lab_source: string; clia?: number | null; ricos?: number | null; clia_rule?: string; clia_absolute?: number | null; clia_absolute_unit?: string };
+export type TeaRefLevelDefaultCore = { level: number; tea: number };
+export type TeaRefCore = { name: string; analyte_id?: string; aliases_json?: string; lab: number | null; lab_source: string; lab_level_defaults?: readonly TeaRefLevelDefaultCore[]; clia?: number | null; ricos?: number | null; clia_rule?: string; clia_absolute?: number | null; clia_absolute_unit?: string };
 export type TeaTestCore = {
   name: string; tea_ref_key: string; unit: string; tea: number;
   /** Cổng truy vết EFLM: `tea` là một ô nhập tay dùng chung, nên nó CHỈ được
@@ -51,24 +52,49 @@ function catalogAliases(item: TeaCatalogCore): string[] {
 }
 
 export function findCatalog<T extends TeaCatalogCore>(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, catalog: readonly T[]): T | null {
-  const wanted = key(test.tea_ref_key || test.name);
-  if (!wanted) return null;
-  return catalog.find((item) => catalogAliases(item).some((value) => key(value) === wanted)) || null;
+  // Ưu tiên khoá đã gán; nếu khoá của dữ liệu cũ không còn hợp lệ thì thử
+  // lại bằng tên hiển thị. Cả hai nhánh vẫn khớp TUYỆT ĐỐI với alias catalog,
+  // không nới thành so gần đúng.
+  const wanted = [test.tea_ref_key, test.name].map(key).filter(Boolean);
+  for (const candidate of wanted) {
+    const found = catalog.find((item) => catalogAliases(item).some((value) => key(value) === candidate));
+    if (found) return found;
+  }
+  return null;
 }
 
 /** `catalogId` là dòng danh mục đã tra được cho xét nghiệm này. Cần nó vì hồ
  * sơ TEa PXN của một analyte CÓ SẴN được lưu với `analyte_id` của danh mục và
  * `name` là tên danh mục ("Sodium"), trong khi xét nghiệm mang tên app tự sinh
  * ("Sodium (Na)") — so tên trần thì không bao giờ gặp nhau. */
-function findRef(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalogId?: string): TeaRefCore | null {
-  const wanted = key(test.tea_ref_key || test.name);
-  const keys = new Set([wanted, catalogId ? key(catalogId) : ''].filter(Boolean));
-  return refs.find((ref) => [ref.analyte_id || '', ref.name, ...aliasesOf(ref)].some((value) => keys.has(key(value)))) || null;
+function findRefs(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalog?: TeaCatalogCore | null): TeaRefCore[] {
+  // Hồ sơ tạo bởi các bản cũ chưa có `analyte_id`, chỉ lưu tên danh mục.
+  // Khi đã tra được catalog, nhận mọi alias CHÍNH XÁC của đúng dòng đó để
+  // tương thích dữ liệu cũ; vẫn không ghép tiền tố hay đoán tên gần giống.
+  const keys = new Set([test.tea_ref_key, test.name, ...(catalog ? catalogAliases(catalog) : [])].map(key).filter(Boolean));
+  return refs.filter((ref) => [ref.analyte_id || '', ref.name, ...aliasesOf(ref)].some((value) => keys.has(key(value))));
 }
 
-export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], source: SigmaTeaSourceCore, targetMean?: number | null): ResolvedTeaCore<T> {
+/** Hồ sơ TEa PXN có dữ liệu (TEa chung hoặc theo mức) trong các hồ sơ khớp. */
+function pickLabRef(refs: readonly TeaRefCore[]): TeaRefCore | null {
+  return refs.find((item) => item.lab != null || !!item.lab_level_defaults?.length) || null;
+}
+
+/** TEa PXN khai riêng theo số mức QC của analyte mà xét nghiệm này khớp. Lớp
+ * trình bày dùng để nói rõ "theo mức QC" thay vì chỉ in TEa chung. */
+export function labLevelTeas(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): readonly TeaRefLevelDefaultCore[] {
   const catalog = findCatalog(test, catalogRows);
-  const ref = findRef(test, refs, catalog?.id);
+  return pickLabRef(findRefs(test, refs, catalog))?.lab_level_defaults || [];
+}
+
+function findRef(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalog?: TeaCatalogCore | null): TeaRefCore | null {
+  return findRefs(test, refs, catalog)[0] || null;
+}
+
+export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], source: SigmaTeaSourceCore, targetMean?: number | null, level?: number | null): ResolvedTeaCore<T> {
+  const catalog = findCatalog(test, catalogRows);
+  const matchingRefs = findRefs(test, refs, catalog);
+  let ref = findRef(test, refs, catalog);
   if (source === 'eflm') {
     const hasTrace = test.tea_source === 'eflm' || !!(test.eflm_analyte || test.eflm_ref || test.eflm_lookup_date);
     const value = Number(test.eflm_tea === undefined ? test.tea : test.eflm_tea);
@@ -80,9 +106,15 @@ export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: re
     };
   }
   if (source === 'lab') {
-    const value = Number(ref?.lab);
+    ref = pickLabRef(matchingRefs) || ref;
+    // TEa riêng của đúng số mức QC thắng TEa chung; mức chưa khai riêng mới
+    // rơi về TEa chung, không bao giờ mượn giá trị của mức khác.
+    const levelTea = Number.isInteger(level) ? ref?.lab_level_defaults?.find((item) => item.level === level) : undefined;
+    const value = Number(levelTea?.tea ?? ref?.lab);
     return { value: Number.isFinite(value) && value > 0 ? value : null, criterion: ref?.lab_source || 'Hồ sơ TEa chuẩn hóa của phòng xét nghiệm', catalog, note: null, criterionDetail: null };
   }
+  if (source === 'ricos') ref = matchingRefs.find((item) => item.ricos != null) || ref;
+  if (source === 'clia') ref = matchingRefs.find((item) => item.clia != null || item.clia_absolute != null || !!item.clia_rule) || ref;
   const percent = Number(source === 'clia' ? (ref?.clia ?? catalog?.clia) : (ref?.ricos ?? catalog?.ricos));
   if (source === 'ricos') return { value: Number.isFinite(percent) && percent > 0 ? percent : null, criterion: 'Ricos / Westgard biological variation', catalog, note: null, criterionDetail: null };
   // Hồ sơ PXN có thể ghi đè cả quy tắc/giới hạn tuyệt đối CLIA. Catalog tích

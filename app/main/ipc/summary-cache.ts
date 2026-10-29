@@ -19,7 +19,7 @@ export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points'
  * `listTestSummaries` và các hàm nó gọi). Bảng không có ở đây và cũng không ở
  * nhóm theo xét nghiệm — kể cả bảng mới thêm sau này — làm bỏ toàn bộ. */
 export const SUMMARY_IGNORED_TABLES: ReadonlySet<string> = new Set([
-  'activity', 'users', 'lab', 'tea_refs', 'reagent_tests', 'report_templates',
+  'activity', 'users', 'lab', 'tea_refs', 'tea_ref_level_defaults', 'reagent_tests', 'report_templates',
   'period_locks', 'sigma_data', 'planned_targets', 'lot_transitions',
   // Tóm tắt chỉ đọc mốc cắt `nce_cuts`; nội dung hồ sơ NCE không đổi kết quả Westgard.
   'nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions',

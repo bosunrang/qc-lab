@@ -192,7 +192,12 @@ export function createSigmaHandlers(db: Db) {
     const test = db.prepare('SELECT name,tea_ref_key,unit,tea,tea_source,eflm_tea,eflm_analyte,eflm_ref,eflm_lookup_date FROM tests WHERE id=?').get(testId) as
       { name: string; tea_ref_key: string; unit: string; tea: number | null; tea_source: string; eflm_tea: number | null; eflm_analyte: string; eflm_ref: string; eflm_lookup_date: string } | undefined;
     if (!test) return { bySource: () => null, basis: (): TeaBasis | undefined => undefined, currentSource: '' };
-    const refs = db.prepare('SELECT name,analyte_id,aliases_json,lab,lab_source,clia,ricos,clia_rule,clia_absolute,clia_absolute_unit FROM tea_refs').all() as TeaRefCore[];
+    const refs = db.prepare('SELECT id,name,analyte_id,aliases_json,lab,lab_source,clia,ricos,clia_rule,clia_absolute,clia_absolute_unit FROM tea_refs').all() as (TeaRefCore & { id: string })[];
+    const levelDefaults = db.prepare('SELECT tea_ref_id,level,tea FROM tea_ref_level_defaults').all() as
+      { tea_ref_id: string; level: number; tea: number }[];
+    for (const ref of refs) {
+      ref.lab_level_defaults = levelDefaults.filter((item) => item.tea_ref_id === ref.id);
+    }
     const means = new Map<number, number | null>(
       (db.prepare('SELECT level,mean FROM test_levels WHERE test_id=?').all(testId) as { level: number; mean: number | null }[])
         .map((row) => [row.level, row.mean]),
@@ -206,7 +211,7 @@ export function createSigmaHandlers(db: Db) {
       const source = rawSource.toLowerCase();
       if (!TEA_SOURCES.has(source)) return undefined;
       const mean = targetMean ?? means.get(level) ?? null;
-      const { value, criterion, criterionDetail } = resolveTea(shape, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE, source as SigmaTeaSourceCore, mean);
+      const { value, criterion, criterionDetail } = resolveTea(shape, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE, source as SigmaTeaSourceCore, mean, level);
       const reference = source === 'eflm' ? [shape.eflm_analyte, shape.eflm_ref, shape.eflm_lookup_date].filter(Boolean).join(' · ') : '';
       return { value, criterion, criterionDetail, source, reference, capturedAt: new Date().toISOString() };
     };

@@ -338,3 +338,26 @@ bậc dự phòng (SG17).
 Đây là rà soát mã kèm tái hiện bằng handler/hàm đã build, **không** phải thẩm
 định lâm sàng, không phải đánh giá ISO/CLSI từng điều khoản, và không xác nhận
 độ đúng của danh mục TEa. Không có thay đổi sản phẩm nào trong báo cáo này.
+
+---
+
+## Quyết định bổ sung 29/10/2026 — TEa chuẩn hóa theo mức QC
+
+- Hồ sơ TEa của phòng xét nghiệm được phép khai một **TEa chung** và/hoặc TEa
+  riêng theo **số mức QC của analyte** (M1, M2, M3…). M1 và M2 được chọn sẵn
+  khi tạo hồ sơ; người dùng có thể bật thêm M3–M6. Việc khai TEa không phụ
+  thuộc việc đã tạo xét nghiệm hay máy ở Danh mục xét nghiệm.
+- Khi tính Sigma, TEa của đúng số mức được ưu tiên cho mọi cấu hình xét nghiệm
+  khớp analyte; mức chưa khai riêng mới rơi về TEa chung. Tuyệt đối không mượn
+  TEa của một số mức khác.
+- Kỳ Sigma mới chụp TEa đã giải theo từng mức như trước. Snapshot số thật của
+  kỳ lịch sử vẫn thắng cấu hình hiện hành, nên thay đổi hồ sơ không viết lại
+  kết quả đã chốt.
+- Dữ liệu theo mức nằm ở `tea_ref_level_defaults` (schema 6); `tea_refs.lab`
+  là TEa chung dự phòng. Bảng `tea_ref_levels` (TEa theo cặp xét nghiệm–máy)
+  chỉ có trong bản phát triển, chưa phát hành, nên bị bỏ hẳn ở schema 7 thay
+  vì giữ lớp tương thích.
+- Nhật ký "Thiết lập/Cập nhật TEa chuẩn hóa" ghi giá trị từng mức trước → sau
+  (vd `M1 8.5%, M2 9.5% → M1 9%, M2 9.5%`); lưu lại y nguyên không ghi nhật ký.
+- Trang Six Sigma chỉ báo "theo mức QC" khi chính hồ sơ khớp xét nghiệm đang
+  xem có TEa theo mức, kèm giá trị từng mức và TEa chung cho mức còn lại.

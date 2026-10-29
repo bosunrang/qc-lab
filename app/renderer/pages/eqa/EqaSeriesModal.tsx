@@ -40,7 +40,7 @@ export function EqaSeriesModal({ testId, onClose }: { testId: string; onClose: (
             <div className="chart-scroll"><QcChart mode="lj" points={points} height={260} /></div>
             <p className="eqa-note">Trục dọc là z của nhà cung cấp; dải ±2 cảnh báo, ±3 không chấp nhận. Điểm J: 0/2/4/8 theo |z| &lt; 1 / &lt; 2 / &lt; 3 / ≥ 3, cộng dồn cùng dấu, đổi dấu thì đặt lại, báo khi |J| ≥ {view.j_limit}.</p>
             <div className="eqa-table-wrap">
-              <table className="eqa-table">
+              <table className="eqa-table eqa-center-rest">
                 <thead><tr><th>Đợt</th><th>Mẫu</th><th>Ngày báo cáo</th><th className="num">z</th><th className="num">% lệch</th><th>Đánh giá</th><th className="num">J</th><th>Tín hiệu</th></tr></thead>
                 <tbody>
                   {[...view.points].reverse().map((p) => (

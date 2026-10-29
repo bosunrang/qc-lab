@@ -173,15 +173,37 @@ const teaMissing = h.saveTeaRef({ data: { name: 'Glucose' } }, actor);
 assert.equal(teaMissing.ok, false);
 assert.equal(teaMissing.error.code, 'invalid-value');
 
-const tea = h.saveTeaRef({
-  data: {
-    name: 'Glucose', labValue: 10, labSource: 'regulation', reference: 'CLIA 2024 final rule',
-    reason: 'Áp dụng theo quy định mới nhất của CLIA', effectiveDate: '2026-01-01',
-    approvedDate: '2025-12-15', nextReviewDate: '2027-01-01', preparedBy: 'KTV A', approvedBy: 'Trưởng khoa B',
-  },
-}, actor);
+const teaData = {
+  analyteId: 'qclab-glucose', name: 'Glucose', labValue: 10,
+  levelValues: [{ level: 1, tea: 8.5 }, { level: 2, tea: 9.5 }],
+  labSource: 'regulation', reference: 'CLIA 2024 final rule',
+  reason: 'Áp dụng theo quy định mới nhất của CLIA', effectiveDate: '2026-01-01',
+  approvedDate: '2025-12-15', nextReviewDate: '2027-01-01', preparedBy: 'KTV A', approvedBy: 'Trưởng khoa B',
+};
+const tea = h.saveTeaRef({ data: teaData }, actor);
 assert.equal(tea.ok, true);
 assert.equal(tea.data.lab, 10);
+assert.deepEqual(tea.data.lab_level_defaults, [{ level: 1, tea: 8.5 }, { level: 2, tea: 9.5 }]);
+assert.equal(h.listTeaRefs().length, 1);
+assert.equal(h.listTeaRefs()[0].lab_level_defaults[0].tea, 8.5, 'listTeaRefs phải trả TEa theo mức độc lập với test–máy');
+
+// Nhật ký phải ghi giá trị từng mức trước → sau, không chỉ đếm số mức.
+const lastAudit = () => db.prepare('SELECT type, detail FROM activity ORDER BY seq DESC LIMIT 1').get();
+const teaAuditCount = () => db.prepare("SELECT COUNT(*) n FROM activity WHERE type LIKE '%TEa chuẩn hóa%'").get().n;
+const teaUpdated = h.saveTeaRef({ id: tea.data.id, data: { ...teaData, levelValues: [{ level: 1, tea: 9 }, { level: 2, tea: 9.5 }] } }, actor);
+assert.equal(teaUpdated.ok, true);
+assert.match(lastAudit().detail, /Theo mức M1 8\.5%, M2 9\.5% → M1 9%, M2 9\.5%/);
+
+// Lưu lại y nguyên: không ghi nhật ký mới.
+const auditsBefore = teaAuditCount();
+const teaSame = h.saveTeaRef({ id: tea.data.id, data: { ...teaData, levelValues: [{ level: 2, tea: 9.5 }, { level: 1, tea: 9 }] } }, actor);
+assert.equal(teaSame.ok, true);
+assert.equal(teaAuditCount(), auditsBefore, 'lưu lại đúng giá trị cũ phải là noChange');
+
+// Thêm hồ sơ mới cho analyte đã có dòng thì cập nhật đúng dòng đó, không nhân đôi.
+const teaByAnalyte = h.saveTeaRef({ data: { ...teaData, labValue: 11 } }, actor);
+assert.equal(teaByAnalyte.ok, true);
+assert.equal(teaByAnalyte.data.id, tea.data.id);
 assert.equal(h.listTeaRefs().length, 1);
 
 const teaRemoved = h.removeTeaRef({ id: tea.data.id }, actor);

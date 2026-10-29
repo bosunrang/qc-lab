@@ -15,8 +15,33 @@ import { quoteIdent } from '../db/sql-ident';
 export function createTeaRefHandlers(db: Db) {
 
   // ---- Bảng TEa tham chiếu ----
-  function listTeaRefs() {
-    return db.prepare('SELECT * FROM tea_refs ORDER BY name').all();
+  function levelTeasOf(teaRefId: string): { level: number; tea: number }[] {
+    return db.prepare('SELECT level,tea FROM tea_ref_level_defaults WHERE tea_ref_id=? ORDER BY level').all(teaRefId) as { level: number; tea: number }[];
+  }
+
+  function attachLabLevels(rows: Record<string, unknown>[]): TeaRef[] {
+    const defaults = db.prepare('SELECT tea_ref_id,level,tea FROM tea_ref_level_defaults ORDER BY level').all() as
+      { tea_ref_id: string; level: number; tea: number }[];
+    return rows.map((row) => ({
+      ...row,
+      lab_level_defaults: defaults.filter((item) => item.tea_ref_id === row.id)
+        .map(({ level, tea }) => ({ level, tea })),
+    })) as unknown as TeaRef[];
+  }
+
+  /** "M1 3.2%, M2 4.8%" — nhật ký phải ghi đủ giá trị từng mức để truy vết
+   * được thay đổi TEa, không chỉ đếm số mức. */
+  function levelText(levels: readonly { level: number; tea: number }[]): string {
+    return levels.length ? levels.map((item) => `M${item.level} ${item.tea}%`).join(', ') : '—';
+  }
+
+  function listTeaRefs(): TeaRef[] {
+    return attachLabLevels(db.prepare('SELECT * FROM tea_refs ORDER BY name').all() as Record<string, unknown>[]);
+  }
+
+  function teaRefById(id: string): TeaRef {
+    const row = db.prepare('SELECT * FROM tea_refs WHERE id=?').get(id) as Record<string, unknown>;
+    return attachLabLevels([row])[0];
   }
 
   /** dd/mm/yyyy — audit log của hồ sơ TEa PXN đọc lại bởi người phụ trách
@@ -31,32 +56,56 @@ export function createTeaRefHandlers(db: Db) {
     const id = input.id || '';
     const result = validateTeaRef(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const { name, unit, section, labValue, labSource, reference, reason, effectiveDate, approvedDate, nextReviewDate, preparedBy, approvedBy } = result.data;
+    const { analyteId, name, unit, section, labValue, levelValues, labSource, reference, reason, effectiveDate, approvedDate, nextReviewDate, preparedBy, approvedBy } = result.data;
+    const levels = [...levelValues].sort((left, right) => left.level - right.level);
     const sourcesJson = JSON.stringify({ reference, reason, effectiveDate, approvedDate, approvedBy });
     const sourceLabel = TEA_LAB_SOURCE_LABELS[labSource] || labSource;
-    const detailOf = (before: number | null) =>
-      `${name} · ${before ?? '—'}% → ${labValue}% · ${sourceLabel} · ${reference} · Hiệu lực ${dmy(effectiveDate)}`
+    const detailOf = (before: number | null, beforeLevels: readonly { level: number; tea: number }[]) =>
+      `${name} · TEa chung ${before ?? '—'}% → ${labValue ?? '—'}% · Theo mức ${levelText(beforeLevels)} → ${levelText(levels)}`
+      + ` · ${sourceLabel} · ${reference} · Hiệu lực ${dmy(effectiveDate)}`
       + ` · Xây dựng: ${preparedBy} · Phê duyệt: ${approvedBy} (${dmy(approvedDate)})`
       + `${nextReviewDate ? ' · Xem xét lại ' + dmy(nextReviewDate) : ''} · Lý do: ${reason}`;
-    if (id) {
-      const existing = db.prepare('SELECT id, lab FROM tea_refs WHERE id=?').get(id) as { id: string; lab: number | null } | undefined;
-      if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa cần cập nhật.' } };
+    const writeLevels = (teaRefId: string) => {
+      db.prepare('DELETE FROM tea_ref_level_defaults WHERE tea_ref_id=?').run(teaRefId);
+      const insert = db.prepare('INSERT INTO tea_ref_level_defaults(tea_ref_id,level,tea) VALUES (?,?,?)');
+      for (const item of levels) insert.run(teaRefId, item.level, item.tea);
+    };
+    type ExistingRow = { id: string; name: string; unit: string; section: string; lab: number | null; lab_source: string; lab_prepared_by: string; lab_next_review_date: string; sources_json: string };
+    const existingSql = 'SELECT id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json FROM tea_refs';
+    // Không có `id` mà analyte đã có dòng (vd chỉ ghi đè CLIA/Ricos) thì gắn hồ
+    // sơ vào đúng dòng đó, không tạo dòng thứ hai cho cùng analyte.
+    const existing = id
+      ? db.prepare(`${existingSql} WHERE id=?`).get(id) as ExistingRow | undefined
+      : analyteId
+        ? db.prepare(`${existingSql} WHERE analyte_id=?`).get(analyteId) as ExistingRow | undefined
+        : undefined;
+    if (id && !existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa cần cập nhật.' } };
+    if (existing) {
+      const beforeLevels = levelTeasOf(existing.id);
+      const unchanged = existing.name === name && existing.unit === unit && existing.section === section
+        && existing.lab === labValue && existing.lab_source === labSource && existing.lab_prepared_by === preparedBy
+        && existing.lab_next_review_date === nextReviewDate && existing.sources_json === sourcesJson
+        && levelText(beforeLevels) === levelText(levels);
+      if (unchanged) return w.noChange(teaRefById(existing.id));
+      const isNew = existing.lab == null && beforeLevels.length === 0;
       const saved = w.commit((tx) => {
         db.prepare(`UPDATE tea_refs SET name=?,unit=?,section=?,lab=?,lab_source=?,lab_prepared_by=?,lab_next_review_date=?,sources_json=? WHERE id=?`)
-          .run(name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson, id);
-        tx.audit(existing.lab == null ? 'Thiết lập TEa chuẩn hóa' : 'Cập nhật TEa chuẩn hóa', detailOf(existing.lab), name);
-        tx.changed(['tea_refs']);
-        return db.prepare('SELECT * FROM tea_refs WHERE id=?').get(id);
+          .run(name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson, existing.id);
+        writeLevels(existing.id);
+        tx.audit(isNew ? 'Thiết lập TEa chuẩn hóa' : 'Cập nhật TEa chuẩn hóa', detailOf(existing.lab, beforeLevels), name);
+        tx.changed(['tea_refs', 'tea_ref_level_defaults']);
+        return teaRefById(existing.id);
       });
       return { ok: true, data: saved };
     }
     const newId = cleanId(uid());
     const saved = w.commit((tx) => {
-      db.prepare(`INSERT INTO tea_refs(id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json)
-        VALUES (?,?,?,?,?,?,?,?,?)`).run(newId, name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson);
-      tx.audit('Thiết lập TEa chuẩn hóa', detailOf(null), name);
-      tx.changed(['tea_refs']);
-      return db.prepare('SELECT * FROM tea_refs WHERE id=?').get(newId);
+      db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`).run(newId, analyteId, name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson);
+      writeLevels(newId);
+      tx.audit('Thiết lập TEa chuẩn hóa', detailOf(null, []), name);
+      tx.changed(['tea_refs', 'tea_ref_level_defaults']);
+      return teaRefById(newId);
     });
     return { ok: true, data: saved };
   });
@@ -86,7 +135,8 @@ export function createTeaRefHandlers(db: Db) {
         db.prepare(`UPDATE tea_refs SET ${quoteIdent(field)}=? WHERE id=?`).run(value, existing.id);
         const after = db.prepare('SELECT clia, ricos, lab, clia_absolute FROM tea_refs WHERE id=?').get(existing.id) as
           { clia: number | null; ricos: number | null; lab: number | null; clia_absolute: number | null };
-        if (after.clia == null && after.ricos == null && after.lab == null && after.clia_absolute == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
+        const hasLevelTea = levelTeasOf(existing.id).length > 0;
+        if (after.clia == null && after.ricos == null && after.lab == null && after.clia_absolute == null && !hasLevelTea) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
       } else {
         const newId = cleanId(uid());
         db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,${quoteIdent(field)}) VALUES (?,?,?,?,?,?)`)
@@ -138,7 +188,8 @@ export function createTeaRefHandlers(db: Db) {
       { id: string; name: string; lab: number | null } | undefined;
     if (!existing) return w.noChange({ analyteId });
     w.commit((tx) => {
-      if (existing.lab == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
+      const hasLevelTea = levelTeasOf(existing.id).length > 0;
+      if (existing.lab == null && !hasLevelTea) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
       else db.prepare('UPDATE tea_refs SET clia=NULL, ricos=NULL, clia_rule=\'\', clia_absolute=NULL, clia_absolute_unit=\'\' WHERE id=?').run(existing.id);
       tx.audit('Khôi phục TEa tham chiếu', `Bỏ ghi đè CLIA/Ricos của "${existing.name}"`, existing.name);
       tx.changed(['tea_refs']);
@@ -164,14 +215,16 @@ export function createTeaRefHandlers(db: Db) {
     const existing = db.prepare('SELECT id, name, clia, ricos, clia_absolute, abbreviation, matrix, lab FROM tea_refs WHERE id=?').get(id) as
       { id: string; name: string; clia: number | null; ricos: number | null; clia_absolute: number | null; abbreviation: string; matrix: string; lab: number | null } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa.' } };
-    if (existing.lab == null) return w.noChange({ id, removedRecord: false });
+    const levelsBefore = levelTeasOf(id);
+    if (existing.lab == null && levelsBefore.length === 0) return w.noChange({ id, removedRecord: false });
     const isCustomAnalyte = !!(existing.abbreviation || existing.matrix);
     const removedRecord = !isCustomAnalyte && existing.clia == null && existing.ricos == null && existing.clia_absolute == null;
     w.commit((tx) => {
       db.prepare(`UPDATE tea_refs SET lab=NULL, lab_source='', lab_prepared_by='', lab_next_review_date='', sources_json='{}' WHERE id=?`).run(id);
+      db.prepare('DELETE FROM tea_ref_level_defaults WHERE tea_ref_id=?').run(id);
       if (removedRecord) db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);
-      tx.audit('Xóa TEa chuẩn hóa', `${existing.name} · ${Number(existing.lab).toFixed(2)}%`, existing.name);
-      tx.changed(['tea_refs']);
+      tx.audit('Xóa TEa chuẩn hóa', `${existing.name} · TEa chung ${existing.lab == null ? '—' : `${Number(existing.lab).toFixed(2)}%`} · Theo mức ${levelText(levelsBefore)}`, existing.name);
+      tx.changed(['tea_refs', 'tea_ref_level_defaults']);
     });
     return { ok: true, data: { id, removedRecord } };
   });

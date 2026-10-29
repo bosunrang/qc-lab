@@ -19,6 +19,8 @@ test('CSDL mới: chạy đủ mọi bước, ghi đúng phiên bản, có dòng
   assert.ok(SCHEMA_VERSION >= 2);
   assert.equal(readSchemaVersion(db), SCHEMA_VERSION);
   assert.ok(columns(db, 'tests').includes('eflm_tea'), 'cột chỉ thêm bằng migration cũng có ở CSDL mới');
+  assert.ok(columns(db, 'tea_ref_level_defaults').includes('tea'), 'phải có TEa theo số mức QC của analyte');
+  assert.deepEqual(columns(db, 'tea_ref_levels'), [], 'bảng TEa theo xét nghiệm–máy của bản phát triển đã bỏ');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM lab WHERE id=1').get().n, 1);
 });
 

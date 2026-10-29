@@ -22,7 +22,7 @@ import { exportSigmaReportXlsx } from '../lib/sigma-summary-export';
 import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib/sigma-print-report';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
-import { resolveSigmaTea, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
+import { resolveSigmaTea, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
 import { governingSigmaLevel } from '../lib/sigma-workflow';
 import { AddSigmaPeriodModal } from './sigma/AddSigmaPeriodModal';
 import { BiasModal } from './sigma/BiasModal';
@@ -102,8 +102,14 @@ export function SigmaPage() {
     if (test?.tea_source && TEA_SOURCES.some((source) => source.value === test.tea_source)) setTeaSource(test.tea_source);
     else setTeaSource('lab');
   }, [test?.id, test?.tea_source]);
+  // Chỉ xét hồ sơ TEa PXN khớp ĐÚNG xét nghiệm đang xem, không phải cả bảng.
+  const labTeaByLevel = useMemo(() => test ? sigmaLabLevelTeas(test, teaRefs) : [], [test, teaRefs]);
   const teaSourceValueText = (source: string): string => {
     if (!test) return 'chưa có';
+    if (source === 'lab' && labTeaByLevel.length) {
+      const common = teaCriterionText(resolveSigmaTea(test, teaRefs, 'lab', sourceTargetMean));
+      return `theo mức QC (${labTeaByLevel.map((item) => `M${item.level} ${item.tea.toFixed(2)}%`).join(' · ')}; mức khác: ${common})`;
+    }
     return teaCriterionText(resolveSigmaTea(test, teaRefs, source as SigmaTeaSource, sourceTargetMean));
   };
   // Câu nhắc của nguồn CLIA phải nói rõ TEa% được giải RIÊNG tại Mean của
@@ -112,7 +118,7 @@ export function SigmaPage() {
   // Thiếu TEa là nguyên nhân phổ biến nhất làm Sigma không tính được, mà bản
   // thân dòng "TEa đang dùng: chưa có" không nói phải làm gì để có. Nói luôn
   // hai đường xử lý: đổi nguồn, hoặc tạo hồ sơ TEa PXN ở Cấu hình chung.
-  const teaMissingHint = teaResolution?.value == null
+  const teaMissingHint = teaResolution?.value == null && !(teaSource === 'lab' && labTeaByLevel.length)
     ? ' Chưa có TEa thì KHÔNG tính được Sigma dù đã nhập đủ CV và Bias. Cách xử lý: đổi “Nguồn TEa” sang CLIA/Ricos/EFLM (xét nghiệm phải được gán analyte trong Bảng TEa tham chiếu), hoặc tạo hồ sơ TEa chuẩn hóa của phòng xét nghiệm ở Cấu hình chung → Bảng TEa tham chiếu.'
     : '';
   const teaHint = teaSource === 'clia'
@@ -122,7 +128,7 @@ export function SigmaPage() {
   const configuredTeaSource = teaSource;
   const targetMeanForLevel = (levelNumber: number) => (levelsByTestId[testId] || []).find((level) => level.level === levelNumber)?.mean ?? null;
   const teaForLevel = (levelNumber: number) => {
-    return test ? resolveSigmaTea(test, teaRefs, teaSource as SigmaTeaSource, targetMeanForLevel(levelNumber)).value : null;
+    return test ? resolveSigmaTea(test, teaRefs, teaSource as SigmaTeaSource, targetMeanForLevel(levelNumber), levelNumber).value : null;
   };
 
   async function saveTeaConfig(patch: { source?: string; tea?: string; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }) {

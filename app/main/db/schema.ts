@@ -11,7 +11,7 @@ import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 7;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -583,6 +583,15 @@ CREATE TABLE IF NOT EXISTS tea_refs (
   clia_absolute_unit TEXT NOT NULL DEFAULT '',
   sources_json TEXT NOT NULL DEFAULT '{}'
 );
+
+-- TEa theo SỐ MỨC QC của analyte, không phụ thuộc xét nghiệm đã được gán
+-- máy hay chưa. Đây là cấu hình người dùng quản lý trực tiếp trong hồ sơ TEa.
+CREATE TABLE IF NOT EXISTS tea_ref_level_defaults (
+  tea_ref_id TEXT NOT NULL REFERENCES tea_refs(id) ON DELETE CASCADE,
+  level INTEGER NOT NULL CHECK (level > 0),
+  tea REAL NOT NULL CHECK (tea > 0),
+  PRIMARY KEY (tea_ref_id, level)
+);
 `;
 
 function hasColumn(db: SqliteLike, table: string, column: string): boolean {
@@ -659,6 +668,21 @@ const MIGRATIONS: Migration[] = [
     // chỉ đánh dấu phiên bản để bản cũ hơn từ chối mở CSDL có dữ liệu ngoại kiểm.
     name: 'Ngoại kiểm: bảng eqa_*',
     up() { /* bảng đã tạo trong SCHEMA_SQL */ },
+  },
+  {
+    version: 6,
+    // `tea_ref_level_defaults` do SCHEMA_SQL tạo; bước này đánh dấu phiên bản
+    // để bản cũ hơn từ chối mở CSDL đã có TEa theo mức QC.
+    name: 'TEa chuẩn hóa theo số mức QC của analyte',
+    up() { /* bảng đã tạo trong SCHEMA_SQL */ },
+  },
+  {
+    version: 7,
+    // Bản phát triển từng có bảng `tea_ref_levels` (TEa theo cặp xét
+    // nghiệm–máy) nhưng chưa phát hành. Bỏ hẳn để chỉ còn một mô hình; CSDL
+    // xem trước đã lên số 7 vẫn mở được vì không hạ số phiên bản.
+    name: 'Bỏ bảng TEa theo xét nghiệm–máy của bản phát triển',
+    up(db) { db.exec('DROP TABLE IF EXISTS tea_ref_levels;'); },
   },
 ];
 

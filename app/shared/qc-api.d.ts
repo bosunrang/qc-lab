@@ -104,12 +104,20 @@ export interface LotTransition {
 export interface TeaRef {
   id: string; name: string; unit: string; section: string; lab: number | null; lab_source: string;
   lab_prepared_by: string; lab_next_review_date: string; sources_json: string;
+  /** TEa riêng theo số mức QC của analyte, áp dụng cho mọi cấu hình xét
+   * nghiệm–máy khớp analyte; mức không có ở đây dùng `lab` (TEa chung). */
+  lab_level_defaults: TeaRefLevelDefault[];
   /** `config:listTeaRefs` trả nguyên hàng `tea_refs`, nên 3 cột này cũng có
    * sẵn — khai đủ ở đây vì bảng TEa tham chiếu cần chúng: `analyte_id` khoá
    * theo analyte của danh mục tích hợp, `clia`/`ricos` là GHI ĐÈ của phòng
    * xét nghiệm lên giá trị mặc định (null = dùng mặc định). */
   analyte_id?: string; aliases_json?: string; clia?: number | null; ricos?: number | null;
   clia_rule?: 'percent' | 'absolute' | 'greater-of' | ''; clia_absolute?: number | null; clia_absolute_unit?: string;
+}
+
+export interface TeaRefLevelDefault {
+  level: number;
+  tea: number;
 }
 
 export interface RuleScopeItem {

@@ -2,14 +2,15 @@
 // tuyệt đối là nghiệp vụ lâm sàng: chỉ quy đổi khi Mean + đơn vị hợp lệ và
 // không được thay bằng nhánh Ricos một cách im lặng.
 import assert from 'node:assert/strict';
-import { findCatalog, resolveTea } from '../main/domain/sigma-tea-core.ts';
+import { findCatalog, labLevelTeas, resolveTea } from '../main/domain/sigma-tea-core.ts';
 
 const sodium = {
-  id: 't-na', name: 'Sodium', tea_ref_key: '', unit: 'mmol/L', tea: 0,
+  name: 'Sodium', tea_ref_key: '', unit: 'mmol/L', tea: 0,
 };
 const catalog = [{ id: 'qclab-sodium', name: 'Sodium', abbr: 'Na', unit: 'mmol/L', clia: null, ricos: 0.73, cliaAbsolute: 4, cliaAbsoluteUnit: 'mmol/L' }];
 
 assert.equal(findCatalog(sodium, catalog)?.id, 'qclab-sodium');
+assert.equal(findCatalog({ ...sodium, tea_ref_key: 'khoa-cu-khong-con' }, catalog)?.id, 'qclab-sodium', 'khoá cũ hỏng phải thử lại bằng tên khớp chính xác');
 const cliaAt100 = resolveTea(sodium, [], catalog, 'clia', 100);
 assert.equal(cliaAt100.value, 4, '±4 mmol/L ở Mean 100 phải thành 4%');
 assert.match(cliaAt100.criterion, /±4 mmol\/L/);
@@ -37,6 +38,20 @@ assert.equal(ricos.value, 0.73);
 
 const lab = resolveTea(sodium, [{ name: 'Sodium', lab: 2.5, lab_source: 'SOP-01' }], catalog, 'lab', 100);
 assert.equal(lab.value, 2.5);
+const labByGenericLevelRef = [{ name: 'Sodium', lab: 2.5, lab_source: 'SOP-02',
+  lab_level_defaults: [{ level: 1, tea: 6.5 }, { level: 2, tea: 7.5 }],
+}];
+assert.equal(resolveTea(sodium, labByGenericLevelRef, catalog, 'lab', 100, 1).value, 6.5, 'TEa riêng của mức phải thắng TEa chung');
+assert.equal(resolveTea(sodium, labByGenericLevelRef, catalog, 'lab', 100, 2).value, 7.5);
+assert.equal(resolveTea(sodium, labByGenericLevelRef, catalog, 'lab', 100).value, 2.5, 'không có mức thì chỉ trả TEa chung');
+assert.equal(resolveTea(sodium, labByGenericLevelRef, catalog, 'lab', 100, 3).value, 2.5, 'mức chưa khai riêng phải rơi về TEa chung');
+assert.equal(resolveTea(sodium, [{ ...labByGenericLevelRef[0], lab: null }], catalog, 'lab', 100, 3).value, null, 'không mượn TEa của mức khác');
+
+// Trang Sigma chỉ được báo "theo mức QC" khi chính xét nghiệm này khớp hồ sơ
+// có TEa theo mức — hồ sơ của analyte khác không được tính.
+const otherAnalyteRef = { name: 'Glucose', lab: 5, lab_source: 'SOP-03', lab_level_defaults: [{ level: 1, tea: 4 }] };
+assert.deepEqual(labLevelTeas(sodium, [otherAnalyteRef], catalog), []);
+assert.deepEqual(labLevelTeas(sodium, [otherAnalyteRef, ...labByGenericLevelRef], catalog).map((item) => item.level), [1, 2]);
 
 // Tên dạng `Tên (Viết tắt)` — ĐÚNG định dạng mà ô "Tên xét nghiệm" ở Cấu hình
 // chung tự sinh khi gợi ý analyte. Trước 2026-09-11 nó KHÔNG tra được analyte
@@ -54,6 +69,8 @@ assert.equal(lab.value, 2.5);
   // ("Sodium"), nên so tên trần với "Sodium (Na)" sẽ không bao giờ gặp nhau.
   const lab = resolveTea(display, [{ name: 'Sodium', analyte_id: 'qclab-sodium', lab: 2.5, lab_source: 'SOP-01' }], catalog, 'lab', 140);
   assert.equal(lab.value, 2.5, 'hồ sơ TEa PXN theo analyte_id phải khớp được xét nghiệm mang tên hiển thị');
+  const legacyLab = resolveTea(display, [{ name: 'Sodium', lab: 2.5, lab_source: 'SOP-OLD' }], catalog, 'lab', 140);
+  assert.equal(legacyLab.value, 2.5, 'hồ sơ cũ chưa có analyte_id vẫn phải khớp chính xác qua tên catalog');
 }
 
 // Bất biến không được nới: chỉ khớp tuyệt đối, không đoán theo tiền tố. TEa

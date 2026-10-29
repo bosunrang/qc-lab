@@ -1,4 +1,4 @@
-import { cleanText, finiteNumber } from './text-utils';
+import { cleanId, cleanText, finiteNumber } from './text-utils';
 
 export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 
@@ -20,15 +20,18 @@ export const TEA_LAB_SOURCE_LABELS: Record<string, string> = {
 };
 
 export interface TeaRefInput {
-  name?: unknown; unit?: unknown; section?: unknown;
+  analyteId?: unknown; name?: unknown; unit?: unknown; section?: unknown;
   labValue?: unknown; labSource?: unknown; reference?: unknown; reason?: unknown;
   effectiveDate?: unknown; approvedDate?: unknown; nextReviewDate?: unknown;
   preparedBy?: unknown; approvedBy?: unknown;
+  levelValues?: unknown;
 }
 
+export interface PreparedTeaRefLevel { level: number; tea: number }
+
 export interface PreparedTeaRef {
-  name: string; unit: string; section: string;
-  labValue: number; labSource: string; reference: string; reason: string;
+  analyteId: string; name: string; unit: string; section: string;
+  labValue: number | null; levelValues: PreparedTeaRefLevel[]; labSource: string; reference: string; reason: string;
   effectiveDate: string; approvedDate: string; nextReviewDate: string;
   preparedBy: string; approvedBy: string;
 }
@@ -37,11 +40,20 @@ export function prepareTeaRef(input: TeaRefInput = {}): PreparedTeaRef {
   const effectiveDate = cleanText(input.effectiveDate, 10).trim();
   const approvedDate = cleanText(input.approvedDate, 10).trim();
   const nextReviewDate = cleanText(input.nextReviewDate, 10).trim();
+  const rawLabValue = String(input.labValue ?? '').trim();
+  const rawLevels = Array.isArray(input.levelValues) ? input.levelValues.slice(0, 200) : [];
   return {
+    analyteId: cleanId(input.analyteId),
     name: cleanText(input.name, 200).trim(),
     unit: cleanText(input.unit, 60).trim(),
     section: cleanText(input.section, 200).trim(),
-    labValue: finiteNumber(input.labValue, NaN),
+    labValue: rawLabValue === '' ? null : finiteNumber(rawLabValue, NaN),
+    levelValues: rawLevels.map((item) => {
+      const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      // Ô bỏ trống phải thành NaN (không phải 0) để báo đúng mức còn thiếu.
+      const rawTea = String(row.tea ?? '').trim();
+      return { level: finiteNumber(row.level, NaN), tea: rawTea === '' ? NaN : finiteNumber(rawTea, NaN) };
+    }),
     labSource: cleanText(input.labSource, 200).trim(),
     reference: cleanText(input.reference, 500).trim(),
     reason: cleanText(input.reason, 1000).trim(),
@@ -59,8 +71,22 @@ export function prepareTeaRef(input: TeaRefInput = {}): PreparedTeaRef {
 export function validateTeaRef(input: TeaRefInput): ValidationResult<PreparedTeaRef> {
   const cleaned = prepareTeaRef(input);
   if (!cleaned.name) return { ok: false, code: 'missing-name', message: 'Nhập tên xét nghiệm.' };
-  if (!Number.isFinite(cleaned.labValue) || cleaned.labValue <= 0) {
-    return { ok: false, code: 'invalid-value', message: 'Giá trị TEa phải là số dương.' };
+  if (cleaned.labValue != null && (!Number.isFinite(cleaned.labValue) || cleaned.labValue <= 0)) {
+    return { ok: false, code: 'invalid-value', message: 'TEa chung phải là số dương.' };
+  }
+  const seenLevels = new Set<number>();
+  for (const row of cleaned.levelValues) {
+    if (!Number.isInteger(row.level) || row.level <= 0) {
+      return { ok: false, code: 'invalid-level-value', message: 'Mức QC của TEa theo mức không hợp lệ.' };
+    }
+    if (!Number.isFinite(row.tea) || row.tea <= 0) {
+      return { ok: false, code: 'invalid-level-value', message: `Nhập TEa mức ${row.level} là số dương, hoặc bỏ chọn mức đó.` };
+    }
+    if (seenLevels.has(row.level)) return { ok: false, code: 'duplicate-level', message: `Mức ${row.level} chỉ được khai một giá trị TEa.` };
+    seenLevels.add(row.level);
+  }
+  if (cleaned.labValue == null && !cleaned.levelValues.length) {
+    return { ok: false, code: 'invalid-value', message: 'Nhập TEa chung hoặc ít nhất một giá trị TEa theo mức QC.' };
   }
   if (!cleaned.labSource) return { ok: false, code: 'missing-source', message: 'Chọn nguồn TEa.' };
   if (!(TEA_LAB_SOURCES as readonly string[]).includes(cleaned.labSource)) {

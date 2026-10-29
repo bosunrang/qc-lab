@@ -190,9 +190,9 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
                       <Fragment key={r.id}>
                         <tr className={rowTone(r.class)}>
                           {showInstrument && <td>{r.instrument_name}</td>}
-                          <td className="eqa-test-cell"><b className="eqa-strong">{r.test_name}</b><span className="eqa-sub">{r.code}</span></td>
+                          <td className="eqa-test-cell"><b className="eqa-strong">{r.test_name}</b><span className="eqa-sub">{[r.code, r.unit].filter(Boolean).join(' · ')}</span></td>
                           {showSample && <td>{r.sample || '—'}</td>}
-                          <td className="num">{rawNum(r.result)} <span className="eqa-unit">{r.unit}</span></td>
+                          <td className="num">{rawNum(r.result)}</td>
                           <td className="num">{rawNum(r.assigned)}</td>
                           <td className="num">{rawNum(r.sigma_p)}</td>
                           <td className="num">{numText(r.z)}</td>

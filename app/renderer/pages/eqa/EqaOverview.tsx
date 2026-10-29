@@ -88,7 +88,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
               </EmptyState>
             ) : (
               <div className="eqa-table-wrap">
-                <table className="eqa-table">
+                <table className="eqa-table eqa-center-rest">
                   <thead>
                     <tr>
                       <th>Chương trình</th><th>Đợt / năm</th><th>Máy</th><th className="num">Kết quả</th>

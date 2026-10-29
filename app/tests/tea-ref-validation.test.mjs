@@ -55,6 +55,27 @@ const BASE = {
   assert.equal(ok.ok, true, JSON.stringify(ok));
   assert.equal(ok.data.name, 'Glucose');
 }
+{
+  const levelOnly = validateTeaRef({ ...BASE, labValue: '', levelValues: [{ level: 1, tea: 8.5 }] });
+  assert.equal(levelOnly.ok, true, JSON.stringify(levelOnly));
+  assert.equal(levelOnly.data.labValue, null);
+  assert.equal(levelOnly.data.levelValues[0].tea, 8.5);
+}
+{
+  const invalidLevel = validateTeaRef({ ...BASE, levelValues: [{ level: 1, tea: 0 }] });
+  assert.equal(invalidLevel.ok, false);
+  assert.equal(invalidLevel.code, 'invalid-level-value');
+  const emptyLevel = validateTeaRef({ ...BASE, levelValues: [{ level: 1, tea: 5 }, { level: 3, tea: '' }] });
+  assert.equal(emptyLevel.ok, false);
+  assert.match(emptyLevel.message, /mức 3/, 'thông báo phải chỉ rõ mức còn trống');
+}
+{
+  const duplicateLevel = validateTeaRef({ ...BASE, levelValues: [
+    { level: 1, tea: 8 }, { level: 1, tea: 9 },
+  ] });
+  assert.equal(duplicateLevel.ok, false);
+  assert.equal(duplicateLevel.code, 'duplicate-level');
+}
 
 console.log('app tea-ref-validation oracle tests passed');
 

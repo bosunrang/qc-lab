@@ -27,16 +27,18 @@
 .eqa-table-wrap{width:100%;overflow-x:auto;}
 .eqa-table{width:100%;}
 .eqa-table th{white-space:nowrap;}
-.eqa-table td{vertical-align:top;}
+.eqa-table td{vertical-align:middle;}
 .eqa-strong{display:block;color:var(--text-primary);font-weight:var(--weight-semibold);}
 .eqa-sub{display:block;margin-top:var(--space-0-5);color:var(--text-tertiary);font-size:var(--text-xs);}
-.eqa-unit{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-normal);}
 .eqa-wrap{min-width:180px;white-space:normal;overflow-wrap:anywhere;}
 .eqa-table tbody tr.is-rej td:first-child{box-shadow:inset 3px 0 0 var(--danger-accent);}
 .eqa-table tbody tr.is-warn td:first-child{box-shadow:inset 3px 0 0 var(--warning-accent);}
 .eqa-table td.num{white-space:nowrap;}
 .eqa-test-cell{min-width:200px;}
 .eqa-row-actions{display:flex;justify-content:center;gap:var(--space-1);white-space:nowrap;}
+/* Căn giữa mọi cột trừ cột đầu (tên chương trình). */
+.eqa-center-rest th:not(:first-child),.eqa-center-rest td:not(:first-child){text-align:center;}
+
 /* Bảng kết quả kỳ: căn giữa mọi cột trừ Xét nghiệm và dòng mở rộng. */
 .eqa-results-table th,.eqa-results-table td{text-align:center;}
 .eqa-results-table th.eqa-test-cell,.eqa-results-table td.eqa-test-cell,.eqa-results-table tr.eqa-detail-row>td{text-align:left;}

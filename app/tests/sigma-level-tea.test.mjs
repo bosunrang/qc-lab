@@ -93,6 +93,17 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   assert.equal(m2.tea, 10);
 }
 
+// 6) TEa chuẩn hóa theo số mức QC của analyte thắng TEa chung và không phụ
+//    thuộc cấu hình test–máy. Đây là đường đọc thật từ SQLite.
+{
+  const { db, sigma, test } = scenario({ source: 'lab', periodTea: 10 });
+  db.prepare("INSERT INTO tea_refs(id,analyte_id,name,lab,lab_source) VALUES ('lab-na','qclab-sodium','Sodium',9,'SOP-LAB')").run();
+  db.prepare("INSERT INTO tea_ref_level_defaults(tea_ref_id,level,tea) VALUES ('lab-na',1,3.2),('lab-na',2,4.8)").run();
+  const [m1, m2] = sigma.listPeriods(test.id)[0].levels;
+  assert.equal(m1.tea, 3.2);
+  assert.equal(m2.tea, 4.8);
+}
+
 // 6) Mức chưa có Mean → không được "đoán" TEa từ giới hạn tuyệt đối; rơi về
 //    `periodTea` chứ không phải bịa một con số theo Mean của mức khác.
 {
