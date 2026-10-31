@@ -8,6 +8,7 @@ import type { ActivityEntry } from '../../shared/qc-api';
 import { uid } from '../domain/text-utils';
 import { auditEntryHash } from '../domain/audit-chain';
 import { canWriteRole, isAdminRole } from '../domain/page-roles';
+import { hasUserCapability, parseUserCapabilities, QC_CONFIG_DENIED_MESSAGE } from '../domain/capabilities';
 import { withTransaction } from '../db/transaction';
 
 export interface Actor { userId: string; username: string; name: string; role: string; clientId: string }
@@ -108,6 +109,18 @@ export function requireWrite(actor: Actor): PermissionDenied | null {
 export function requireAdmin(actor: Actor): PermissionDenied | null {
   if (isAdminRole(actor.role)) return null;
   return { ok: false, error: { code: 'forbidden', message: 'Chỉ quản trị mới được thực hiện thao tác này.' } };
+}
+
+/** Cổng `qc.config` cho `writeCommand()`. `Actor` không mang capability nên
+ * đọc thẳng `users.capabilities_json` ngay lúc gọi: quyền vừa bị thu hồi có
+ * hiệu lực ở lần ghi kế tiếp, không chờ đăng nhập lại. */
+export function requireQcConfig(db: Db): (actor: Actor) => PermissionDenied | null {
+  return (actor) => {
+    if (isAdminRole(actor.role)) return null;
+    const row = db.prepare('SELECT capabilities_json FROM users WHERE id=? AND active<>0').get(actor.userId) as { capabilities_json: string } | undefined;
+    if (hasUserCapability({ role: actor.role, capabilities: parseUserCapabilities(row?.capabilities_json) }, 'qc.config')) return null;
+    return { ok: false, error: { code: 'forbidden-qc-config', message: QC_CONFIG_DENIED_MESSAGE } };
+  };
 }
 
 /** SQLite trả cột snake_case (`prev_hash`, `user_id`...) — chuyển về camelCase

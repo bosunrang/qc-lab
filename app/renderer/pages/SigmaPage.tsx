@@ -12,6 +12,7 @@ import { useSigmaStore, type SigmaLevelSaveInput } from '../store/sigma-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
+import { hasUserCapability, QC_CONFIG_DENIED_MESSAGE } from '../../main/domain/capabilities';
 import { CalcIcon, DownloadIcon, PrintIcon } from '../components/BtnIcons';
 import { RowActionButton } from '../components/RowActionButton';
 import { PageHeader } from '../components/PageHeader';
@@ -36,7 +37,11 @@ export function SigmaPage() {
   const { periods: loadedPeriods, loading, error: loadError, loadPeriods, loadCohorts, savePeriod, removePeriod, saveTeaConfig: saveTeaConfigStore } = useSigmaStore(useShallow((s) => ({ periods: s.periods, loading: s.loading, error: s.error, loadPeriods: s.loadPeriods, loadCohorts: s.loadCohorts, savePeriod: s.savePeriod, removePeriod: s.removePeriod, saveTeaConfig: s.saveTeaConfig })));
   // Vai trò chỉ-xem: vẫn đọc được bảng kỳ/Sigma/MU, không sửa được (main
   // chặn bằng requireWrite ở sigma-handlers.savePeriod).
-  const writable = canWrite(useAuthStore((s) => s.user)?.role);
+  const currentUser = useAuthStore((s) => s.user);
+  const writable = canWrite(currentUser?.role);
+  // Nguồn và giá trị TEa là tiêu chí chất lượng: main chặn bằng `qc.config`
+  // ở `sigma-handlers.saveTeaConfig`, nên KTV không có quyền này chỉ xem.
+  const teaEditable = hasUserCapability(currentUser, 'qc.config');
   const [testId, setTestId] = useState('');
   const currentTest = useRef(testId);
   currentTest.current = testId;
@@ -366,20 +371,21 @@ export function SigmaPage() {
           <div className="sg-setup-fields sg-analysis-fields">
             <div className="field sg-tea-source">
               <label>Nguồn TEa</label>
-              <select aria-label="Nguồn TEa" disabled={!writable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
+              <select aria-label="Nguồn TEa" disabled={!teaEditable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
                 {TEA_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label} · {teaSourceValueText(s.value)}</option>)}
               </select>
             </div>
             <div className="field sg-tea-input">
               <label>{teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'}</label>
-              <input key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !writable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Nhập TEa%' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
+              <input key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !teaEditable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Nhập TEa%' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
             </div>
           </div>
+          {writable && !teaEditable && <p className="hint">{QC_CONFIG_DENIED_MESSAGE}</p>}
           {teaSource === 'eflm' && test && <div className="sg-eflm-box">
-            <div className="field sg-eflm-field"><label>Xét nghiệm trên EFLM</label><input disabled={!writable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_analyte || test.name).trim()) saveTeaConfig({ eflmAnalyte: e.currentTarget.value }); }} /></div>
-            <div className="field sg-eflm-field"><label>Mức APS</label><select disabled={!writable} value={test.eflm_aps || 'desirable'} onChange={(e) => saveTeaConfig({ eflmAps: e.target.value })}><option value="minimum">minimum</option><option value="desirable">desirable</option><option value="optimum">optimum</option></select></div>
-            <div className="field sg-eflm-field"><label htmlFor="sg-eflm-lookup-date">Ngày tra cứu</label><DateField id="sg-eflm-lookup-date" value={test.eflm_lookup_date || ''} disabled={!writable} onChange={(value) => { if (value !== (test.eflm_lookup_date || '')) saveTeaConfig({ eflmLookupDate: value }); }} /></div>
-            <div className="field sg-eflm-field"><label>Link/tài liệu EFLM</label><input disabled={!writable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_ref || '').trim()) saveTeaConfig({ eflmRef: e.currentTarget.value }); }} /></div>
+            <div className="field sg-eflm-field"><label>Xét nghiệm trên EFLM</label><input disabled={!teaEditable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_analyte || test.name).trim()) saveTeaConfig({ eflmAnalyte: e.currentTarget.value }); }} /></div>
+            <div className="field sg-eflm-field"><label>Mức APS</label><select disabled={!teaEditable} value={test.eflm_aps || 'desirable'} onChange={(e) => saveTeaConfig({ eflmAps: e.target.value })}><option value="minimum">minimum</option><option value="desirable">desirable</option><option value="optimum">optimum</option></select></div>
+            <div className="field sg-eflm-field"><label htmlFor="sg-eflm-lookup-date">Ngày tra cứu</label><DateField id="sg-eflm-lookup-date" value={test.eflm_lookup_date || ''} disabled={!teaEditable} onChange={(value) => { if (value !== (test.eflm_lookup_date || '')) saveTeaConfig({ eflmLookupDate: value }); }} /></div>
+            <div className="field sg-eflm-field"><label>Link/tài liệu EFLM</label><input disabled={!teaEditable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_ref || '').trim()) saveTeaConfig({ eflmRef: e.currentTarget.value }); }} /></div>
           </div>}
           <div className="alert info sg-sigma-input-note">
             <div className="sg-sigma-note-list">

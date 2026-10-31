@@ -21,7 +21,7 @@ export const TEA_LAB_SOURCE_LABELS: Record<string, string> = {
 
 export interface TeaRefInput {
   analyteId?: unknown; name?: unknown; unit?: unknown; section?: unknown;
-  labValue?: unknown; labSource?: unknown; reference?: unknown; reason?: unknown;
+  labValue?: unknown; labSource?: unknown; reference?: unknown; sourceUrl?: unknown; reason?: unknown;
   effectiveDate?: unknown; approvedDate?: unknown; nextReviewDate?: unknown;
   preparedBy?: unknown; approvedBy?: unknown;
   levelValues?: unknown;
@@ -31,7 +31,7 @@ export interface PreparedTeaRefLevel { level: number; tea: number }
 
 export interface PreparedTeaRef {
   analyteId: string; name: string; unit: string; section: string;
-  labValue: number | null; levelValues: PreparedTeaRefLevel[]; labSource: string; reference: string; reason: string;
+  labValue: number | null; levelValues: PreparedTeaRefLevel[]; labSource: string; reference: string; sourceUrl: string; reason: string;
   effectiveDate: string; approvedDate: string; nextReviewDate: string;
   preparedBy: string; approvedBy: string;
 }
@@ -56,6 +56,7 @@ export function prepareTeaRef(input: TeaRefInput = {}): PreparedTeaRef {
     }),
     labSource: cleanText(input.labSource, 200).trim(),
     reference: cleanText(input.reference, 500).trim(),
+    sourceUrl: cleanText(input.sourceUrl, 500).trim(),
     reason: cleanText(input.reason, 1000).trim(),
     effectiveDate: DATE_RE.test(effectiveDate) ? effectiveDate : '',
     approvedDate: DATE_RE.test(approvedDate) ? approvedDate : '',
@@ -93,6 +94,15 @@ export function validateTeaRef(input: TeaRefInput): ValidationResult<PreparedTea
     return { ok: false, code: 'invalid-source', message: 'Nguồn TEa không hợp lệ.' };
   }
   if (cleaned.reference.length < 3) return { ok: false, code: 'invalid-reference', message: 'Tham chiếu cần ít nhất 3 ký tự.' };
+  // Link nguồn mở được từ app (trang Cấu hình chung) nên chỉ nhận http(s).
+  // "Nguồn khác đã thẩm định" không nằm trong danh mục chuẩn nào, nên bắt buộc
+  // có link để người xem xét mở lại đúng tài liệu đã dùng.
+  if (cleaned.sourceUrl && !/^https?:\/\/[^\s]+$/i.test(cleaned.sourceUrl)) {
+    return { ok: false, code: 'invalid-source-url', message: 'Link nguồn phải bắt đầu bằng http:// hoặc https://.' };
+  }
+  if (cleaned.labSource === 'other' && !cleaned.sourceUrl) {
+    return { ok: false, code: 'missing-source-url', message: 'Nguồn khác đã thẩm định cần có link tới tài liệu nguồn.' };
+  }
   if (cleaned.reason.length < 10) return { ok: false, code: 'invalid-reason', message: 'Lý do cần ít nhất 10 ký tự.' };
   if (!cleaned.effectiveDate || !cleaned.approvedDate) {
     return { ok: false, code: 'missing-dates', message: 'Nhập đủ ngày hiệu lực và ngày duyệt.' };

@@ -91,7 +91,6 @@ assertForbidden(config.saveInstrument({ data: { name: 'May la' } }, unknown), 'v
 // ── 3) technician: ghi được dữ liệu QC ────────────────────────────────────
 const techPoint = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-01', val: 5, runId: 'r1' } }, tech);
 assert.equal(techPoint.ok, true, 'KTV phai them duoc diem QC');
-assert.equal(westgard.saveRuleAction(test.id, '1-2s', 'alert', tech).ok, true, 'KTV phai cap nhat duoc hanh dong luat Westgard');
 assert.equal(sigma.savePeriod({ testId: test.id, period: '2026-09', tea: 10, levels: [{ level: 1, cv: 3 }] }, tech).ok, true, 'KTV phai luu duoc ky Sigma');
 assert.equal(reagent.saveMetadata({ id: comparison.id, data: { reagent: 'KTV sua ten' } }, tech).ok, true, 'KTV phai sua duoc so sanh hoa chat');
 db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-tech','ktv','Ky thuat vien','technician',1)").run();
@@ -102,6 +101,9 @@ assert.equal(techNce.ok, true, 'KTV phai lap duoc ho so NCE');
 assertForbidden(config.saveInstrument({ data: { name: 'May cua KTV' } }, tech), 'KTV saveInstrument');
 assertForbidden(config.saveTest({ data: { name: 'Test cua KTV', instrumentId: instrument.id } }, tech), 'KTV saveTest');
 assertForbidden(config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 5, sd: 0.2 } }, tech), 'KTV saveTestLevel');
+// Hành động luật quyết định lần chạy nào bị loại: cùng mức admin với phạm vi
+// luật (đánh giá tổng thể 2026-10-31, N1). Trước đó KTV đổi được qua LAN.
+assertForbidden(westgard.saveRuleAction(test.id, '1-2s', 'alert', tech), 'KTV saveRuleAction');
 assertForbidden(config.saveTeaRef({ data: { test: 'Glucose', value: 10, source: 'clia', reference: 'CLIA 2024', reason: 'Ly do du dai de qua gate', effective: '2026-01-01', prepared: 'A', approved: 'B', approvedDate: '2026-01-01' } }, tech), 'KTV saveTeaRef');
 assertForbidden(report.lockPeriod({ data: { ym: '2026-09' } }, tech), 'KTV lockPeriod');
 assertForbidden(reagent.removeComparison({ id: comparison.id }, tech), 'KTV removeReagentComparison');

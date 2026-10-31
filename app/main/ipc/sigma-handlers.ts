@@ -9,7 +9,7 @@ import { TEA_CATALOG_WITH_CLIA_ABSOLUTE } from '../domain/tea-catalog';
 import { isoLocalDate } from '../domain/local-date';
 import { sha256Hex } from '../domain/sha256';
 import { cleanId, cleanText, finiteNumber } from '../domain/text-utils';
-import { type IpcResult } from './shared';
+import { type IpcResult, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 
 const PERIOD_RE = /^\d{4}-\d{2}$/;
@@ -258,7 +258,9 @@ export function createSigmaHandlers(db: Db) {
     }));
   }
 
-  const saveTeaConfig = writeCommand(db, 'saveTeaConfig', 'write', (w, input: { testId?: unknown; source?: unknown; tea?: unknown; eflmAnalyte?: unknown; eflmAps?: unknown; eflmLookupDate?: unknown; eflmRef?: unknown }): IpcResult<Test> => {
+  /** TEa là tiêu chí chất lượng của xét nghiệm (Sigma, thiết kế QC, cổng Bias
+   * khi đổi dải) nên cần quyền `qc.config`, không phải mọi tài khoản ghi. */
+  const saveTeaConfig = writeCommand(db, 'saveTeaConfig', requireQcConfig(db), (w, input: { testId?: unknown; source?: unknown; tea?: unknown; eflmAnalyte?: unknown; eflmAps?: unknown; eflmLookupDate?: unknown; eflmRef?: unknown }): IpcResult<Test> => {
     const testId = cleanId(input?.testId), source = cleanText(input?.source, 20).trim();
     if (!TEA_SOURCES.has(source)) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
     const test = db.prepare('SELECT * FROM tests WHERE id=?').get(testId) as {
@@ -281,9 +283,13 @@ export function createSigmaHandlers(db: Db) {
     ] as const;
     const current = [test.tea_source, test.tea, test.eflm_analyte, test.eflm_aps, test.eflm_lookup_date, test.eflm_ref, test.eflm_tea];
     if (next.every((value, i) => value === current[i])) return w.noChange(test as unknown as Test);
+    // Ghi trước → sau của đúng những trường đổi, để truy được TEa đã dùng ở
+    // từng thời điểm (trước đây chỉ ghi "Nguồn eflm").
+    const fieldLabels = ['nguồn', 'TEa', 'xét nghiệm EFLM', 'mức APS', 'ngày tra EFLM', 'tài liệu EFLM', 'TEa EFLM'];
+    const changes = next.flatMap((value, i) => value === current[i] ? [] : [`${fieldLabels[i]}: ${current[i] || current[i] === 0 ? current[i] : '—'} → ${value || value === 0 ? value : '—'}`]);
     w.commit((tx) => {
       db.prepare('UPDATE tests SET tea_source=?,tea=?,eflm_analyte=?,eflm_aps=?,eflm_lookup_date=?,eflm_ref=?,eflm_tea=? WHERE id=?').run(...next, testId);
-      tx.audit('Cập nhật TEa Six Sigma', `Nguồn ${source} cho xét nghiệm "${test.name}"`, test.name);
+      tx.audit('Cập nhật TEa Six Sigma', `Xét nghiệm "${test.name}": ${changes.join('; ')}`, test.name);
       tx.changed(['tests'], [testId]);
     });
     return { ok: true, data: db.prepare('SELECT * FROM tests WHERE id=?').get(testId) as Test };

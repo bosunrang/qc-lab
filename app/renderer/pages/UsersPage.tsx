@@ -20,8 +20,10 @@ import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/p
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
 
-/** Quyền nghiệp vụ NCE cấp riêng cho KTV (main kiểm ở `domain/nce/permissions.ts`). */
-const NCE_CAPABILITY_OPTIONS: readonly [string, string][] = [
+/** Quyền nghiệp vụ cấp riêng cho KTV (danh sách mã ở `domain/capabilities.ts`;
+ * main kiểm ở `ipc/shared.ts` và `domain/nce/permissions.ts`). */
+const CAPABILITY_OPTIONS: readonly [string, string][] = [
+  ['qc.config', 'Cấu hình tiêu chí QC (lập dải Mean/SD, TEa)'],
   ['nce.release', 'Cho phép hoạt động trở lại sau sự cố'],
   ['nce.approve', 'Duyệt đóng hồ sơ NCE'],
 ];
@@ -172,7 +174,7 @@ export function UsersPage() {
                   <tr key={user.id}>
                     <td><b>{user.name || user.username}</b><div className="hint">@{user.username}{user.initials ? ` · ${user.initials}` : ''}</div></td>
                     <td>{roleLabel(user.role)}{user.role !== 'admin' && user.capabilities.length > 0 && (
-                      <div className="hint">{NCE_CAPABILITY_OPTIONS.filter(([id]) => user.capabilities.includes(id)).map(([, label]) => label).join(' · ')}</div>
+                      <div className="hint">{CAPABILITY_OPTIONS.filter(([id]) => user.capabilities.includes(id)).map(([, label]) => label).join(' · ')}</div>
                     )}</td>
                     <td>{user.active === false ? <span className="tag rej">Khóa</span> : <span className="tag ok">Hoạt động</span>}</td>
                     <td><div className="user-row-actions">
@@ -197,7 +199,7 @@ export function UsersPage() {
 function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
   const { update, setNceCapabilities } = useUsersStore(useShallow((s) => ({ update: s.update, setNceCapabilities: s.setNceCapabilities })));
   const [role, setRole] = useState<string>(user.role);
-  const [nceCaps, setNceCaps] = useState<Set<string>>(() => new Set(user.capabilities));
+  const [grantedCaps, setGrantedCaps] = useState<Set<string>>(() => new Set(user.capabilities));
   // `pagePerms` null = chưa thu hẹp → tick sẵn toàn bộ thẻ của vai trò.
   const [selected, setSelected] = useState<Set<string>>(() => new Set(user.pagePerms ?? rolePageIds(user.role)));
 
@@ -206,8 +208,8 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
     if (!pagePerms.length) { await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return; }
     const result = await update(user.id, { name: user.name, role, active: user.active, pagePerms });
     if (!result.ok) { await infoDialog(result.error.message); return; }
-    // Người chỉ xem không giữ quyền NCE: đổi sang vai trò chỉ xem thì thu luôn.
-    const caps = canWrite(role) ? [...nceCaps].sort() : [];
+    // Người chỉ xem không giữ quyền nghiệp vụ: đổi sang vai trò chỉ xem thì thu luôn.
+    const caps = canWrite(role) ? [...grantedCaps].sort() : [];
     if (caps.join(',') !== [...user.capabilities].sort().join(',')) {
       const saved = await setNceCapabilities(user.id, caps);
       if (!saved.ok) { await infoDialog(saved.error.message); return; }
@@ -229,16 +231,16 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
           onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
       </div>
       <div className="field">
-        <label id="editUserNceLabel">Quyền hồ sơ NCE</label>
+        <label id="editUserCapLabel">Quyền nghiệp vụ</label>
         {role === 'admin'
-          ? <div className="hint">Quản trị viên mặc nhiên được cho phép hoạt động trở lại và duyệt hồ sơ NCE.</div>
+          ? <div className="hint">Quản trị viên mặc nhiên có mọi quyền nghiệp vụ.</div>
           : !canWrite(role)
-            ? <div className="hint">Tài khoản chỉ xem không được cấp quyền NCE.</div>
+            ? <div className="hint">Tài khoản chỉ xem không được cấp quyền nghiệp vụ.</div>
             : (
-              <div className="user-perm-grid" role="group" aria-labelledby="editUserNceLabel">
-                {NCE_CAPABILITY_OPTIONS.map(([id, label]) => (
-                  <label key={id} className={nceCaps.has(id) ? 'selected' : ''}>
-                    <input type="checkbox" checked={nceCaps.has(id)} onChange={(e) => setNceCaps((prev) => { const next = new Set(prev); if (e.target.checked) next.add(id); else next.delete(id); return next; })} />
+              <div className="user-perm-grid" role="group" aria-labelledby="editUserCapLabel">
+                {CAPABILITY_OPTIONS.map(([id, label]) => (
+                  <label key={id} className={grantedCaps.has(id) ? 'selected' : ''}>
+                    <input type="checkbox" checked={grantedCaps.has(id)} onChange={(e) => setGrantedCaps((prev) => { const next = new Set(prev); if (e.target.checked) next.add(id); else next.delete(id); return next; })} />
                     <span>{label}</span>
                   </label>
                 ))}

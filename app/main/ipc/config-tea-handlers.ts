@@ -56,13 +56,15 @@ export function createTeaRefHandlers(db: Db) {
     const id = input.id || '';
     const result = validateTeaRef(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const { analyteId, name, unit, section, labValue, levelValues, labSource, reference, reason, effectiveDate, approvedDate, nextReviewDate, preparedBy, approvedBy } = result.data;
+    const { analyteId, name, unit, section, labValue, levelValues, labSource, reference, sourceUrl, reason, effectiveDate, approvedDate, nextReviewDate, preparedBy, approvedBy } = result.data;
     const levels = [...levelValues].sort((left, right) => left.level - right.level);
-    const sourcesJson = JSON.stringify({ reference, reason, effectiveDate, approvedDate, approvedBy });
+    // `sourceUrl` chỉ có mặt khi được nhập: hồ sơ cũ không có khoá này, và lưu
+    // lại y nguyên phải ra đúng chuỗi cũ để `noChange` vẫn nhận ra.
+    const sourcesJson = JSON.stringify({ reference, ...(sourceUrl ? { sourceUrl } : {}), reason, effectiveDate, approvedDate, approvedBy });
     const sourceLabel = TEA_LAB_SOURCE_LABELS[labSource] || labSource;
     const detailOf = (before: number | null, beforeLevels: readonly { level: number; tea: number }[]) =>
       `${name} · TEa chung ${before ?? '—'}% → ${labValue ?? '—'}% · Theo mức ${levelText(beforeLevels)} → ${levelText(levels)}`
-      + ` · ${sourceLabel} · ${reference} · Hiệu lực ${dmy(effectiveDate)}`
+      + ` · ${sourceLabel} · ${reference}${sourceUrl ? ` (${sourceUrl})` : ''} · Hiệu lực ${dmy(effectiveDate)}`
       + ` · Xây dựng: ${preparedBy} · Phê duyệt: ${approvedBy} (${dmy(approvedDate)})`
       + `${nextReviewDate ? ' · Xem xét lại ' + dmy(nextReviewDate) : ''} · Lý do: ${reason}`;
     const writeLevels = (teaRefId: string) => {

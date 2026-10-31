@@ -258,19 +258,28 @@ export function createWestgardHandlers(db: Db) {
   const { listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks } = createHistoricalWestgard(db);
 
   /** Ghi đè riêng cho một xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
-   * hình chung. */
-  const saveRuleAction = writeCommand(db, 'saveRuleAction', 'write', (w, testId: string, ruleId: string, value: RuleAction | ''): IpcResult<{ ruleId: string; action: RuleAction | '' }> => {
+   * hình chung.
+   *
+   * CHỈ admin, cùng mức với `saveRuleScope` và cấu hình luật chung: hành động
+   * của luật quyết định lần chạy nào bị loại (ISO 15189:2022 7.3.7.2). Trước
+   * đây cổng là `write`, nên KTV đổi được 1-3s thành "Cảnh báo" qua máy trạm
+   * LAN dù giao diện chỉ mở ở trang Cấu hình chung của admin. */
+  const saveRuleAction = writeCommand(db, 'saveRuleAction', 'admin', (w, testId: string, ruleId: string, value: RuleAction | ''): IpcResult<{ ruleId: string; action: RuleAction | '' }> => {
     const test = db.prepare('SELECT id, name, rule_actions_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (value !== '' && !isRuleAction(value)) return { ok: false, error: { code: 'invalid-action', message: 'Hành động luật không hợp lệ.' } };
     const overrides = parseRuleActions(test.rule_actions_json);
+    const previous = overrides[ruleId];
     const action: RuleAction | '' = value;
+    if ((previous ?? '') === action) return w.noChange({ ruleId, action });
     if (action) overrides[ruleId] = action; else delete overrides[ruleId];
-    const label = action === '' ? 'theo cấu hình chung' : action === 'inactive' ? 'không dùng' : action === 'alert' ? 'cảnh báo' : 'loại bỏ';
+    // Bản ghi cũ có thể là boolean (`true`/`false` từ trước khi có hành động).
+    const labelOf = (item: RuleAction | boolean | '' | undefined) => item === '' || item === undefined ? 'theo cấu hình chung'
+      : item === true ? 'bật (hành động mặc định)' : item === false || item === 'inactive' ? 'không dùng' : item === 'alert' ? 'cảnh báo' : 'loại bỏ';
     w.commit((tx) => {
       db.prepare('UPDATE tests SET rule_actions_json=? WHERE id=?').run(serializeRuleActions(overrides), testId);
-      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${label}`, test.name);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId}: ${labelOf(previous)} → ${labelOf(action)}`, test.name);
       tx.changed(['tests'], [testId]);
     });
     return { ok: true, data: { ruleId, action } };

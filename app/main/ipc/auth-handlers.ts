@@ -12,7 +12,7 @@ import {
   type UserCreateInput, type UserUpdateInput, type LoginInput,
 } from '../domain/auth-validation';
 import { canWriteRole, roleLabel, roleOf } from '../domain/page-roles';
-import { parseNceCapabilities } from '../domain/nce/permissions';
+import { parseUserCapabilities } from '../domain/capabilities';
 import { type Actor, type IpcResult, type PermissionDenied, writeAudit, withTransaction } from './shared';
 import { writeCommand, writeCommandAsync } from './write-command';
 
@@ -51,7 +51,7 @@ function toPublicUser(row: UserRow): PublicUser {
     role: roleOf(row.role),
     pagePerms: parsePagePerms(row.page_perms_json), active: !!row.active, mustChangePassword: !!row.must_change_password,
     avatar: row.avatar || '',
-    capabilities: parseNceCapabilities(row.capabilities_json),
+    capabilities: parseUserCapabilities(row.capabilities_json),
   };
 }
 
@@ -193,24 +193,26 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
   });
 
-  /** Cấp/thu quyền nghiệp vụ NCE (`nce.release`, `nce.approve`) cho một tài
-   * khoản. Người chỉ xem không được cấp: quyền NCE là quyền ghi. Quản trị viên
-   * mặc nhiên có cả hai, nên lưu cho tài khoản quản trị không đổi gì thực tế
-   * nhưng vẫn được ghi để giữ lựa chọn khi vai trò đổi. */
+  /** Cấp/thu quyền nghiệp vụ (`nce.release`, `nce.approve`, `qc.config` — xem
+   * `domain/capabilities.ts`) cho một tài khoản. Tên IPC giữ từ lúc chỉ có
+   * quyền NCE. Người chỉ xem không được cấp: mọi capability đều là quyền ghi.
+   * Quản trị viên mặc nhiên có tất cả, nên lưu cho tài khoản quản trị không đổi
+   * gì thực tế nhưng vẫn được ghi để giữ lựa chọn khi vai trò đổi. */
   const setNceCapabilities = writeCommand(db, 'setNceCapabilities', adminOnly, (w, input: { id: unknown; capabilities: unknown }): IpcResult<PublicUser> => {
     const id = String(input?.id || '');
     const existing = db.prepare('SELECT * FROM users WHERE id=?').get(id) as UserRow | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy người dùng.' } };
     const requested = Array.isArray(input?.capabilities) ? input.capabilities : null;
-    if (!requested) return { ok: false, error: { code: 'invalid-capabilities', message: 'Danh sách quyền NCE không hợp lệ.' } };
-    const capabilities = parseNceCapabilities(requested).sort();
-    if (capabilities.length !== new Set(requested).size) return { ok: false, error: { code: 'invalid-capabilities', message: 'Có mã quyền NCE không hợp lệ.' } };
-    if (capabilities.length && !canWriteRole(existing.role)) return { ok: false, error: { code: 'viewer-capabilities', message: 'Tài khoản chỉ xem không được cấp quyền NCE.' } };
-    const before = parseNceCapabilities(existing.capabilities_json).sort();
+    if (!requested) return { ok: false, error: { code: 'invalid-capabilities', message: 'Danh sách quyền nghiệp vụ không hợp lệ.' } };
+    const capabilities = parseUserCapabilities(requested).sort();
+    if (capabilities.length !== new Set(requested).size) return { ok: false, error: { code: 'invalid-capabilities', message: 'Có mã quyền nghiệp vụ không hợp lệ.' } };
+    if (capabilities.length && !canWriteRole(existing.role)) return { ok: false, error: { code: 'viewer-capabilities', message: 'Tài khoản chỉ xem không được cấp quyền nghiệp vụ.' } };
+    const before = parseUserCapabilities(existing.capabilities_json).sort();
     if (JSON.stringify(before) === JSON.stringify(capabilities)) return w.noChange(toPublicUser(existing));
     w.commit((tx) => {
       db.prepare('UPDATE users SET capabilities_json=? WHERE id=?').run(JSON.stringify(capabilities), id);
-      tx.audit('Phân quyền NCE', `"${existing.username}": ${capabilities.length ? capabilities.join(', ') : 'không có quyền NCE riêng'}`, existing.username);
+      const list = (items: string[]) => (items.length ? items.join(', ') : 'không có quyền riêng');
+      tx.audit('Phân quyền nghiệp vụ', `"${existing.username}": ${list(before)} → ${list(capabilities)}`, existing.username);
       tx.changed(['users']);
     });
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };

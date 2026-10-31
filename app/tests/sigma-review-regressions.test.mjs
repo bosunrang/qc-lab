@@ -149,7 +149,8 @@ test('SG04: MDC uses exact same per-level TEa as Sigma', t => {
 
 test('SG05: EFLM survives source switches; old shared value is never migrated as confirmed EFLM', t => {
   const { db, sigma, assay } = scenario(t);
-  const input = { testId: assay.id, source: 'eflm', tea: 10, eflmRef: 'Certificate' };
+  // Truy vết EFLM cần ngày tra cứu (đánh giá tổng thể 2026-10-31, N8).
+  const input = { testId: assay.id, source: 'eflm', tea: 10, eflmRef: 'Certificate', eflmLookupDate: '2026-09-01' };
   assert.equal(sigma.saveTeaConfig(input, actor).ok, true);
   sigma.saveTeaConfig({ testId: assay.id, source: 'clia', tea: 4 / 140 * 100 }, actor);
   const restored = sigma.saveTeaConfig({ testId: assay.id, source: 'eflm' }, actor).data;

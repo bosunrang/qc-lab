@@ -1,6 +1,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from './useFocusTrap';
+import { modalEnterSubmits } from '../lib/modal-enter';
 
 /** Nút CHÍNH của modal = nút `.btn.teal` trong `.modal-f`, đúng quy ước màu
  * của app (teal = hành động chính, ghost = phụ/hủy, danger = phá hủy).
@@ -33,27 +34,19 @@ export function Modal({ title, onClose, children, footer, size = 'md', className
   useFocusTrap(true, onClose, boxRef);
 
   /** Enter = bấm nút chính. Làm ở ĐÂY, không phải ở từng modal, vì cả ~20 modal
-   * đều cần và một bản cài đặt riêng cho mỗi modal sẽ lệch nhau.
-   *
-   * Bốn cổng loại trừ, mỗi cổng là một lỗi thật nếu thiếu:
-   *  - `isComposing`: bộ gõ tiếng Việt (Telex/VNI) dùng Enter để chốt ký tự
-   *    đang gõ. Thiếu cổng này thì đang gõ giữa từ mà modal tự lưu.
-   *  - `defaultPrevented`: ô nào tự xử lý Enter rồi (gợi ý tên xét nghiệm ở
-   *    Cấu hình chung, thêm cặp mẫu ở So sánh hóa chất, ô ngày, ô năm của lịch)
-   *    thì handler của nó chạy TRƯỚC (bubble từ trong ra) và đã `preventDefault`
-   *    — tôn trọng, không lưu đè lên.
-   *  - `textarea`/`contenteditable`: Enter ở đó là xuống dòng.
-   *  - `button`/`a`: Enter đã là "bấm chính nó".
+   * đều cần và một bản cài đặt riêng cho mỗi modal sẽ lệch nhau. Các cổng loại
+   * trừ (bộ gõ tiếng Việt, textarea, danh sách `select` đang mở…) nằm ở
+   * `modalEnterSubmits()` để test được.
    *
    * `preventDefault()` là thứ chặn submit CHẠY HAI LẦN với modal dùng `<form>`
    * thật: nó huỷ implicit submission của trình duyệt, rồi `click()` chạy đúng
    * một lần. Bỏ nó đi là form submit đôi. */
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== 'Enter' || event.defaultPrevented) return;
-    if (event.nativeEvent.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-    const target = event.target as HTMLElement | null;
-    const tag = target?.tagName;
-    if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A' || target?.isContentEditable) return;
+    if (!modalEnterSubmits({
+      key: event.key, defaultPrevented: event.defaultPrevented, isComposing: event.nativeEvent.isComposing,
+      ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, shiftKey: event.shiftKey,
+      target: event.target as HTMLElement | null,
+    })) return;
     const button = primaryButton(boxRef.current);
     if (!button) return;
     event.preventDefault();

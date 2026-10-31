@@ -19,7 +19,7 @@ import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPo
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
 import { readGlobalRules } from '../db/rule-settings';
 import { parseRuleActions, makeIsOnLayered, makeRuleActionLayered, parseRuleScopes, makeScopeOf } from '../domain/rule-config';
-import { evaluateRangeCandidate, validateRangeReason } from '../domain/range-workflow';
+import { evaluateRangeCandidate, manualRangeDeviation, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
 import { isDateInLockedPeriod } from '../db/period-locks';
@@ -32,7 +32,7 @@ import { nceRunSnapshot } from '../db/nce-evaluation';
 import { nceErrorClass } from '../domain/nce/tier';
 import { emptyChecklist } from '../domain/nce/update';
 import { defaultNceDueDate } from '../domain/nce/config';
-import { type Actor, type IpcResult, nowIso } from './shared';
+import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 
 interface QcPointRow {
@@ -294,8 +294,10 @@ export function createEntryHandlers(db: Db) {
     } };
   }
 
-  const applyLabRange = writeCommand(db, 'applyLabRange', 'write', (w, input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): IpcResult<RangeCandidateView> => {
-    const actor = w.actor;
+  /** Lập dải PXN và hoàn dải NSX đặt lại giới hạn kiểm soát, nên cần quyền
+   * `qc.config` (ISO 15189:2022 6.2.3, 7.3.7.2) — trước đây mọi tài khoản ghi
+   * đều làm được, kể cả nhập Mean/SD tay tuỳ ý. */
+  const applyLabRange = writeCommand(db, 'applyLabRange', requireQcConfig(db), (w, input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): IpcResult<RangeCandidateView> => {
     const reason = validateRangeReason(input.data?.reason, 10);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do thiết lập dải tối thiểu 10 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
@@ -326,18 +328,33 @@ export function createEntryHandlers(db: Db) {
       effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
     }, changedAt);
     const mfgMean = row.mfg_mean ?? row.mean, mfgSd = row.mfg_sd ?? row.sd;
+    // Nhật ký phải đủ để người xem xét dựng lại quyết định: dải đề xuất từ dữ
+    // liệu, mức lệch của Mean/SD tay, và căn cứ của cổng sai số hệ thống.
+    // Bias ở cổng là số đo ngoài app (ngoại kiểm, vật liệu chuẩn sau hiệu
+    // chuẩn) nên vẫn do người dùng nhập; main ghi thêm Bias đối chiếu tự tính
+    // so với Mean nhà sản xuất để người xem xét so được hai con số.
+    const r4 = (value: number) => Number(value.toFixed(4));
+    const proposed = fresh.data.proposed;
+    const deviation = manual ? manualRangeDeviation({ mean: proposed.mean, sd: proposed.sd }, p) : null;
+    const selection = manual
+      ? `chỉnh thủ công (đề xuất Mean ${r4(proposed.mean)}, SD ${r4(proposed.sd)}, n=${proposed.n}${deviation ? `; SD tay gấp ${deviation.sdRatio.toFixed(2)} lần, Mean lệch ${deviation.meanShiftSd.toFixed(2)} SD${deviation.exceeds ? ' — VƯỢT NGƯỠNG CẢNH BÁO' : ''}` : ''})`
+      : `dải đề xuất (n=${proposed.n}, ${proposed.days} ngày)`;
+    const safety = fresh.data.safety.needed
+      ? ` Cổng sai số hệ thống: hồ sơ ${fresh.data.safety.nceId}, Bias nhập ${Number(input.data.bias)}% (ngưỡng ±${fresh.data.safety.biasThreshold?.toFixed(2)}%), đã xác nhận xử lý nguyên nhân.`
+      : '';
+    const referenceBias = row.mfg_mean != null && row.mfg_mean !== 0
+      ? ` Bias đối chiếu so với Mean NSX ${row.mfg_mean}: ${((p.mean - row.mfg_mean) / Math.abs(row.mfg_mean) * 100).toFixed(2)}%.`
+      : '';
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
-      const selection = manual ? 'chỉnh thủ công' : 'dải đề xuất';
-      tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
+      tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}.${safety}${referenceBias} Lý do: ${reason}`, fresh.data.testId);
       tx.changed(['test_levels'], [fresh.data.testId]);
     });
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   });
 
-  const revertManufacturerRange = writeCommand(db, 'revertManufacturerRange', 'write', (w, input: { data: { testId: string; level: number; reason: string } }): IpcResult<RangeCandidateView> => {
-    const actor = w.actor;
+  const revertManufacturerRange = writeCommand(db, 'revertManufacturerRange', requireQcConfig(db), (w, input: { data: { testId: string; level: number; reason: string } }): IpcResult<RangeCandidateView> => {
     const reason = validateRangeReason(input.data?.reason, 5);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do hoàn dải tối thiểu 5 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
@@ -355,7 +372,7 @@ export function createEntryHandlers(db: Db) {
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
         .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
-      tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
+      tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về dải nhà sản xuất, Mean ${row.mean ?? '—'} → ${m}; SD ${row.sd ?? '—'} → ${sd}. Lý do: ${reason}`, fresh.data.testId);
       tx.changed(['test_levels'], [fresh.data.testId]);
     });
     return rangeCandidate(fresh.data.testId, fresh.data.level);

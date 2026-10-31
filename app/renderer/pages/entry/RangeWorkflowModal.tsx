@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { reauthDialog } from '../../state/dialog-store';
 import { useEntryStore } from '../../store/entry-store';
+import { useAuthStore } from '../../store/auth-store';
+import { hasUserCapability, QC_CONFIG_DENIED_MESSAGE } from '../../../main/domain/capabilities';
+import { manualRangeDeviation, MANUAL_MEAN_SHIFT_LIMIT_SD, MANUAL_SD_RATIO_LIMIT } from '../../../main/domain/range-workflow';
 import type { RangeCandidateView } from '../../../shared/qc-api';
 
 export type RangeMode = 'apply' | 'revert';
@@ -29,6 +32,12 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
   const [rangeSelection, setRangeSelection] = useState<'proposed' | 'manual'>('proposed');
   const [rangeManualMean, setRangeManualMean] = useState(() => (proposed ? proposed.mean.toFixed(decimals) : ''));
   const [rangeManualSd, setRangeManualSd] = useState(() => (proposed ? proposed.sd.toFixed(4) : ''));
+  // Main chặn bằng `qc.config`; ở đây chỉ khoá nút và nói rõ lý do, người
+  // không có quyền vẫn xem được dải đề xuất.
+  const canConfigure = hasUserCapability(useAuthStore((s) => s.user), 'qc.config');
+  const manualDeviation = mode === 'apply' && rangeSelection === 'manual' && proposed
+    ? manualRangeDeviation({ mean: proposed.mean, sd: proposed.sd }, { mean: Number(rangeManualMean), sd: Number(rangeManualSd) })
+    : null;
 
   async function submitRangeWorkflow() {
     const minimum = mode === 'apply' ? 10 : 5;
@@ -51,7 +60,7 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
 
   return (
     <Modal title={mode === 'apply' ? 'Thiết lập dải QC mới' : 'Hoàn dải QC nhà sản xuất'} onClose={onClose} size="lg" className="range-workflow-modal"
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className={`btn ${mode === 'apply' ? 'teal' : 'danger'}`} disabled={mode === 'apply' && !rangeCandidate.eligible} onClick={submitRangeWorkflow}>{mode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className={`btn ${mode === 'apply' ? 'teal' : 'danger'}`} disabled={!canConfigure || (mode === 'apply' && !rangeCandidate.eligible)} onClick={submitRangeWorkflow}>{mode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</button></>}>
       {mode === 'apply' && proposed && (
         <>
           <p className="range-workflow-meta">{testName || 'Xét nghiệm'} · Mức {rangeCandidate.level}{rangeCandidate.lot ? ` · Lô ${rangeCandidate.lot}` : ''}</p>
@@ -87,6 +96,13 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
             <label className="field"><span>Mean chốt <b>*</b></span><input aria-label="Mean chốt thủ công" type="number" inputMode="decimal" step="any" value={rangeManualMean} onChange={(e) => setRangeManualMean(e.target.value)} /></label>
             <label className="field"><span>SD chốt <b>*</b></span><input aria-label="SD chốt thủ công" type="number" inputMode="decimal" min="0" step="any" value={rangeManualSd} onChange={(e) => setRangeManualSd(e.target.value)} /></label>
           </div>}
+          {manualDeviation?.exceeds && (
+            <div className="alert warn">
+              SD chốt gấp {manualDeviation.sdRatio.toFixed(2)} lần SD quan sát, Mean lệch {manualDeviation.meanShiftSd.toFixed(2)} SD so với dải đề xuất
+              (ngưỡng cảnh báo: {MANUAL_SD_RATIO_LIMIT} lần SD, {MANUAL_MEAN_SHIFT_LIMIT_SD} SD). Giới hạn rộng hơn dữ liệu quan sát làm luật Westgard khó phát hiện lỗi;
+              ghi rõ căn cứ trong lý do. Mức lệch này được ghi vào nhật ký.
+            </div>
+          )}
           {rangeCandidate.safety.needed && (
             <div className="alert warn range-safety-gate">
               <b>Cổng an toàn sai số hệ thống {rangeCandidate.safety.nceId ? `· ${rangeCandidate.safety.nceId}` : ''}</b>
@@ -99,6 +115,7 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
       )}
       {mode === 'revert' && <p>Khôi phục Mean={rangeCandidate.manufacturer.mean?.toFixed(decimals) ?? '—'} và SD={rangeCandidate.manufacturer.sd?.toFixed(4) ?? '—'} của nhà sản xuất.</p>}
       <label className="field"><span>Lý do <b>*</b></span><textarea rows={3} value={rangeReason} onChange={(e) => setRangeReason(e.target.value)} placeholder={mode === 'apply' ? 'Tối thiểu 10 ký tự' : 'Tối thiểu 5 ký tự'} /></label>
+      {!canConfigure && <div className="alert info">{QC_CONFIG_DENIED_MESSAGE}</div>}
       {rangeSubmitError && <div className="alert warn">{rangeSubmitError}</div>}
     </Modal>
   );

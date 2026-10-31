@@ -8,10 +8,9 @@ export type TeaRefCore = { name: string; analyte_id?: string; aliases_json?: str
 export type TeaTestCore = {
   name: string; tea_ref_key: string; unit: string; tea: number;
   /** Cổng truy vết EFLM: `tea` là một ô nhập tay dùng chung, nên nó CHỈ được
-   * coi là TEa EFLM khi xét nghiệm thật sự khai nguồn EFLM hoặc có ít nhất
-   * một dấu vết tra cứu (analyte/tài liệu/ngày). Thiếu cổng này, mọi xét
-   * nghiệm có `tea` (kể cả TEa gõ tay cho nguồn khác) đều hiện thành "TEa
-   * EFLM đã truy vết". */
+   * coi là TEa EFLM khi có ngày tra cứu database EFLM (xem `resolveTea`).
+   * Thiếu cổng này, mọi xét nghiệm có `tea` (kể cả TEa gõ tay cho nguồn khác)
+   * đều hiện thành "TEa EFLM đã truy vết". */
   tea_source?: string; eflm_analyte?: string; eflm_ref?: string; eflm_lookup_date?: string;
   eflm_tea?: number | null;
 };
@@ -96,12 +95,17 @@ export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: re
   const matchingRefs = findRefs(test, refs, catalog);
   let ref = findRef(test, refs, catalog);
   if (source === 'eflm') {
-    const hasTrace = test.tea_source === 'eflm' || !!(test.eflm_analyte || test.eflm_ref || test.eflm_lookup_date);
+    // Truy vết tối thiểu là NGÀY TRA: database biến thiên sinh học EFLM được
+    // cập nhật theo thời gian, thiếu ngày thì không biết TEa lấy từ phiên bản
+    // nào. Tên xét nghiệm EFLM để trống thì hiểu là tên xét nghiệm (ô nhập ở
+    // trang Sigma mặc định hiện đúng tên đó). Trước đây chỉ cần chọn nguồn
+    // `eflm` là được coi là đã truy vết.
+    const hasTrace = !!String(test.eflm_lookup_date || '').trim();
     const value = Number(test.eflm_tea === undefined ? test.tea : test.eflm_tea);
     return {
       value: hasTrace && Number.isFinite(value) && value > 0 ? value : null,
       criterion: 'TEa EFLM nhập và được truy vết bởi phòng xét nghiệm', catalog,
-      note: hasTrace ? null : 'Chọn EFLM thì cần tra database EFLM và nhập TEa% cùng thông tin truy xuất.',
+      note: hasTrace ? null : 'Chọn EFLM thì cần tra database EFLM, nhập TEa% và ngày tra cứu.',
       criterionDetail: null,
     };
   }
