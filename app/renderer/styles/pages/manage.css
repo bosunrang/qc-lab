@@ -500,7 +500,7 @@ main:has(.config-shell){padding-bottom:16px;}
    mục xét nghiệm (đổi máy thì cả dòng đổi theo), và cột "Xét nghiệm trong
    panel" của thẻ Panel QC (gộp danh sách dài lại thành một dòng để đọc). */
 .assay-machine-select,
-.panel-test-select{width:100%;max-width:280px;height:var(--control-h);padding:0 28px 0 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background-color:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;text-align:left;cursor:pointer;}
+.panel-test-select{width:100%;max-width:280px;height:var(--control-h);padding:0 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background-color:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;text-align:left;cursor:pointer;}
 .assay-machine-select:hover,
 .panel-test-select:hover{border-color:var(--accent-border-strong);}
 .assay-machine-select:focus:not(:focus-visible),

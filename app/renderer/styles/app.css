@@ -143,6 +143,83 @@ textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:v
 input:not([type="checkbox"]):not([type="radio"]):focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){border-color:var(--accent-border);box-shadow:none;}
 input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:var(--surface-subtle);color:var(--text-readonly);border-color:var(--border-subtle);}
 input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--surface-page);color:var(--text-disabled);border-color:var(--border-subtle);cursor:not-allowed;}
+
+/* Danh sách xổ xuống của `select`. Mặc định Chromium vẽ danh sách này bằng
+   cửa sổ của hệ điều hành — CSS không với tới được, nên nó luôn vuông góc dù
+   ô chọn đã bo tròn. `appearance:base-select` đưa danh sách về DOM thật, cho
+   phép dùng lại ĐÚNG bộ token popup của app (so `.vn-date-picker`: cùng nền,
+   viền, bán kính và đổ bóng). Bọc trong `@supports` để trình duyệt chưa hỗ
+   trợ vẫn rơi về danh sách gốc thay vì mất kiểu. */
+@supports (appearance:base-select){
+  /* Ở chế độ này `select` là hộp flex: chữ của mục đang chọn rồi tới mũi tên.
+     Viền/bán kính/nền/chiều cao vẫn lấy từ các rule control ở trên.
+     `align-items:center` là bắt buộc: mặc định của Chromium là `normal`
+     (kéo giãn), làm chữ dính lên mép trên của ô 36px. `space-between` đẩy
+     chevron về mép phải thay vì đứng sát sau chữ.
+     `nowrap` cũng bắt buộc: mặc định Chromium cho chữ xuống dòng, mà ô chọn
+     đã bị khoá chiều cao nên dòng thứ hai sẽ bị cắt ngang thân chữ. */
+  select{appearance:base-select;align-items:center;justify-content:space-between;white-space:nowrap;overflow:hidden;}
+  /* Mũi tên mặc định của Chromium là ký tự tam giác (`disclosure-open`), lệch
+     kiểu với icon của app. Thay bằng chevron vẽ theo đúng quy ước của
+     `BtnIcons.tsx` (khung 24, nét 1.8, đầu nét tròn). SVG chỉ dùng làm mặt nạ
+     nên màu `black` trong đó không hiển thị — màu thật lấy từ token qua
+     `background-color`. `sticky` giữ chevron ở mép phải khi nhãn dài hơn ô:
+     để nó trôi theo dòng chữ thì `overflow:hidden` sẽ cắt mất luôn chevron. */
+  select::picker-icon{
+    content:'';
+    position:sticky;
+    right:0;
+    flex:0 0 auto;
+    width:16px;
+    height:16px;
+    margin-left:var(--space-1-5);
+    background-color:var(--text-tertiary);
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") center/16px 16px no-repeat;
+    transition:rotate var(--motion-fast) ease;
+  }
+  select:open::picker-icon{rotate:180deg;}
+  select::picker(select){
+    appearance:base-select;
+    box-sizing:border-box;
+    /* Danh sách không được hẹp hơn ô chọn đã neo nó. */
+    min-width:anchor-size(width);
+    /* Chừa khe giữa ô chọn và danh sách. Đặt cả trên lẫn dưới vì danh sách
+       tự lật lên phía trên khi sát đáy màn hình. */
+    margin-block:var(--space-1);
+    padding:var(--space-1);
+    border:1px solid var(--surface-border);
+    border-radius:var(--radius-md);
+    background:var(--surface);
+    box-shadow:var(--shadow-popover);
+    /* Thanh cuộn chung của app (tokens.css) khai bằng bộ chọn `*`, mà `*`
+       không khớp pseudo-element nên danh sách đang rơi về thanh cuộn mặc định. */
+    scrollbar-width:thin;
+    scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  /* Các rule `option` dưới đây CỐ Ý không viết lồng sau `::picker(select)`:
+     lightningcss (bộ rút gọn CSS lúc build) từ chối mọi bộ chọn đứng sau một
+     pseudo-element. Không cần lồng vẫn đúng phạm vi — chữ hiện trong ô chọn
+     là BẢN SAO nội dung của `option`, không phải chính thẻ `option`, nên các
+     rule này chỉ chạm tới các mục nằm trong danh sách. */
+  option{
+    display:flex;
+    align-items:center;
+    min-height:var(--control-h-compact);
+    padding:0 var(--space-2);
+    border-radius:var(--radius-sm);
+    color:var(--text-primary);
+    font-size:var(--text-base);
+    font-weight:var(--weight-normal);
+    line-height:var(--leading-body);
+    cursor:pointer;
+  }
+  /* Chromium chèn sẵn một cột dấu tích cho mục đang chọn, đẩy lệch chữ so với
+     ô chọn ở trên. Mục đang chọn đã nhận biết được bằng nền, nên bỏ cột đó. */
+  option::checkmark{display:none;}
+  option:hover{background:var(--surface-subtle);color:var(--accent);}
+  option:checked{background:var(--accent);color:var(--on-accent);}
+  option:disabled{color:var(--text-disabled);cursor:not-allowed;}
+}
 label{display:block;font-size:var(--text-sm);color:var(--text-secondary);margin:var(--space-2) 0 var(--field-label-gap);font-weight:var(--weight-semibold);}
 
 /* `.field` là block thường, KHÔNG phải flex column: nhãn là block, ô nhập
