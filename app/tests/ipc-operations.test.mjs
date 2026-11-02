@@ -102,7 +102,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 146);
+  assert.equal(handlers.size, 147);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });

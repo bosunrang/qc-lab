@@ -271,7 +271,7 @@ async function createWindow(): Promise<void> {
 
   const lanTls = startLanTls(userDataDir);
   const lan = new LanHttpServer<PublicUser>({
-    login: (input) => auth.login(input as { data: { username: string; password: string } }),
+    login: (input, clientId) => auth.login(input as { data: { username: string; password: string } }, clientId),
     getLoginBrand: () => settings.getLoginBrand(),
     actorOf: desktopActor,
     currentUser: (actor) => auth.getUser(actor.userId),

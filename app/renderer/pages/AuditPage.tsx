@@ -11,6 +11,7 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { roleLabel } from '../lib/permissions';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../../main/domain/audit-format';
+import { auditSizeWarning } from '../../main/domain/audit-filter';
 import { downloadCsv } from '../lib/export';
 
 const AUTO_VERIFY_MAX = 5000;
@@ -63,6 +64,7 @@ export function AuditPage() {
   }
 
   const hasFilter = !!(query || from || to);
+  const sizeWarning = auditSizeWarning(result.total);
 
   return (
     <div>
@@ -79,6 +81,7 @@ export function AuditPage() {
             <div className="audit-integrity-total"><b>{result.total}</b><span>dòng hoạt động đã ghi nhận</span></div>
             <AuditIntegrityStatus chain={chain} total={result.total} needsManualVerification={result.total > AUTO_VERIFY_MAX} onVerify={onVerify} />
           </div>
+          {sizeWarning && <div className="alert warn" role="status">{sizeWarning}</div>}
         </div>
       </div>
 

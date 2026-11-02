@@ -18,10 +18,12 @@ export interface LanTlsSource {
   caCertificate(): Buffer;
 }
 export interface LanServerDeps<User> {
-  login(input: unknown): Promise<LoginResult<User>> | LoginResult<User>;
+  /** `clientId` = `lan:<ip>` của máy trạm, để nhật ký đăng nhập (kể cả lần
+   * sai) ghi đúng máy đã thử. */
+  login(input: unknown, clientId: string): Promise<LoginResult<User>> | LoginResult<User>;
   /** Nhận diện công khai cho màn hình đăng nhập; không có cài đặt nội bộ. */
   getLoginBrand?(): Promise<unknown> | unknown;
-  actorOf(user: User): Actor;
+  actorOf(user: User, clientId: string): Actor;
   currentUser(actor: Actor): User | null;
   invoke(method: string, args: unknown[], actor: Actor): Promise<unknown>;
   staticDir?: string;
@@ -164,10 +166,11 @@ export class LanHttpServer<User> {
           res.setHeader('retry-after', String(Math.ceil(gate.retryAfterMs / 1000)));
           return send(res, 429, { ok: false, error: { code: 'too-many-attempts', message: `Đăng nhập sai quá nhiều lần. Thử lại sau ${minutes} phút.` } });
         }
-        const result = await this.deps.login(input);
+        const clientId = `lan:${remoteAddress(req)}`;
+        const result = await this.deps.login(input, clientId);
         if (!result.ok) return send(res, 401, result);
         gate.attempt.succeed();
-        const session = this.sessions.create(this.deps.actorOf(result.data));
+        const session = this.sessions.create(this.deps.actorOf(result.data, clientId));
         res.setHeader('set-cookie', `qclab_session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`);
         return send(res, 200, { ok: true, data: result.data });
       }

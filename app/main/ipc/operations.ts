@@ -287,6 +287,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     getLoginBrand: { channel: 'settings:getLoginBrand', lan: true, run: () => settings.getLoginBrand() },
     saveLabProfile: { channel: 'settings:saveLabProfile', lan: false, run: (ctx, input) => settings.saveLabProfile(input, ctx.actor()) },
     getStorageInfo: { channel: 'settings:getStorageInfo', lan: true, run: () => settings.getStorageInfo() },
+    // Một chiều, chặn "Xoá sạch dữ liệu test": quản trị làm trên máy chính.
+    enableOperationMode: { channel: 'settings:enableOperationMode', lan: false, run: (ctx) => settings.enableOperationMode(ctx.actor()) },
 
     listPeriodLocks: { channel: 'report:listPeriodLocks', lan: true, run: () => report.listPeriodLocks() },
     getReportTemplateSettings: { channel: 'report:getTemplateSettings', lan: true, run: () => report.getReportTemplateSettings() },

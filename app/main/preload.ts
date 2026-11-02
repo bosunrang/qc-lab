@@ -145,6 +145,7 @@ const api = {
   importBackup: () => ipcRenderer.invoke('backup:import'),
   backupStatus: () => ipcRenderer.invoke('backup:status'),
   resetOperationalData: () => ipcRenderer.invoke('backup:resetAll'),
+  enableOperationMode: () => ipcRenderer.invoke('settings:enableOperationMode'),
   getLisSettings: () => ipcRenderer.invoke('lis:getSettings'),
   saveLisSettings: (input: unknown) => ipcRenderer.invoke('lis:saveSettings', input),
   pullLisQueue: () => ipcRenderer.invoke('lis:pullQueue'),

@@ -46,8 +46,10 @@ export interface DesktopHandlers {
   firebase: ReturnType<typeof createFirebaseHandlers>;
 }
 
-export function desktopActor(user: PublicUser): Actor {
-  return { userId: user.id, username: user.username, name: user.name, role: user.role, clientId: 'app-desktop' };
+/** `clientId` mặc định là máy chính; máy trạm LAN truyền `lan:<ip>` để mọi
+ * dòng nhật ký của phiên đó ghi đúng máy đã thao tác. */
+export function desktopActor(user: PublicUser, clientId = 'app-desktop'): Actor {
+  return { userId: user.id, username: user.username, name: user.name, role: user.role, clientId };
 }
 
 export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): OperationTable<HostApiName> {

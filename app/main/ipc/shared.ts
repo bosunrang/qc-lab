@@ -41,14 +41,9 @@ let broadcastWindow: BroadcastTarget | null = null;
 let cloudChangeNotifier: (() => void) | null = null;
 let lanChangeNotifier: ((payload: StoreChangedPayload) => void) | null = null;
 
-/** Giới hạn vận hành: không để bảng nhật ký sống phình vô hạn.
- * Người dùng vẫn có đường lưu trữ thủ công có CSV; xoay vòng chỉ là phao an
- * toàn khi thao tác đó bị bỏ quên. */
-export const AUDIT_HARD_CAP = 50_000;
-export const AUDIT_ROTATE_TO = 40_000;
-
-/** Neo hash của phần nhật ký đã bị lưu trữ/xoay vòng. Cả hai đường cắt đều
- * dùng chung một thao tác upsert để không lệch tên khoá trong `app_meta`. */
+/** Neo hash của phần nhật ký đã được lưu trữ. Chỉ "Lưu trữ nhật ký cũ" (có
+ * xuất CSV trước) mới cắt bảng `activity`; app không tự xoá dòng nào khi bảng
+ * lớn (ISO 15189:2022 8.4.3) — xem `AUDIT_SIZE_WARNING_ROWS`. */
 export function setActivityAnchor(db: Db, hash: string): void {
   db.prepare("INSERT INTO app_meta(key,value) VALUES('activityAnchor',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(hash);
 }
@@ -137,7 +132,7 @@ export function rowToAuditEntry(row: Record<string, unknown>): ActivityEntry {
   };
 }
 
-function insertAudit(db: Db, actor: Actor, type: string, detail: string, target = ''): { seq: number } {
+function insertAudit(db: Db, actor: Actor, type: string, detail: string, target = ''): void {
   const row = db.prepare('SELECT hash FROM activity ORDER BY seq DESC LIMIT 1').get() as { hash: string } | undefined;
   const seqRow = db.prepare('SELECT COALESCE(MAX(seq),0) as maxSeq FROM activity').get() as { maxSeq: number };
   const entry = {
@@ -153,36 +148,12 @@ function insertAudit(db: Db, actor: Actor, type: string, detail: string, target 
       userId: entry.userId, role: entry.role, type: entry.type, detail: entry.detail, target: entry.target,
       clientId: entry.clientId, prevHash: entry.prevHash, hash: entry.hash,
     });
-  return { seq: entry.seq };
-}
-
-/** Cắt mềm nhật ký vượt ngưỡng, giữ anchor ở hash cuối của phần bị gỡ. Hàm
- * này không gọi `writeAudit()` để tránh đệ quy; thay vào đó ghi đúng một dòng
- * giải thích sau khi cắt. */
-function rotateAuditOverflow(db: Db, actor: Actor): void {
-  const count = Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n);
-  if (count <= AUDIT_HARD_CAP) return;
-  const dropCount = count - AUDIT_ROTATE_TO;
-  const dropped = db.prepare(`SELECT id,hash FROM activity ORDER BY seq ASC LIMIT ${dropCount}`).all() as { id: string; hash: string }[];
-  const tipHash = [...dropped].reverse().find((row) => row.hash)?.hash || '';
-  if (!dropped.length) return;
-  const placeholders = dropped.map(() => '?').join(',');
-  db.prepare(`DELETE FROM activity WHERE id IN (${placeholders})`).run(...dropped.map((row) => row.id));
-  setActivityAnchor(db, tipHash);
-  insertAudit(db, actor, 'Xoay vòng nhật ký hoạt động',
-    `Nhật ký vượt ${AUDIT_HARD_CAP} dòng: tự động loại ${dropped.length} dòng cũ nhất, giữ lại ${AUDIT_ROTATE_TO} dòng mới nhất (không xuất CSV). Hash đỉnh phần đã loại: ${tipHash || '—'}. Nên dùng "Lưu trữ nhật ký cũ" để có file CSV trước khi cắt.`, 'Nhật ký');
 }
 
 export function writeAudit(db: Db, actor: Actor, type: string, detail: string, target = ''): void {
-  // Thêm dòng và (khi vượt ngưỡng) xoay vòng là một đơn vị: xoá dòng cũ mà
-  // không cập nhật anchor thì chuỗi hash báo sai ngay dòng đầu.
-  withTransaction(db, () => {
-    const entry = insertAudit(db, actor, type, detail, target);
-    // Trước ngưỡng không truy vấn COUNT(*) ở mỗi thao tác. Sau khi seq đã lớn,
-    // chỉ khi bảng thực sự vượt ngưỡng mới cắt; archive có thể làm seq cao mà
-    // bảng nhỏ, khi đó phép đếm rẻ này chỉ là kiểm tra phòng thủ.
-    if (entry.seq > AUDIT_HARD_CAP) rotateAuditOverflow(db, actor);
-  });
+  // Đọc hash/seq cuối và chèn dòng mới là một đơn vị, để hai lần ghi không
+  // cùng nối vào một dòng trước.
+  withTransaction(db, () => insertAudit(db, actor, type, detail, target));
   notifyChanged(['activity']);
   cloudChangeNotifier?.();
 }

@@ -34,6 +34,12 @@ import type { PublicUser } from '../../shared/qc-api';
 
 export type { PublicUser };
 
+/** Nơi đăng nhập cho dòng nhật ký: cột `client_id` không hiện ở trang Nhật
+ * ký hay CSV, nên ghi kèm vào phần chi tiết. */
+function clientLabel(clientId: string): string {
+  return clientId.startsWith('lan:') ? `máy trạm LAN ${clientId.slice(4) || '?'}` : 'máy chính';
+}
+
 function parsePagePerms(value: string | null): string[] | null {
   if (!value) return null;
   try {
@@ -116,8 +122,12 @@ export function createAuthHandlers(db: Db) {
 
   /** Bất đồng bộ vì đây là cổng KHÔNG cần đăng nhập, mở cả qua LAN: mỗi lần
    * thử phải băm 600.000 vòng, chạy đồng bộ thì vài yêu cầu dồn dập đủ làm đơ
-   * main process. Chỉ phần băm là chờ; đọc và ghi SQLite vẫn đồng bộ. */
-  async function login(input: { data: LoginInput }): Promise<IpcResult<PublicUser>> {
+   * main process. Chỉ phần băm là chờ; đọc và ghi SQLite vẫn đồng bộ.
+   *
+   * `clientId` là nơi đăng nhập: `app-desktop` cho máy chính, `lan:<ip>` cho
+   * máy trạm (`lan/http-server.ts`). Lần đăng nhập sai cũng ghi nhật ký kèm
+   * nơi thử (GV3); máy trạm LAN đã có bộ đếm chặn thử dồn dập trước bước này. */
+  async function login(input: { data: LoginInput }, clientId = 'app-desktop'): Promise<IpcResult<PublicUser>> {
     const result = validateLoginInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, password } = result.data;
@@ -126,13 +136,26 @@ export function createAuthHandlers(db: Db) {
     // Đọc lại SAU khi chờ băm: trong lúc đó admin có thể vừa khoá tài khoản
     // hoặc đổi mật khẩu, nên kết luận phải dựa trên hàng hiện tại.
     const row = db.prepare('SELECT * FROM users WHERE username=?').get(username) as UserRow | undefined;
+    const failed = (reason: string) => {
+      // Không có phiên: người thực hiện là tài khoản bị thử (hoặc chỉ tên đã
+      // gõ khi tài khoản không tồn tại). Không bao giờ ghi mật khẩu.
+      const actor: Actor = row
+        ? { userId: row.id, username: row.username, name: row.name, role: row.role, clientId }
+        : { userId: '', username, name: username, role: '', clientId };
+      // eslint-disable-next-line no-restricted-syntax -- thao tác trước đăng nhập
+      writeAudit(db, actor, 'Đăng nhập thất bại', `${reason} · ${clientLabel(clientId)}`, username);
+    };
     if (!row || !passwordOk || row.pass_hash !== stored?.pass_hash) {
+      failed(row ? 'Sai mật khẩu' : 'Tài khoản không tồn tại');
       return { ok: false, error: { code: 'invalid-credentials', message: 'Sai tên đăng nhập hoặc mật khẩu.' } };
     }
-    if (!row.active) return { ok: false, error: { code: 'inactive', message: 'Tài khoản đã bị khoá.' } };
+    if (!row.active) {
+      failed('Tài khoản đã bị khoá');
+      return { ok: false, error: { code: 'inactive', message: 'Tài khoản đã bị khoá.' } };
+    }
     // Đăng nhập chưa có phiên nên không qua writeCommand(); chỉ ghi nhật ký.
     // eslint-disable-next-line no-restricted-syntax -- thao tác trước đăng nhập
-    writeAudit(db, { userId: row.id, username: row.username, name: row.name, role: row.role, clientId: 'app-desktop' }, 'Đăng nhập', `Đăng nhập thành công`, row.username);
+    writeAudit(db, { userId: row.id, username: row.username, name: row.name, role: row.role, clientId }, 'Đăng nhập', `Đăng nhập thành công · ${clientLabel(clientId)}`, row.username);
     return { ok: true, data: toPublicUser(row) };
   }
 

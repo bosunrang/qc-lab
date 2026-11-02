@@ -15,6 +15,7 @@ import { BACKUP_FILE_FORMAT, BACKUP_FILE_FORMAT_VERSION, validateBackupEnvelope,
 import { type Actor, type IpcResult, nowIso, requireAdmin } from './shared';
 import { writeCommand } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
+import { keepOperationMode, readOperationMode, type OperationModeState } from '../db/operation-mode';
 
 /** Ngưỡng chỉ còn áp cho tệp backup JSON cũ: phải đọc cả tệp thành chuỗi. */
 const LEGACY_JSON_MAX_BYTES = 128 * 1024 * 1024;
@@ -176,11 +177,14 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     return { ok: true, data: { path: filePath, bytes, points } };
   });
 
-  /** Trạng thái sao lưu cho panel "Quản trị dữ liệu" — đọc, không ghi. */
-  function backupStatus(): { lastBackupAt: string | null; lastBackupBytes: number } {
+  /** Trạng thái cho panel "Quản trị dữ liệu" — đọc, không ghi. `activityRows`
+   * để nhắc lưu trữ nhật ký khi bảng lớn (app không tự xoá nhật ký). */
+  function backupStatus(): { lastBackupAt: string | null; lastBackupBytes: number; activityRows: number; operationMode: OperationModeState | null } {
     return {
       lastBackupAt: getMeta('lastBackupAt'),
       lastBackupBytes: Number(getMeta('lastBackupBytes') || 0) || 0,
+      activityRows: Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n),
+      operationMode: readOperationMode(db),
     };
   }
 
@@ -210,8 +214,10 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     }
 
     try {
-      if (inspected.kind === 'sqlite') restoreAllTablesFromFile(db, filePath);
-      else restoreAllTables(db, inspected.envelope.data);
+      keepOperationMode(db, () => {
+        if (inspected.kind === 'sqlite') restoreAllTablesFromFile(db, filePath);
+        else restoreAllTables(db, inspected.envelope.data);
+      });
     } catch (e) {
       return fail('restore-failed', e instanceof Error ? e.message : 'Phục hồi thất bại.');
     }
@@ -235,6 +241,9 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
    * hash tamper-evident không bị phá: xoá nhật ký mà giữ anchor, hoặc ngược
    * lại, sẽ làm `verifyAuditChain()` báo sai ngay dòng đầu. */
   const resetOperationalData = writeCommand(db, 'resetOperationalData', 'admin', (w): IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }> => {
+    if (readOperationMode(db)) {
+      return fail('operation-mode', 'Hệ thống đang ở chế độ vận hành nên không xoá sạch dữ liệu được. Dữ liệu QC chỉ thay đổi qua các quy trình có nhật ký.');
+    }
     let snapshotPath: string;
     try {
       snapshotPath = writeSafetySnapshot(db, userDataDir, 'pre-reset-backup');

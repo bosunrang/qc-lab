@@ -9,6 +9,8 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
 import { NceConfigPanel } from './settings/NceConfigPanel';
+import { auditSizeWarning } from '../../main/domain/audit-filter';
+import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
 
 const LOGO_SIZE = 96;
 
@@ -67,10 +69,10 @@ export function SettingsPage() {
   const {
     profile, backup: backupInfo, lis, lisQueue, firebase,
     loadAll, loadStorage, save, loadFirebase,
-    exportBackup, chooseBackupFile, importBackup, resetOperationalData,
+    exportBackup, chooseBackupFile, importBackup, resetOperationalData, enableOperationMode,
     saveLis, pullLisQueue, importLisResult, rejectLisResult,
     connectFirebase: connectFirebaseApi, syncFirebase, disconnectFirebase: disconnectFirebaseApi,
-  } = useSettingsStore(useShallow((s) => ({ profile: s.profile, backup: s.backup, lis: s.lis, lisQueue: s.lisQueue, firebase: s.firebase, loadAll: s.loadAll, loadStorage: s.loadStorage, save: s.save, loadFirebase: s.loadFirebase, exportBackup: s.exportBackup, chooseBackupFile: s.chooseBackupFile, importBackup: s.importBackup, resetOperationalData: s.resetOperationalData, saveLis: s.saveLis, pullLisQueue: s.pullLisQueue, importLisResult: s.importLisResult, rejectLisResult: s.rejectLisResult, connectFirebase: s.connectFirebase, syncFirebase: s.syncFirebase, disconnectFirebase: s.disconnectFirebase })));
+  } = useSettingsStore(useShallow((s) => ({ profile: s.profile, backup: s.backup, lis: s.lis, lisQueue: s.lisQueue, firebase: s.firebase, loadAll: s.loadAll, loadStorage: s.loadStorage, save: s.save, loadFirebase: s.loadFirebase, exportBackup: s.exportBackup, chooseBackupFile: s.chooseBackupFile, importBackup: s.importBackup, resetOperationalData: s.resetOperationalData, enableOperationMode: s.enableOperationMode, saveLis: s.saveLis, pullLisQueue: s.pullLisQueue, importLisResult: s.importLisResult, rejectLisResult: s.rejectLisResult, connectFirebase: s.connectFirebase, syncFirebase: s.syncFirebase, disconnectFirebase: s.disconnectFirebase })));
   const [name, setName] = useState('');
   const [dept, setDept] = useState('');
   const [address, setAddress] = useState('');
@@ -328,6 +330,20 @@ export function SettingsPage() {
     await infoDialog(`Đã xoá ${result.data.clearedTables.length} bảng dữ liệu vận hành.\n\nBản sao lưu trước khi xoá: ${result.data.preResetSnapshotPath}`, { type: 'success' });
   }
 
+  /** Bật chế độ vận hành: một chiều, nên đi qua confirm + reauth như xoá sạch. */
+  async function turnOnOperationMode() {
+    if (!(await confirmDialog(
+      'Sau khi bật, "Xóa sạch dữ liệu test" bị khoá vĩnh viễn trên máy này; dữ liệu QC chỉ còn thay đổi qua các quy trình có nhật ký (huỷ điểm, lưu trữ nhật ký…). Phục hồi backup hay tải từ Firebase cũng không tắt được chế độ này. Chỉ bật khi đã bắt đầu dùng dữ liệu QC thật. Tiếp tục?',
+      { title: 'Bật chế độ vận hành', danger: true, confirmLabel: 'Bật chế độ vận hành' },
+    ))) return;
+    if (!(await reauthDialog({ title: 'Xác thực bật chế độ vận hành', message: 'Bật chế độ vận hành là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
+    const result = await enableOperationMode();
+    if (!result.ok) { await showError(result.error.message); return; }
+    await infoDialog('Đã bật chế độ vận hành. "Xóa sạch dữ liệu test" không còn dùng được.', { type: 'success' });
+  }
+  const operationMode = backupInfo?.operationMode ?? null;
+  const auditWarning = backupInfo ? auditSizeWarning(backupInfo.activityRows) : null;
+
   return (
     <>
       <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
@@ -378,6 +394,7 @@ export function SettingsPage() {
 
       <div className="panel settings-admin-panel">
         <h2 className="panel-title settings-panel-title"><DataAdminIcon />Quản trị dữ liệu</h2>
+        {auditWarning && <div className="alert warn" role="status">{auditWarning} Mở trang Nhật ký hoạt động để lưu trữ.</div>}
         <div className="admin-tools">
           <div className="admin-tool">
             <b>Xuất backup</b>
@@ -397,11 +414,25 @@ export function SettingsPage() {
               <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
             </div>
           </div>
-          <div className="admin-tool">
-            <b>Xóa sạch dữ liệu test</b>
-            <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
-            <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
-          </div>
+          {operationMode ? (
+            <div className="admin-tool">
+              <b>Chế độ vận hành</b>
+              <span>Đã bật lúc {formatAuditDateTimeVN(operationMode.enabledAt)}{operationMode.enabledBy ? ` bởi ${operationMode.enabledBy}` : ''}. "Xóa sạch dữ liệu test" đã bị khoá; dữ liệu QC chỉ thay đổi qua các quy trình có nhật ký.</span>
+            </div>
+          ) : (
+            <>
+              <div className="admin-tool">
+                <b>Xóa sạch dữ liệu test</b>
+                <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
+                <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
+              </div>
+              <div className="admin-tool">
+                <b>Chế độ vận hành</b>
+                <span>Bật khi bắt đầu dùng dữ liệu QC thật: khoá vĩnh viễn "Xóa sạch dữ liệu test". Không thể tắt lại.</span>
+                <button className="btn ghost" onClick={turnOnOperationMode}>Bật chế độ vận hành</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

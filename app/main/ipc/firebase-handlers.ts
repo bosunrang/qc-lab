@@ -18,6 +18,7 @@ import { createFirebaseClient, type FirebaseSession } from '../domain/firebase-c
 import { type IpcResult } from './shared';
 import { writeCommand, writeCommandAsync, type WriteSteps } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
+import { keepOperationMode } from '../db/operation-mode';
 
 const CONFIG_KEY = 'firebaseConfig';
 const EMAIL_KEY = 'firebaseEmail';
@@ -160,7 +161,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
    * (cần tắt khoá ngoại NGOÀI transaction), `w.commit()` giữ phần còn lại. */
   async function pullNow(w: WriteSteps, remote: FirebasePayload, keep: Connection): Promise<void> {
     const snapshot = writeSafetySnapshot(db, userDataDir, 'pre-firebase-pull');
-    restoreAllTables(db, remote.backup.data);
+    keepOperationMode(db, () => restoreAllTables(db, remote.backup.data));
     w.commit((tx) => {
       writeConnection(keep);
       tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây; bản an toàn trước đó tại ${snapshot}`, '');

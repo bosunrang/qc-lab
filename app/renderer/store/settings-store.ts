@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   LabProfile, IpcResult, LisGatewaySettings, LisQueueRecord, FirebaseSettings,
   FirebaseConnectResult, FirebaseSyncResult, StorageInfo, BackupFileSummary,
+  BackupStatus, OperationModeState,
 } from '../../shared/qc-api';
 
 /** Trang Cài đặt gom 5 nhóm dữ liệu backend độc lập: hồ sơ đơn vị, dung
@@ -23,7 +24,7 @@ import type {
 interface SettingsState {
   profile: LabProfile | null;
   storage: StorageInfo | null;
-  backup: { lastBackupAt: string | null; lastBackupBytes: number } | null;
+  backup: BackupStatus | null;
   lis: LisGatewaySettings | null;
   lisQueue: { pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null;
   firebase: FirebaseSettings | null;
@@ -39,6 +40,7 @@ interface SettingsState {
   chooseBackupFile: () => Promise<IpcResult<BackupFileSummary | null>>;
   importBackup: () => Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
   resetOperationalData: () => Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
+  enableOperationMode: () => Promise<IpcResult<OperationModeState>>;
 
   loadLis: () => Promise<void>;
   saveLis: (data: { enabled: boolean; url: string; token: string }) => Promise<IpcResult<LisGatewaySettings>>;
@@ -93,6 +95,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetOperationalData: async () => {
     const result = await window.qcApi.resetOperationalData();
     if (result.ok) await get().loadAll();
+    return result;
+  },
+  enableOperationMode: async () => {
+    const result = await window.qcApi.enableOperationMode();
+    if (result.ok) await get().loadBackupStatus();
     return result;
   },
 

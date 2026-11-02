@@ -60,7 +60,7 @@ export function verifyAuditChain(activity: readonly Partial<AuditEntry>[] = [], 
 
 /** Tính lại toàn bộ prevHash/hash theo ĐÚNG thứ tự mảng hiện tại (không sắp
  * xếp lại theo ts/seq) — dùng sau khi merge nhật ký từ nhiều nguồn (Firebase
- * sync) hoặc sau khi archive/rotate cắt bớt phần đầu. */
+ * sync) hoặc sau khi lưu trữ (archive) cắt bớt phần đầu. */
 export function relinkAuditChain(activity: readonly Partial<AuditEntry>[] = [], anchor = ''): AuditEntry[] {
   let previous = String(anchor || '');
   return activity.map(entry => {

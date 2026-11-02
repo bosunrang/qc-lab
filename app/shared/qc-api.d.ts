@@ -1,6 +1,11 @@
 // Hợp đồng IPC lộ ra qua preload.ts — dùng chung giữa main và renderer để
 // renderer có type an toàn khi gọi window.qcApi.*
 export interface LisGatewaySettings { enabled: boolean; url: string; token: string }
+/** Chế độ vận hành đã bật: lúc nào, ai bật. */
+export interface OperationModeState { enabledAt: string; enabledBy: string }
+/** Trạng thái cho panel "Quản trị dữ liệu". `activityRows` dùng để nhắc lưu
+ * trữ nhật ký; `operationMode` là `null` khi chưa bật chế độ vận hành. */
+export interface BackupStatus { lastBackupAt: string | null; lastBackupBytes: number; activityRows: number; operationMode: OperationModeState | null }
 /** Kết quả kiểm tra một tệp backup trước khi phục hồi. `legacy` là tệp .json
  * xuất trước khi đổi sang định dạng SQLite. */
 export interface BackupFileSummary {
@@ -850,7 +855,7 @@ export interface QcApi {
   /** Phục hồi từ tệp vừa kiểm tra ở `chooseBackupFile()`; luôn tạo bản an
    * toàn của dữ liệu hiện tại trước khi thay thế. */
   importBackup(): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
-  backupStatus(): Promise<{ lastBackupAt: string | null; lastBackupBytes: number }>;
+  backupStatus(): Promise<BackupStatus>;
   /** Ghi lỗi không được bắt của renderer vào tệp log của máy chính. Chỉ cửa
    * sổ Electron của máy chính gọi được; máy trạm LAN không mở kênh này. */
   reportClientError(input: { message: string; stack?: string }): Promise<IpcResult<null>>;
@@ -861,8 +866,12 @@ export interface QcApi {
    * dùng chọn; `data: null` khi huỷ hộp thoại. Không kèm CSDL. Chỉ quản trị
    * viên, chỉ máy chính. */
   exportLogBundle(): Promise<IpcResult<{ path: string; files: number; bytes: number } | null>>;
-  /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. */
+  /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. Bị chặn
+   * (`operation-mode`) khi đã bật chế độ vận hành. */
   resetOperationalData(): Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
+  /** Bật chế độ vận hành — một chiều, không tắt được. Renderer xác thực lại
+   * mật khẩu trước khi gọi. Chỉ quản trị viên, chỉ máy chính. */
+  enableOperationMode(): Promise<IpcResult<OperationModeState>>;
 
   getLisSettings(): Promise<LisGatewaySettings>;
   saveLisSettings(input: { data: { enabled: boolean; url: string; token: string } }): Promise<IpcResult<LisGatewaySettings>>;

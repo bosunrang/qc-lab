@@ -32,6 +32,7 @@ import { createSettingsHandlers } from '../../main/ipc/settings-handlers';
 import { createReportHandlers } from '../../main/ipc/report-handlers';
 import { createLisHandlers } from '../../main/ipc/lis-handlers';
 import { bindOperations, createBusinessOperations, sessionContext } from '../../main/ipc/operations';
+import { readOperationMode } from '../../main/db/operation-mode';
 import type { QcApi, IpcResult } from '../../shared/qc-api';
 import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from '../lib/browser-export';
 
@@ -162,6 +163,8 @@ export async function createRealBrowserApi(): Promise<QcApi> {
       return {
         lastBackupAt: at,
         lastBackupBytes: Number.isFinite(bytes) ? bytes : 0,
+        activityRows: Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n),
+        operationMode: readOperationMode(db),
       };
     },
 

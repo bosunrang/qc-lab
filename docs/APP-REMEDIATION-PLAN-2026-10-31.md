@@ -108,20 +108,35 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 - **Test:** đổi 1-3s sang "Cảnh báo" hôm nay không đổi kết luận của run hôm qua;
   thay đổi không được rơi vào kỳ đã khoá; thêm ca vào bộ thẩm định `app/validation/`.
 
-## GV3 — Toàn vẹn nhật ký (A2, A7, A8, P0, M)
+## GV3 — Toàn vẹn nhật ký (A2, A7, A8, P0, M) — đã làm 02/11/2026
 
 - **Căn cứ:** ISO 15189:2022 8.4.3 (lưu giữ hồ sơ), quy tắc dự án "không xoá cứng điểm QC".
-- **Phương án:**
-  1. Bỏ `rotateAuditOverflow` tự xoá. Thay bằng cảnh báo cho admin khi bảng
-     `activity` vượt ngưỡng (giữ `AUDIT_HARD_CAP` làm ngưỡng cảnh báo), trỏ tới
-     "Lưu trữ nhật ký cũ" — đường này đã xuất CSV trước khi gỡ. Kiểm lại kích
-     thước gói Firebase khi nhật ký lớn (ngưỡng 256 MB).
-  2. `clientId` của máy trạm LAN thành `lan:<ip>`; ghi audit cho lần đăng nhập sai.
-  3. Thêm "chế độ vận hành" (cờ trong `app_meta`, bật một chiều, cần xác thực lại
-     mật khẩu): khi bật, ẩn và chặn "Xoá sạch dữ liệu test" ở main.
-- **Tệp:** `ipc/shared.ts`, `ipc/desktop-operations.ts`, `ipc/auth-handlers.ts`,
-  `lan/http-server.ts`, `ipc/backup-handlers.ts`, `SettingsPage.tsx`, `AuditPage.tsx`.
-- **Test:** vượt ngưỡng không xoá dòng nào; `resetOperationalData` bị chặn khi đã bật chế độ vận hành.
+- **Đã làm:**
+  1. Bỏ `rotateAuditOverflow` (cùng `AUDIT_HARD_CAP`/`AUDIT_ROTATE_TO`): app không
+     tự xoá dòng nhật ký nào. Ngưỡng 50.000 dòng nay là `AUDIT_SIZE_WARNING_ROWS`
+     (`domain/audit-filter.ts`), chỉ để hiện lời nhắc "Lưu trữ nhật ký cũ" ở trang
+     Nhật ký và panel Quản trị dữ liệu (Cài đặt). `backupStatus()` trả thêm
+     `activityRows`. Kích thước gói Firebase không cần sửa thêm: `pushNow()` đã đo
+     cỡ, cảnh báo khi gần giới hạn và từ chối kèm thông báo rõ khi vượt.
+  2. `login(input, clientId)`: máy chính là `app-desktop`, máy trạm là `lan:<ip>`
+     (cả phiên LAN mang `clientId` này, nên mọi dòng nhật ký của phiên ghi đúng
+     máy). Đăng nhập sai ghi dòng "Đăng nhập thất bại" với lý do (sai mật khẩu /
+     tài khoản không tồn tại / tài khoản bị khoá) và nơi thử, không ghi mật khẩu.
+     Vì cột `client_id` không hiện ở trang Nhật ký hay CSV, nơi đăng nhập được ghi
+     kèm trong phần chi tiết.
+  3. Chế độ vận hành (`db/operation-mode.ts`, khoá `operationModeAt`/`operationModeBy`
+     trong `app_meta`): bật ở Cài đặt → Quản trị dữ liệu, qua xác nhận + xác thực
+     lại mật khẩu; không có thao tác tắt. Khi bật, `resetOperationalData` trả lỗi
+     `operation-mode` và giao diện thay thẻ "Xóa sạch dữ liệu test" bằng trạng thái
+     chế độ vận hành. Phục hồi backup và tải từ Firebase giữ lại cờ
+     (`keepOperationMode`), để không thể tắt bằng cách nạp dữ liệu cũ hơn lúc bật.
+- **Lệch so với phương án:** `enableOperationMode` nằm ở `settings-handlers.ts`
+  (bảng thao tác nghiệp vụ, kênh `settings:enableOperationMode`, không mở qua LAN)
+  thay vì handler backup, để bản xem trước chạy thật thay vì thêm một hàm
+  "not-available" (test `browser-preview-coverage` canh ngưỡng này).
+- **Test:** `app/tests/audit-integrity.test.mjs` (đăng nhập sai, `lan:<ip>`, chế
+  độ vận hành, phục hồi backup cũ); `audit-handlers.test.mjs` mục 10 nay kiểm vượt
+  ngưỡng không xoá dòng nào; `lan-http-server.test.mjs` kiểm `clientId` của máy trạm.
 
 ## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L)
 

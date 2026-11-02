@@ -105,10 +105,11 @@
   letter-spacing:.06em;
 }
 
-/* Bốn công cụ quản trị dùng một hàng. Lưới tự lấy chiều cao của mô tả dài
-   nhất, vì vậy nút thao tác của cả bốn thẻ luôn thẳng hàng mà không cần ép
-   chiều cao riêng. */
-.admin-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-3);margin:var(--panel-content-gap) var(--space-4) var(--space-4);align-items:stretch}
+/* Các công cụ quản trị (4 hoặc 5 thẻ, tuỳ chế độ vận hành) dùng một hàng khi
+   đủ rộng. Lưới tự lấy chiều cao của mô tả dài nhất, vì vậy nút thao tác của
+   các thẻ luôn thẳng hàng mà không cần ép chiều cao riêng. */
+.settings-admin-panel > .alert{margin:var(--panel-content-gap) var(--space-4) 0}
+.admin-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:var(--space-3);margin:var(--panel-content-gap) var(--space-4) var(--space-4);align-items:stretch}
 .admin-tool{
   border:1px solid var(--surface-border); border-radius:var(--radius-md); box-shadow:var(--panel-shadow); overflow:hidden; background:var(--surface);
   padding:var(--space-3);display:grid;grid-template-rows:auto 1fr auto;gap:var(--space-2);min-width:0;
