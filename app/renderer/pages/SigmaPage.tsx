@@ -328,7 +328,7 @@ export function SigmaPage() {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       <div className="panel sg-no-level-panel">
-        <div className="row-flex sg-control-row"><div className="field sg-test-picker"><label>Chọn xét nghiệm</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{sigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}</select></div>
+        <div className="row-flex sg-control-row"><div className="field sg-test-picker"><label htmlFor="sgTestSelectNoLevel">Chọn xét nghiệm</label><select id="sgTestSelectNoLevel" value={testId} onChange={(e) => setTestId(e.target.value)}>{sigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}</select></div>
         </div>
         <div className="alert warn sg-no-level-alert">Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.
           {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Cấu hình Mean/SD</button>}
@@ -359,33 +359,33 @@ export function SigmaPage() {
           </div>
           <div className="row-flex sg-control-row">
             <div className="field sg-test-picker">
-              <label>Chọn xét nghiệm</label>
+              <label htmlFor="sgTestSelect">Chọn xét nghiệm</label>
               <select id="sgTestSelect" aria-label="Chọn xét nghiệm" value={selectedVisible ? testId : ''} onChange={(event) => { setTestId(event.target.value); setTestSearch(''); }}>
                 {!visibleSigmaTests.length && <option value="" disabled>Không tìm thấy xét nghiệm phù hợp</option>}
                 {visibleSigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}
               </select>
             </div>
-            <div className="field sg-unit-field"><label>Đơn vị</label><input value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
-            <div className="field sg-instrument-field"><label>Thiết bị</label><input value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
+            <div className="field sg-unit-field"><label htmlFor="sg-unit">Đơn vị</label><input id="sg-unit" value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
+            <div className="field sg-instrument-field"><label htmlFor="sg-instrument">Thiết bị</label><input id="sg-instrument" value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
           </div>
           <div className="sg-setup-fields sg-analysis-fields">
             <div className="field sg-tea-source">
-              <label>Nguồn TEa</label>
-              <select aria-label="Nguồn TEa" disabled={!teaEditable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
+              <label htmlFor="sg-tea-source">Nguồn TEa</label>
+              <select id="sg-tea-source" aria-label="Nguồn TEa" disabled={!teaEditable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
                 {TEA_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label} · {teaSourceValueText(s.value)}</option>)}
               </select>
             </div>
             <div className="field sg-tea-input">
-              <label>{teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'}</label>
-              <input key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !teaEditable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Nhập TEa%' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
+              <label htmlFor="sg-tea-value">{teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'}</label>
+              <input id="sg-tea-value" key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !teaEditable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Nhập TEa%' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
             </div>
           </div>
           {writable && !teaEditable && <p className="hint">{QC_CONFIG_DENIED_MESSAGE}</p>}
           {teaSource === 'eflm' && test && <div className="sg-eflm-box">
-            <div className="field sg-eflm-field"><label>Xét nghiệm trên EFLM</label><input disabled={!teaEditable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_analyte || test.name).trim()) saveTeaConfig({ eflmAnalyte: e.currentTarget.value }); }} /></div>
-            <div className="field sg-eflm-field"><label>Mức APS</label><select disabled={!teaEditable} value={test.eflm_aps || 'desirable'} onChange={(e) => saveTeaConfig({ eflmAps: e.target.value })}><option value="minimum">minimum</option><option value="desirable">desirable</option><option value="optimum">optimum</option></select></div>
+            <div className="field sg-eflm-field"><label htmlFor="sg-eflm-analyte">Xét nghiệm trên EFLM</label><input id="sg-eflm-analyte" disabled={!teaEditable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_analyte || test.name).trim()) saveTeaConfig({ eflmAnalyte: e.currentTarget.value }); }} /></div>
+            <div className="field sg-eflm-field"><label htmlFor="sg-eflm-aps">Mức APS</label><select id="sg-eflm-aps" disabled={!teaEditable} value={test.eflm_aps || 'desirable'} onChange={(e) => saveTeaConfig({ eflmAps: e.target.value })}><option value="minimum">minimum</option><option value="desirable">desirable</option><option value="optimum">optimum</option></select></div>
             <div className="field sg-eflm-field"><label htmlFor="sg-eflm-lookup-date">Ngày tra cứu</label><DateField id="sg-eflm-lookup-date" value={test.eflm_lookup_date || ''} disabled={!teaEditable} onChange={(value) => { if (value !== (test.eflm_lookup_date || '')) saveTeaConfig({ eflmLookupDate: value }); }} /></div>
-            <div className="field sg-eflm-field"><label>Link/tài liệu EFLM</label><input disabled={!teaEditable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_ref || '').trim()) saveTeaConfig({ eflmRef: e.currentTarget.value }); }} /></div>
+            <div className="field sg-eflm-field"><label htmlFor="sg-eflm-ref">Link/tài liệu EFLM</label><input id="sg-eflm-ref" disabled={!teaEditable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_ref || '').trim()) saveTeaConfig({ eflmRef: e.currentTarget.value }); }} /></div>
           </div>}
           <div className="alert info sg-sigma-input-note">
             <div className="sg-sigma-note-list">

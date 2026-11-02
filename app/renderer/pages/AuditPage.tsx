@@ -95,8 +95,8 @@ export function AuditPage() {
         <div className="audit-filterbar">
           <DateField label="Từ ngày" className="audit-date" value={from} onChange={(v) => setRange(v, to)} />
           <DateField label="Đến ngày" className="audit-date" value={to} onChange={(v) => setRange(from, v)} />
-          <div className="field"><label>Số dòng mỗi trang</label>
-            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+          <div className="field"><label htmlFor="audit-page-size">Số dòng mỗi trang</label>
+            <select id="audit-page-size" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
               <option value={25}>25 dòng</option><option value={50}>50 dòng</option><option value={100}>100 dòng</option>
             </select>
           </div>
@@ -219,8 +219,8 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
       {err && <p className="field-error" role="alert">{err}</p>}
       <p className="audit-archive-copy">Xuất CSV của đúng phần sẽ lưu trữ, gồm PrevHash/Hash để đối chiếu chuỗi. Sau khi xác thực lại, hệ thống chỉ xoá khi bạn xác nhận đã kiểm tra file tải về.</p>
       <div className="field">
-        <label>Giữ lại dữ liệu trong</label>
-        <select value={months} onChange={(e) => setMonths(e.target.value as never)}>
+        <label htmlFor="audit-archive-months">Giữ lại dữ liệu trong</label>
+        <select id="audit-archive-months" value={months} onChange={(e) => setMonths(e.target.value as never)}>
           <option value="12">12 tháng gần nhất</option><option value="24">24 tháng gần nhất</option><option value="36">36 tháng gần nhất</option>
         </select>
       </div>

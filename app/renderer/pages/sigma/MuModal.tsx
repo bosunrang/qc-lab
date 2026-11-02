@@ -37,13 +37,13 @@ export function MuModal({ level, onClose, onSubmit }: {
       <label className="sg-mu-bias-toggle">
         <input type="checkbox" checked={includeBias} onChange={(e) => setIncludeBias(e.target.checked)} /> Đưa u(bias) vào ngân sách
       </label>
-      <div className="field"><label>u(Cref) % — độ không đảm bảo của giá trị gán, từ báo cáo EQA/chứng chỉ CRM</label><input type="number" step="0.001" min="0" value={uCref} onChange={(e) => setUCref(e.target.value)} /></div>
+      <div className="field"><label htmlFor="mu-ucref">u(Cref) % — độ không đảm bảo của giá trị gán, từ báo cáo EQA/chứng chỉ CRM</label><input id="mu-ucref" type="number" step="0.001" min="0" value={uCref} onChange={(e) => setUCref(e.target.value)} /></div>
       <details className="alert info sg-mu-help">
         <summary>Hướng dẫn xác định u(Cref)</summary>
         <p>Nhập độ không đảm bảo chuẩn theo %. Nếu chứng chỉ cho độ không đảm bảo mở rộng U, tính u = U/k với hệ số phủ k trên chứng chỉ; chỉ chia 2 khi k = 2. Nếu u ở đơn vị nồng độ, đổi u% = 100 × u / |giá trị tham chiếu|. Áp dụng cách quy đổi này cho cả u(Cref) và u(cal); không chia lại nếu tài liệu đã cho u chuẩn. Không suy u(Cref) từ độ phân tán các vòng bias{level.biasSem != null ? ` (SEM hiện ${level.biasSem.toFixed(3)}%, chỉ tham khảo)` : ''}. Bỏ trống là chưa đánh giá, không phải 0.</p>
         <p>Mô hình có/không cộng bias phải được người phụ trách phê duyệt; bỏ bias cần chứng cứ xử lý/hiệu chỉnh và tránh tính trùng thành phần.</p>
       </details>
-      <div className="field"><label>u(cal)% chuẩn — từ CoA hiệu chuẩn (0 là kết luận hợp lệ, khác với bỏ trống)</label><input type="number" step="0.001" min="0" value={uCal} onChange={(e) => setUCal(e.target.value)} /></div>
+      <div className="field"><label htmlFor="mu-ucal">u(cal)% chuẩn — từ CoA hiệu chuẩn (0 là kết luận hợp lệ, khác với bỏ trống)</label><input id="mu-ucal" type="number" step="0.001" min="0" value={uCal} onChange={(e) => setUCal(e.target.value)} /></div>
       {preview && (
         <p className="sg-mu-preview">
           {preview.complete ? 'Dự tính' : 'Tạm tính chưa đầy đủ'}: u_c = {preview.uc.toFixed(3)}% · U (k=2) = {preview.U.toFixed(3)}%

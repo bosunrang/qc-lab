@@ -1,6 +1,6 @@
 // Tab "LotsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { useWestgardStore } from '../../store/westgard-store';
@@ -13,9 +13,17 @@ import { vnDate } from '../../lib/format';
 import { EmptyState, lotStatus } from './shared';
 import type { QcLot, LotGroup } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
+import { formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
 
 const LOTS_PAGE_SIZE = 15;
 const LOT_GROUPS_PAGE_SIZE = 10;
+
+/** Mã lỗi `saveLot` (`validateLot` + handler) → ô cần sửa. */
+const LOT_FIELD_ERRORS: FieldErrorMap = { 'missing-lot-no': 'lotNo', 'duplicate-lot': 'lotNo', 'level-in-use': 'level' };
+/** Mã lỗi `saveLotGroup` → ô cần sửa. `duplicate-group` cố ý không gắn ô:
+ * trùng có thể do tên HOẶC do bộ lô, chỉ ra một ô sẽ dẫn người dùng sai chỗ. */
+const LOT_GROUP_FIELD_ERRORS: FieldErrorMap = { 'not-enough-lots': 'lotIds', 'missing-name': 'name' };
 
 function ListPagination({ page, pageCount, pageSize, total, itemLabel, onPageChange }: {
   page: number; pageCount: number; pageSize: number; total: number; itemLabel: string; onPageChange: (page: number) => void;
@@ -67,8 +75,12 @@ export function LotsTab() {
   const [lotGroupPage, setLotGroupPage] = useState(1);
   const [editingLot, setEditingLot] = useState<QcLot | 'new' | null>(null);
   const [editingGroup, setEditingGroup] = useState<LotGroup | 'new' | null>(null);
-  const [lotErr, setLotErr] = useState<string | null>(null);
-  const [groupErr, setGroupErr] = useState<string | null>(null);
+  const [lotErr, setLotErr] = useState<FormError | null>(null);
+  const [groupErr, setGroupErr] = useState<FormError | null>(null);
+  const lotFormRef = useRef<HTMLFormElement>(null);
+  const groupFormRef = useRef<HTMLFormElement>(null);
+  const lotErrorId = useInvalidField(lotFormRef, lotErr);
+  const groupErrorId = useInvalidField(groupFormRef, groupErr);
   const [groupChecked, setGroupChecked] = useState<Set<string>>(new Set());
 
   // Lọc theo bộ field của tab này (số lô, mô tả, nhà cung cấp, chương trình,
@@ -155,7 +167,7 @@ export function LotsTab() {
       }
     }
     const result = await saveLot(id, data);
-    if (!result.ok) { setLotErr(result.error.message); return; }
+    if (!result.ok) { setLotErr(formErrorFrom(result.error, LOT_FIELD_ERRORS)); return; }
     setEditingLot(null);
   }
 
@@ -177,7 +189,7 @@ export function LotsTab() {
     };
     const id = editingGroup !== 'new' && editingGroup ? editingGroup.id : undefined;
     const result = await saveLotGroup(id, data);
-    if (!result.ok) { setGroupErr(result.error.message); return; }
+    if (!result.ok) { setGroupErr(formErrorFrom(result.error, LOT_GROUP_FIELD_ERRORS)); return; }
     setEditingGroup(null);
   }
 
@@ -248,20 +260,20 @@ export function LotsTab() {
       {editingLot && (
         <Modal busy={savingLot.busy} title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
           footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-form" disabled={savingLot.busy}>{savingLot.busy ? 'Đang lưu…' : editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
-          <form id="lot-form" onSubmit={(e) => { e.preventDefault(); void savingLot.run(e.currentTarget); }}>
-            {lotErr && <p className="field-error" role="alert">{lotErr}</p>}
+          <form id="lot-form" ref={lotFormRef} onSubmit={(e) => { e.preventDefault(); void savingLot.run(e.currentTarget); }}>
+            {lotErr && <p id={lotErrorId} className="field-error" role="alert">{lotErr.message}</p>}
             <div className="grid2">
-              <div className="field"><label>Số lô</label><input name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
+              <div className="field"><label htmlFor="lot-no">Số lô</label><input id="lot-no" name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
               <div className="field">
-                <label>Mức QC</label>
-                <select name="level" defaultValue={editingLot !== 'new' ? editingLot.level : 1}>
+                <label htmlFor="lot-level">Mức QC</label>
+                <select id="lot-level" name="level" defaultValue={editingLot !== 'new' ? editingLot.level : 1}>
                   {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
             </div>
             <div className="grid2">
-              <div className="field"><label>Mô tả</label><input name="description" placeholder="VD: Acusera Assayed Chemistry Control" defaultValue={editingLot !== 'new' ? editingLot.description : ''} /></div>
-              <div className="field"><label>Nhà cung cấp</label><input name="supplier" placeholder="Randox" defaultValue={editingLot !== 'new' ? editingLot.supplier : ''} /></div>
+              <div className="field"><label htmlFor="lot-description">Mô tả</label><input id="lot-description" name="description" placeholder="VD: Acusera Assayed Chemistry Control" defaultValue={editingLot !== 'new' ? editingLot.description : ''} /></div>
+              <div className="field"><label htmlFor="lot-supplier">Nhà cung cấp</label><input id="lot-supplier" name="supplier" placeholder="Randox" defaultValue={editingLot !== 'new' ? editingLot.supplier : ''} /></div>
             </div>
             <div className="grid2">
               <DateField id="lot-opened" name="opened" label="Ngày mở" defaultValue={editingLot !== 'new' ? editingLot.opened : ''} />
@@ -274,10 +286,10 @@ export function LotsTab() {
       {editingGroup && (
         <Modal busy={savingGroup.busy} title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
           footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-group-form" disabled={savingGroup.busy}>{savingGroup.busy ? 'Đang lưu…' : editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
-          <form id="lot-group-form" onSubmit={(e) => { e.preventDefault(); void savingGroup.run(e.currentTarget); }}>
-            {groupErr && <p className="field-error" role="alert">{groupErr}</p>}
-            <label className="lot-group-picker-label">Chọn các lô QC</label>
-            <div className="lot-level-picker">
+          <form id="lot-group-form" ref={groupFormRef} onSubmit={(e) => { e.preventDefault(); void savingGroup.run(e.currentTarget); }}>
+            {groupErr && <p id={groupErrorId} className="field-error" role="alert">{groupErr.message}</p>}
+            <label id="lot-group-picker-label" className="lot-group-picker-label">Chọn các lô QC</label>
+            <div className="lot-level-picker" role="group" aria-labelledby="lot-group-picker-label">
               {[1, 2, 3, 4, 5, 6].map((level) => {
                 const levelLots = lots.filter((lot) => lot.level === level);
                 if (!levelLots.length) return null;
@@ -286,7 +298,7 @@ export function LotsTab() {
                   {levelLots.map((lot) => {
                     const locked = !!lot.depleted && !groupChecked.has(lot.id);
                     return <label className={lot.depleted ? 'lot-opt-depleted' : ''} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
-                      <input type="checkbox" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
+                      <input type="checkbox" data-field="lotIds" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
                         const next = new Set(groupChecked);
                         if (e.target.checked) next.add(lot.id); else next.delete(lot.id);
                         setGroupChecked(next);
@@ -299,7 +311,7 @@ export function LotsTab() {
               })}
               {!lots.length && <EmptyState size="compact">Chưa có lô QC để tạo nhóm.</EmptyState>}
             </div>
-            <div className="field"><label>Tên nhóm lô</label><input name="name" placeholder="Tự động: 1102/1103" defaultValue={editingGroup !== 'new' ? editingGroup.name : ''} autoFocus /></div>
+            <div className="field"><label htmlFor="lot-group-name">Tên nhóm lô</label><input id="lot-group-name" name="name" placeholder="Tự động: 1102/1103" defaultValue={editingGroup !== 'new' ? editingGroup.name : ''} autoFocus /></div>
           </form>
         </Modal>
       )}

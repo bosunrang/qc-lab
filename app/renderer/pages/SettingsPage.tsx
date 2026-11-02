@@ -376,9 +376,9 @@ export function SettingsPage() {
                 </div>
               </div>
               <div className="field">
-                <label>Chọn ảnh logo</label>
+                <label htmlFor="logoFilePick">Chọn ảnh logo</label>
                 <div className="file-pick">
-                  <button type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>Chọn tệp</button>
+                  <button id="logoFilePick" type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>Chọn tệp</button>
                   <span id="logoFileName" className="hint">{logoFileName || 'Chưa chọn tệp'}</span>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickLogo} />

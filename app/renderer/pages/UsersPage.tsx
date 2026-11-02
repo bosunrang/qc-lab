@@ -7,7 +7,7 @@
 //      Vai trò là trần trên, lưới checkbox chỉ thu hẹp thêm. Chặn thật ở
 //      main (`auth-handlers.ts` gọi `selectUserPermissions`), lưới này chỉ
 //      là giao diện.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useUsersStore } from '../store/users-store';
 import { useAuthStore } from '../store/auth-store';
@@ -20,6 +20,15 @@ import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/p
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
 import { AsyncButton } from '../components/AsyncButton';
+import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../lib/field-error';
+import { useInvalidField } from '../lib/useInvalidField';
+
+/** Mã lỗi `createUser` / `resetPassword` (`auth-validation.ts`) → ô cần sửa.
+ * Các ô dùng state, không nằm trong `<form>`, nên tìm qua `data-field`. */
+const USER_FIELD_ERRORS: FieldErrorMap = {
+  'missing-username': 'username', 'invalid-username': 'username', 'duplicate-username': 'username',
+  'missing-name': 'name', 'weak-password': 'password', 'missing-page-perms': 'pagePerms',
+};
 
 /** Quyền nghiệp vụ cấp riêng cho KTV (danh sách mã ở `domain/capabilities.ts`;
  * main kiểm ở `ipc/shared.ts` và `domain/nce/permissions.ts`). */
@@ -41,7 +50,7 @@ function PermGrid({ groupId, labelledBy, role, selected, onToggle, availableOnly
         const enabled = allowed.has(page.id);
         return (
           <label key={page.id} className={enabled ? (selected.has(page.id) ? 'selected' : '') : 'disabled'} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
-            <input type="checkbox" value={page.id} checked={enabled && selected.has(page.id)} disabled={!enabled}
+            <input type="checkbox" data-field="pagePerms" value={page.id} checked={enabled && selected.has(page.id)} disabled={!enabled}
               onChange={(e) => onToggle(page.id, e.target.checked)} />
             <span>{page.label}</span>
           </label>
@@ -76,6 +85,12 @@ function CreatePanel() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(rolePageIds('technician')));
   const availableCount = rolePageIds(role).length;
   const initials = initialsFromName(name);
+  // Lỗi vẫn hiện bằng hộp thoại như cũ; đóng hộp thoại xong thì ô sai được
+  // đánh dấu và nhận focus. Câu lỗi nằm trong một `span hidden` để ô có
+  // `aria-describedby` trỏ tới mà giao diện không thêm dòng chữ nào.
+  const [err, setErr] = useState<FormError | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const errorId = useInvalidField(panelRef, err);
 
   function changeRole(next: string) {
     setRole(next);
@@ -84,24 +99,30 @@ function CreatePanel() {
 
   async function submit() {
     const pagePerms = [...selected];
-    if (!pagePerms.length) { await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return; }
+    if (!pagePerms.length) {
+      await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.');
+      setErr(formError('Cần chọn ít nhất một thẻ được phép dùng.', 'pagePerms'));
+      return;
+    }
     const result = await create({ username: username.trim().toLowerCase(), name, initials: initialsFromName(name), role, password, pagePerms });
-    if (!result.ok) { await errorDialog(result.error.message); return; }
+    if (!result.ok) { await errorDialog(result.error.message); setErr(formErrorFrom(result.error, USER_FIELD_ERRORS)); return; }
+    setErr(null);
     setUsername(''); setName(''); setPassword('');
     setSelected(new Set(rolePageIds(role)));
   }
 
   return (
-    <div className="panel users-create-panel">
+    <div className="panel users-create-panel" ref={panelRef}>
       <h2 className="panel-title">Thêm người dùng</h2>
+      {err && <span id={errorId} hidden>{err.message}</span>}
       <div className="user-create-layout">
         <section className="user-create-section" aria-labelledby="userAccountTitle">
           <h3 id="userAccountTitle">Thông tin tài khoản</h3>
           <div className="user-create-fields">
-            <div className="field"><label htmlFor="uUser">Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-            <div className="field"><label htmlFor="uName">Họ tên</label><input id="uName" aria-label="Họ tên" value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div className="field"><label htmlFor="uUser">Tên đăng nhập</label><input id="uUser" data-field="username" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+            <div className="field"><label htmlFor="uName">Họ tên</label><input id="uName" data-field="name" aria-label="Họ tên" value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="field"><label htmlFor="uRole">Vai trò</label><RoleSelect id="uRole" value={role} onChange={changeRole} /></div>
-            <div className="field"><label htmlFor="uPass">Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            <div className="field"><label htmlFor="uPass">Mật khẩu tạm</label><input id="uPass" data-field="password" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
             <div className="user-initials-preview">Mã viết tắt tự tạo <span className="pill">{initials || '—'}</span></div>
           </div>
         </section>
@@ -256,21 +277,23 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
 function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () => void }) {
   const { resetPassword } = useUsersStore(useShallow((s) => ({ resetPassword: s.resetPassword })));
   const [password, setPassword] = useState('');
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<FormError | null>(null);
   const [done, setDone] = useState(false);
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const errorId = useInvalidField(fieldRef, err);
 
   async function submit() {
     const result = await resetPassword(user.id, password);
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) { setErr(formErrorFrom(result.error, USER_FIELD_ERRORS)); return; }
     setDone(true);
   }
 
   return (
     <Modal title={`Đặt lại mật khẩu — ${user.username}`} onClose={onClose}
       footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Đặt lại</AsyncButton></>}>
-      {err && <p className="field-error" role="alert">{err}</p>}
+      {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
       {done ? <p>Đã đặt lại mật khẩu — người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp.</p> : (
-        <div className="field"><label>Mật khẩu mới (≥8 ký tự)</label><input autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+        <div className="field" ref={fieldRef}><label htmlFor="resetUserPassword">Mật khẩu mới (≥8 ký tự)</label><input id="resetUserPassword" data-field="password" autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }} /></div>
       )}
     </Modal>

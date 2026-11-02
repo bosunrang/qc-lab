@@ -1,6 +1,6 @@
 // Tab "InstrumentsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
@@ -9,11 +9,18 @@ import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { EmptyState, FieldRow } from './shared';
 import type { Instrument } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
+import { formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
+
+/** Mã lỗi `saveInstrument` (`validateInstrument`) → ô cần sửa. */
+const INSTRUMENT_FIELD_ERRORS: FieldErrorMap = { 'missing-name': 'name', 'duplicate-name': 'name' };
 
 export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { createRequest?: number; onCreateRequestHandled?: () => void } = {}) {
   const { instruments, tests, panels, saveInstrument, removeInstrument } = useManageStore(useShallow((s) => ({ instruments: s.instruments, tests: s.tests, panels: s.panels, saveInstrument: s.saveInstrument, removeInstrument: s.removeInstrument })));
   const [editing, setEditing] = useState<Instrument | 'new' | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<FormError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorId = useInvalidField(formRef, err);
   const [query, setQuery] = useState('');
 
   function openNew() { setErr(null); setEditing('new'); }
@@ -33,7 +40,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
     };
     const id = editing !== 'new' && editing ? editing.id : undefined;
     const result = await saveInstrument(id, data);
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) { setErr(formErrorFrom(result.error, INSTRUMENT_FIELD_ERRORS)); return; }
     setEditing(null);
   }
   const saving = useAsyncAction(submit);
@@ -78,15 +85,15 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
         {editing && (
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="instrument-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
-            <form id="instrument-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error" role="alert">{err}</p>}
+            <form id="instrument-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
+              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <FieldRow>
-                <div className="field"><label>Tên hiển thị</label><input name="name" placeholder="VD: AU5800-01" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
-                <div className="field"><label>Khoa / Khu vực</label><input name="section" placeholder="Hóa sinh" defaultValue={editing !== 'new' ? editing.section : ''} /></div>
+                <div className="field"><label htmlFor="instrument-name">Tên hiển thị</label><input id="instrument-name" name="name" placeholder="VD: AU5800-01" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
+                <div className="field"><label htmlFor="instrument-section">Khoa / Khu vực</label><input id="instrument-section" name="section" placeholder="Hóa sinh" defaultValue={editing !== 'new' ? editing.section : ''} /></div>
               </FieldRow>
               <FieldRow>
-                <div className="field"><label>Nhà sản xuất</label><input name="manufacturer" placeholder="Beckman Coulter" defaultValue={editing !== 'new' ? editing.manufacturer : ''} /></div>
-                <div className="field"><label>Số sê-ri</label><input name="serial" defaultValue={editing !== 'new' ? editing.serial : ''} /></div>
+                <div className="field"><label htmlFor="instrument-manufacturer">Nhà sản xuất</label><input id="instrument-manufacturer" name="manufacturer" placeholder="Beckman Coulter" defaultValue={editing !== 'new' ? editing.manufacturer : ''} /></div>
+                <div className="field"><label htmlFor="instrument-serial">Số sê-ri</label><input id="instrument-serial" name="serial" defaultValue={editing !== 'new' ? editing.serial : ''} /></div>
               </FieldRow>
               <label className="rcfg-check instrument-active">
                 <input type="checkbox" name="active" defaultChecked={editing === 'new' || editing.active === 1} /> Máy đang hoạt động

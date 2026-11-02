@@ -262,6 +262,10 @@ label.field>span:first-child{display:block;margin-bottom:var(--field-label-gap);
 .field-row{display:flex;gap:var(--field-gap);align-items:flex-end;flex-wrap:wrap;}
 .field-row>div{flex:1;min-width:120px;}
 .field-error{color:var(--danger-text);font-size:var(--text-xs);margin-top:var(--space-1-5);}
+/* Ô bị lỗi lưu chỉ ra (`aria-invalid`, U7): viền đỏ, kể cả khi đang focus bằng
+   chuột (đủ độ ưu tiên để thắng `:focus:not(:focus-visible)` ở trên). Ô ngày
+   không có viền riêng nên tô viền khung `.datebox`. */
+:is(input:not([type="checkbox"]):not([type="radio"]),select,textarea)[aria-invalid="true"]:not(:disabled),.datebox:has(>input.date-text[aria-invalid="true"]){border-color:var(--danger-accent);}
 
 
 .btn{font-family:var(--font-sans);display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--control-h);min-height:var(--control-h);padding:0 var(--button-padding-x);border:1px solid transparent;border-radius:var(--control-radius);box-shadow:var(--shadow-button);font-size:var(--button-font-size);font-weight:var(--button-font-weight);letter-spacing:0;cursor:pointer;white-space:nowrap;transition:background var(--motion-fast) ease,border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,transform var(--motion-fast) ease;background:var(--accent);color:var(--on-accent);}

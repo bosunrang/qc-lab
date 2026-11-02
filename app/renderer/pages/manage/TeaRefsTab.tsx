@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
@@ -10,6 +10,8 @@ import { useAuthStore } from '../../store/auth-store';
 import type { TeaRef } from '../../../shared/qc-api';
 import { EmptyState } from './shared';
 import { useAsyncAction } from '../../components/AsyncButton';
+import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
 
 
 const TEA_STATUS: Record<string, { cls: string; label: string }> = {
@@ -27,6 +29,19 @@ const TEA_LAB_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: 'professional', label: 'Hiệp hội / ủy ban chuyên môn' },
   { value: 'other', label: 'Nguồn khác đã thẩm định' },
 ];
+
+/** Mã lỗi `addTeaAnalyte` → ô cần sửa. */
+const TEA_ADD_FIELD_ERRORS: FieldErrorMap = { 'missing-name': 'name', duplicate: 'name', 'missing-clia-absolute': 'cliaAbsolute' };
+/** Mã lỗi `saveTeaRef` (`validateTeaRef`) → ô cần sửa. Hai mã có danh sách
+ * ô: chỉ vào ô còn trống trong cặp. Lỗi TEa theo mức chọn ô ngay lúc lưu
+ * (xem `submit`) vì phải biết mức nào sai. */
+const TEA_PROFILE_FIELD_ERRORS: FieldErrorMap = {
+  'missing-name': 'name', 'invalid-value': 'labValue', 'missing-source': 'labSource', 'invalid-source': 'labSource',
+  'invalid-reference': 'reference', 'invalid-source-url': 'sourceUrl', 'missing-source-url': 'sourceUrl',
+  'invalid-reason': 'reason', 'missing-dates': ['effectiveDate', 'approvedDate'],
+  'approved-after-effective': 'approvedDate', 'review-before-effective': 'nextReviewDate',
+  'missing-signoff': ['preparedBy', 'approvedBy'],
+};
 
 function normalizeTeaKey(value: string) { return value.trim().toLocaleLowerCase('vi'); }
 function formatTeaValue(value: number | null | undefined) { return value == null ? '—' : `${value}%`; }
@@ -51,8 +66,12 @@ export function TeaRefsTab() {
   const [labDraft, setLabDraft] = useState('');
   const [levelDrafts, setLevelDrafts] = useState<Record<number, string>>({});
   const [adding, setAdding] = useState(false);
-  const [addErr, setAddErr] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [addErr, setAddErr] = useState<FormError | null>(null);
+  const [err, setErr] = useState<FormError | null>(null);
+  const addFormRef = useRef<HTMLFormElement>(null);
+  const profileFormRef = useRef<HTMLFormElement>(null);
+  const addErrorId = useInvalidField(addFormRef, addErr);
+  const errorId = useInvalidField(profileFormRef, err);
   const [query, setQuery] = useState('');
   const current = editing && editing !== 'new' ? teaRefs.find((ref) => ref.id === editing) : null;
   const currentSources = useMemo(() => parseSources(current?.sources_json), [current]);
@@ -97,7 +116,13 @@ export function TeaRefsTab() {
       ? selectedTeaLevels.map((level) => ({ level, tea: levelDrafts[level] ?? '' }))
       : [];
     const result = await saveTeaRef(editing !== 'new' ? (editing as string) : undefined, { ...data, labValue: labDraft, levelValues });
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) {
+      // TEa theo mức sai: chỉ vào ô của mức đầu tiên chưa có số dương.
+      const levelError = result.error.code === 'invalid-level-value' || result.error.code === 'duplicate-level';
+      const badLevel = levelError ? selectedTeaLevels.find((level) => !(Number(levelDrafts[level]) > 0)) : undefined;
+      setErr(badLevel != null ? formError(result.error.message, `levelTea:${badLevel}`) : formErrorFrom(result.error, TEA_PROFILE_FIELD_ERRORS));
+      return;
+    }
     setEditing(null);
   }
 
@@ -110,7 +135,7 @@ export function TeaRefsTab() {
       cliaRule: String(form.get('cliaRule') || '') as 'percent' | 'absolute' | 'greater-of',
       cliaAbsolute: String(form.get('cliaAbsolute') || ''), cliaAbsoluteUnit: String(form.get('cliaAbsoluteUnit') || ''),
     });
-    if (!result.ok) { setAddErr(result.error.message); return; }
+    if (!result.ok) { setAddErr(formErrorFrom(result.error, TEA_ADD_FIELD_ERRORS)); return; }
     setAdding(false);
   }
 
@@ -191,25 +216,25 @@ export function TeaRefsTab() {
       </div>
       {adding && <Modal busy={addingAnalyte.busy} title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} size="lg" className="rcfg-modal"
         footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Hủy</button><button className="btn teal" type="submit" form="tea-add-form" disabled={addingAnalyte.busy}>{addingAnalyte.busy ? 'Đang lưu…' : 'Thêm xét nghiệm'}</button></>}>
-        <form id="tea-add-form" onSubmit={(event) => { event.preventDefault(); void addingAnalyte.run(event.currentTarget); }}>
-          {addErr && <p className="field-error" role="alert">{addErr}</p>}
+        <form id="tea-add-form" ref={addFormRef} onSubmit={(event) => { event.preventDefault(); void addingAnalyte.run(event.currentTarget); }}>
+          {addErr && <p id={addErrorId} className="field-error" role="alert">{addErr.message}</p>}
           <div className="grid2">
-            <div className="field"><label>Tên quốc tế <span className="req">*</span></label><input name="name" placeholder="VD: Creatine kinase-MB" autoFocus /></div>
-            <div className="field"><label>Viết tắt</label><input name="abbreviation" placeholder="VD: CK-MB" /></div>
+            <div className="field"><label htmlFor="tea-add-name">Tên quốc tế <span className="req">*</span></label><input id="tea-add-name" name="name" placeholder="VD: Creatine kinase-MB" autoFocus /></div>
+            <div className="field"><label htmlFor="tea-add-abbreviation">Viết tắt</label><input id="tea-add-abbreviation" name="abbreviation" placeholder="VD: CK-MB" /></div>
           </div>
           <div className="grid2">
-            <div className="field"><label>Đơn vị</label><input name="unit" placeholder="U/L" /></div>
-            <div className="field"><label>Nhóm</label><input name="section" placeholder="Hóa sinh" /></div>
+            <div className="field"><label htmlFor="tea-add-unit">Đơn vị</label><input id="tea-add-unit" name="unit" placeholder="U/L" /></div>
+            <div className="field"><label htmlFor="tea-add-section">Nhóm</label><input id="tea-add-section" name="section" placeholder="Hóa sinh" /></div>
           </div>
           <div className="grid2">
-            <div className="field"><label>TEa CLIA %</label><input name="clia" type="number" step="any" /></div>
-            <div className="field"><label>TEa Ricos %</label><input name="ricos" type="number" step="any" /></div>
+            <div className="field"><label htmlFor="tea-add-clia">TEa CLIA %</label><input id="tea-add-clia" name="clia" type="number" step="any" /></div>
+            <div className="field"><label htmlFor="tea-add-ricos">TEa Ricos %</label><input id="tea-add-ricos" name="ricos" type="number" step="any" /></div>
           </div>
           <div className="grid2">
-            <div className="field"><label>Quy tắc CLIA</label><select name="cliaRule" defaultValue="greater-of"><option value="greater-of">Lấy giá trị lớn hơn (% hoặc tuyệt đối)</option><option value="percent">Chỉ dùng %</option><option value="absolute">Chỉ dùng giới hạn tuyệt đối</option></select></div>
-            <div className="field"><label>Giới hạn CLIA tuyệt đối</label><input name="cliaAbsolute" type="number" step="any" placeholder="Ví dụ: 0.05" /></div>
+            <div className="field"><label htmlFor="tea-add-clia-rule">Quy tắc CLIA</label><select id="tea-add-clia-rule" name="cliaRule" defaultValue="greater-of"><option value="greater-of">Lấy giá trị lớn hơn (% hoặc tuyệt đối)</option><option value="percent">Chỉ dùng %</option><option value="absolute">Chỉ dùng giới hạn tuyệt đối</option></select></div>
+            <div className="field"><label htmlFor="tea-add-clia-absolute">Giới hạn CLIA tuyệt đối</label><input id="tea-add-clia-absolute" name="cliaAbsolute" type="number" step="any" placeholder="Ví dụ: 0.05" /></div>
           </div>
-          <div className="field"><label>Đơn vị giới hạn tuyệt đối</label><input name="cliaAbsoluteUnit" placeholder="Mặc định dùng đơn vị xét nghiệm" /></div>
+          <div className="field"><label htmlFor="tea-add-clia-absolute-unit">Đơn vị giới hạn tuyệt đối</label><input id="tea-add-clia-absolute-unit" name="cliaAbsoluteUnit" placeholder="Mặc định dùng đơn vị xét nghiệm" /></div>
           <div className="hint flow-note">Chỉ khai giới hạn tuyệt đối khi nguồn CLIA của analyte quy định đơn vị đo; hệ thống sẽ chỉ dùng khi đơn vị tương thích.</div>
           <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
@@ -219,11 +244,11 @@ export function TeaRefsTab() {
           <button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button>
           <button className="btn teal" type="submit" form="tearef-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm hồ sơ TEa' : 'Lưu thay đổi'}</button>
         </>}>
-        <form id="tearef-form" onSubmit={(event) => { event.preventDefault(); void saving.run(event.currentTarget); }}>
-          {err && <p className="field-error" role="alert">{err}</p>}
+        <form id="tearef-form" ref={profileFormRef} onSubmit={(event) => { event.preventDefault(); void saving.run(event.currentTarget); }}>
+          {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
           <input type="hidden" name="analyteId" value={profileAnalyteId} />
           <input type="hidden" name="section" value={current?.section || prefill?.section || ''} />
-          <section className="tea-form-section"><b>Thông tin TEa phòng xét nghiệm</b><div className="tea-form-primary"><div className="field"><label>Tên xét nghiệm</label><input name="name" defaultValue={current?.name || prefill?.name || ''} autoFocus /></div><div className="field"><label>Đơn vị</label><input name="unit" defaultValue={current?.unit || prefill?.unit || ''} /></div><div className="field tea-form-source"><label>Nguồn</label><select name="labSource" defaultValue={current?.lab_source || ''}><option value="">— Chọn nguồn chính —</option>{TEA_LAB_SOURCE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></div></section>
+          <section className="tea-form-section"><b>Thông tin TEa phòng xét nghiệm</b><div className="tea-form-primary"><div className="field"><label htmlFor="tea-profile-name">Tên xét nghiệm</label><input id="tea-profile-name" name="name" defaultValue={current?.name || prefill?.name || ''} autoFocus /></div><div className="field"><label htmlFor="tea-profile-unit">Đơn vị</label><input id="tea-profile-unit" name="unit" defaultValue={current?.unit || prefill?.unit || ''} /></div><div className="field tea-form-source"><label htmlFor="tea-profile-source">Nguồn</label><select id="tea-profile-source" name="labSource" defaultValue={current?.lab_source || ''}><option value="">— Chọn nguồn chính —</option>{TEA_LAB_SOURCE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></div></section>
           <section className="tea-form-section">
             <div className="tea-apply-heading"><div><b>Cách áp dụng TEa</b><p>Chọn một giá trị chung hoặc khai riêng theo từng mức QC.</p></div></div>
             <div className="tea-mode-row">
@@ -233,7 +258,7 @@ export function TeaRefsTab() {
               </div>
               <span className="tea-mode-help">{teaMode === 'common' ? 'Một giá trị áp dụng cho mọi mức QC.' : 'Nhập riêng TEa cho M1, M2, M3…'}</span>
             </div>
-            {teaMode === 'common' ? <div className="tea-common-card"><div className="field"><label>Giá trị TEa (%)</label><input name="labValue" type="number" min="0.01" step="0.01" value={labDraft} onChange={(event) => setLabDraft(event.target.value)} placeholder="Ví dụ: 15" /></div><p>Giá trị này được áp dụng thống nhất cho tất cả mức QC của xét nghiệm.</p></div> : <>
+            {teaMode === 'common' ? <div className="tea-common-card"><div className="field"><label htmlFor="tea-profile-value">Giá trị TEa (%)</label><input id="tea-profile-value" name="labValue" type="number" min="0.01" step="0.01" value={labDraft} onChange={(event) => setLabDraft(event.target.value)} placeholder="Ví dụ: 15" /></div><p>Giá trị này được áp dụng thống nhất cho tất cả mức QC của xét nghiệm.</p></div> : <>
               <div className="tea-level-heading"><div><b>TEa theo mức QC</b><p>Chọn các mức cần áp dụng. M1 và M2 được chọn sẵn khi tạo hồ sơ mới.</p></div><span className="tag none">{selectedTeaLevels.length} mức</span></div>
               <div className="tea-level-picker">
                 <div className="tea-level-picker-label"><b>Chọn mức QC</b><small>Có thể bật thêm hoặc bỏ bớt mức trước khi lưu.</small></div>
@@ -246,13 +271,13 @@ export function TeaRefsTab() {
               </div>
               <div className="tea-generic-level-grid">{selectedTeaLevels.map((level) => <label className="tea-generic-level-card" key={level}>
                 <span><b>Mức {level}</b><small>Giá trị TEa (%)</small></span>
-                <input aria-label={`TEa mức ${level}`} type="number" min="0.01" step="0.01" value={levelDrafts[level] ?? ''} onChange={(event) => { const value = event.target.value; setLevelDrafts((drafts) => ({ ...drafts, [level]: value })); }} placeholder="Nhập %" />
+                <input aria-label={`TEa mức ${level}`} data-field={`levelTea:${level}`} type="number" min="0.01" step="0.01" value={levelDrafts[level] ?? ''} onChange={(event) => { const value = event.target.value; setLevelDrafts((drafts) => ({ ...drafts, [level]: value })); }} placeholder="Nhập %" />
               </label>)}</div>
-              <div className="tea-level-fallback field"><label>TEa dự phòng (%) <span className="tea-form-label-note">(không bắt buộc)</span></label><input name="labValue" type="number" min="0.01" step="0.01" value={labDraft} onChange={(event) => setLabDraft(event.target.value)} placeholder="Dùng khi một mức chưa nhập riêng" /></div>
+              <div className="tea-level-fallback field"><label htmlFor="tea-profile-value">TEa dự phòng (%) <span className="tea-form-label-note">(không bắt buộc)</span></label><input id="tea-profile-value" name="labValue" type="number" min="0.01" step="0.01" value={labDraft} onChange={(event) => setLabDraft(event.target.value)} placeholder="Dùng khi một mức chưa nhập riêng" /></div>
             </>}
           </section>
-          <section className="tea-form-section"><b>Căn cứ áp dụng</b><div className="field"><label>Tham chiếu <span className="tea-form-label-note">(tối thiểu 3 ký tự)</span></label><input name="reference" defaultValue={currentSources.reference || ''} /></div><div className="field"><label htmlFor="tea-source-url">Link nguồn <span className="tea-form-label-note">(bắt buộc với "Nguồn khác đã thẩm định")</span></label><input id="tea-source-url" name="sourceUrl" inputMode="url" placeholder="https://" defaultValue={currentSources.sourceUrl || ''} /></div><div className="field"><label>Lý do áp dụng <span className="tea-form-label-note">(tối thiểu 10 ký tự)</span></label><textarea name="reason" defaultValue={currentSources.reason || ''} /></div></section>
-          <section className="tea-form-section tea-form-section-last"><b>Hiệu lực và phê duyệt</b><div className="tea-form-dates"><DateField label="Ngày hiệu lực" name="effectiveDate" defaultValue={currentSources.effectiveDate || ''} /><DateField label="Ngày duyệt" name="approvedDate" defaultValue={currentSources.approvedDate || ''} /><DateField label="Ngày xem lại kế tiếp" name="nextReviewDate" defaultValue={current?.lab_next_review_date || ''} /></div><div className="tea-form-people"><div className="field"><label>Người chuẩn bị</label><input name="preparedBy" defaultValue={current?.lab_prepared_by || ''} /></div><div className="field"><label>Người duyệt</label><input name="approvedBy" defaultValue={currentSources.approvedBy || ''} /></div></div></section>
+          <section className="tea-form-section"><b>Căn cứ áp dụng</b><div className="field"><label htmlFor="tea-profile-reference">Tham chiếu <span className="tea-form-label-note">(tối thiểu 3 ký tự)</span></label><input id="tea-profile-reference" name="reference" defaultValue={currentSources.reference || ''} /></div><div className="field"><label htmlFor="tea-source-url">Link nguồn <span className="tea-form-label-note">(bắt buộc với "Nguồn khác đã thẩm định")</span></label><input id="tea-source-url" name="sourceUrl" inputMode="url" placeholder="https://" defaultValue={currentSources.sourceUrl || ''} /></div><div className="field"><label htmlFor="tea-profile-reason">Lý do áp dụng <span className="tea-form-label-note">(tối thiểu 10 ký tự)</span></label><textarea id="tea-profile-reason" name="reason" defaultValue={currentSources.reason || ''} /></div></section>
+          <section className="tea-form-section tea-form-section-last"><b>Hiệu lực và phê duyệt</b><div className="tea-form-dates"><DateField id="tea-effective-date" label="Ngày hiệu lực" name="effectiveDate" defaultValue={currentSources.effectiveDate || ''} /><DateField id="tea-approved-date" label="Ngày duyệt" name="approvedDate" defaultValue={currentSources.approvedDate || ''} /><DateField id="tea-next-review-date" label="Ngày xem lại kế tiếp" name="nextReviewDate" defaultValue={current?.lab_next_review_date || ''} /></div><div className="tea-form-people"><div className="field"><label htmlFor="tea-profile-prepared-by">Người chuẩn bị</label><input id="tea-profile-prepared-by" name="preparedBy" defaultValue={current?.lab_prepared_by || ''} /></div><div className="field"><label htmlFor="tea-profile-approved-by">Người duyệt</label><input id="tea-profile-approved-by" name="approvedBy" defaultValue={currentSources.approvedBy || ''} /></div></div></section>
         </form>
       </Modal>}
     </>

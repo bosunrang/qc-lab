@@ -13,6 +13,8 @@ import { defaultRuleAction } from '../../../main/domain/westgard-rules';
 import { NOT_RETROACTIVE_NOTE } from '../../../main/domain/rule-config';
 import type { Test } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
+import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
 
 function testCatalogKey(test: Test): string {
   // `analyte_id` là mã kỹ thuật từ các lần tạo/cập nhật trước. Một số bản ghi
@@ -32,6 +34,11 @@ const SCOPE_LABELS: Record<string, string> = {
 };
 const ACTION_LABELS: Record<string, string> = {
   inactive: 'Không dùng', alert: 'Cảnh báo', reject: 'Loại bỏ',
+};
+
+/** Mã lỗi `saveTest` (`validateTest` + handler) → ô cần sửa. */
+const TEST_FIELD_ERRORS: FieldErrorMap = {
+  'missing-name': 'name', 'duplicate-name': 'name', 'missing-instrument': 'instrumentIds', 'invalid-tea': 'tea',
 };
 
 export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string; onNeedInstrument?: () => void } = {}) {
@@ -59,7 +66,9 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   const [editingSingleAssignment, setEditingSingleAssignment] = useState(false);
   const [assigningMachines, setAssigningMachines] = useState(false);
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Record<string, string>>({});
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<FormError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorId = useInvalidField(formRef, err);
   const [query, setQuery] = useState('');
   const [nameQuery, setNameQuery] = useState('');
   const [namePickerOpen, setNamePickerOpen] = useState(false);
@@ -178,7 +187,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     if (assigningMachines) {
       const existingInstrumentIds = new Set(editingAssignments.map(item => item.instrument_id));
       if (!selectedInstrumentIds.some(id => !existingInstrumentIds.has(id))) {
-        setErr('Chọn ít nhất một máy mới để gán xét nghiệm.');
+        setErr(formError('Chọn ít nhất một máy mới để gán xét nghiệm.', 'instrumentIds'));
         return;
       }
     }
@@ -218,17 +227,17 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
           const action = String(fd.get(`ruleAction:${rule}`) || '') as '' | 'inactive' | 'alert' | 'reject';
           if (action !== (ruleActions[rule] || '')) {
             const actionResult = await saveRuleAction(testId, rule, action);
-            if (!actionResult.ok) { setErr(actionResult.error.message); return; }
+            if (!actionResult.ok) { setErr(formError(actionResult.error.message)); return; }
           }
           const scope = String(fd.get(`ruleScope:${rule}`) || '');
           if (scope !== (ruleScopes[rule] || '')) {
             const scopeResult = await saveRuleScope(testId, rule, scope as '' | 'within' | 'across' | 'both');
-            if (!scopeResult.ok) { setErr(scopeResult.error.message); return; }
+            if (!scopeResult.ok) { setErr(formError(scopeResult.error.message)); return; }
           }
         }
       }
     }
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) { setErr(formErrorFrom(result.error, TEST_FIELD_ERRORS)); return; }
     setAssigningMachines(false); setEditing(null);
   }
   const catalogGroups = useMemo(() => {
@@ -295,8 +304,8 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
         {editing && (
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal rcfg-assay-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
-            <form id="test-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error" role="alert">{err}</p>}
+            <form id="test-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
+              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <div className="assay-setup-layout">
                 <section className="assay-config-card assay-settings-column">
                   <div className="assay-card-head">
@@ -305,9 +314,9 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                   <div className="assay-card-body">
                     <div className="assay-main-grid">
                     <div className="field">
-                      <label>Tên xét nghiệm <span className="req">*</span></label>
+                      <label htmlFor="test-name">Tên xét nghiệm <span className="req">*</span></label>
                       <div className="assay-name-picker">
-                        <input ref={nameInputRef} name="name" autoComplete="off"
+                        <input ref={nameInputRef} id="test-name" name="name" autoComplete="off"
                           role="combobox" aria-autocomplete="list" aria-expanded={namePickerOpen}
                           aria-controls="assayTeaSuggestions"
                           placeholder="Gõ để tìm tên, viết tắt hoặc bí danh…"
@@ -341,13 +350,13 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                       <input type="hidden" name="teaRefKey" defaultValue={editing !== 'new' ? editing.tea_ref_key : ''} />
                       <input type="hidden" name="teaSource" defaultValue={editing !== 'new' ? editing.tea_source : ''} />
                     </div>
-                    <div className="field"><label>Đơn vị</label><input name="unit" defaultValue={editing !== 'new' ? editing.unit : ''} /></div>
+                    <div className="field"><label htmlFor="test-unit">Đơn vị</label><input id="test-unit" name="unit" defaultValue={editing !== 'new' ? editing.unit : ''} /></div>
                     </div>
                     <div className="assay-detail-grid">
-                      <div className="field"><label>Phương pháp</label><input name="method" defaultValue={editing !== 'new' ? editing.method : ''} /></div>
-                      <div className="field"><label>TEa %</label><input name="tea" type="number" step="0.01" defaultValue={editing !== 'new' ? editing.tea : ''} /></div>
-                      <div className="field"><label>Hóa chất</label><input name="reagent" defaultValue={editing !== 'new' ? editing.reagent : ''} /></div>
-                      <div className="field"><label>Số thập phân</label><select name="decimalPlaces" defaultValue={editing !== 'new' ? editing.decimal_places : 2}>{[0, 1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
+                      <div className="field"><label htmlFor="test-method">Phương pháp</label><input id="test-method" name="method" defaultValue={editing !== 'new' ? editing.method : ''} /></div>
+                      <div className="field"><label htmlFor="test-tea">TEa %</label><input id="test-tea" name="tea" type="number" step="0.01" defaultValue={editing !== 'new' ? editing.tea : ''} /></div>
+                      <div className="field"><label htmlFor="test-reagent">Hóa chất</label><input id="test-reagent" name="reagent" defaultValue={editing !== 'new' ? editing.reagent : ''} /></div>
+                      <div className="field"><label htmlFor="test-decimal-places">Số thập phân</label><select id="test-decimal-places" name="decimalPlaces" defaultValue={editing !== 'new' ? editing.decimal_places : 2}>{[0, 1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
                     </div>
                   </div>
                 </section>
@@ -402,8 +411,8 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                 <div className="assay-advanced-body">
                   <label className="rcfg-check"><input type="checkbox" name="cusumOn" defaultChecked={editing !== 'new' && editing.cusum_on === 1} /> Bật biểu đồ CUSUM cho xét nghiệm này</label>
                   <div className="assay-cusum-grid">
-                    <div className="field"><label>Ngưỡng tích lũy k (SD)</label><input name="cusumK" type="number" step="0.1" min="0.1" defaultValue={editing !== 'new' ? editing.cusum_k : 0.5} /></div>
-                    <div className="field"><label>Ngưỡng cảnh báo h (SD)</label><input name="cusumH" type="number" step="0.5" min="0.5" defaultValue={editing !== 'new' ? editing.cusum_h : 4} /></div>
+                    <div className="field"><label htmlFor="test-cusum-k">Ngưỡng tích lũy k (SD)</label><input id="test-cusum-k" name="cusumK" type="number" step="0.1" min="0.1" defaultValue={editing !== 'new' ? editing.cusum_k : 0.5} /></div>
+                    <div className="field"><label htmlFor="test-cusum-h">Ngưỡng cảnh báo h (SD)</label><input id="test-cusum-h" name="cusumH" type="number" step="0.5" min="0.5" defaultValue={editing !== 'new' ? editing.cusum_h : 4} /></div>
                   </div>
                 </div>
               </details>

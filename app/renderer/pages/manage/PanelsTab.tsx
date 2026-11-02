@@ -1,6 +1,6 @@
 // Tab "PanelsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
@@ -9,6 +9,15 @@ import { confirmDialog, infoDialog, errorDialog } from '../../state/dialog-store
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
+import { formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
+
+/** Mã lỗi `savePanel` (`validatePanel` + handler) → ô cần sửa. Ô máy và các
+ * ô chọn xét nghiệm điều khiển bằng state nên tìm qua `data-field`. */
+const PANEL_FIELD_ERRORS: FieldErrorMap = {
+  'missing-name': 'name', 'duplicate-panel': 'name', 'missing-instrument': 'instrumentId',
+  'missing-tests': 'testIds', 'wrong-instrument': 'testIds',
+};
 
 export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => void; onGoInstruments?: () => void } = {}) {
   const { panels, instruments, tests, savePanel, removePanel } = useManageStore(useShallow((s) => ({ panels: s.panels, instruments: s.instruments, tests: s.tests, savePanel: s.savePanel, removePanel: s.removePanel })));
@@ -24,7 +33,9 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
   }
 
   const [editing, setEditing] = useState<QcPanel | 'new' | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<FormError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorId = useInvalidField(formRef, err);
   // Mở modal Panel QC thì tự chọn MÁY ĐẦU TIÊN để danh sách xét nghiệm hiện
   // ngay; để rỗng thì modal chỉ hiện
   // "Chọn máy để hiện danh sách xét nghiệm" — cùng lớp lỗi "không tự chọn
@@ -61,7 +72,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
     const data = { name: String(fd.get('name') || ''), instrumentId, active: fd.get('active') === 'on', testIds: Array.from(checked) };
     const id = editing !== 'new' && editing ? editing.id : undefined;
     const result = await savePanel(id, data);
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) { setErr(formErrorFrom(result.error, PANEL_FIELD_ERRORS)); return; }
     setEditing(null);
   }
 
@@ -102,13 +113,13 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
         {editing && (
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="panel-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
-            <form id="panel-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error" role="alert">{err}</p>}
+            <form id="panel-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
+              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <div className="grid2 panel-qc-main-grid">
-                <div className="field"><label>Tên Panel QC</label><input name="name" placeholder="VD: Sinh hóa AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
+                <div className="field"><label htmlFor="panel-name">Tên Panel QC</label><input id="panel-name" name="name" placeholder="VD: Sinh hóa AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
                 <div className="field">
-                  <label>Máy xét nghiệm</label>
-                  <select value={instrumentId} onChange={(e) => {
+                  <label htmlFor="panel-instrument">Máy xét nghiệm</label>
+                  <select id="panel-instrument" data-field="instrumentId" value={instrumentId} onChange={(e) => {
                     const nextId = e.target.value;
                     setInstrumentId(nextId);
                     // Đổi máy rồi đổi LẠI đúng máy ban đầu thì `testIds` gốc của
@@ -123,12 +134,12 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
                   </select>
                 </div>
               </div>
-              <label className="panel-test-label">Chọn xét nghiệm trong panel</label>
-              <div className="panel-test-picker group-lot-picker">
+              <label id="panel-test-label" className="panel-test-label">Chọn xét nghiệm trong panel</label>
+              <div className="panel-test-picker group-lot-picker" role="group" aria-labelledby="panel-test-label">
                 {instrumentId && !visibleTests.length && <EmptyState size="compact">Máy này chưa có xét nghiệm.</EmptyState>}
                 {visibleTests.map((t) => (
                   <label key={t.id}>
-                    <input type="checkbox" checked={checked.has(t.id)} onChange={(e) => {
+                    <input type="checkbox" data-field="testIds" checked={checked.has(t.id)} onChange={(e) => {
                       setChecked((prev) => { const next = new Set(prev); if (e.target.checked) next.add(t.id); else next.delete(t.id); return next; });
                     }} />
                     <span><b>{t.name}</b><small>{instruments.find((i) => i.id === t.instrument_id)?.name || '—'} · {t.unit || 'Chưa có đơn vị'}</small></span>

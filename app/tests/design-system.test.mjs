@@ -272,7 +272,7 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
     'tên xét nghiệm đã thể hiện ở selector, không lặp lại ở trường chỉ đọc');
   assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row\{display:grid;grid-template-columns:minmax\(0,1fr\) 118px minmax\(0,1fr\);/,
     'chọn xét nghiệm, đơn vị và thiết bị dùng chung một hàng');
-  assert.match(sigmaPage, /<div className="field sg-unit-field"><label>Đơn vị<\/label>/,
+  assert.match(sigmaPage, /<div className="field sg-unit-field"><label htmlFor="sg-unit">Đơn vị<\/label>/,
     'đơn vị nằm trong hàng nhận diện xét nghiệm');
   assert.match(sigmaPage, /const sigmaTestLabel = \(item: typeof tests\[number\]\) => \{[\s\S]*?item\.instrument_id[\s\S]*?`\$\{item\.name\} — \$\{machine\}`/,
     'lựa chọn Sigma nêu cả máy khi một xét nghiệm có nhiều cấu hình máy');

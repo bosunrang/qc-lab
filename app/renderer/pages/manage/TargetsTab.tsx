@@ -178,8 +178,8 @@ export function TargetsTab() {
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.</EmptyState> : <>
       <div className="target-selector target-config-selector">
-        <div className="field target-config-panel-field"><label>Panel QC</label><select value={panelId} onChange={(e) => { setPanelId(e.target.value); setLevel(1); }}>{panels.length ? panels.map((item) => <option key={item.id} value={item.id}>{panelLabel(item)}</option>) : <option value="">Chưa có panel</option>}</select></div>
-        <div className="field target-config-group-field"><label>Nhóm lô QC</label><select value={groupId} onChange={(e) => setGroupId(e.target.value)}>{lotGroups.length ? lotGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>) : <option value="">Không tìm thấy nhóm lô QC phù hợp</option>}</select></div>
+        <div className="field target-config-panel-field"><label htmlFor="target-panel">Panel QC</label><select id="target-panel" value={panelId} onChange={(e) => { setPanelId(e.target.value); setLevel(1); }}>{panels.length ? panels.map((item) => <option key={item.id} value={item.id}>{panelLabel(item)}</option>) : <option value="">Chưa có panel</option>}</select></div>
+        <div className="field target-config-group-field"><label htmlFor="target-lot-group">Nhóm lô QC</label><select id="target-lot-group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>{lotGroups.length ? lotGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>) : <option value="">Không tìm thấy nhóm lô QC phù hợp</option>}</select></div>
         {panel && selectedGroup ? <div className="target-summary"><span className="tag ok"><b>{linked}</b> đã gán mức này</span><span className={`tag ${other ? 'warn' : 'none'}`}><b>{other}</b> đang dùng lô khác</span><span className={`tag ${empty ? 'warn' : 'none'}`}><b>{empty}</b> chưa gán lô</span><span className={`tag ${missing ? 'warn' : 'ok'}`}><b>{missing}</b> thiếu Mean/SD</span></div> : null}
       </div>
       {panel && selectedGroup ? <>

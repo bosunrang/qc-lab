@@ -5,7 +5,7 @@
 // trị + 1 nút Lưu DUY NHẤT — không phải các nút hành động tách rời (Kích
 // hoạt/Chấp nhận/Không chấp nhận) như bản trước, thiết kế mà người dùng đã
 // yêu cầu bỏ.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
@@ -19,6 +19,16 @@ import { EmptyState } from './shared';
 import { normalizeSearch } from '../../lib/useTestSelection';
 import type { LotTransition } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
+import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
+
+/** Mã lỗi `createLotTransition` (`validateLotTransition` + handler) → ô cần
+ * sửa. Thiếu lô thì chỉ vào ô lô còn trống. `duplicate-transition` và
+ * `missing-target` không gắn ô: lỗi thuộc cả bộ Panel/lô hoặc bảng Mean/SD. */
+const TRANSITION_FIELD_ERRORS: FieldErrorMap = {
+  'missing-panel': 'panelId', 'missing-lots': ['fromLotId', 'toLotId'], 'same-lot': 'toLotId',
+  'different-levels': 'toLotId', 'no-target-tests': 'fromLotId', 'accepted-immutable': 'status',
+};
 
 /** Giờ:phút + ngày dạng Việt Nam; giá trị không hợp lệ thì trả rỗng. */
 function formatDateTimeVN(value: string): string {
@@ -62,7 +72,9 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   // Sửa) nhưng đổi status khác 'accepted' sẽ bị main chặn
   // (`accepted-immutable` — không đổi được kết luận đã chấp nhận).
   const [creating, setCreating] = useState<'new' | LotTransition | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<FormError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorId = useInvalidField(formRef, err);
   const [draftPanelId, setDraftPanelId] = useState('');
   const [draftFromLotId, setDraftFromLotId] = useState('');
   const [draftToLotId, setDraftToLotId] = useState('');
@@ -116,7 +128,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
         meanRaw: read('.tm-mean'), lowRaw: read('.tm-low'), highRaw: read('.tm-high'), sdRaw: read('.tm-sd'),
         k: Number(row.getAttribute('data-k') || 2) || 2,
       });
-      if ('error' in parsed) { setErr(parsed.message); return; }
+      if ('error' in parsed) { setErr(formError(parsed.message)); return; }
       criteria.push({ testId: row.getAttribute('data-test') || '', level: Number(row.getAttribute('data-level') || 1), mean: parsed.mean, sd: parsed.sd, low: parsed.low, high: parsed.high });
     }
     const editing = creating !== 'new' ? creating : null;
@@ -127,7 +139,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
       toLotId: String(fd.get('toLotId') || ''), startDate: String(fd.get('startDate') || ''), note: editing?.note || '',
       status, criteria,
     }, editing?.id);
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) { setErr(formErrorFrom(result.error, TRANSITION_FIELD_ERRORS)); return; }
     setCreating(null);
   }
 
@@ -171,21 +183,21 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
         {creating && (
           <Modal busy={saving.busy} title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
             footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Hủy</button><button className="btn teal" type="submit" form="transition-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
-            <form id="transition-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error" role="alert">{err}</p>}
+            <form id="transition-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
+              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <div className="lot-trans-row3">
                 <div className="field">
-                  <label>Panel QC áp dụng</label>
-                  <select name="panelId" value={draftPanelId} onChange={(e) => setDraftPanelId(e.target.value)}><option value="">— Chọn Panel QC —</option>{panels.map((p) => <option key={p.id} value={p.id}>{p.name} · {instrumentName(p.instrument_id)}</option>)}</select>
+                  <label htmlFor="transition-panel">Panel QC áp dụng</label>
+                  <select id="transition-panel" name="panelId" value={draftPanelId} onChange={(e) => setDraftPanelId(e.target.value)}><option value="">— Chọn Panel QC —</option>{panels.map((p) => <option key={p.id} value={p.id}>{p.name} · {instrumentName(p.instrument_id)}</option>)}</select>
                 </div>
-                <div className="field"><label>Lô cũ</label><select name="fromLotId" value={draftFromLotId} onChange={(e) => setDraftFromLotId(e.target.value)}><option value="">Chọn số lô</option>{availableLots(draftFromLotId).filter((lot) => lot.id !== draftToLotId).map((lot) => <option key={lot.id} value={lot.id}>{lotOptionLabel(lot)}</option>)}</select></div>
-                <div className="field"><label>Lô mới</label><select name="toLotId" value={draftToLotId} onChange={(e) => setDraftToLotId(e.target.value)}><option value="">Chọn số lô</option>{availableLots(draftToLotId).filter((lot) => lot.id !== draftFromLotId).map((lot) => <option key={lot.id} value={lot.id}>{lotOptionLabel(lot)}</option>)}</select></div>
+                <div className="field"><label htmlFor="transition-from-lot">Lô cũ</label><select id="transition-from-lot" name="fromLotId" value={draftFromLotId} onChange={(e) => setDraftFromLotId(e.target.value)}><option value="">Chọn số lô</option>{availableLots(draftFromLotId).filter((lot) => lot.id !== draftToLotId).map((lot) => <option key={lot.id} value={lot.id}>{lotOptionLabel(lot)}</option>)}</select></div>
+                <div className="field"><label htmlFor="transition-to-lot">Lô mới</label><select id="transition-to-lot" name="toLotId" value={draftToLotId} onChange={(e) => setDraftToLotId(e.target.value)}><option value="">Chọn số lô</option>{availableLots(draftToLotId).filter((lot) => lot.id !== draftFromLotId).map((lot) => <option key={lot.id} value={lot.id}>{lotOptionLabel(lot)}</option>)}</select></div>
               </div>
               <div className="lot-trans-row2">
                 <DateField id="transition-start-date" name="startDate" label="Ngày bắt đầu" defaultValue={creating && creating !== 'new' ? creating.start_date : todayIso()} />
                 <div className="field">
-                  <label>Trạng thái</label>
-                  <select name="status" defaultValue={creating !== 'new' ? creating.status : 'planned'}>
+                  <label htmlFor="transition-status">Trạng thái</label>
+                  <select id="transition-status" name="status" defaultValue={creating !== 'new' ? creating.status : 'planned'}>
                     <option value="planned">Dự kiến</option>
                     <option value="active">Đang chạy song song</option>
                     <option value="accepted">Chấp nhận lô mới</option>

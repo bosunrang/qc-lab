@@ -321,6 +321,13 @@ dark-accent (6,4–8,6:1). Test: `design-system.test.mjs`.
   Firebase, kích hoạt/dừng nhóm lô, đổi số lô. Mặc định vẫn là nút đỏ.
 - **Test:** `app/tests/notifications.test.mjs`.
 
+**U7 phần còn lại — đã làm 02/11/2026:** mọi cặp nhãn–ô trong `.field` có `htmlFor`/`id`
+(trừ nhãn của cả bảng, ảnh xem trước, ô đệm); `DateField` tự sinh `id` khi không truyền.
+Lưu thất bại: `lib/field-error.ts` + `lib/useInvalidField.ts` đổi mã lỗi của main (bảng mã
+→ tên ô ở từng form: máy, xét nghiệm, lô, nhóm lô, Panel, chuyển lô, TEa, người dùng) thành
+`aria-invalid` + `aria-describedby` tới dòng lỗi + focus vào ô; sửa ô thì tự gỡ. Viền đỏ
+dùng `--danger-accent`. Test: `app/tests/field-error.test.mjs`, e2e `modal-ux.e2e.mjs`.
+
 **U10 (thuộc GV11) — đã làm 02/11/2026:** `.qc-sheet` một sàn `min-width:780px` (bỏ sàn
 1080/840px theo cửa sổ khiến 1366px cuộn ngang 340px, nay 40px); `.qc-sheet-wrap`
 `max-height:max(360px,calc(100vh - 208px))` thay 574px; rule 1050px của sidebar dùng

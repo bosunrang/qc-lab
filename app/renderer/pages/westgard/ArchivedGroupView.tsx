@@ -16,17 +16,17 @@ export function ArchivedGroupPicker({ state }: { state: ArchivedWestgardState })
     <>
       <div className="wg-test-picker wg-test-picker-3">
         <div className="field">
-          <label>Tìm nhanh</label>
-          <input type="search" placeholder="Tên xét nghiệm hoặc số lô..." value={archivedQuery} onChange={(e) => setArchivedQuery(e.target.value)} />
+          <label htmlFor="wg-archived-search">Tìm nhanh</label>
+          <input id="wg-archived-search" type="search" placeholder="Tên xét nghiệm hoặc số lô..." value={archivedQuery} onChange={(e) => setArchivedQuery(e.target.value)} />
         </div>
-        <div className="field"><label>Chọn xét nghiệm <span className="hint">({archivedMatchedTests.length || archivedOrderedTests.length}/{archivedOrderedTests.length})</span></label>
-          <select value={archivedTestId} disabled={archivedTestsLoading || !archivedTestOptions.length} onChange={(e) => setArchivedTestId(e.target.value)}>
+        <div className="field"><label htmlFor="wg-archived-test">Chọn xét nghiệm <span className="hint">({archivedMatchedTests.length || archivedOrderedTests.length}/{archivedOrderedTests.length})</span></label>
+          <select id="wg-archived-test" value={archivedTestId} disabled={archivedTestsLoading || !archivedTestOptions.length} onChange={(e) => setArchivedTestId(e.target.value)}>
             {!archivedTestOptions.length && <option value="">{archivedTestsLoading ? 'Đang nạp xét nghiệm...' : 'Nhóm lô này chưa dùng cho xét nghiệm nào'}</option>}
             {archivedTestOptions.map((t) => <option key={t.id} value={t.id}>{archivedTestPickerLabel(t)}</option>)}
           </select>
         </div>
-        <div className="field"><label>Nhóm lô đã dừng/lưu trữ <span className="hint">({archivedGroupOptions.length}/{archivedGroups.length})</span></label>
-          <select value={archivedGroupId} onChange={(e) => setArchivedGroupId(e.target.value)}>
+        <div className="field"><label htmlFor="wg-archived-group">Nhóm lô đã dừng/lưu trữ <span className="hint">({archivedGroupOptions.length}/{archivedGroups.length})</span></label>
+          <select id="wg-archived-group" value={archivedGroupId} onChange={(e) => setArchivedGroupId(e.target.value)}>
             {archivedGroupOptions.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.active === 0 ? 'đã lưu trữ' : 'đã dừng'}{g.stopped_at ? ` ${vnDate(g.stopped_at)}` : ''}</option>)}
           </select>
         </div>

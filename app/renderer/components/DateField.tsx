@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent } from 'react';
+import { useId, useRef, useState, type MouseEvent } from 'react';
 import { vnDate } from '../lib/format';
 import { openDatePicker } from '../state/date-picker-store';
 import { FIELD_EDIT_EVENT } from '../lib/modal-close';
@@ -37,6 +37,10 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   label?: string; id?: string; name?: string; disabled?: boolean; className?: string;
   value?: string; onChange?: (value: string) => void; defaultValue?: string;
 }) {
+  // Không truyền `id` thì tự sinh: có `label` mà ô không có id thì bấm nhãn
+  // không focus được ô và trình đọc màn hình không nối nhãn với ô (U7).
+  const autoId = useId();
+  const inputId = id || autoId;
   const isControlled = value !== undefined;
   const nativeRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLInputElement>(null);
@@ -65,7 +69,7 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
 
   const box = (
     <span className={`datebox ${className}`.trim()}>
-      <input ref={textRef} id={id} className="date-text" inputMode="numeric" placeholder="dd/mm/yyyy"
+      <input ref={textRef} id={inputId} className="date-text" inputMode="numeric" placeholder="dd/mm/yyyy"
         disabled={disabled} aria-label={label} defaultValue={formatDateDisplay(iso)}
         key={isControlled ? iso : undefined}
         onBlur={(e) => commit(parseDateInput(e.target.value))}
@@ -85,7 +89,7 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   );
 
   if (label === undefined) return box;
-  return <div className="field">{label && <label htmlFor={id}>{label}</label>}{box}</div>;
+  return <div className="field">{label && <label htmlFor={inputId}>{label}</label>}{box}</div>;
 }
 
 

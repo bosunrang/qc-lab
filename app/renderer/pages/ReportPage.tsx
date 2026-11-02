@@ -274,14 +274,14 @@ export function ReportPage() {
           <div className="report-lock-description">Khóa một kỳ theo tháng sẽ chặn sửa hoặc hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b>. Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức.</div>
           <div className="report-lock-controls">
             <div className="field">
-              <label>Tháng</label>
-              <select aria-label="Tháng" disabled={!admin} value={month} onChange={(e) => setLockYm(`${year}-${String(Number(e.target.value)).padStart(2, '0')}`)}>
+              <label htmlFor="report-lock-month">Tháng</label>
+              <select id="report-lock-month" aria-label="Tháng" disabled={!admin} value={month} onChange={(e) => setLockYm(`${year}-${String(Number(e.target.value)).padStart(2, '0')}`)}>
                 {MONTHS.map((m) => <option value={m} key={m}>Tháng {m}</option>)}
               </select>
             </div>
             <div className="field">
-              <label>Năm</label>
-              <select aria-label="Năm" disabled={!admin} value={year} onChange={(e) => setLockYm(`${e.target.value}-${String(month).padStart(2, '0')}`)}>
+              <label htmlFor="report-lock-year">Năm</label>
+              <select id="report-lock-year" aria-label="Năm" disabled={!admin} value={year} onChange={(e) => setLockYm(`${e.target.value}-${String(month).padStart(2, '0')}`)}>
                 {years.map((y) => <option value={y} key={y}>{y}</option>)}
               </select>
             </div>

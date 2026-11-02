@@ -44,6 +44,28 @@ test('modal: focus, Esc theo lớp, hỏi khi bỏ dữ liệu, chặn lưu trù
     assert.equal(saved, 1, 'bấm Lưu hai lần liền chỉ tạo một máy');
     assert.equal(await activeText(page), '＋ Thêm máy xét nghiệm', 'đóng xong focus về nút đã mở form');
 
+    // U7: nhãn gắn với ô — bấm "Tên hiển thị" thì con trỏ về ô tên.
+    await page.getByRole('button', { name: '＋ Thêm máy xét nghiệm' }).click();
+    await modal.waitFor();
+    await modal.locator('input[name=section]').click();
+    assert.equal(await activeName(page), 'section');
+    await modal.getByText('Tên hiển thị', { exact: true }).click();
+    assert.equal(await activeName(page), 'name', 'bấm nhãn focus vào ô tên');
+    // U7: lưu trùng tên thì ô tên bị đánh dấu sai, nối với dòng lỗi và nhận focus.
+    await nameInput.fill('Máy E2E');
+    await modal.locator('input[name=section]').click();
+    await modal.locator('button[type=submit]').click();
+    const fieldError = modal.locator('.field-error');
+    await fieldError.waitFor();
+    assert.equal(await nameInput.getAttribute('aria-invalid'), 'true', 'ô tên mang aria-invalid');
+    assert.equal(await activeName(page), 'name', 'focus về ô tên bị lỗi');
+    const errorId = await fieldError.getAttribute('id');
+    assert.ok(errorId && (await nameInput.getAttribute('aria-describedby'))?.split(' ').includes(errorId), 'ô tên trỏ tới dòng lỗi');
+    await page.keyboard.type(' 2');
+    assert.equal(await nameInput.getAttribute('aria-invalid'), null, 'sửa ô thì gỡ dấu lỗi');
+    await modal.getByRole('button', { name: 'Hủy' }).click();
+    await modal.waitFor({ state: 'detached' });
+
     // U3: Esc khi lịch chọn ngày đang mở trong modal chỉ đóng lịch.
     await page.locator('.config-shell-tabs').getByRole('button', { name: /Lô & Nhóm QC/ }).click();
     await page.getByRole('button', { name: '+ Thêm lô' }).click();
