@@ -335,6 +335,15 @@ dùng `--danger-accent`. Test: `app/tests/field-error.test.mjs`, e2e `modal-ux.e
 `AppShell` theo dõi `(max-width: 1050px)` để mục điều hướng có `title`/`aria-label` khi chỉ
 còn icon. Test: `design-system.test.mjs`.
 
+**U11 (thuộc GV11) — đã làm 02/11/2026:**
+- Bỏ khối `*::-webkit-scrollbar*` và token `--scrollbar-size`, `--scrollbar-thumb-hover`.
+- 531 khai báo padding/margin/gap viết px trùng thang đổi sang `var(--space-*)`. Giá trị tính
+  ra không đổi. Còn 13 giá trị lẻ ngoài thang (căn chỉnh quang học).
+- Biểu đồ L-J, CUSUM, nhiều mức và So sánh hoá chất dùng chung `CHART_TEAL`
+  (`lib/chart-colors.ts`, = `--teal-500`), thay ba mã teal khác nhau.
+
+Test: `design-system.test.mjs`. `eqa.css` chưa đổi vì thuộc phần EQA đang làm.
+
 **U12 (thuộc GV11) — đã làm 02/11/2026:**
 - Dấu thanh đặt trên âm chính ở vần mở (QĐ 1989/QĐ-BGDĐT 2018): "Xoá", "Huỷ", "khoá", "hoá",
   "tích luỹ"… trong mã nguồn, chú thích và test.

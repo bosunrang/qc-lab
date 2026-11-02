@@ -3,6 +3,7 @@ import { qcRunKey, compareQcRunKey } from '../../main/domain/sort-order';
 // ±1/±2/±3SD, nhãn bậc SD bên trái, giá trị thật bên phải và nhãn ngày trục X.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { vnDate, vnDayMonth } from '../lib/format';
+import { CHART_TEAL } from '../lib/chart-colors';
 
 export interface QcChartPoint {
   date: string; runId: string; val: number; z: number;
@@ -54,8 +55,8 @@ function LjTooltip({ hit, decimals = 2 }: { hit: LjHover | null; decimals?: numb
 /** Bảng màu chuẩn của biểu đồ Levey-Jennings. */
 const LJ = {
   okBand: '#e8f6ef', okMid: '#ffffff', warnBand: '#fff3cf', rejectBand: '#f9d6d5',
-  grid: '#5d6b76', mean: '#17212b', line: '#0e8f8f',
-  okPoint: '#0e8f8f', warnPoint: '#dd8b1f', rejectPoint: '#c5221f',
+  grid: '#5d6b76', mean: '#17212b', line: CHART_TEAL,
+  okPoint: CHART_TEAL, warnPoint: '#dd8b1f', rejectPoint: '#c5221f',
 } as const;
 
 /** Dải nền theo bậc SD — `leveyJenningsBandRects`, đúng thứ tự vẽ (dải sau
@@ -69,7 +70,7 @@ const BANDS: { low: number; high: number; color: keyof typeof LJ }[] = [
   { low: -1, high: 1, color: 'okMid' },
 ];
 
-const CUSUM_COLORS = { pos: '#0b747d', neg: '#4f789d', warn: '#dd8b1f', rej: '#c5221f' };
+const CUSUM_COLORS = { pos: CHART_TEAL, neg: '#4f789d', warn: '#dd8b1f', rej: '#c5221f' };
 
 /** Chiều cao vẽ: mốc `height`; bật `responsiveHeight` thì giữ cùng tỷ lệ hình
  * học so với mốc 1180px, nhưng chỉ cho tăng tối đa 20% — ở trang Nhập QC, ẩn
@@ -346,9 +347,9 @@ function drawLJ(
 }
 
 /** Màu theo mức cho biểu đồ tổng hợp nhiều mức. */
-const MULTI_COLORS = ['#0e8f8f', '#7a4f9a', '#c47d12', '#2f7d5b', '#5369a6', '#9a5b3c'];
+const MULTI_COLORS = [CHART_TEAL, '#7a4f9a', '#c47d12', '#2f7d5b', '#5369a6', '#9a5b3c'];
 const MULTI_CUSUM_COLORS = [
-  ['#0e8f8f', '#5369a6'], ['#7a4f9a', '#c47d12'], ['#2f7d5b', '#9a5b3c'],
+  [CHART_TEAL, '#5369a6'], ['#7a4f9a', '#c47d12'], ['#2f7d5b', '#9a5b3c'],
 ] as const;
 
 /** `label` chỉ cần khi một mức có NHIỀU đường (mức hiện hành + lô cũ khi bật

@@ -575,7 +575,7 @@ test('ghi chú OPSpecs chảy như một đoạn văn, không tách text node th
   const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
   assert.match(
     sigma,
-    /\.sg-opspec-note\{display:block;width:100%;margin:12px 0 0;\}/,
+    /\.sg-opspec-note\{display:block;width:100%;margin:var\(--space-3\) 0 0;\}/,
     'ghi chú Sigma có chữ đậm xen giữa phải bỏ flex của alert',
   );
 });
@@ -599,6 +599,38 @@ test('CSS trang không còn giá trị thô nào', () => {
   const bad = Object.entries(found).filter(([, v]) => v.length)
     .map(([k, v]) => `${k}: ${v.length} chỗ — ${[...new Set(v)].slice(0, 6).join(', ')}`);
   assert.deepEqual(bad, [], 'dùng token trong tokens.css, đừng viết thẳng giá trị');
+});
+
+// U11: biểu đồ vẽ canvas/SVG không đọc được biến CSS, nên màu teal của chúng
+// lấy từ `lib/chart-colors.ts` và phải trùng `--teal-500`. Trước đây L-J,
+// CUSUM và So sánh hoá chất dùng ba mã teal khác nhau.
+test('biểu đồ dùng chung một màu teal, trùng --teal-500', () => {
+  const chartColors = readFileSync(join(ROOT, 'renderer', 'lib', 'chart-colors.ts'), 'utf8');
+  const teal = /CHART_TEAL = '(#[0-9a-f]{6})'/.exec(chartColors)?.[1];
+  assert.equal(teal, /--teal-500:(#[0-9a-f]{6});/.exec(tokensSrc)?.[1]);
+  for (const name of ['QcChart.tsx', 'ReagentChart.tsx']) {
+    const source = readFileSync(join(ROOT, 'renderer', 'components', name), 'utf8');
+    assert.doesNotMatch(source, /#0e8f8f|#0b747d|#0c6f78/i, `${name} còn mã teal riêng`);
+  }
+});
+
+// U11: padding/margin/gap có giá trị đúng một bậc của thang `--space-*` phải
+// dùng token (trước đây ~530 chỗ viết thẳng px). Giá trị lẻ ngoài thang (1px,
+// 3px, 5px…) chưa ép: đó là căn chỉnh quang học, không phải nhịp khoảng cách.
+// `eqa.css` thuộc phần EQA đang làm riêng.
+test('khoảng cách trùng thang --space-* viết bằng token', () => {
+  const SCALE = new Set([2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32]);
+  const PROP = /(?:^|[{;\s])((?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?)\s*:\s*([^;{}]+)/g;
+  const found = [];
+  for (const file of PAGE_CSS.filter((f) => !f.endsWith('eqa.css'))) {
+    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of source.matchAll(PROP)) {
+      for (const px of m[2].matchAll(/(?:^|[\s(,])(\d+)px(?![\w-])/g)) {
+        if (SCALE.has(Number(px[1]))) found.push(`${relative(STYLE_DIR, file)}: ${m[1]}:${m[2].trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(found, [], 'dùng var(--space-*) thay cho px');
 });
 
 

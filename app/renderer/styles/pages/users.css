@@ -19,7 +19,7 @@
 .user-table th:nth-child(4), .user-table td:nth-child(4){width:40%}
 
 .user-row-actions{
-  display:flex;flex-wrap:nowrap;gap:6px;align-items:center;justify-content:center;white-space:nowrap;
+  display:flex;flex-wrap:nowrap;gap:var(--space-1-5);align-items:center;justify-content:center;white-space:nowrap;
 }
 
 /* Bảng lùi vào trong panel như bảng Nhật ký hoạt động (`.audit-table-wrap`):

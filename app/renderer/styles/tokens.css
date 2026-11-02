@@ -383,10 +383,8 @@
   --toolbar-gap:var(--space-2);
   --page-header-gap:var(--space-6);
 
-  --scrollbar-size:8px;
   --scrollbar-track:var(--gray-100);
   --scrollbar-thumb:var(--scrollbar-thumb-base);
-  --scrollbar-thumb-hover:color-mix(in srgb, var(--scrollbar-thumb-base) 82%, black);
 
   /* Thứ tự lớp — đặt theo vai trò, thấp → cao. Trước 2026-09-25 có 17 số
      (1…1400) chọn tuỳ chỗ. Các cặp bắt buộc "phải đè":
@@ -426,16 +424,11 @@
    cần hạ token ở đây. Đặt SAU khối :root chính để bộ đọc token của test
    không lấy nhầm giá trị 0. */
 @media(prefers-reduced-motion:reduce){:root{--motion-fast:0ms;--motion:0ms;}}
-/* Thanh cuộn dùng chung: mảnh 8px, track xám
-   rất nhạt và thumb bo tròn có viền cùng màu track. Áp cho cả trục dọc lẫn
-   kéo ngang của mọi vùng cuộn (bảng, biểu đồ, modal, textarea); từng vùng
-   cố ý ẩn scrollbar vẫn có selector riêng ghi đè. */
+/* Thanh cuộn dùng chung: kiểu mảnh, track xám rất nhạt. Áp cho cả trục dọc
+   lẫn kéo ngang của mọi vùng cuộn (bảng, biểu đồ, modal, textarea). Chromium
+   bỏ qua `::-webkit-scrollbar*` khi đã đặt `scrollbar-width/color`, nên không
+   giữ khối đó. */
 *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);}
-*::-webkit-scrollbar{width:var(--scrollbar-size);height:var(--scrollbar-size);}
-*::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:var(--radius-full);}
-*::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid var(--scrollbar-track);border-radius:var(--radius-full);background-clip:padding-box;}
-*::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover);}
-*::-webkit-scrollbar-button{display:none;width:0;height:0;}
 html,body,#root{height:100%;}
 body{margin:0;font-family:var(--font-sans);font-size:var(--text-base);color:var(--text-primary);background:var(--surface-page);}
 h1,h2,h3,h4,p{margin:0;}
