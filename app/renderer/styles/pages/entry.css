@@ -55,11 +55,22 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-month-picker select,.qc-current-month{height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 10px;font-size:var(--text-sm);}
 .qc-month-picker select:first-of-type{min-width:92px;}
 .qc-current-month{white-space:nowrap;min-width:112px;}
-.qc-sheet-wrap{display:block;max-width:100%;margin:14px;border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:574px;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
+/* Chiều cao vùng cuộn bám theo cửa sổ thay vì cố định 574px (vốn chỉ vừa
+   cửa sổ cao ~768px): khi cuộn trang để bảng nằm ngay dưới header dính
+   (`.head` 88px), phần còn lại gồm tiêu đề bảng (64–90px khi tên xét nghiệm
+   xuống dòng), margin 14px hai đầu và viền panel — trừ 208px là đáy bảng
+   luôn nằm trong cửa sổ. Sàn 360px giữ đủ khoảng 7 hàng ngày khi cửa sổ
+   thấp hơn `minHeight` 700px của Electron (vd trình duyệt preview). */
+.qc-sheet-wrap{display:block;max-width:100%;margin:14px;border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:max(360px,calc(100vh - 208px));overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
 .entry-sheet-message{display:grid;gap:8px;margin:12px 16px 16px;}
-.qc-sheet{min-width:1080px;border:none;margin:0;table-layout:auto;border-radius:0;border-collapse:separate;border-spacing:0;overflow:visible;}
-@media(max-width:1280px){ .qc-sheet{ min-width:840px; } }
-@media(max-width:1150px){ .qc-sheet{ min-width:780px; } }
+/* Một sàn bề rộng DUY NHẤT, không đổi theo cửa sổ. Bản trước đặt 1080px ở
+   trên 1280px rồi hạ 840/780px ở cửa sổ hẹp, nên ở 1366px bảng bị ép rộng
+   1080px trong vùng chỉ ~740px — cuộn ngang NHIỀU hơn ở 1280px (sàn 840px).
+   Bảng đã `width:100%` (rule `table` chung) nên tự giãn hết vùng khi rộng;
+   khi hẹp, trình duyệt không bao giờ ép bảng dưới bề rộng min-content của
+   nội dung, nên 780px chỉ là sàn cho xét nghiệm ít mức. Lượng cuộn ngang vì
+   thế chỉ giảm dần khi cửa sổ rộng ra. */
+.qc-sheet{min-width:780px;border:none;margin:0;table-layout:auto;border-radius:0;border-collapse:separate;border-spacing:0;overflow:visible;}
 .qc-sheet thead{position:relative;z-index:var(--z-sticky-head);}
 .qc-sheet thead tr{position:sticky;top:0;z-index:var(--z-sticky-head);}
 /* Header sticky đã có `border-bottom` 1px từ rule bảng chung. Không thêm

@@ -307,6 +307,32 @@ test('header mức QC có tooltip nhưng không giả làm liên kết', () => {
     'giữ dấu hiệu trợ giúp, không gạch chân tên Mức/Lô');
 });
 
+// U10 (docs/APP-REVIEW-2026-10-31.md): bố cục cửa sổ nhỏ.
+test('bảng Nhập QC: sàn bề rộng không đổi theo cửa sổ, chiều cao bám cửa sổ', () => {
+  const entry = readFileSync(join(STYLE_DIR, 'pages', 'entry.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Sàn đặt theo từng media query từng làm 1366px cuộn ngang nhiều hơn 1280px.
+  const media = [...entry.matchAll(/@media[^{]*\{([^{}]*\{[^{}]*\})*[^{}]*\}/g)].map((m) => m[0]);
+  for (const block of media) {
+    assert.doesNotMatch(block, /\.qc-sheet\s*\{[^}]*min-width/, `không đổi sàn .qc-sheet theo cửa sổ: ${block}`);
+  }
+  assert.equal((entry.match(/(^|[}\s])\.qc-sheet\s*\{[^}]*min-width:/g) || []).length, 1, 'chỉ một sàn bề rộng cho .qc-sheet');
+  const wrap = entry.match(/\.qc-sheet-wrap\{[^}]*\}/)[0];
+  assert.match(wrap, /max-height:[^;]*100vh/, 'vùng cuộn bảng nhập phải bám chiều cao cửa sổ');
+  assert.doesNotMatch(wrap, /max-height:\d+px/, 'không cố định chiều cao vùng cuộn bằng px');
+});
+
+test('sidebar tự thu gọn ở cửa sổ hẹp: đúng bề rộng và còn tên truy cập', () => {
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const shell = readFileSync(join(ROOT, 'renderer/components/AppShell.tsx'), 'utf8');
+  // Rule thu gọn phải đủ độ đặc hiệu để thắng `.app-shell:not(.nav-collapsed)` của ngưỡng 1280px.
+  assert.match(app, /@media\(max-width:1050px\)\{\.app-shell:not\(\.nav-collapsed\)\{grid-template-columns:var\(--sidebar-collapsed-width\)/,
+    'ngưỡng 1050px phải thật sự thu cột sidebar về bề rộng thu gọn');
+  assert.match(app, /@media\(max-width:1050px\)\{[^@]*\.nav-label[^{]*\{display:none;/, 'ngưỡng 1050px ẩn nhãn điều hướng');
+  assert.match(shell, /NAV_ICON_ONLY_QUERY = '\(max-width: 1050px\)'/, 'AppShell theo dõi đúng ngưỡng CSS ẩn nhãn');
+  assert.match(shell, /title=\{iconOnly \? item\.label : undefined\} aria-label=\{iconOnly \? item\.label : undefined\}/,
+    'mục điều hướng chỉ còn icon phải có tooltip và tên truy cập');
+});
+
 test('Nhập QC không rò kiểu dáng sang Sigma và không giữ dữ liệu ghi chú cũ', () => {
   const entry = readFileSync(join(STYLE_DIR, 'pages', 'entry.css'), 'utf8');
   const page = readEntryPageSources();

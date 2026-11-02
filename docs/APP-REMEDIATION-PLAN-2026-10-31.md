@@ -306,6 +306,13 @@ vòng vào trong (`--focus-ring-offset-inset: -2px`) để không thành hai vi�
 khung cha cắt. Nền tối (sidebar, nút phân đoạn đang chọn) dùng `--focus-ring-on-dark` =
 dark-accent (6,4–8,6:1). Test: `design-system.test.mjs`.
 
+**U10 (thuộc GV11) — đã làm 02/11/2026:** `.qc-sheet` một sàn `min-width:780px` (bỏ sàn
+1080/840px theo cửa sổ khiến 1366px cuộn ngang 340px, nay 40px); `.qc-sheet-wrap`
+`max-height:max(360px,calc(100vh - 208px))` thay 574px; rule 1050px của sidebar dùng
+`.app-shell:not(.nav-collapsed)` để thắng rule 1280px (trước cột vẫn rộng 196px), và
+`AppShell` theo dõi `(max-width: 1050px)` để mục điều hướng có `title`/`aria-label` khi chỉ
+còn icon. Test: `design-system.test.mjs`.
+
 **Còn lại của GV9:** U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu) — đổi cách hiển thị
 trạng thái nên cần người dùng chốt trước.
 

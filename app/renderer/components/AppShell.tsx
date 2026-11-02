@@ -7,7 +7,7 @@
 // sidebar và route dùng CÙNG một bảng; chặn truy cập thật theo route nằm ở
 // router.tsx, chặn ghi thật nằm ở main. Quyền theo từng người dùng
 // (`pagePerms`) được tính cùng bảng đó qua `canUserAccessPage()`.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageErrorBoundary } from './ErrorBoundary';
@@ -27,6 +27,24 @@ const NAV_GROUPS: { label: string; ids: string[] }[] = [
 
 const COLLAPSE_KEY = 'qclab-nav-collapsed';
 
+/** Ở cửa sổ hẹp, `app.css` TỰ thu sidebar về dạng chỉ icon bằng CSS
+ * (`@media(max-width:1050px)` ẩn `.nav-label`), trong khi cờ `collapsed`
+ * chỉ biết người dùng có bấm nút thu gọn hay không. Theo dõi đúng truy vấn
+ * đó để mục điều hướng vẫn có `title`/`aria-label` khi chữ bị ẩn —
+ * `display:none` cũng gỡ chữ khỏi cây truy cập, link sẽ không còn tên. Giữ
+ * ngưỡng này trùng với `app.css`. */
+const NAV_ICON_ONLY_QUERY = '(max-width: 1050px)';
+
+function subscribeNavIconOnly(onChange: () => void) {
+  const query = window.matchMedia(NAV_ICON_ONLY_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+function navIconOnlyByViewport(): boolean {
+  return window.matchMedia(NAV_ICON_ONLY_QUERY).matches;
+}
+
 function RuntimeIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h.01M8 15h.01M12 9h4M12 15h4" /></svg>;
 }
@@ -40,6 +58,9 @@ export function AppShell() {
   const { profile, load } = useSettingsStore(useShallow((s) => ({ profile: s.profile, load: s.load })));
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } });
+
+  // Chỉ còn icon khi người dùng thu gọn HOẶC cửa sổ hẹp tự thu gọn bằng CSS.
+  const iconOnly = useSyncExternalStore(subscribeNavIconOnly, navIconOnlyByViewport) || collapsed;
 
   useEffect(() => { load(); }, [load]);
 
@@ -76,7 +97,7 @@ export function AppShell() {
               <div key={group.label}>
                 {!collapsed && <div className="nav-group">{group.label}</div>}
                 {items.map((item) => (
-                  <NavLink key={item.path} to={item.path} title={collapsed ? item.label : undefined} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <NavLink key={item.path} to={item.path} title={iconOnly ? item.label : undefined} aria-label={iconOnly ? item.label : undefined} className={({ isActive }) => (isActive ? 'active' : '')}>
                     <span className="ic" aria-hidden="true"><NavIcon id={item.id} /></span>
                     {!collapsed && <span className="nav-label">{item.label}</span>}
                   </NavLink>
@@ -85,7 +106,7 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="sidebar-footer" role="status" aria-live="polite" title={collapsed ? `Máy chủ cục bộ · ${RUNTIME_LABEL}` : undefined}>
+        <div className="sidebar-footer" role="status" aria-live="polite" title={iconOnly ? `Máy chủ cục bộ · ${RUNTIME_LABEL}` : undefined}>
           <div className="sidebar-runtime">
             <span className="sidebar-runtime-icon"><RuntimeIcon /></span>
             <div className="sidebar-runtime-copy">

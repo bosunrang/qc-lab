@@ -7,7 +7,12 @@ body{background:var(--surface-page);color:var(--text-primary);font-size:var(--te
 /* Từ 1280px sidebar thu hẹp còn clamp(196px,18vw,230px) (chưa thu gọn hẳn
    về dạng icon) cho tới ngưỡng thu gọn 1050px. */
 @media(max-width:1280px){.app-shell:not(.nav-collapsed){grid-template-columns:clamp(196px,18vw,230px) minmax(0,1fr);}}
-@media(max-width:1050px){.app-shell{grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}}
+/* Ngưỡng thu gọn phải cùng độ đặc hiệu (0,2,0) với rule 1280px ở trên và
+   đứng SAU nó. Bản trước chỉ là `.app-shell` (0,1,0) nên thua rule
+   `:not(.nav-collapsed)`: ở 1024–1050px chữ đã ẩn mà cột sidebar vẫn rộng
+   196px, chỉ chừa khoảng trống thay vì nhường chỗ cho bảng. Ngưỡng 1050px
+   này khớp `NAV_ICON_ONLY_QUERY` trong `AppShell.tsx`. */
+@media(max-width:1050px){.app-shell:not(.nav-collapsed){grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}}
 .app-shell.nav-collapsed{grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}
 
 
