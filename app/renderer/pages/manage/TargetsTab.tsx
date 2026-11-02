@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
-import { confirmDialog, reauthDialog, infoDialog, choiceDialog } from '../../state/dialog-store';
+import { infoDialog, errorDialog, reauthDialog, choiceDialog } from '../../state/dialog-store';
+import { showToast } from '../../state/toast-store';
 import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
@@ -106,7 +107,7 @@ export function TargetsTab() {
         meanRaw: read('.tm-mean'), lowRaw: read('.tm-low'), highRaw: read('.tm-high'), sdRaw: read('.tm-sd'),
         k: Number(row.getAttribute('data-k') || 2) || 2,
       });
-      if ('error' in result) { await infoDialog(result.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+      if ('error' in result) { await errorDialog(result.message, { title: 'Chưa lưu được Mean/SD' }); return; }
       picked.push({
         testId, level, mean: result.mean, sd: result.sd, low: result.low, high: result.high, qcLotId: lotId, name: test.name,
         switching: !!(current?.qc_lot_id && lotId && current.qc_lot_id !== lotId),
@@ -138,10 +139,10 @@ export function TargetsTab() {
         const result = await savePlannedTargets({
           items: switching.map((item) => ({ testId: item.testId, level: item.level, qcLotId: item.qcLotId, mean: item.mean, sd: item.sd, low: item.low, high: item.high })),
         });
-        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD dự kiến' }); return; }
+        if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được Mean/SD dự kiến' }); return; }
         for (const item of picked.filter((row) => !row.switching)) {
           const saved = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
-          if (!saved.ok) { await infoDialog(saved.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+          if (!saved.ok) { await errorDialog(saved.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
         }
         await infoDialog(
           `Đã lưu Mean/SD dự kiến cho ${result.data.saved} xét nghiệm ở mức ${level}. Nhóm lô đang dùng vẫn tiếp tục như bình thường — vào tab "Lô & Nhóm QC" bấm "Kích hoạt" khi bắt đầu dùng nhóm lô này.`,
@@ -151,14 +152,14 @@ export function TargetsTab() {
       }
       for (const item of picked) {
         const result = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
-        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+        if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
       }
       for (const item of unlink) {
         const result = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: '' });
-        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+        if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
       }
       const total = picked.length + unlink.length;
-      await infoDialog(`Đã lưu Mean/SD mức ${level} cho ${total} xét nghiệm.`, { type: 'success', title: 'Đã lưu Mean/SD' });
+      showToast(`Đã lưu Mean/SD mức ${level} cho ${total} xét nghiệm.`);
     } finally {
       setSaving(false);
     }

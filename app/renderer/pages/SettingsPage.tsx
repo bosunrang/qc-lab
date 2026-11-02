@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store/settings-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
-import { infoDialog, confirmDialog, reauthDialog } from '../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
@@ -150,13 +151,13 @@ export function SettingsPage() {
 
   if (!profile) return <div className="panel"><EmptyState>Đang tải…</EmptyState></div>;
 
-  const showError = (message: string) => infoDialog(message, { type: 'warn' });
+  const showError = (message: string) => errorDialog(message);
 
   async function submit() {
     const result = await save({ name, dept, address, brandTitle, brandSub, logoText, logoData: pendingLogo || undefined });
     if (!result.ok) { await showError(result.error.message); return; }
     setPendingLogo(null);
-    await infoDialog('Đã lưu cài đặt.', { type: 'success' });
+    showToast('Đã lưu cài đặt.');
   }
 
   function pickLogo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -217,7 +218,7 @@ export function SettingsPage() {
 
   async function pickBackupFile() {
     const verified = await chooseBackupFile();
-    if (!verified.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`, { type: 'warn' }); return; }
+    if (!verified.ok) { await errorDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`); return; }
     if (!verified.data) return;
     const created = verified.data.createdAt ? ` tạo lúc ${new Date(verified.data.createdAt).toLocaleString('vi-VN')}` : '';
     if (!(await confirmDialog(
@@ -235,7 +236,7 @@ export function SettingsPage() {
     setLisErr(null);
     const result = await saveLis({ enabled: lisEnabled, url: lisUrl, token: lisToken });
     if (!result.ok) { setLisErr(result.error.message); return; }
-    await infoDialog('Đã lưu cấu hình LIS Gateway.', { type: 'success' });
+    showToast('Đã lưu cấu hình LIS Gateway.');
   }
 
   async function refreshFirebase() {
@@ -256,7 +257,7 @@ export function SettingsPage() {
         if (push) {
           const synced = await syncFirebase('push');
           if (!synced.ok) { await showError(synced.error.message); return; }
-          await infoDialog('Đã ghi dữ liệu trên máy lên Firebase.', { type: 'success' });
+          showToast('Đã ghi dữ liệu trên máy lên Firebase.');
         } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một backup an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
           if (!(await reauthDialog({ title: 'Xác thực trước khi tải Firebase', message: 'Tải dữ liệu đám mây sẽ thay thế dữ liệu cục bộ — xác thực lại mật khẩu.' }))) return;
           const synced = await syncFirebase('pull');
@@ -264,18 +265,18 @@ export function SettingsPage() {
           await infoDialog('Đã tải dữ liệu từ Firebase. Nếu tài khoản hiện tại không còn trong dữ liệu đám mây, hãy đăng nhập lại.', { type: 'success' });
         }
       } else {
-        await infoDialog(result.data.state === 'pushed' ? 'Đã kết nối và đưa dữ liệu hiện tại lên Firebase.' : 'Đã kết nối Firebase; dữ liệu đã đồng bộ.', { type: 'success' });
+        showToast(result.data.state === 'pushed' ? 'Đã kết nối và đưa dữ liệu hiện tại lên Firebase.' : 'Đã kết nối Firebase; dữ liệu đã đồng bộ.');
       }
       await refreshFirebase();
     } finally { setFbBusy(false); }
   }
 
   async function disconnectFirebase() {
-    if (!(await confirmDialog('Ngắt Firebase? Dữ liệu vẫn được giữ nguyên trên máy.', { title: 'Ngắt đồng bộ đám mây' }))) return;
+    if (!(await confirmDialog('Ngắt Firebase? Dữ liệu vẫn được giữ nguyên trên máy.', { title: 'Ngắt đồng bộ đám mây', danger: false }))) return;
     const result = await disconnectFirebaseApi();
     if (!result.ok) { await showError(result.error.message); return; }
     await refreshFirebase();
-    await infoDialog('Đã ngắt Firebase.', { type: 'success' });
+    showToast('Đã ngắt Firebase.');
   }
 
 
@@ -296,14 +297,14 @@ export function SettingsPage() {
     // `importLisResult` của store tự làm mới hàng chờ TỪ NGUỒN THẬT sau khi
     // ghi thành công (không tự suy đoán trạng thái mới) — xem settings-store.
     const result = await importLisResult(record);
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     if (result.data.gatewayWarning) await infoDialog(result.data.gatewayWarning, { type: 'warn' });
   }
 
   async function rejectLisRecord(messageId: string) {
     if (!(await confirmDialog('Bỏ kết quả QC này khỏi hàng chờ LIS?', { title: 'Hàng chờ LIS', danger: true }))) return;
     const result = await rejectLisResult(messageId);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   function backupStatusText(): string {

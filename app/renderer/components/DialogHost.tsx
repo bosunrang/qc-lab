@@ -90,7 +90,7 @@ export function DialogHost() {
     const glyph = type === 'success' ? '✓' : '!';
     return createPortal(
       <div className="modal-bg dialog-layer" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) { dialog.resolve(); close(); } }}>
-        <div className="modal confirm-modal info-modal" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
+        <div className="modal confirm-modal info-modal" ref={boxRef} role={type === 'error' ? 'alertdialog' : 'dialog'} aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
           <div className="confirm-modal-h">
             <div />
             <button type="button" className="modal-close" aria-label="Đóng hộp thoại" onClick={() => { dialog.resolve(); close(); }}>✕</button>
@@ -169,7 +169,7 @@ function ReauthForm({ title, message, onResolve }: { title: string; message?: st
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        {error && <p className="field-error">{error}</p>}
+        {error && <p className="field-error" role="alert">{error}</p>}
       </form>
       <div className="confirm-modal-actions">
         <button type="button" className="btn ghost" onClick={() => onResolve(false)}>Hủy</button>

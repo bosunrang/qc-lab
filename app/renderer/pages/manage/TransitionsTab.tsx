@@ -11,7 +11,7 @@ import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
 import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
 import { vnDate } from '../../lib/format';
 import { todayIso } from '../../state/date-picker-store';
@@ -55,7 +55,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   async function removeTransition(tr: LotTransition) {
     if (!(await confirmDialog('Xóa dòng chuyển tiếp lô này?', { title: 'Xóa dòng chuyển tiếp lô', danger: true, confirmLabel: 'Xóa' }))) return;
     const result = await removeLotTransition(tr.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
   // `'new'` = thêm mới, một hồ sơ = đang SỬA hồ sơ đó (cả 2 chiều trên cùng
   // modal). Hồ sơ đã 'accepted' vẫn mở "Sửa" được (mọi dòng luôn hiện nút
@@ -172,7 +172,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
           <Modal busy={saving.busy} title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
             footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Hủy</button><button className="btn teal" type="submit" form="transition-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
             <form id="transition-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error">{err}</p>}
+              {err && <p className="field-error" role="alert">{err}</p>}
               <div className="lot-trans-row3">
                 <div className="field">
                   <label>Panel QC áp dụng</label>

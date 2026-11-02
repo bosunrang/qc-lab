@@ -306,6 +306,21 @@ vòng vào trong (`--focus-ring-offset-inset: -2px`) để không thành hai vi�
 khung cha cắt. Nền tối (sidebar, nút phân đoạn đang chọn) dùng `--focus-ring-on-dark` =
 dark-accent (6,4–8,6:1). Test: `design-system.test.mjs`.
 
+**U8 (thuộc GV11) — đã làm 02/11/2026:**
+
+- Lỗi thao tác dùng `errorDialog()` (hộp thoại kiểu `error`, nền đỏ, `role="alertdialog"`)
+  thay cho kiểu `warn` vàng; `warn` chỉ còn cho lưu ý/hướng dẫn ("Hãy tạo lô QC trước…").
+  Lỗi trong khung trang (Nhập QC, Lập dải, Sigma, khoảng ngày báo cáo) dùng `alert rej`
+  như NCE; `field-error` có `role="alert"`.
+- Lưu thành công: `showToast()` (`state/toast-store.ts`, `components/ToastHost.tsx`) — dòng
+  tự tắt 4–8 giây ở góc dưới phải, tối đa 3 dòng. Giữ hộp thoại cho thông báo phải đọc kỹ:
+  đường dẫn backup/log/bản sao lưu, tải từ Firebase (có thể phải đăng nhập lại), bật chế
+  độ vận hành, Mean/SD dự kiến (hướng dẫn bước tiếp).
+- Hộp xác nhận: thao tác không xoá/không mất dữ liệu truyền `danger: false` (nút teal): đính
+  chính ngày phát hiện, gắn lần chạy vào hồ sơ, vẫn lưu giá trị bất thường, khoá kỳ, ngắt
+  Firebase, kích hoạt/dừng nhóm lô, đổi số lô. Mặc định vẫn là nút đỏ.
+- **Test:** `app/tests/notifications.test.mjs`.
+
 **U10 (thuộc GV11) — đã làm 02/11/2026:** `.qc-sheet` một sàn `min-width:780px` (bỏ sàn
 1080/840px theo cửa sổ khiến 1366px cuộn ngang 340px, nay 40px); `.qc-sheet-wrap`
 `max-height:max(360px,calc(100vh - 208px))` thay 574px; rule 1050px của sidebar dùng

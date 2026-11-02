@@ -5,7 +5,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
+import { showToast } from '../../state/toast-store';
 import { teaSuggestions, findTeaSuggestion, normalizeName, type TeaSuggestion } from '../../lib/tea-suggest';
 import { EmptyState, WESTGARD_RULES, parseRuleConfig } from './shared';
 import { defaultRuleAction } from '../../../main/domain/westgard-rules';
@@ -50,8 +51,8 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     if (!ok) return;
     if (!await reauthDialog({ title: 'Xác thực xóa xét nghiệm', message: `Nhập lại mật khẩu trước khi xóa ${targetLabel}.` })) return;
     const result = await removeTest(selected.id, [selected.id]);
-    if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa xóa được xét nghiệm' }); return; }
-    await infoDialog(`Đã xóa ${targetLabel}.`, { type: 'success', title: 'Đã cập nhật danh mục' });
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa xóa được xét nghiệm' }); return; }
+    showToast(`Đã xóa ${targetLabel}.`);
   }
 
   const [editing, setEditing] = useState<Test | 'new' | null>(null);
@@ -295,7 +296,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal rcfg-assay-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
             <form id="test-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error">{err}</p>}
+              {err && <p className="field-error" role="alert">{err}</p>}
               <div className="assay-setup-layout">
                 <section className="assay-config-card assay-settings-column">
                   <div className="assay-card-head">

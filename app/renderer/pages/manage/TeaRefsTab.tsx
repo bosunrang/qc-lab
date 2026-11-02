@@ -5,7 +5,7 @@ import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
 import { TEA_CATALOG, TEA_SOURCE_CARDS } from '../../../main/domain/tea-catalog';
 import { useManageStore } from '../../store/manage-store';
-import { confirmDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { useAuthStore } from '../../store/auth-store';
 import type { TeaRef } from '../../../shared/qc-api';
 import { EmptyState } from './shared';
@@ -86,7 +86,7 @@ export function TeaRefsTab() {
 
   async function commitTeaValue(ref: { id: string; name: string; unit: string; section: string }, field: 'clia' | 'ricos', input: HTMLInputElement) {
     const result = await setTeaRefValue({ analyteId: ref.id, field, value: input.value, name: ref.name, unit: ref.unit, section: ref.section });
-    if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được TEa' }); }
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được TEa' }); }
   }
 
   async function submit(form: HTMLFormElement) {
@@ -124,7 +124,7 @@ export function TeaRefsTab() {
   async function removeLabProfile(id: string, name: string) {
     if (!(await confirmDialog(`Xoá hồ sơ TEa chuẩn hóa của "${name}"?`, { title: 'Xóa TEa chuẩn hóa', confirmLabel: 'Xóa', danger: true }))) return;
     const result = await removeTeaLabProfile(id);
-    if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa xóa được' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa xóa được' }); return; }
     setEditing(null);
   }
 
@@ -192,7 +192,7 @@ export function TeaRefsTab() {
       {adding && <Modal busy={addingAnalyte.busy} title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} size="lg" className="rcfg-modal"
         footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Hủy</button><button className="btn teal" type="submit" form="tea-add-form" disabled={addingAnalyte.busy}>{addingAnalyte.busy ? 'Đang lưu…' : 'Thêm xét nghiệm'}</button></>}>
         <form id="tea-add-form" onSubmit={(event) => { event.preventDefault(); void addingAnalyte.run(event.currentTarget); }}>
-          {addErr && <p className="field-error">{addErr}</p>}
+          {addErr && <p className="field-error" role="alert">{addErr}</p>}
           <div className="grid2">
             <div className="field"><label>Tên quốc tế <span className="req">*</span></label><input name="name" placeholder="VD: Creatine kinase-MB" autoFocus /></div>
             <div className="field"><label>Viết tắt</label><input name="abbreviation" placeholder="VD: CK-MB" /></div>
@@ -220,7 +220,7 @@ export function TeaRefsTab() {
           <button className="btn teal" type="submit" form="tearef-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm hồ sơ TEa' : 'Lưu thay đổi'}</button>
         </>}>
         <form id="tearef-form" onSubmit={(event) => { event.preventDefault(); void saving.run(event.currentTarget); }}>
-          {err && <p className="field-error">{err}</p>}
+          {err && <p className="field-error" role="alert">{err}</p>}
           <input type="hidden" name="analyteId" value={profileAnalyteId} />
           <input type="hidden" name="section" value={current?.section || prefill?.section || ''} />
           <section className="tea-form-section"><b>Thông tin TEa phòng xét nghiệm</b><div className="tea-form-primary"><div className="field"><label>Tên xét nghiệm</label><input name="name" defaultValue={current?.name || prefill?.name || ''} autoFocus /></div><div className="field"><label>Đơn vị</label><input name="unit" defaultValue={current?.unit || prefill?.unit || ''} /></div><div className="field tea-form-source"><label>Nguồn</label><select name="labSource" defaultValue={current?.lab_source || ''}><option value="">— Chọn nguồn chính —</option>{TEA_LAB_SOURCE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></div></section>

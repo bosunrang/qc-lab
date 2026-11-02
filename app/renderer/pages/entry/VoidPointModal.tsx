@@ -65,7 +65,7 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
         <label htmlFor="voidReasonInput">{reasonMin ? `Lý do hủy (bắt buộc, tối thiểu ${reasonMin} ký tự)` : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>
         <textarea id="voidReasonInput" autoFocus value={voidReason} onChange={(e) => setVoidReason(e.target.value)} rows={3}
           placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." />
-        {voidErr && <p className="field-error">{voidErr}</p>}
+        {voidErr && <p className="field-error" role="alert">{voidErr}</p>}
       </div>
     </Modal>
   );

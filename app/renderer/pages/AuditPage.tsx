@@ -6,7 +6,8 @@ import { useAuditStore, type ChainVerifyView } from '../store/audit-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { Modal } from '../components/Modal';
 import { DateField } from '../components/DateField';
-import { confirmDialog, reauthDialog, infoDialog } from '../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { roleLabel } from '../lib/permissions';
@@ -55,13 +56,13 @@ export function AuditPage() {
 
   async function onExport() {
     const csv = await exportCsv();
-    if (!csv.ok) { await infoDialog(csv.error.message); return; }
+    if (!csv.ok) { await errorDialog(csv.error.message); return; }
     downloadCsv(csv.data, `nhat-ky-hoat-dong-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function onVerify() {
     const r = await refreshChain();
-    if (!r.ok) { await infoDialog(r.error.message); return; }
+    if (!r.ok) { await errorDialog(r.error.message); return; }
   }
 
   const hasFilter = !!(query || from || to);
@@ -208,14 +209,14 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     if (!downloaded) return;
     const result = await archive(Number(months) as 12 | 24 | 36);
     if (!result.ok) { setErr(result.error.message); return; }
-    await infoDialog(result.data.removedCount > 0 ? `Đã lưu trữ ${result.data.removedCount} dòng cũ hơn ${months} tháng.` : 'Không có dòng nào cũ hơn mốc đã chọn.', { type: 'success' });
+    showToast(result.data.removedCount > 0 ? `Đã lưu trữ ${result.data.removedCount} dòng cũ hơn ${months} tháng.` : 'Không có dòng nào cũ hơn mốc đã chọn.');
     onClose();
   }
 
   return (
     <Modal title="Lưu trữ nhật ký cũ" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
-      {err && <p className="field-error">{err}</p>}
+      {err && <p className="field-error" role="alert">{err}</p>}
       <p className="audit-archive-copy">Xuất CSV của đúng phần sẽ lưu trữ, gồm PrevHash/Hash để đối chiếu chuỗi. Sau khi xác thực lại, hệ thống chỉ xoá khi bạn xác nhận đã kiểm tra file tải về.</p>
       <div className="field">
         <label>Giữ lại dữ liệu trong</label>

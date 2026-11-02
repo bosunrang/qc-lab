@@ -3,7 +3,8 @@
 // chờ phòng xét nghiệm chốt theo SOP; main kiểm lại mọi giá trị khi lưu.
 import { useEffect, useState } from 'react';
 import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
-import { infoDialog } from '../../state/dialog-store';
+import { errorDialog } from '../../state/dialog-store';
+import { showToast } from '../../state/toast-store';
 import type { NceConfigView } from '../../../shared/qc-api';
 
 export function NceConfigPanel() {
@@ -20,9 +21,9 @@ export function NceConfigPanel() {
     setSaving(true);
     const result = await window.qcApi.saveNceConfig({ data: config });
     setSaving(false);
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     setConfig(result.data);
-    await infoDialog('Đã lưu cấu hình hồ sơ NCE.', { type: 'success' });
+    showToast('Đã lưu cấu hình hồ sơ NCE.');
   }
 
   return (

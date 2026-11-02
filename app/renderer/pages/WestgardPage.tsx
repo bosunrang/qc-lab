@@ -14,7 +14,7 @@ import { QcChart, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
-import { infoDialog } from '../state/dialog-store';
+import { errorDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
 import { observedStats } from '../../main/domain/observed-stats';
 import { NOT_RETROACTIVE_NOTE } from '../../main/domain/rule-config';
@@ -151,7 +151,7 @@ export function WestgardPage() {
     try {
       await resetRuleSettings();
       if (selectedTestRef.current === testId) await loadAnalysis(testId, levelNums);
-    } catch (error) { await infoDialog(error instanceof Error ? error.message : 'Không lưu được cấu hình.', { type: 'warn' }); }
+    } catch (error) { await errorDialog(error instanceof Error ? error.message : 'Không lưu được cấu hình.'); }
   }
 
   const displayBlocks = displayedWestgardBlocks(
@@ -164,7 +164,7 @@ export function WestgardPage() {
     if (!analysisReady) return;
     const error = await exportTableXlsx('Westgard', WESTGARD_EXPORT_HEADERS, westgardExportRows(displayBlocks),
       `westgard-${currentSummary?.testName || 'xet-nghiem'}.xlsx`);
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (error) await errorDialog(error);
   }
   async function printPdf() {
     if (!analysisReady) return;
@@ -178,14 +178,14 @@ export function WestgardPage() {
       <body><h1>${escapeHtml(title)}</h1><p>Kết luận được đánh giá theo cấu hình luật hiện tại. Thống kê chỉ dùng các lần chạy được chấp nhận.</p>
       <table><thead><tr>${WESTGARD_EXPORT_HEADERS.map(header => '<th>' + escapeHtml(header) + '</th>').join('')}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     const error = await printHtmlToPdf(html, `westgard-${currentSummary?.testName || 'xet-nghiem'}.pdf`);
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (error) await errorDialog(error);
   }
 
   async function onToggleRule(ruleId: string, on: boolean) {
     try {
       await saveRuleSetting(ruleId, on);
       if (selectedTestRef.current === testId) await loadAnalysis(testId, levelNums);
-    } catch (error) { await infoDialog(error instanceof Error ? error.message : 'Không lưu được cấu hình.', { type: 'warn' }); }
+    } catch (error) { await errorDialog(error instanceof Error ? error.message : 'Không lưu được cấu hình.'); }
   }
 
   // Khi chưa có bất kỳ xét nghiệm nào, không dựng một panel thiết lập toàn

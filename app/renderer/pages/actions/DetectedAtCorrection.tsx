@@ -12,7 +12,7 @@ export function DetectedAtCorrection(props: SectionProps) {
   const [draft, setDraft] = useState<{ detectedAt: string; reason: string; version: number } | null>(null);
   async function save() {
     if (!draft) return;
-    if (!(await confirmDialog(`Đính chính ngày phát hiện từ ${dateText(record.detected_at)} thành ${dateText(draft.detectedAt)}? Chỉ ghi ngày thực tế có căn cứ, không lùi ngày để nhận QC cũ. Ngày lập hồ sơ, ngày QC và thời điểm quyết định không đổi.`, { title: 'Đính chính ngày phát hiện', confirmLabel: 'Lưu đính chính' }))) return;
+    if (!(await confirmDialog(`Đính chính ngày phát hiện từ ${dateText(record.detected_at)} thành ${dateText(draft.detectedAt)}? Chỉ ghi ngày thực tế có căn cứ, không lùi ngày để nhận QC cũ. Ngày lập hồ sơ, ngày QC và thời điểm quyết định không đổi.`, { title: 'Đính chính ngày phát hiện', confirmLabel: 'Lưu đính chính', danger: false }))) return;
     if (await props.run((base) => update({ ...base, expectedVersion: draft.version, patch: {}, detectedAtCorrection: { detectedAt: draft.detectedAt, reason: draft.reason } }))) setDraft(null);
   }
   return <div className="nce-date-correction">

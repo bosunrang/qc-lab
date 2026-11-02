@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { EmptyState, FieldRow } from './shared';
 import type { Instrument } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
@@ -40,7 +40,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
   async function remove(i: Instrument) {
     if (!(await confirmDialog(`Xoá máy xét nghiệm "${i.name}"?`, { danger: true }))) return;
     const result = await removeInstrument(i.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
   const visible = instruments.filter((i) => !query || i.name.toLowerCase().includes(query.toLowerCase()) || i.manufacturer.toLowerCase().includes(query.toLowerCase()) || i.serial.toLowerCase().includes(query.toLowerCase()));
   const testCountOf = (id: string) => tests.filter((t) => t.instrument_id === id).length;
@@ -79,7 +79,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="instrument-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
             <form id="instrument-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error">{err}</p>}
+              {err && <p className="field-error" role="alert">{err}</p>}
               <FieldRow>
                 <div className="field"><label>Tên hiển thị</label><input name="name" placeholder="VD: AU5800-01" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
                 <div className="field"><label>Khoa / Khu vực</label><input name="section" placeholder="Hóa sinh" defaultValue={editing !== 'new' ? editing.section : ''} /></div>

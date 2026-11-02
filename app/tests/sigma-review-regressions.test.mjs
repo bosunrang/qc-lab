@@ -94,7 +94,7 @@ test('SG02/11: actual blur handlers preserve unchanged values; switching test re
   const methods = evaluate(payload + cv + bias + '\n({commitCv,commitBias})', {
     currentTest, useSigmaStore: { getState: () => ({ loading: false }) },
     editablePercent: value => value == null ? '' : value.toFixed(2),
-    savePeriod: async () => { calls++; return { ok: true }; }, infoDialog: async () => {},
+    savePeriod: async () => { calls++; return { ok: true }; }, infoDialog: async () => {}, errorDialog: async () => {},
     confirmDialog: async () => { confirmations++; return accept; },
   });
   assert.equal(await methods.commitCv(period, 1, period.levels[0].cv.toFixed(2)), true);
@@ -133,7 +133,7 @@ test('SG03c: Bias RMS giữ thêm trung bình có dấu để truy xuất hướ
 test('SG03b: lỗi nhập Bias dùng thông báo trung tâm, không chen vào phía trên bảng', () => {
   const modal = section(page, 'function BiasModal(', 'function CohortModal(');
   assert.match(modal, /infoDialog\('Nhập ít nhất 1 vòng EQA\/EQC\.', \{ title: 'Chưa thể áp dụng Bias%', type: 'warn' \}\)/);
-  assert.match(modal, /infoDialog\(result\.error\?\.message \|\| 'Lỗi không xác định\.', \{ title: 'Không thể áp dụng Bias%', type: 'warn' \}\)/);
+  assert.match(modal, /errorDialog\(result\.error\?\.message \|\| 'Lỗi không xác định\.', \{ title: 'Không thể áp dụng Bias%' \}\)/);
   assert.doesNotMatch(modal, /field-error|setErr\(/);
 });
 

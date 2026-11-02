@@ -2,7 +2,10 @@ import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 
 export interface ConfirmOptions { title?: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
-export interface InfoOptions { title?: string; type?: 'warn' | 'success' }
+/** `error`: thao tác thất bại (nền đỏ); `warn`: lưu ý/hướng dẫn trước khi làm
+ * tiếp. Lưu thành công thì dùng `showToast()` (toast-store), trừ khi thông báo
+ * có thông tin phải đọc kỹ (đường dẫn tệp, bước làm tiếp). */
+export interface InfoOptions { title?: string; type?: 'warn' | 'success' | 'error' }
 export interface ReauthOptions { title?: string; message?: string }
 /** Hộp thoại nhiều hơn 2 đường đi (Huỷ + N lựa chọn) — `confirmDialog` chỉ có
  * đúng 2. Dựng khi bảng Mean/SD cần 3 đường: Huỷ / Dự kiến / Lưu và chuyển
@@ -35,6 +38,11 @@ export function infoDialog(message: string, opts: InfoOptions = {}): Promise<voi
   return new Promise((resolve) => {
     dialogStore.setState({ dialog: { kind: 'info', message, opts, resolve } });
   });
+}
+
+/** Báo thao tác không thực hiện được — thường là `result.error.message`. */
+export function errorDialog(message: string, opts: Omit<InfoOptions, 'type'> = {}): Promise<void> {
+  return infoDialog(message, { ...opts, type: 'error' });
 }
 
 /** Mở dialog xác thực lại mật khẩu người dùng hiện tại — resolve true nếu

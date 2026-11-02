@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog } from '../../state/dialog-store';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
@@ -20,7 +20,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
     });
     if (!ok) return;
     const result = await removePanel(panel.id);
-    if (!result.ok) await infoDialog(result.error.message, { title: 'Chưa xóa được Panel QC' });
+    if (!result.ok) await errorDialog(result.error.message, { title: 'Chưa xóa được Panel QC' });
   }
 
   const [editing, setEditing] = useState<QcPanel | 'new' | null>(null);
@@ -103,7 +103,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="panel-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
             <form id="panel-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p className="field-error">{err}</p>}
+              {err && <p className="field-error" role="alert">{err}</p>}
               <div className="grid2 panel-qc-main-grid">
                 <div className="field"><label>Tên Panel QC</label><input name="name" placeholder="VD: Sinh hóa AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
                 <div className="field">

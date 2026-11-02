@@ -15,7 +15,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { RowActionButton } from '../components/RowActionButton';
-import { confirmDialog, infoDialog } from '../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog } from '../state/dialog-store';
 import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/permissions';
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
@@ -86,7 +86,7 @@ function CreatePanel() {
     const pagePerms = [...selected];
     if (!pagePerms.length) { await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return; }
     const result = await create({ username: username.trim().toLowerCase(), name, initials: initialsFromName(name), role, password, pagePerms });
-    if (!result.ok) { await infoDialog(result.error.message); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     setUsername(''); setName(''); setPassword('');
     setSelected(new Set(rolePageIds(role)));
   }
@@ -129,13 +129,13 @@ function UserActions({ user, current, onPerms, onReset }: {
 
   async function toggle() {
     const result = await update(user.id, { name: user.name, role: user.role, active: !user.active });
-    if (!result.ok) await infoDialog(result.error.message);
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   async function removeUser() {
     if (!(await confirmDialog(`Xoá tài khoản "${user.username}"? Nhật ký hoạt động của người này vẫn được giữ lại.`, { danger: true, confirmLabel: 'Xoá' }))) return;
     const result = await remove(user.id);
-    if (!result.ok) await infoDialog(result.error.message);
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   if (current) {
@@ -208,12 +208,12 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
     const pagePerms = [...selected];
     if (!pagePerms.length) { await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return; }
     const result = await update(user.id, { name: user.name, role, active: user.active, pagePerms });
-    if (!result.ok) { await infoDialog(result.error.message); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     // Người chỉ xem không giữ quyền nghiệp vụ: đổi sang vai trò chỉ xem thì thu luôn.
     const caps = canWrite(role) ? [...grantedCaps].sort() : [];
     if (caps.join(',') !== [...user.capabilities].sort().join(',')) {
       const saved = await setNceCapabilities(user.id, caps);
-      if (!saved.ok) { await infoDialog(saved.error.message); return; }
+      if (!saved.ok) { await errorDialog(saved.error.message); return; }
     }
     onClose();
   }
@@ -268,7 +268,7 @@ function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () =
   return (
     <Modal title={`Đặt lại mật khẩu — ${user.username}`} onClose={onClose}
       footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Đặt lại</AsyncButton></>}>
-      {err && <p className="field-error">{err}</p>}
+      {err && <p className="field-error" role="alert">{err}</p>}
       {done ? <p>Đã đặt lại mật khẩu — người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp.</p> : (
         <div className="field"><label>Mật khẩu mới (≥8 ký tự)</label><input autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }} /></div>

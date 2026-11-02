@@ -87,7 +87,8 @@ test('trang lỗi khi hiển thị chỉ thay vùng nội dung; lỗi không đ�
     assert.equal(await alert.count(), 0, 'đổi trang thì hết trạng thái lỗi');
 
     await page.evaluate(() => { setTimeout(() => { throw new Error('lỗi thử E2E'); }); });
-    const dialog = page.locator('.modal[role=dialog]', { hasText: 'lỗi thử E2E' });
+    // Lỗi dùng hộp thoại kiểu `error` (U8) nên vai trò là `alertdialog`.
+    const dialog = page.locator('.modal[role=alertdialog]', { hasText: 'lỗi thử E2E' });
     await dialog.waitFor();
     assert.match(await dialog.innerText(), /Dữ liệu đã lưu không bị ảnh hưởng/);
   } finally {

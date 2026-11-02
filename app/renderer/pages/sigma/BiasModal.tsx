@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
-import { infoDialog } from '../../state/dialog-store';
+import { infoDialog, errorDialog } from '../../state/dialog-store';
 import { parseEqaDraft } from '../../lib/sigma-workflow';
 import { eqaRoundBias, eqaRoundsStats } from '../../../main/domain/sigma-metrics';
 import type { SigmaEqaRound } from '../../../shared/qc-api';
@@ -32,7 +32,7 @@ export function BiasModal({ initialRounds, onClose, onSubmit }: {
       return;
     }
     const result = await onSubmit(parsedRounds);
-    if (!result.ok) await infoDialog(result.error?.message || 'Lỗi không xác định.', { title: 'Không thể áp dụng Bias%', type: 'warn' });
+    if (!result.ok) await errorDialog(result.error?.message || 'Lỗi không xác định.', { title: 'Không thể áp dụng Bias%' });
   }
 
   return (

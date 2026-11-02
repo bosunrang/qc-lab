@@ -22,7 +22,7 @@ import { Modal } from '../components/Modal';
 import { RowActionButton } from '../components/RowActionButton';
 import { ReagentChart } from '../components/ReagentChart';
 import { ReagentToolIcon } from '../components/ReagentToolIcon';
-import { confirmDialog, infoDialog } from '../state/dialog-store';
+import { confirmDialog, errorDialog } from '../state/dialog-store';
 import { printHtmlToPdf } from '../lib/export';
 import { vnDate } from '../lib/format';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
@@ -347,7 +347,7 @@ export function ReagentPage() {
   const result = current.result;
   const meta = async (data: Record<string, unknown>) => {
     const saved = await store.saveMetadata(current.id, data);
-    if (!saved.ok) await infoDialog(saved.error.message, { title: 'Chưa lưu được thông tin', type: 'warn' });
+    if (!saved.ok) await errorDialog(saved.error.message, { title: 'Chưa lưu được thông tin' });
   };
   const wp = { disabled: !writable };
 
@@ -363,7 +363,7 @@ export function ReagentPage() {
   async function removeCurrent() {
     if (!(await confirmDialog(`Xóa phép so sánh "${current.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xóa phép so sánh', danger: true, confirmLabel: 'Xóa' }))) return;
     const r = await store.remove(current.id);
-    if (!r.ok) await infoDialog(r.error.message, { type: 'warn' });
+    if (!r.ok) await errorDialog(r.error.message);
     else setCurrentId('');
   }
 
@@ -371,14 +371,14 @@ export function ReagentPage() {
     const comparison = store.comparisons.find((item) => item.id === id);
     if (!comparison || !(await confirmDialog(`Xóa phép so sánh "${comparison.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xóa phép so sánh', danger: true, confirmLabel: 'Xóa' }))) return;
     const removed = await store.remove(id);
-    if (!removed.ok) await infoDialog(removed.error.message, { type: 'warn' });
+    if (!removed.ok) await errorDialog(removed.error.message);
     else if (id === current.id) setCurrentId('');
   }
 
   async function createFromTea(name: string, unit: string): Promise<boolean> {
     const created = await store.create(name, unit);
     if (!created.ok) {
-      await infoDialog(created.error.message, { title: 'Chưa tạo được phép so sánh', type: 'warn' });
+      await errorDialog(created.error.message, { title: 'Chưa tạo được phép so sánh' });
       return false;
     }
     setCurrentId(created.data.id);
@@ -404,7 +404,7 @@ export function ReagentPage() {
       <body><h1>${title}</h1><table><thead><tr><th>Hóa chất</th><th>Lô cũ → mới</th><th>Ngày</th><th>n</th><th>%Bias</th><th>r</th><th>Kết luận</th></tr></thead>
       <tbody>${body}</tbody></table></body></html>`;
     const error = await printHtmlToPdf(html, summary ? 'so-sanh-hoa-chat-tong-hop.pdf' : `so-sanh-${current.reagent}.pdf`);
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (error) await errorDialog(error);
   }
 
   return (

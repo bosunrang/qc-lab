@@ -117,7 +117,7 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
       {mode === 'revert' && <p>Khôi phục Mean={rangeCandidate.manufacturer.mean?.toFixed(decimals) ?? '—'} và SD={rangeCandidate.manufacturer.sd?.toFixed(4) ?? '—'} của nhà sản xuất.</p>}
       <label className="field"><span>Lý do <b>*</b></span><textarea rows={3} value={rangeReason} onChange={(e) => setRangeReason(e.target.value)} placeholder={mode === 'apply' ? 'Tối thiểu 10 ký tự' : 'Tối thiểu 5 ký tự'} /></label>
       {!canConfigure && <div className="alert info">{QC_CONFIG_DENIED_MESSAGE}</div>}
-      {rangeSubmitError && <div className="alert warn">{rangeSubmitError}</div>}
+      {rangeSubmitError && <div className="alert rej" role="alert">{rangeSubmitError}</div>}
     </Modal>
   );
 }

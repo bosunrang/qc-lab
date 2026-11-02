@@ -3,7 +3,7 @@
 // ra trong trình xử lý sự kiện (`onClick`…) — hai loại mà `PageErrorBoundary`
 // không bắt được. Trước đây các lỗi này chỉ nằm trong console: nút bấm im
 // lặng, người dùng không biết thao tác đã không xong.
-import { dialogStore, infoDialog } from '../state/dialog-store';
+import { dialogStore, errorDialog } from '../state/dialog-store';
 
 /** Lỗi trình duyệt tự phát, vô hại, không phải lỗi của thao tác. */
 const BENIGN = [/ResizeObserver loop/i];
@@ -36,7 +36,7 @@ export interface UnhandledReporterDeps {
 
 const defaultDeps: UnhandledReporterDeps = {
   dialogOpen: () => dialogStore.getState().dialog.kind !== 'none',
-  show: (message) => { void infoDialog(message, { title: 'Thao tác không hoàn tất', type: 'warn' }); },
+  show: (message) => { void errorDialog(message, { title: 'Thao tác không hoàn tất' }); },
   log: (...args) => console.error(...args),
   report: sendClientError,
 };

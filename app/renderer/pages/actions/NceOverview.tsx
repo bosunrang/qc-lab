@@ -5,7 +5,7 @@ import { useNceStore } from '../../store/nce-store';
 import { useAuthStore } from '../../store/auth-store';
 import { canWrite } from '../../lib/permissions';
 import { EmptyState } from '../../components/EmptyState';
-import { confirmDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { nceStatusBadge } from '../../lib/nce-labels';
 import { NCE_SOURCE_LABEL } from '../../../main/domain/nce/labels';
 import type { NceDossierView, NceQueueRowView } from '../../../shared/qc-api';
@@ -103,11 +103,11 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
 
   async function attach(row: NceQueueRowView) {
     if (!row.attach_to) return;
-    if (!(await confirmDialog(`Gắn lần chạy ${nceRunLabel({ date: row.date, runId: row.run_id })} vào hồ sơ ${row.attach_to.nce_id}? QC tiếp tục bị loại sau xử lý tức thời nên hồ sơ sẽ phải xử lý theo CAPA đầy đủ.`, { title: 'Gắn vào hồ sơ đang mở', confirmLabel: 'Gắn vào hồ sơ' }))) return;
+    if (!(await confirmDialog(`Gắn lần chạy ${nceRunLabel({ date: row.date, runId: row.run_id })} vào hồ sơ ${row.attach_to.nce_id}? QC tiếp tục bị loại sau xử lý tức thời nên hồ sơ sẽ phải xử lý theo CAPA đầy đủ.`, { title: 'Gắn vào hồ sơ đang mở', confirmLabel: 'Gắn vào hồ sơ', danger: false }))) return;
     const current = await get(row.attach_to.id);
     if (!current) return;
     const result = await attachRun({ id: current.record.id, expectedVersion: current.record.row_version, run: { date: row.date, runId: row.run_id } });
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     onOpen(result.data.record.id);
   }
 

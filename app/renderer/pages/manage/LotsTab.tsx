@@ -7,7 +7,8 @@ import { useWestgardStore } from '../../store/westgard-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
+import { showToast } from '../../state/toast-store';
 import { vnDate } from '../../lib/format';
 import { EmptyState, lotStatus } from './shared';
 import type { QcLot, LotGroup } from '../../../shared/qc-api';
@@ -91,13 +92,13 @@ export function LotsTab() {
   async function removeLotRow(lot: QcLot) {
     if (!(await confirmDialog(`Xóa lô QC ${lot.lot_no}?`, { title: 'Xóa lô QC', danger: true, confirmLabel: 'Xóa lô QC' }))) return;
     const result = await removeLot(lot.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   async function removeGroup(group: LotGroup) {
     if (!(await confirmDialog(`Xóa nhóm lô ${group.name}? Các lô QC bên trong vẫn được giữ nguyên.`, { title: 'Xóa nhóm lô', danger: true, confirmLabel: 'Xóa nhóm lô' }))) return;
     const result = await removeLotGroup(group.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   /** Kích hoạt nhóm lô — áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
@@ -108,21 +109,21 @@ export function LotsTab() {
     if (!(await confirmDialog(
       `Áp dụng Mean/SD của nhóm lô ${group.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`
       + ' Nhóm lô đang giữ các mức đó sẽ được đánh dấu đã dừng.',
-      { title: 'Kích hoạt nhóm lô', confirmLabel: 'Áp dụng' },
+      { title: 'Kích hoạt nhóm lô', confirmLabel: 'Áp dụng', danger: false },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực Mean/SD', message: 'Nhập lại mật khẩu trước khi áp Mean/SD của nhóm lô này.' }))) return;
     const result = await activateLotGroup(group.id);
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
-    await infoDialog(result.data.status === 'applied'
+    if (!result.ok) { await errorDialog(result.error.message); return; }
+    showToast(result.data.status === 'applied'
       ? `Đã áp Mean/SD cho ${result.data.applied} mức QC.`
         + (result.data.stoppedGroups.length ? ` Dừng ${result.data.stoppedGroups.length} nhóm lô bị thay thế.` : '')
-      : 'Nhóm lô này đã đang được dùng — không có mức nào cần áp thêm.', { type: 'success' });
+      : 'Nhóm lô này đã đang được dùng — không có mức nào cần áp thêm.');
   }
 
   async function stopGroup(group: LotGroup) {
-    if (!(await confirmDialog(`Dừng nhóm lô ${group.name}? Nhóm đã dừng vẫn giữ nguyên lịch sử Mean/SD của các xét nghiệm đã dùng nó.`, { title: 'Dừng nhóm lô', confirmLabel: 'Dừng nhóm lô' }))) return;
+    if (!(await confirmDialog(`Dừng nhóm lô ${group.name}? Nhóm đã dừng vẫn giữ nguyên lịch sử Mean/SD của các xét nghiệm đã dùng nó.`, { title: 'Dừng nhóm lô', confirmLabel: 'Dừng nhóm lô', danger: false }))) return;
     const result = await stopLotGroup(group.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   async function submitLot(form: HTMLFormElement) {
@@ -148,7 +149,7 @@ export function LotsTab() {
         const ok = await confirmDialog(
           `Đổi số lô "${plan.oldLotNo}" thành "${plan.newLotNo}" sẽ cập nhật ${plan.affected} điểm QC đã ghi.`
           + ` Số lô là nhãn nhận dạng — giá trị, ngày và Mean/SD của từng điểm không đổi.${lockNote}`,
-          { title: 'Đổi số lô QC', confirmLabel: 'Đổi số lô' },
+          { title: 'Đổi số lô QC', confirmLabel: 'Đổi số lô', danger: false },
         );
         if (!ok) return;
       }
@@ -248,7 +249,7 @@ export function LotsTab() {
         <Modal busy={savingLot.busy} title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
           footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-form" disabled={savingLot.busy}>{savingLot.busy ? 'Đang lưu…' : editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
           <form id="lot-form" onSubmit={(e) => { e.preventDefault(); void savingLot.run(e.currentTarget); }}>
-            {lotErr && <p className="field-error">{lotErr}</p>}
+            {lotErr && <p className="field-error" role="alert">{lotErr}</p>}
             <div className="grid2">
               <div className="field"><label>Số lô</label><input name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
               <div className="field">
@@ -274,7 +275,7 @@ export function LotsTab() {
         <Modal busy={savingGroup.busy} title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
           footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-group-form" disabled={savingGroup.busy}>{savingGroup.busy ? 'Đang lưu…' : editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
           <form id="lot-group-form" onSubmit={(e) => { e.preventDefault(); void savingGroup.run(e.currentTarget); }}>
-            {groupErr && <p className="field-error">{groupErr}</p>}
+            {groupErr && <p className="field-error" role="alert">{groupErr}</p>}
             <label className="lot-group-picker-label">Chọn các lô QC</label>
             <div className="lot-level-picker">
               {[1, 2, 3, 4, 5, 6].map((level) => {

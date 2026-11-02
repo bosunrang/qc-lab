@@ -257,7 +257,7 @@ export function EntryPage() {
     if (deviation != null) {
       const confirmed = await confirmDialog(
         `Giá trị ${formatQcValue(val, decimals)} lệch ${deviation >= 0 ? '+' : ''}${deviation.toFixed(2)}SD, vượt ngưỡng ±5SD so với Mean/SD hiện tại. Hãy kiểm tra đơn vị, dấu thập phân và mức QC trước khi lưu.`,
-        { title: 'Giá trị QC bất thường', confirmLabel: 'Vẫn lưu', cancelLabel: 'Kiểm tra lại' },
+        { title: 'Giá trị QC bất thường', confirmLabel: 'Vẫn lưu', cancelLabel: 'Kiểm tra lại', danger: false },
       );
       if (!confirmed) return false;
     }

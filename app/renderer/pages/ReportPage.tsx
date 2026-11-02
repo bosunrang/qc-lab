@@ -16,7 +16,8 @@ import { normalizeSearch, useTestSelection } from '../lib/useTestSelection';
 import { PrintIcon } from '../components/PrintIcon';
 import { Modal } from '../components/Modal';
 import { ERROR_CLASS_LABEL } from '../../main/domain/westgard-rules';
-import { reauthDialog, infoDialog, confirmDialog } from '../state/dialog-store';
+import { confirmDialog, errorDialog, reauthDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { downloadCsv, exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
@@ -169,7 +170,7 @@ export function ReportPage() {
     return run(async () => {
       const { points, nce } = await collect();
       const error = await printHtmlToPdf(buildPrintHtml(selected ? testSelectLabel(selected, summaries) : selectedId, start, end, points, nce), `bao-cao-${stamp()}.pdf`);
-      if (error) await infoDialog(error);
+      if (error) await errorDialog(error);
     });
   }
 
@@ -184,7 +185,7 @@ export function ReportPage() {
         rows.push([], ['PHỤ LỤC NCE'], NCE_HEADERS, ...nce.map(nceRow));
       }
       const error = await exportTableXlsx(selected?.testName || 'Báo cáo', POINT_HEADERS, rows, `bao-cao-${stamp()}.xlsx`);
-      if (error) await infoDialog(error);
+      if (error) await errorDialog(error);
     });
   }
 
@@ -203,18 +204,18 @@ export function ReportPage() {
     const label = monthVN(lockYm);
     if (!(await confirmDialog(
       'Sau khi khóa, không ai (kể cả admin) sửa/hủy được điểm QC trong kỳ này ở bất kỳ xét nghiệm nào cho tới khi mở khóa. Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức của kỳ.',
-      { title: `Khóa kỳ ${label}?`, confirmLabel: 'Khóa kỳ', cancelLabel: 'Hủy' },
+      { title: `Khóa kỳ ${label}?`, confirmLabel: 'Khóa kỳ', cancelLabel: 'Hủy', danger: false },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực khóa kỳ', message: `Nhập lại mật khẩu để khóa kỳ ${label}.` }))) return;
     const result = await lock(lockYm, '');
-    if (!result.ok) { await infoDialog(result.error.message); return; }
-    await infoDialog(`Đã khóa kỳ ${label}.`, { type: 'success' });
+    if (!result.ok) { await errorDialog(result.error.message); return; }
+    showToast(`Đã khóa kỳ ${label}.`);
   }
 
   async function saveTemplateSettings() {
     const result = await saveTemplate({ formCode, version: formVersion });
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
-    await infoDialog('Đã lưu biểu mẫu báo cáo Six Sigma.', { type: 'success' });
+    if (!result.ok) { await errorDialog(result.error.message); return; }
+    showToast('Đã lưu biểu mẫu báo cáo Six Sigma.');
   }
 
   return (
@@ -244,7 +245,7 @@ export function ReportPage() {
               <div className="field"><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
               <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
             </div>
-            {rangeInvalid && <div className="alert warn report-range-error" role="alert">Từ ngày ({vnDate(start)}) đang sau Đến ngày ({vnDate(end)}) — báo cáo sẽ không có dòng nào. Hãy đổi lại khoảng ngày.</div>}
+            {rangeInvalid && <div className="alert rej report-range-error" role="alert">Từ ngày ({vnDate(start)}) đang sau Đến ngày ({vnDate(end)}) — báo cáo sẽ không có dòng nào. Hãy đổi lại khoảng ngày.</div>}
             <div className="report-export-bar">
               <div className="report-export-options">
                 <label className="report-nce-option">
@@ -309,8 +310,8 @@ export function ReportPage() {
         onDone={async (note) => {
           if (!(await reauthDialog({ title: 'Xác thực mở khóa', message: `Nhập lại mật khẩu để mở khóa kỳ ${monthVN(unlocking)}.` }))) return false;
           const result = await unlock(unlocking, note);
-          if (!result.ok) { await infoDialog(result.error.message); return false; }
-          await infoDialog(`Đã mở khóa kỳ ${monthVN(unlocking)}.`, { type: 'success' });
+          if (!result.ok) { await errorDialog(result.error.message); return false; }
+          showToast(`Đã mở khóa kỳ ${monthVN(unlocking)}.`);
           return true;
         }} />}
     </>
@@ -331,7 +332,7 @@ function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void;
   return (
     <Modal title={`Mở khóa kỳ ${monthVN(ym)}`} onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submit}>Xác nhận mở khóa</AsyncButton></>}>
-      {err && <p className="field-error">{err}</p>}
+      {err && <p className="field-error" role="alert">{err}</p>}
       <div className="hint">Mở khóa kỳ {monthVN(ym)} sẽ cho phép sửa/hủy lại điểm QC của kỳ này ở mọi xét nghiệm. Lý do được ghi vào nhật ký hoạt động.</div>
       <div className="field">
         <label htmlFor="unlockReasonInput">Lý do mở khóa</label>

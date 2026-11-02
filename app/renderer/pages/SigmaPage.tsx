@@ -21,7 +21,7 @@ import { DateField } from '../components/DateField';
 import { printHtmlToPdf } from '../lib/export';
 import { exportSigmaReportXlsx } from '../lib/sigma-summary-export';
 import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib/sigma-print-report';
-import { confirmDialog, infoDialog } from '../state/dialog-store';
+import { confirmDialog, errorDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 import { resolveSigmaTea, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
 import { governingSigmaLevel } from '../lib/sigma-workflow';
@@ -150,7 +150,7 @@ export function SigmaPage() {
       eflmLookupDate: patch.eflmLookupDate ?? test.eflm_lookup_date,
       eflmRef: patch.eflmRef ?? test.eflm_ref,
     });
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     if (patch.source && currentTest.current === test.id) setTeaSource(patch.source);
     await loadTests();
   }
@@ -214,18 +214,18 @@ export function SigmaPage() {
   async function removePeriodRow(period: SigmaPeriodView) {
     if (!(await confirmDialog(`Xóa kỳ ${vnPeriod(period.period)}? Số liệu CV/Bias của kỳ này sẽ mất.`, { title: 'Xóa kỳ Six Sigma', danger: true, confirmLabel: 'Xóa' }))) return;
     const result = await removePeriod(period.id, testId);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   async function exportPeriod(period: SigmaPeriodView) {
     if (!test) return;
     const error = await exportSigmaReportXlsx({ test, instrumentName, periods: [period], mode: 'period' });
-    if (error) await infoDialog(error, { title: 'Không xuất được báo cáo kỳ', type: 'warn' });
+    if (error) await errorDialog(error, { title: 'Không xuất được báo cáo kỳ' });
   }
   async function exportAllPeriods() {
     if (!test) return;
     const error = await exportSigmaReportXlsx({ test, instrumentName, periods, mode: 'comparison' });
-    if (error) await infoDialog(error, { title: 'Không xuất được báo cáo các kỳ', type: 'warn' });
+    if (error) await errorDialog(error, { title: 'Không xuất được báo cáo các kỳ' });
   }
 
   async function printPeriod(period: SigmaPeriodView) {
@@ -250,7 +250,7 @@ export function SigmaPage() {
       teaCriterion: teaSourceValueText(period.teaSource || teaSource),
       period,
     }), `Báo cáo Six Sigma - ${period.period}.pdf`, { pageNumbers: true });
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (error) await errorDialog(error);
   }
   async function printAllPeriods() {
     if (!test) return;
@@ -268,7 +268,7 @@ export function SigmaPage() {
       instrumentName,
       periods,
     }), `Báo cáo tổng hợp Six Sigma - ${test.name}.pdf`, { pageNumbers: true });
-    if (error) await infoDialog(error, { type: 'warn' });
+    if (error) await errorDialog(error);
   }
 
   async function commitCv(period: SigmaPeriodView, level: number, value: string): Promise<boolean> {
@@ -277,7 +277,7 @@ export function SigmaPage() {
     if (previous.cvSource === 'iqc-cohort' && !await confirmDialog('Chuyển CV sang nhập tay? Nguồn lô và xác nhận rà soát IQC của mức này sẽ được gỡ.', { title: 'Đổi nguồn CV' })) return false;
     const result = await saveOwnedPeriod(period,
       levelsPayloadFrom(period, level, { cv: value === '' ? undefined : Number(value), cvSource: 'manual', cohortN: undefined, sourceLot: '', sourceStart: '', sourceEnd: '', cohortStatus: '' }));
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return false; }
+    if (!result.ok) { await errorDialog(result.error.message); return false; }
     return true;
   }
 
@@ -307,7 +307,7 @@ export function SigmaPage() {
     if (previous.eqaRounds.length && !await confirmDialog('Thay các vòng EQA bằng Bias nhập tay? Để giữ chi tiết từng vòng, hãy dùng nút Chi tiết.', { title: 'Đổi nguồn Bias' })) return false;
     const result = await saveOwnedPeriod(period,
       levelsPayloadFrom(period, level, { biasEqa: value === '' ? undefined : Number(value), eqaRounds: [] }));
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return false; }
+    if (!result.ok) { await errorDialog(result.error.message); return false; }
     return true;
   }
 
@@ -341,14 +341,14 @@ export function SigmaPage() {
     try {
       const cohorts = await loadCohorts(period.testId, period.period, period.levels.map((level) => level.level));
       if (currentTest.current === period.testId) setCohortModal({ period, cohorts });
-    } catch { await infoDialog('Không tải được dữ liệu IQC theo lô. Vui lòng thử lại.', { type: 'warn' }); }
+    } catch { await errorDialog('Không tải được dữ liệu IQC theo lô. Vui lòng thử lại.'); }
   }
 
   return (
     <div className="sigma-page">
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       {loading && <div className="hint" role="status">Đang tải dữ liệu Sigma…</div>}
-      {loadError && <div className="alert warn" role="alert">{loadError} <button className="btn ghost sm" onClick={() => loadPeriods(testId)}>Thử lại</button></div>}
+      {loadError && <div className="alert rej" role="alert">{loadError} <button className="btn ghost sm" onClick={() => loadPeriods(testId)}>Thử lại</button></div>}
       <div className="sg-top-grid">
         <div className="panel">
           <div className="sg-setup-heading">

@@ -37,7 +37,7 @@ export function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
           </select>
         </label>
       </div>
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error" role="alert">{error}</p>}
     </div>
   </Modal>;
 }

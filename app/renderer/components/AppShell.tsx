@@ -15,6 +15,7 @@ import { useAuthStore } from '../store/auth-store';
 import { useSettingsStore } from '../store/settings-store';
 import { canUserAccessPage, pageById, type PageDef } from '../lib/permissions';
 import { DialogHost } from './DialogHost';
+import { ToastHost } from './ToastHost';
 import { DatePickerPopup } from './DatePickerPopup';
 import { NavIcon } from './NavIcon';
 
@@ -124,6 +125,7 @@ export function AppShell() {
         </PageErrorBoundary>
       </main>
       <DialogHost />
+      <ToastHost />
       <DatePickerPopup />
     </div>
   );

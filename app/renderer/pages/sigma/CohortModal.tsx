@@ -1,7 +1,7 @@
 // Hộp thoại chọn CV IQC theo lô (cohort) và xác nhận rà soát của trang Six Sigma.
 import { useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
-import { confirmDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { cohortStatusLabel, cohortStatusTone, vnDate, vnPeriod } from './shared';
 import type { SigmaCohortView, SigmaPeriodView } from '../../../shared/qc-api';
 import { AsyncButton } from '../../components/AsyncButton';
@@ -21,7 +21,7 @@ export function CohortModal({ period, cohorts, onClose, onSubmit }: {
     );
     if (!confirmed) return;
     const result = await onSubmit(selected, true);
-    if (!result.ok) await infoDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC', type: 'warn' });
+    if (!result.ok) await errorDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC' });
   }
   return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} size="xl"
     footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</AsyncButton></>}>

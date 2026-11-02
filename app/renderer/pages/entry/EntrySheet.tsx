@@ -246,8 +246,8 @@ export const EntrySheet = memo(function EntrySheet({
       </div>
       {(noteErr || pointErr || pointFeedback || voidMsg) && (
         <div className="entry-sheet-message" role="status" aria-live="polite">
-          {noteErr && <div className="alert warn">{noteErr}</div>}
-          {pointErr && <div className="alert warn">{pointErr}</div>}
+          {noteErr && <div className="alert rej" role="alert">{noteErr}</div>}
+          {pointErr && <div className="alert rej" role="alert">{pointErr}</div>}
           {pointFeedback && <div className={`alert ${pointFeedback.kind}`}>{pointFeedback.message}</div>}
           {voidMsg && <div className="alert warn">{voidMsg}</div>}
         </div>
