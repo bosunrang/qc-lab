@@ -173,7 +173,25 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   độ vận hành, phục hồi backup cũ); `audit-handlers.test.mjs` mục 10 nay kiểm vượt
   ngưỡng không xoá dòng nào; `lan-http-server.test.mjs` kiểm `clientId` của máy trạm.
 
-## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L)
+## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L) — mục 1 đã làm 02/11/2026
+
+**Đã làm mục 1 (cùng N10 của GV8):**
+
+- Huỷ điểm thuộc lần chạy bị loại (chính điểm Loại bỏ, hoặc mức khác của lần chạy
+  vi phạm) cần lý do ≥ 10 ký tự với mọi loại huỷ (`rejectedRunVoidReasonError`,
+  `voidReasonMinimum` ở `domain/entry-validation.ts`; modal Huỷ điểm báo trước và
+  đòi cùng ngưỡng). Lần chạy đạt giữ quy tắc cũ. "Nhập sai dữ liệu" vẫn không mở NCE.
+- Bằng chứng lưu bền trên chính điểm đã huỷ: cột `qc_points.void_rejection_json`
+  (migration 9) = `{rules, rejectedLevels}`; nhật ký ghi "Thuộc lần chạy … bị loại
+  (luật …), mức vi phạm …". Không dùng bảng sự kiện riêng: điểm đã huỷ không bao giờ
+  bị xoá, nên nó là nơi giữ bằng chứng tự nhiên; biên bản xem xét (mục 2) đọc
+  `voided=1 AND void_rejection_json<>''`. Điểm huỷ trước migration 9 để rỗng.
+- Chưa làm: mục 2 (biên bản xem xét QC theo tháng) và mục 3 (cảnh báo khi khoá kỳ).
+  Danh sách điểm đã huỷ ở Nhập QC chưa hiện dấu "lần chạy bị loại".
+- **Test:** `app/tests/void-rejected-run.test.mjs`; `entry-handlers` thêm ca "nhập sai
+  dữ liệu" điểm Loại bỏ thiếu lý do bị từ chối.
+
+**Phương án gốc (31/10/2026):**
 
 - **Căn cứ:** ISO 15189:2022 7.3.7.2 (xử lý khi IQC không đạt và xem xét dữ liệu
   QC định kỳ), 7.5/8.4 (sửa hồ sơ phải có lý do và người có thẩm quyền).
@@ -242,7 +260,10 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 - **N7:** `allowedRuleScopes('2of3-2s')` tính theo số mức của xét nghiệm.
 - **N9:** chặn ngày tương lai; cảnh báo/chặn lô hết hạn; snapshot Mean/SD của
   điểm nhập lùi ngày lấy dải hiệu lực theo ngày từ `mean_sd_history_json`.
-- **N10:** lập dải PXN loại run bị loại khỏi phép tính, vẫn đòi n ≥ 20 và ≥ 20 ngày.
+- **N10 — đã làm 02/11/2026:** `evaluateRangeCandidate()` tính Mean/SD trên các
+  lần chạy không bị loại, vẫn đòi n ≥ 20 và ≥ 20 ngày độc lập đếm trên chính các điểm
+  được tính; lần chạy bị loại không còn chặn. Cảnh báo 1-2s vẫn được tính. Trang
+  Nhập QC và hộp thoại lập dải ghi số điểm đã bỏ. Test: `range-workflow.test.mjs`.
 - **N11:** Sigma chỉ cảnh báo khi đích đổi trong nhóm IQC, không đánh `unstable`.
 - **N12:** chấp nhận lô mới cần thống kê cột song song tối thiểu (n, số ngày, run bị loại).
 - **N13:** ngưỡng so sánh lô hoá chất lấy từ TEa của xét nghiệm, đánh giá theo từng mức nồng độ.

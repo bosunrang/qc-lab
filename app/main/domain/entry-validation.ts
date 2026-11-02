@@ -102,6 +102,23 @@ export function voidNceChoice(kind: VoidKind): { openNce: boolean; forced: boole
   return { openNce: false, forced: false, reasonRequired: true };
 }
 
+/** Huỷ một điểm thuộc lần chạy bị loại (điểm Loại bỏ, hoặc mức khác của lần
+ * chạy đó vi phạm) cần lý do ≥ 10 ký tự với MỌI loại huỷ, kể cả "nhập sai dữ
+ * liệu" (ISO 15189:2022 7.3.7.2, 8.4; N4). Không có cổng này thì huỷ rồi nhập
+ * lại là lần chạy "Đạt", hàng chờ NCE trống, chỉ còn một dòng nhật ký. Loại
+ * "nhập sai dữ liệu" vẫn không mở NCE — đó là thiết kế, không phải lỗ hổng. */
+export const REJECTED_RUN_VOID_REASON_MIN = 10;
+
+export function voidReasonMinimum(kind: VoidKind, runRejected: boolean): number {
+  if (runRejected) return REJECTED_RUN_VOID_REASON_MIN;
+  return voidNceChoice(kind).reasonRequired ? 5 : 0;
+}
+
+export function rejectedRunVoidReasonError(reason: string): { code: string; message: string } | null {
+  if (reason.trim().length >= REJECTED_RUN_VOID_REASON_MIN) return null;
+  return { code: 'reason-required-rejected-run', message: `Điểm này thuộc lần chạy bị loại: cần ghi lý do huỷ tối thiểu ${REJECTED_RUN_VOID_REASON_MIN} ký tự (vd. bằng chứng nhập sai).` };
+}
+
 export function validateVoidInput(input: VoidPointInput): ValidationResult<PreparedVoid> {
   const pointId = cleanId(input.pointId);
   if (!pointId) return { ok: false, code: 'missing-point', message: 'Thiếu mã điểm QC.' };

@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useEntryStore } from '../../store/entry-store';
-import { voidNceChoice, type VoidKind } from '../../../main/domain/entry-validation';
+import { voidNceChoice, voidReasonMinimum, type VoidKind } from '../../../main/domain/entry-validation';
 import { formatQcValue, vnDate } from './shared';
 import type { QcPointView } from '../../../shared/qc-api';
 
@@ -23,9 +23,12 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   const [voidReason, setVoidReason] = useState('');
   const [voidErr, setVoidErr] = useState<string | null>(null);
   const voidChoice = voidNceChoice(voidKind);
+  // Điểm thuộc lần chạy bị loại cần lý do với mọi loại huỷ (N4); main kiểm lại.
+  const runRejected = point.verdict === 'rej' || (point.runRejectedBy?.length ?? 0) > 0;
+  const reasonMin = voidReasonMinimum(voidKind, runRejected);
 
   async function submitVoid() {
-    if (voidChoice.reasonRequired && voidReason.trim().length < 5) { setVoidErr('Cần ghi lý do hủy tối thiểu 5 ký tự.'); return; }
+    if (voidReason.trim().length < reasonMin) { setVoidErr(`Cần ghi lý do hủy tối thiểu ${reasonMin} ký tự.`); return; }
     const openNce = voidChoice.forced ? voidChoice.openNce : voidOpenNce;
     const result = await voidPoint(point.id, voidReason.trim(), voidKind, openNce);
     if (!result.ok) { setVoidErr(result.error.message); return; }
@@ -39,6 +42,7 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
     <Modal title="Hủy điểm QC" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className="btn danger" onClick={submitVoid}>Hủy điểm này</button></>}>
       <div className="hint">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
+      {runRejected && <div className="alert warn">Điểm này thuộc lần chạy bị loại{point.rules.length ? ` (luật ${point.rules.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
       <div className="field">
         <label htmlFor="voidKindInput">Loại hủy</label>
         <select id="voidKindInput" aria-label="Loại hủy điểm QC" value={voidKind}
@@ -57,7 +61,7 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
           : 'Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.'}</div>
       </div>
       <div className="field">
-        <label htmlFor="voidReasonInput">{voidChoice.reasonRequired ? 'Lý do hủy (bắt buộc, tối thiểu 5 ký tự)' : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>
+        <label htmlFor="voidReasonInput">{reasonMin ? `Lý do hủy (bắt buộc, tối thiểu ${reasonMin} ký tự)` : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>
         <textarea id="voidReasonInput" autoFocus value={voidReason} onChange={(e) => setVoidReason(e.target.value)} rows={3}
           placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." />
         {voidErr && <p className="field-error">{voidErr}</p>}

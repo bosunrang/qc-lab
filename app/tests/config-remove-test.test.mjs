@@ -32,7 +32,7 @@ assert.equal(forbidden.error.code, 'forbidden');
 // 2) thêm 1 điểm QC vi phạm rồi huỷ kèm kind=analytical -> tự mở hồ sơ NCE
 const point = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-02', val: 14 } }, actor);
 assert.equal(point.ok, true);
-const voided = entry.voidPoint({ data: { pointId: point.data.id, kind: 'analytical' } }, actor);
+const voided = entry.voidPoint({ data: { pointId: point.data.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor);
 assert.equal(voided.ok, true);
 assert.ok(voided.data.nceId, 'huỷ điểm kind=analytical phải tự mở hồ sơ NCE');
 const nceBefore = nce.listNce().find((r) => r.test_id === test.id);

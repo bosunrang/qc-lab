@@ -5,6 +5,9 @@ import { EmptyState } from '../../components/EmptyState';
 import type { RangeMode } from './RangeWorkflowModal';
 import type { RangeCandidateView } from '../../../shared/qc-api';
 
+/** Lần chạy bị loại chỉ bị bỏ khỏi phép tính dải (CLSI C24), không chặn. */
+const excludedText = (rejected: number) => rejected > 0 ? `, đã bỏ ${rejected} điểm thuộc lần chạy bị loại` : '';
+
 export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, rangeError, levelNums, rangeLevel, decimals, writable, onRangeLevel, onOpen }: {
   rangeCandidate: RangeCandidateView | null;
   rangeError: string | null;
@@ -41,8 +44,8 @@ export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, r
                 <div className="range-band-body">· Mức {rangeCandidate.level}: Mean={rangeCandidate.current.mean != null ? rangeCandidate.current.mean.toFixed(decimals) : '—'} SD={rangeCandidate.current.sd != null ? rangeCandidate.current.sd.toFixed(4) : '—'}.
                   {rangeCandidate.proposed
                     ? rangeCandidate.eligible
-                      ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
-                      : ` Cần ≥20 kết quả trên ≥20 ngày độc lập và không lần chạy nào bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày, ${rangeCandidate.proposed.rejected} điểm thuộc lần chạy bị loại.`
+                      ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập${excludedText(rangeCandidate.proposed.rejected)}). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
+                      : ` Cần ≥20 kết quả trên ≥20 ngày độc lập, không tính lần chạy bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày${excludedText(rangeCandidate.proposed.rejected)}.`
                     : ' Chưa có dữ liệu của lô đang vận hành.'}
                 </div>
               </div>

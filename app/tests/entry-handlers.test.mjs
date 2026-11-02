@@ -89,7 +89,7 @@ assert.equal(entryRelated.length, 4, 'chi thao tac thanh cong moi ghi audit');
 const p3 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-04', val: 14, runId: '2026-08-04-1' } }, actor);
 assert.equal(p3.ok, true);
 assert.equal(p3.data.verdict, 'rej');
-const voidAnalytical = entry.voidPoint({ data: { pointId: p3.data.id, kind: 'analytical' } }, actor);
+const voidAnalytical = entry.voidPoint({ data: { pointId: p3.data.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor);
 assert.equal(voidAnalytical.ok, true, JSON.stringify(voidAnalytical));
 assert.equal(voidAnalytical.data.reusedAction, false);
 assert.ok(voidAnalytical.data.nceId, 'kind analytical phai tu mo 1 ho so NCE moi');
@@ -112,7 +112,9 @@ assert.deepEqual(triggerPoint.rules, ['1-3s']);
 assert.equal(triggerPoint.voided, false);
 
 const p4 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-05', val: 14, runId: '2026-08-05-1' } }, actor);
-const voidDataEntry = entry.voidPoint({ data: { pointId: p4.data.id, kind: 'data-entry' } }, actor);
+// N4: điểm Loại bỏ — kể cả nhập sai dữ liệu — phải có lý do ≥ 10 ký tự.
+assert.equal(entry.voidPoint({ data: { pointId: p4.data.id, kind: 'data-entry' } }, actor).error.code, 'reason-required-rejected-run');
+const voidDataEntry = entry.voidPoint({ data: { pointId: p4.data.id, kind: 'data-entry', reason: 'Gõ nhầm 14 thay cho 10.4' } }, actor);
 assert.equal(voidDataEntry.ok, true);
 assert.equal(voidDataEntry.data.nceId, null, "kind data-entry khong duoc mo NCE");
 
@@ -127,7 +129,7 @@ assert.ok(voidOtherOk.data.nceId, "kind other tu chon openNce=true phai mo NCE")
 const p6 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-07', val: 14, runId: '2026-08-07-1' } }, actor);
 ensureUser(db, actor);
 const manualNce = createIqcNce(nce, actor, test.id, { date: '2026-08-07', runId: '2026-08-07-1' });
-const voidReuse = entry.voidPoint({ data: { pointId: p6.data.id, kind: 'analytical' } }, actor);
+const voidReuse = entry.voidPoint({ data: { pointId: p6.data.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor);
 assert.equal(voidReuse.ok, true);
 assert.equal(voidReuse.data.reusedAction, true, 'phai dung lai ho so NCE dang xu ly cua chinh lan chay nay');
 assert.equal(voidReuse.data.nceId, manualNce.record.nce_id);

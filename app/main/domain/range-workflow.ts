@@ -11,25 +11,33 @@ export interface RangeCandidatePoint {
 }
 
 export interface RangeCandidateStats extends StatsResult {
+  /** Số ngày độc lập của các điểm ĐƯỢC TÍNH (không thuộc lần chạy bị loại). */
   days: number;
+  /** Số điểm thuộc lần chạy bị loại — đã bỏ khỏi phép tính. */
   rejected: number;
   warnings: number;
   eligible: boolean;
 }
 
-
+/** Dải PXN đề xuất (CLSI C24-Ed4): Mean/SD tính trên kết quả của các lần chạy
+ * KHÔNG bị loại; lần chạy bị loại chỉ bị bỏ khỏi phép tính, không chặn việc
+ * lập dải. Vẫn đòi ≥ 20 kết quả trên ≥ 20 ngày độc lập, đếm trên chính các
+ * điểm được tính. Cảnh báo (1-2s) là dao động bình thường nên vẫn được tính.
+ *
+ * Trước 2026-11-02 một lần chạy bị loại bất kỳ chặn lập dải vĩnh viễn (N10),
+ * đẩy người dùng sang huỷ điểm để "làm sạch" dữ liệu (N4). */
 export function evaluateRangeCandidate(points: readonly RangeCandidatePoint[]): RangeCandidateStats | null {
-  const calculated = stats(points.map((point) => point.val));
+  const isRejected = (point: RangeCandidatePoint) => point.runRejected || point.verdict === 'rej';
+  const included = points.filter((point) => !isRejected(point));
+  const calculated = stats(included.map((point) => point.val));
   if (!calculated) return null;
-  const days = new Set(points.map((point) => point.date)).size;
-  const rejected = points.filter((point) => point.runRejected || point.verdict === 'rej').length;
-  const warnings = points.filter((point) => point.verdict === 'warn').length;
+  const days = new Set(included.map((point) => point.date)).size;
   return {
     ...calculated,
     days,
-    rejected,
-    warnings,
-    eligible: calculated.n >= 20 && days >= 20 && rejected === 0 && calculated.sd > 0,
+    rejected: points.length - included.length,
+    warnings: included.filter((point) => point.verdict === 'warn').length,
+    eligible: calculated.n >= 20 && days >= 20 && calculated.sd > 0,
   };
 }
 

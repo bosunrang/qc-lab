@@ -11,7 +11,7 @@ import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -223,7 +223,10 @@ CREATE TABLE IF NOT EXISTS qc_points (
   void_requires_rerun INTEGER NOT NULL DEFAULT 0,
   voided_at TEXT NOT NULL DEFAULT '',
   voided_by TEXT NOT NULL DEFAULT '',
-  entry_seq INTEGER NOT NULL DEFAULT 0 -- thứ tự nhập, xem POST_MIGRATION_SQL
+  entry_seq INTEGER NOT NULL DEFAULT 0, -- thứ tự nhập, xem POST_MIGRATION_SQL
+  -- Lần chạy của điểm bị loại lúc huỷ: JSON {rules, rejectedLevels}; rỗng nếu
+  -- không. Giữ bằng chứng run bị loại sau khi huỷ/nhập lại (N4, migration 9).
+  void_rejection_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_level_date ON qc_points(test_id, level, date);
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_run ON qc_points(test_id, run_id);
@@ -728,6 +731,13 @@ const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, 'qc_points', 'entry_seq', 'INTEGER NOT NULL DEFAULT 0');
       db.exec('UPDATE qc_points SET entry_seq = rowid WHERE entry_seq = 0;');
     },
+  },
+  {
+    version: 9,
+    // Điểm huỷ trước bước này để rỗng: không tính lại kết luận lúc huỷ được,
+    // vì điểm đã ra khỏi chuỗi đánh giá.
+    name: 'Điểm huỷ giữ bằng chứng lần chạy bị loại',
+    up(db) { addColumnIfMissing(db, 'qc_points', 'void_rejection_json', "TEXT NOT NULL DEFAULT ''"); },
   },
 ];
 

@@ -87,7 +87,7 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
               </tbody>
             </table></div>
           </section>
-          <div className="range-workflow-note">Mean/SD đề xuất được tính trên toàn bộ tập dữ liệu đang xét; hệ thống không tự loại điểm để làm đẹp SD.</div>
+          <div className="range-workflow-note">Mean/SD đề xuất được tính trên mọi kết quả của các lần chạy không bị loại{proposed.rejected > 0 ? ` (đã bỏ ${proposed.rejected} điểm thuộc lần chạy bị loại)` : ''}; hệ thống không tự loại thêm điểm nào để làm đẹp SD.</div>
           <div className="range-apply-choice" role="group" aria-label="Chọn cách áp dụng dải">
             <span>Giá trị áp dụng</span>
             <div className="dayseg"><button type="button" className={rangeSelection === 'proposed' ? 'on' : ''} aria-pressed={rangeSelection === 'proposed'} onClick={() => setRangeSelection('proposed')}>Dải đề xuất</button><button type="button" className={rangeSelection === 'manual' ? 'on' : ''} aria-pressed={rangeSelection === 'manual'} onClick={() => setRangeSelection('manual')}>Chỉnh thủ công</button></div>

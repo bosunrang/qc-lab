@@ -37,7 +37,7 @@ const today = new Date().toISOString().slice(0, 10);
 const prefix = `NCE-${today.replace(/-/g, '')}`;
 db.prepare('INSERT INTO actions(id,nce_id) VALUES (?,?)').run('gap-01', `${prefix}-01`);
 db.prepare('INSERT INTO actions(id,nce_id) VALUES (?,?)').run('gap-03', `${prefix}-03`);
-const voided = entry.voidPoint({ data: { pointId: point.id, kind: 'analytical' } }, actor);
+const voided = entry.voidPoint({ data: { pointId: point.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor);
 assert.equal(voided.ok, true, JSON.stringify(voided));
 assert.equal(voided.data.nceId, `${prefix}-04`);
 
@@ -45,7 +45,7 @@ assert.equal(voided.data.nceId, `${prefix}-04`);
 const second = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-03', val: 14.2 } }, actor).data;
 const actionCount = db.prepare('SELECT COUNT(*) n FROM actions').get().n;
 db.exec("CREATE TRIGGER fail_void_audit BEFORE INSERT ON activity WHEN NEW.type='Hủy điểm QC' BEGIN SELECT RAISE(FAIL, 'void-audit-failed'); END");
-assert.throws(() => entry.voidPoint({ data: { pointId: second.id, kind: 'analytical' } }, actor), /void-audit-failed/);
+assert.throws(() => entry.voidPoint({ data: { pointId: second.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor), /void-audit-failed/);
 assert.equal(db.prepare('SELECT voided FROM qc_points WHERE id=?').get(second.id).voided, 0);
 assert.equal(db.prepare('SELECT COUNT(*) n FROM actions').get().n, actionCount, 'hủy lỗi không được tạo NCE dở dang');
 

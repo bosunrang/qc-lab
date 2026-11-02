@@ -15,7 +15,7 @@ import type { NceRunSnapshot } from '../domain/nce/types';
 
 export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries };
 import { uid } from '../domain/text-utils';
-import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
+import { validateQcPointInput, validateVoidInput, rejectedRunVoidReasonError, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
 import { evaluateRangeCandidate, manualRangeDeviation, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
@@ -252,7 +252,7 @@ export function createEntryHandlers(db: Db) {
     const lotRow = config.qc_lot_id ? db.prepare('SELECT lot_no FROM qc_lots WHERE id=?').get(config.qc_lot_id) as { lot_no: string } | undefined : undefined;
     const lot = lotRow?.lot_no || '';
     const active = activeEvaluation(testId), rows = active.levels.find((item) => item.level === level)?.pts || [];
-    // Cổng dải PXN đếm theo LẦN CHẠY bị loại, không theo verdict riêng của
+    // Dải PXN bỏ điểm theo LẦN CHẠY bị loại, không theo verdict riêng của
     // mức: một điểm đạt nằm trong lần chạy đã hỏng vì mức khác vi phạm không
     // phải dữ liệu in-control. Dùng `rejectedLevelsByRun()` thay vì
     // `acceptedRunPoints()` để mức CHƯA có Mean/SD (z không hữu hạn nên không
@@ -464,6 +464,18 @@ export function createEntryHandlers(db: Db) {
       const index = history.findIndex((item) => item.id === pointId);
       if (index >= 0) view = { ...history[index], verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
     }
+    // N4: điểm thuộc lần chạy bị loại (chính nó Loại bỏ, hoặc mức khác của lần
+    // chạy vi phạm) cần lý do với MỌI loại huỷ, và điểm đã huỷ giữ lại bằng
+    // chứng đó — huỷ rồi nhập lại không còn xoá được dấu vết lần chạy bị loại.
+    // Nhánh lô lịch sử phía trên không có kết luận theo lần chạy, chỉ có
+    // kết luận riêng của điểm.
+    const rejectedLevels = view && 'runRejectedBy' in view ? view.runRejectedBy ?? [] : [];
+    const runRejected = view?.verdict === 'rej' || rejectedLevels.length > 0;
+    if (runRejected) {
+      const reasonError = rejectedRunVoidReasonError(reason);
+      if (reasonError) return { ok: false, error: reasonError };
+    }
+    const rejectionJson = runRejected ? JSON.stringify({ rules: view?.rules ?? [], rejectedLevels }) : '';
     const kindLabel = kind === 'analytical' ? 'Kết quả QC thực tế không hợp lệ' : kind === 'data-entry' ? 'Nhập sai dữ liệu' : '';
     const composedReason = kindLabel ? (reason ? `${kindLabel} — ${reason}` : kindLabel) : reason;
     // Hồ sơ NCE theo LẦN CHẠY (D-01): dùng lại hồ sơ đang xử lý của chính lần
@@ -478,9 +490,12 @@ export function createEntryHandlers(db: Db) {
         ? { ...p, verdict: view.verdict, rules: Array.from(new Set(view.rules)) } : p) };
     }
     const mutation = w.commit((tx) => {
-      db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=? WHERE id=?')
-        .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, pointId);
-      tx.audit('Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}`, test ? test.name : '');
+      db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=?, void_rejection_json=? WHERE id=?')
+        .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, rejectionJson, pointId);
+      const rejectionNote = runRejected
+        ? ` · Thuộc lần chạy ${point.run_id || '(không mã)'} bị loại${view?.rules.length ? ` (luật ${view.rules.join(', ')})` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
+        : '';
+      tx.audit('Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}${rejectionNote}`, test ? test.name : '');
       let nceId: string | null = null, reusedAction = false, createdAction = false;
       if (openNce && existingNce) { nceId = existingNce.nce_id; reusedAction = true; }
       else if (openNce && snapshot) {

@@ -105,10 +105,11 @@ assert.equal(warned.data.eligible, true, 'một cảnh báo 1-2s lẻ không đ�
 // Và nó VẪN nằm trong phép tính, không bị lọc lén để SD đẹp hơn.
 assert.ok(warned.data.proposed.sd > 0.5, 'điểm cảnh báo vẫn tham gia tính SD');
 
-// Ngược lại: một LẦN CHẠY bị loại thì chặn, kể cả khi chính mức này đạt.
-// Mức 3 vượt +4SD ngày 10/08 nên cả lần chạy `2026-08-10-1` mất hiệu lực —
-// điểm Mức 2 cùng lần chạy đó không còn là dữ liệu in-control dù verdict
-// riêng của nó vẫn là 'ok'.
+// Một LẦN CHẠY bị loại thì bị bỏ khỏi phép tính, kể cả khi chính mức này
+// đạt — nhưng KHÔNG chặn lập dải (N10, CLSI C24-Ed4; sửa 02/11/2026: trước đây
+// chặn vĩnh viễn, đẩy người dùng sang huỷ điểm). Mức 3 vượt +4SD ngày 10/08
+// nên cả lần chạy `2026-08-10-1` mất hiệu lực — điểm Mức 2 cùng lần chạy đó
+// không còn là dữ liệu in-control dù verdict riêng của nó vẫn là 'ok'.
 const lot3 = config.saveLot({ data: { lotNo: 'LOT-RUN', level: 3 } }, actor).data;
 config.saveTestLevel({ testId: test.id, data: { level: 3, mean: 30, sd: 1, qcLotId: lot3.id } }, actor);
 makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 3, lotId: lot3.id }] });
@@ -117,10 +118,21 @@ assert.equal(entry.addPoint({ data: { testId: test.id, level: 3, date: '2026-08-
 const collateral = entry.queryPoints(test.id, 2).find((point) => point.date === '2026-08-10');
 assert.equal(collateral.verdict, 'ok', 'điểm Mức 2 tự nó không vi phạm gì');
 assert.deepEqual(collateral.runRejectedBy, [3], 'nhưng lần chạy của nó bị Mức 3 làm hỏng');
-const blocked = entry.rangeCandidate(test.id, 2);
-assert.equal(blocked.data.proposed.n, 20, 'không lọc lén điểm ra khỏi phép tính');
-assert.equal(blocked.data.proposed.rejected, 1, 'đếm điểm thuộc lần chạy bị loại');
-assert.equal(blocked.data.eligible, false, 'lần chạy bị loại thì chưa được lập dải');
+const excluded = entry.rangeCandidate(test.id, 2);
+assert.equal(excluded.data.proposed.n, 19, 'điểm thuộc lần chạy bị loại ra khỏi phép tính');
+assert.equal(excluded.data.proposed.days, 19, 'ngày độc lập đếm trên điểm được tính');
+assert.equal(excluded.data.proposed.rejected, 1, 'đếm điểm thuộc lần chạy bị loại');
+assert.equal(excluded.data.eligible, false, 'còn 19 kết quả: chưa đủ 20');
+// Thêm một ngày đạt: đủ 20 kết quả được tính trên 20 ngày → lập được dải,
+// không cần huỷ điểm của lần chạy bị loại.
+assert.equal(entry.addPoint({ data: { testId: test.id, level: 2, date: '2026-08-21', val: 20.2 } }, actor).ok, true);
+const enough = entry.rangeCandidate(test.id, 2);
+assert.equal(enough.data.proposed.n, 20);
+assert.equal(enough.data.proposed.rejected, 1);
+assert.equal(enough.data.eligible, true, 'lần chạy bị loại không còn chặn lập dải');
+const expectedValues = [...Array.from({ length: 19 }, (_, i) => i + 1).filter((day) => day !== 10).map((day) => (day % 2 ? 19.8 : 20.2)), 22.5, 20.2];
+const expectedMean = expectedValues.reduce((sum, value) => sum + value, 0) / expectedValues.length;
+assert.ok(Math.abs(enough.data.proposed.mean - expectedMean) < 1e-9, 'Mean tính đúng trên các điểm được giữ');
 
 console.log('app range workflow end-to-end tests passed');
 
