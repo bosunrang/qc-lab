@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
+import { Pagination, pageBounds } from '../../components/Pagination';
 import type { HistoryQcPointView, Test, TestLevel, QcLot } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from './shared';
@@ -267,16 +268,7 @@ export function HistoryTab() {
                   );
                 })}</tbody>
               </table>
-              {detailPageCount > 1 && (
-                <div className="table-pagination">
-                  <span className="hint">Hiển thị {(detailPageClamped - 1) * HISTORY_POINT_PAGE + 1}–{Math.min(detailPageClamped * HISTORY_POINT_PAGE, detailPoints.length)} / {detailPoints.length} điểm</span>
-                  <div>
-                    <button type="button" className="btn ghost sm" disabled={detailPageClamped <= 1} onClick={() => setDetailPage(detailPageClamped - 1)}>‹ Trước</button>
-                    <b>Trang {detailPageClamped}/{detailPageCount}</b>
-                    <button type="button" className="btn ghost sm" disabled={detailPageClamped >= detailPageCount} onClick={() => setDetailPage(detailPageClamped + 1)}>Sau ›</button>
-                  </div>
-                </div>
-              )}
+              <Pagination page={detailPageClamped} pageCount={detailPageCount} {...pageBounds(detailPageClamped, HISTORY_POINT_PAGE, detailPoints.length)} total={detailPoints.length} unit="điểm" label="Phân trang điểm QC" onPageChange={setDetailPage} />
             </>) : <EmptyState title="Chưa có điểm QC">Không có điểm QC nào khớp với lô/mức này.</EmptyState>}
           </Modal>
         );

@@ -72,6 +72,6 @@
 .audit-table td:nth-child(3) .pill{max-width:100%;white-space:normal;}
 
 .audit-filterbar .audit-date{width:170px;height:var(--control-h);}
-.audit-filterbar .audit-date .date-text{max-width:none;min-width:0;height:var(--control-h);flex:1;}
+.audit-filterbar .audit-date .date-text{max-width:none;min-width:0;flex:1;}
 
 

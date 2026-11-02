@@ -7,6 +7,7 @@ import { useWestgardStore } from '../../store/westgard-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
+import { Pagination, pageBounds } from '../../components/Pagination';
 import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
 import { vnDate } from '../../lib/format';
@@ -24,22 +25,6 @@ const LOT_FIELD_ERRORS: FieldErrorMap = { 'missing-lot-no': 'lotNo', 'duplicate-
 /** Mã lỗi `saveLotGroup` → ô cần sửa. `duplicate-group` cố ý không gắn ô:
  * trùng có thể do tên HOẶC do bộ lô, chỉ ra một ô sẽ dẫn người dùng sai chỗ. */
 const LOT_GROUP_FIELD_ERRORS: FieldErrorMap = { 'not-enough-lots': 'lotIds', 'missing-name': 'name' };
-
-function ListPagination({ page, pageCount, pageSize, total, itemLabel, onPageChange }: {
-  page: number; pageCount: number; pageSize: number; total: number; itemLabel: string; onPageChange: (page: number) => void;
-}) {
-  if (pageCount <= 1) return null;
-  const from = (page - 1) * pageSize + 1;
-  const to = Math.min(total, from + pageSize - 1);
-  return <nav className="lot-list-pagination" aria-label={`Phân trang ${itemLabel}`}>
-    <span className="hint" role="status">{from}–{to} trên {total} {itemLabel}</span>
-    <div className="lot-page-controls">
-      <button className="btn ghost lot-page-button" type="button" aria-label="Trang trước" title="Trang trước" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>‹</button>
-      <b aria-current="page">{page}/{pageCount}</b>
-      <button className="btn ghost lot-page-button" type="button" aria-label="Trang sau" title="Trang sau" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>›</button>
-    </div>
-  </nav>;
-}
 
 /** Thứ tự hiển thị nhóm lô: nhóm đang thật sự hoạt động lên ĐẦU, "Đã dừng"/
  * "Đã lưu trữ" đẩy xuống CUỐI — người dùng yêu cầu để nhóm đang dùng không
@@ -230,7 +215,7 @@ export function LotsTab() {
             ))}
           </tbody>
         </table> : <EmptyState title="Chưa có lô QC">Tạo từng lô QC độc lập, sau đó ghép nhóm và thiết lập Mean/SD.</EmptyState>}
-        <ListPagination page={currentLotPage} pageCount={lotPageCount} pageSize={LOTS_PAGE_SIZE} total={lots.length} itemLabel="lô" onPageChange={setLotPage} />
+        <Pagination page={currentLotPage} pageCount={lotPageCount} {...pageBounds(currentLotPage, LOTS_PAGE_SIZE, lots.length)} total={lots.length} unit="lô QC" label="Phân trang lô QC" onPageChange={setLotPage} />
       </div>
 
       <div className="panel rcfg-list lot-config-right">
@@ -253,7 +238,7 @@ export function LotsTab() {
             </div>
           </article>;
         })}</div> : <EmptyState title="Chưa có nhóm lô QC">Chọn ít nhất hai lô QC để tạo một nhóm lô dùng cho Mean/SD.</EmptyState>}
-        <ListPagination page={currentLotGroupPage} pageCount={lotGroupPageCount} pageSize={LOT_GROUPS_PAGE_SIZE} total={lotGroups.length} itemLabel="nhóm lô" onPageChange={setLotGroupPage} />
+        <Pagination page={currentLotGroupPage} pageCount={lotGroupPageCount} {...pageBounds(currentLotGroupPage, LOT_GROUPS_PAGE_SIZE, lotGroups.length)} total={lotGroups.length} unit="nhóm lô" label="Phân trang nhóm lô" onPageChange={setLotGroupPage} />
       </div>
       </div>
 

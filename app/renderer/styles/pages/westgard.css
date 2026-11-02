@@ -133,7 +133,7 @@
   min-height:var(--panel-header-h);
   display:flex;
   align-items:center;
-  padding:var(--space-2-5) var(--panel-padding);
+  padding:var(--space-2-5) var(--panel-header-px);
   background:var(--surface-section-header);
   font-size:var(--title-panel);
   font-weight:var(--title-panel-weight);
@@ -141,7 +141,7 @@
 }
 .wg-cusum-heading{
   display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
-  min-height:var(--panel-header-h); padding:var(--space-2-5) var(--panel-padding); background:var(--surface-section-header); border-bottom:1px solid var(--surface-divider);
+  min-height:var(--panel-header-h); padding:var(--space-2-5) var(--panel-header-px); background:var(--surface-section-header); border-bottom:1px solid var(--surface-divider);
 }
 .wg-cusum-heading .panel-title{
   min-height:0; margin:0; padding:0; background:transparent;
@@ -177,7 +177,7 @@
    tiêu đề, nên không cần guard `:first-child`. */
 .panel>h3:has(.wg-level-title){
   display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3-5); flex-wrap:wrap;
-  min-height:var(--panel-header-h); margin:0; padding:var(--space-2-5) var(--panel-padding);
+  min-height:var(--panel-header-h); margin:0; padding:var(--space-2-5) var(--panel-header-px);
   background:var(--surface-section-header); border-bottom:1px solid var(--surface-divider);
 }
 .wg-level-title{font-size:var(--title-panel);font-weight:var(--title-panel-weight);color:var(--text-primary);}

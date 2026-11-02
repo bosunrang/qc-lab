@@ -335,6 +335,20 @@ dùng `--danger-accent`. Test: `app/tests/field-error.test.mjs`, e2e `modal-ux.e
 `AppShell` theo dõi `(max-width: 1050px)` để mục điều hướng có `title`/`aria-label` khi chỉ
 còn icon. Test: `design-system.test.mjs`.
 
+**U9 (thuộc GV11) — đã làm 02/11/2026:**
+- Phân trang chung `components/Pagination.tsx` (Nhật ký, điểm QC trong Lịch sử, danh sách
+  lô và nhóm lô). Bỏ `ListPagination` và CSS `.lot-list-pagination`/`.lot-page-*`. Chỉ hiện
+  khi có từ hai trang.
+- Thẻ số liệu chung `components/StatCard.tsx` (`.stat-card`) cho Tổng quan và So sánh hoá
+  chất. Bỏ `.dash-kpi`, `.rc-stat-card`. Thẻ Sigma tô nền theo vùng nên vẫn riêng (U5).
+- Dải tiêu đề panel cấp một dùng token `--panel-header-px` (= `--panel-padding`) thay cho
+  14/16/20px: quy tắc chung, Tổng quan, Nhập QC, Westgard, Six Sigma.
+- Ô ngày: `.datebox` `box-sizing:border-box;height:var(--control-h)`, ô bên trong `height:100%`.
+  Trước khung cao 38px. Bỏ các chỗ trang đặt lại chiều cao ô ngày.
+- Hộp trống tự dựng đã được luật `EmptyState` chặn từ trước.
+
+Test: `design-system.test.mjs`.
+
 **U11 (thuộc GV11) — đã làm 02/11/2026:**
 - Bỏ khối `*::-webkit-scrollbar*` và token `--scrollbar-size`, `--scrollbar-thumb-hover`.
 - 531 khai báo padding/margin/gap viết px trùng thang đổi sang `var(--space-*)`. Giá trị tính

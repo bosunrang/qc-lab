@@ -11,6 +11,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useSettingsStore } from '../store/settings-store';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { StatCard, type StatTone } from '../components/StatCard';
 import {
   buildDashboardViewModel, normalizeDashboardSearch, levelTargetOk, dashboardTestRank,
   type DashboardStatus, type DashboardTestItem, type DashboardAlertItem,
@@ -173,7 +174,7 @@ function TestsPanel({ model }: { model: Model }) {
 }
 
 function LoadingView({ subtitle }: { subtitle: string }) {
-  return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <div className="dash-kpi" key={label}><div className="k">{label}</div><div className="v">—</div></div>)}</div></div></>;
+  return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <StatCard key={label} label={label} value="—" />)}</div></div></>;
 }
 
 export function DashboardPage() {
@@ -192,9 +193,9 @@ export function DashboardPage() {
   const today = todayIso(), model = buildDashboardViewModel(testSummaries, lots, overdueActions, today);
   // Kẹp 0..100 trước khi vẽ thanh tiến độ.
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
-  return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{[
-    ['Xét nghiệm', model.tests.length, ''], ['Điểm QC', model.kpi.totalPoints, ''], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'teal'],
-  ].map(([label, value, tone]) => <div className="dash-kpi" key={String(label)}><div className="k">{label}</div><div className={`v ${tone}`}>{value}</div></div>)}</div></div><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
+  return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{([
+    ['Xét nghiệm', model.tests.length], ['Điểm QC', model.kpi.totalPoints], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'accent'],
+  ] as [string, number, StatTone?][]).map(([label, value, tone]) => <StatCard key={label} label={label} value={value} tone={tone} />)}</div></div><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
 }
 
 

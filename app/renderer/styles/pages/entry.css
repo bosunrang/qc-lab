@@ -44,7 +44,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 /* ---- Bảng nhập QC (worksheet theo lịch tháng) ---- */
 .qc-sheet-panel{border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
-.qc-sheet-heading{background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);display:grid;align-items:center;justify-content:space-between;gap:var(--space-3-5);min-height:64px;padding:var(--space-2-5) var(--space-4);position:sticky;top:0;z-index:var(--z-sticky-head);grid-template-columns:minmax(220px,1fr) auto;}
+.qc-sheet-heading{background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);display:grid;align-items:center;justify-content:space-between;gap:var(--space-3-5);min-height:64px;padding:var(--space-2-5) var(--panel-header-px);position:sticky;top:0;z-index:var(--z-sticky-head);grid-template-columns:minmax(220px,1fr) auto;}
 .qc-sheet-title{display:flex;gap:var(--space-0-5);min-width:0;align-items:baseline;flex-wrap:wrap;column-gap:var(--space-2);row-gap:var(--space-0-5);}
 .qc-sheet-title span{color:var(--text-accent);font-size:var(--title-panel);font-weight:var(--weight-semibold);}
 .qc-sheet-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--title-panel);color:var(--text-strong);letter-spacing:-.01em;line-height:var(--leading-heading);}
@@ -122,7 +122,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-cumulative b{color:var(--accent-text);display:block;margin-top:var(--space-0-5);font-size:var(--text-sm);font-variant-numeric:tabular-nums;}
 
 /* ---- Biểu đồ Levey-Jennings xếp chồng ---- */
-.lj-toolbar{display:grid;align-items:center;min-height:var(--panel-header-h);margin:0;padding:var(--space-2-5) var(--space-3-5);gap:var(--space-3-5) var(--space-4);grid-template-columns:minmax(180px,1fr) auto;background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;box-shadow:none;}
+.lj-toolbar{display:grid;align-items:center;min-height:var(--panel-header-h);margin:0;padding:var(--space-2-5) var(--panel-header-px);gap:var(--space-3-5) var(--space-4);grid-template-columns:minmax(180px,1fr) auto;background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;box-shadow:none;}
 .lj-toolbar h2.panel-title{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;}
 .lj-filter{display:flex;gap:var(--space-3);align-items:center;justify-content:flex-end;flex-wrap:wrap;}
 .lj-range{margin:var(--panel-content-gap) var(--space-4) var(--space-3);font-size:var(--text-sm);}
@@ -181,7 +181,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 /* ---- "Điểm trong khoảng xem" (panel gấp lại) ---- */
 .entry-secondary-panel{padding:0;overflow:hidden;}
-.entry-secondary-summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--space-4);border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);color:var(--text-primary);}
+.entry-secondary-summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--panel-header-px);border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);color:var(--text-primary);}
 .entry-secondary-summary>span{font-size:var(--title-panel);font-weight:var(--weight-semibold);}
 .entry-secondary-summary>small{flex:1;color:var(--text-tertiary);font-size:var(--text-sm);font-weight:700;text-align:right;}
 /* Mức cho dải kiểm soát là lựa chọn RIÊNG: đặt ở góc phải tiêu đề để không
@@ -271,8 +271,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 .lj-date-field { display: grid; grid-template-columns: 54px 164px; gap: var(--space-2); align-items: center; margin: 0; }
 .lj-date-field .hint { display: flex; align-items: center; justify-content: flex-end; height: var(--control-h); white-space: nowrap; line-height:var(--leading-none); }
-.lj-date-field .datebox { width: 164px; height: var(--control-h); }
-.lj-date-field .datebox input.date-text { height: var(--control-h); padding-top: 0; padding-bottom: 0; }
+.lj-date-field .datebox { width: 164px; }
+.lj-date-field .datebox input.date-text { padding-top: 0; padding-bottom: 0; }
 
 .qc-month-picker select, .qc-current-month, .qc-today-jump { height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0 var(--space-2-5); font-size: var(--text-sm); }
 .qc-today-jump { white-space: nowrap; min-width: 104px; }

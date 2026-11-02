@@ -364,8 +364,15 @@ test('mật độ control dùng token component, không viết lại số chuẩ
     'ô tìm nhanh toàn app dùng token riêng 36px');
   assert.match(app, /input\[type="date"\][^{]*\{height:var\(--control-h\);min-height:var\(--control-h\);\}/,
     'ô ngày gốc toàn app dùng 36px');
-  assert.match(app, /\.datebox input\.date-text\{[^}]*height:var\(--control-h\)[^}]*min-height:var\(--control-h\)/,
-    'DatePicker dùng chung cao 36px');
+  // U9: khung `.datebox` kể cả viền cao 36px, ô bên trong lấp đầy khung.
+  // Trước đây ô trong cao 36px nên khung thành 38px, lệch các ô nhập cùng hàng.
+  assert.match(app, /\.datebox\{[^}]*box-sizing:border-box;height:var\(--control-h\);/,
+    'DatePicker dùng chung cao 36px kể cả viền');
+  assert.match(app, /\.datebox input\.date-text\{[^}]*height:100%;min-height:0;/, 'ô ngày lấp đầy khung, không cộng thêm viền');
+  for (const file of PAGE_CSS.filter((f) => !f.endsWith('eqa.css') && !f.endsWith('app.css'))) {
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /(?:datebox|date-text)\s*\{[^}]*(?<![-\w])height:var\(--control-h\)/,
+      `${relative(STYLE_DIR, file)}: chiều cao ô ngày đặt ở .datebox chung, trang không đặt lại`);
+  }
   for (const name of ['audit.css', 'entry.css', 'manage.css', 'reagent.css']) {
     const css = readFileSync(join(STYLE_DIR, 'pages', name), 'utf8');
     assert.doesNotMatch(css, /(?:datebox|date-text)[^{]*\{[^}]*height:var\(--control-h-(?:sm|compact)\)/,
@@ -611,6 +618,46 @@ test('biểu đồ dùng chung một màu teal, trùng --teal-500', () => {
   for (const name of ['QcChart.tsx', 'ReagentChart.tsx']) {
     const source = readFileSync(join(ROOT, 'renderer', 'components', name), 'utf8');
     assert.doesNotMatch(source, /#0e8f8f|#0b747d|#0c6f78/i, `${name} còn mã teal riêng`);
+  }
+});
+
+// U9: phân trang và thẻ số liệu chỉ dựng qua component chung; dải tiêu đề
+// panel dùng chung một lề ngang. Trước đây có 3 kiểu phân trang, 2 kiểu thẻ số
+// liệu tự dựng và tiêu đề panel lẫn 14/16/20px.
+test('phân trang, thẻ số liệu và lề tiêu đề panel dùng chung', () => {
+  const RENDERER = join(ROOT, 'renderer');
+  const tsxFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? tsxFiles(path) : entry.name.endsWith('.tsx') ? [path] : [];
+  });
+  const OWNERS = { 'table-pagination': 'Pagination.tsx', 'stat-card': 'StatCard.tsx' };
+  const RETIRED = ['dash-kpi', 'rc-stat-card', 'lot-list-pagination', 'lot-page-button'];
+  const bad = [];
+  for (const file of tsxFiles(RENDERER).filter((f) => !/[\\/]pages[\\/]eqa[\\/]/.test(f))) {
+    const source = readFileSync(file, 'utf8');
+    for (const m of source.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{'([^']*)'\})/g)) {
+      for (const name of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+        if (OWNERS[name] && !file.endsWith(OWNERS[name])) bad.push(`${relative(ROOT, file)}: ${name} (dùng ${OWNERS[name]})`);
+        if (RETIRED.includes(name)) bad.push(`${relative(ROOT, file)}: ${name} đã bỏ`);
+      }
+    }
+  }
+  assert.deepEqual(bad, []);
+  assert.match(tokensSrc, /--panel-header-px:var\(--panel-padding\);/);
+  const HEADERS = {
+    'app.css': ['.panel>.panel-head:first-child'], 'pages/dashboard.css': ['.dash-test-toolbar'],
+    'pages/entry.css': ['.qc-sheet-heading', '.lj-toolbar', '.entry-secondary-summary'],
+    'pages/sigma.css': ['.sg-setup-heading', '.sg-data-head', '.sg-collapse-summary'],
+  };
+  for (const [file, selectors] of Object.entries(HEADERS)) {
+    const css = readFileSync(join(STYLE_DIR, file), 'utf8');
+    for (const selector of selectors) {
+      // Lấy khối khai báo của rule mở đầu dòng bằng selector đó.
+      const at = css.search(new RegExp(`(?:^|\\n)${selector.replace(/[.*+?^${}()|[\]\\>]/g, '\\$&')}[,{]`));
+      assert.ok(at >= 0, `${file} có ${selector}`);
+      const block = css.slice(at, css.indexOf('}', at));
+      assert.match(block, /padding:var\(--space-[0-9-]+\) var\(--panel-header-px\);/, `${file} ${selector}`);
+    }
   }
 });
 

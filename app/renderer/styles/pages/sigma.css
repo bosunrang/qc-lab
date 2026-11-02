@@ -13,7 +13,7 @@
    tiếp trên trang Sigma là dải tiêu đề cấp section nên phải dùng token 14px,
    giống tiêu đề "Số liệu theo kỳ" và các panel khác trong app. */
 .sigma-page>.panel>h2.panel-title:first-child{color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
-.sg-setup-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2-5);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--space-3-5);color:var(--text-primary);background:var(--surface-section-header);}
+.sg-setup-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2-5);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--panel-header-px);color:var(--text-primary);background:var(--surface-section-header);}
 .sg-setup-heading h2{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
 .sg-setup-search{flex:0 1 280px;min-width:180px;}
 .sg-setup-search input[type="search"]{box-sizing:border-box;width:100%;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-2);font-size:var(--text-sm);}
@@ -38,7 +38,7 @@
 @media(max-width:1280px){ .sgbig{ min-height:154px; padding:var(--space-3) var(--space-3-5); } }
 @media(max-width:1150px){ .sgbig{ min-height:146px; padding:var(--space-3) var(--space-3); } }
 
-.sg-data-head{min-height:var(--panel-header-h);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-1) var(--space-3-5);border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);}
+.sg-data-head{min-height:var(--panel-header-h);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-1) var(--panel-header-px);border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);}
 .sg-data-head h2.panel-title{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
 .sg-data-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:wrap;}
 .sg-data-head-actions .btn{height:var(--control-h-compact);min-height:var(--control-h-compact);padding:var(--space-0-5) var(--space-3);}
@@ -64,7 +64,7 @@
 .sg-level-sigma b{font-size:var(--text-lg);font-weight:var(--weight-bold);line-height:var(--leading-heading);font-variant-numeric:tabular-nums;}
 
 .sg-collapse-panel{padding:0;overflow:hidden;}
-.sg-collapse-summary{display:flex;align-items:center;min-height:var(--panel-header-h);padding:var(--space-2-5) var(--space-3-5);border-bottom:1px solid transparent;background:var(--surface-section-header);color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);cursor:pointer;list-style:none;}
+.sg-collapse-summary{display:flex;align-items:center;min-height:var(--panel-header-h);padding:var(--space-2-5) var(--panel-header-px);border-bottom:1px solid transparent;background:var(--surface-section-header);color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);cursor:pointer;list-style:none;}
 .sg-collapse-summary::-webkit-details-marker{display:none;}
 .sg-collapse-summary:before{content:none;}
 .sg-collapse-summary:after{content:"+";margin-left:auto;color:var(--text-tertiary);font-size:var(--text-md);font-weight:var(--weight-bold);}.sg-collapse-panel[open]>.sg-collapse-summary{border-bottom-color:var(--border-subtle);}.sg-collapse-panel[open]>.sg-collapse-summary:after{content:"−";}

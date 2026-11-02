@@ -17,6 +17,7 @@ import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { StatCard } from '../components/StatCard';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
 import { RowActionButton } from '../components/RowActionButton';
@@ -100,21 +101,9 @@ function StatsPanel({ result }: { result: ReagentComparisonResult | null }) {
       ) : (
         <div className="rc-stats-content">
           <div className="rc-stat-kpis">
-            <div className="rc-stat-card">
-              <div className="rc-stat-label">Hệ số tương quan (Pearson r)</div>
-              <div className="rc-stat-value">{fmt(result.r, 4)}</div>
-              <div className="rc-stat-sub">R² = {fmt(result.fit.r2, 4)}</div>
-            </div>
-            <div className="rc-stat-card">
-              <div className="rc-stat-label">%Bias</div>
-              <div className={`rc-stat-value ${result.passBias ? 'ok' : 'bad'}`}>{fmt(result.bias, 3)}%</div>
-              <div className="rc-stat-sub">Mong muốn &lt; {fmt(result.biasT, 3)}%</div>
-            </div>
-            <div className="rc-stat-card">
-              <div className="rc-stat-label">P (hai phía / two-tail)</div>
-              <div className="rc-stat-value">{fmt(result.p2, 4)}</div>
-              <div className="rc-stat-sub">α = {fmt(result.alpha, 4)}</div>
-            </div>
+            <StatCard label="Hệ số tương quan (Pearson r)" value={fmt(result.r, 4)} sub={<>R² = {fmt(result.fit.r2, 4)}</>} tone="accent" />
+            <StatCard label="%Bias" value={<>{fmt(result.bias, 3)}%</>} sub={<>Mong muốn &lt; {fmt(result.biasT, 3)}%</>} tone={result.passBias ? 'accent' : 'danger'} />
+            <StatCard label="P (hai phía / two-tail)" value={fmt(result.p2, 4)} sub={<>α = {fmt(result.alpha, 4)}</>} tone="accent" />
           </div>
           <div className="rc-stat-section">
             <h4>Kiểm định t bắt cặp (t-Test: Paired Two Sample for Means)</h4>

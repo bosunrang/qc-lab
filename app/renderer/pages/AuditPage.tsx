@@ -10,6 +10,7 @@ import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/d
 import { showToast } from '../state/toast-store';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
 import { roleLabel } from '../lib/permissions';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../../main/domain/audit-format';
 import { auditSizeWarning } from '../../main/domain/audit-filter';
@@ -125,16 +126,7 @@ export function AuditPage() {
           <EmptyState title="Không có dữ liệu phù hợp">Thử xoá bộ lọc hoặc chọn khoảng ngày khác.</EmptyState>
         )}
 
-        {result.resultTo > 0 && (
-          <div className="table-pagination">
-            <span className="hint">Hiển thị {result.resultFrom}–{result.resultTo} / {result.filteredCount} dòng</span>
-            <div>
-              <button className="btn ghost sm" disabled={result.page <= 1} onClick={() => setPage(result.page - 1)}>‹ Trước</button>
-              <b>Trang {result.page}/{result.pageCount}</b>
-              <button className="btn ghost sm" disabled={result.page >= result.pageCount} onClick={() => setPage(result.page + 1)}>Sau ›</button>
-            </div>
-          </div>
-        )}
+        <Pagination page={result.page} pageCount={result.pageCount} from={result.resultFrom} to={result.resultTo} total={result.filteredCount} unit="dòng" label="Phân trang nhật ký" onPageChange={setPage} />
       </div>
 
       {archiving && <ArchiveModal onClose={() => setArchiving(false)} />}

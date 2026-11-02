@@ -315,6 +315,9 @@
   --panel-padding:var(--space-5);
   --panel-content-gap:var(--space-4);
   --panel-header-h:48px;
+  /* Lề ngang của dải tiêu đề panel, bằng lề nội dung panel. Trước 02/11/2026
+     các trang dùng lẫn 14/16/20px. */
+  --panel-header-px:var(--panel-padding);
   --subpanel-header-h:44px;
   --panel-shadow:var(--shadow-panel);
 
