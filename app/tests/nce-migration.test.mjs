@@ -22,7 +22,7 @@ function legacyDb() {
     'approved', 'effective', 'active', '2026-09-08', '2026-09-05', JSON.stringify({
       eventSource: 'iqc', processPhase: 'exam', owner: 'KTV An', correction: 'Dừng trả kết quả, hiệu chuẩn lại', containmentStatus: 'held',
       riskSeverity: 3, riskOccurrence: 2, riskDetectability: 4, riskLevel: 'medium', riskBasis: 'SOP-QC-07',
-      qcMaterialStatus: 'ok', instrumentStatus: 'checked-ok', reagentStatus: 'abnormal', reagentNote: 'Lô hóa chất mới', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
+      qcMaterialStatus: 'ok', instrumentStatus: 'checked-ok', reagentStatus: 'abnormal', reagentNote: 'Lô hoá chất mới', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
       causeCategory: 'calibration', cause: 'Hiệu chuẩn quá hạn', approvedBy: 'Người duyệt',
     }));
   insert.run('a2', '2026-09-02', '2026-09-02T02:00:00Z', '', 'u-an', 'an', null, null, '', null, '', '', '', 'NCE-20260902-01',
@@ -61,7 +61,7 @@ test('ca 18: chuyển hồ sơ cũ, không bịa dữ liệu, chạy lại khôn
   assert.equal(a1.tier, '', 'không tự phân tầng');
   const checklist = JSON.parse(a1.checklist_json);
   assert.deepEqual(checklist.instrument, { status: 'ok', note: '' });
-  assert.deepEqual(checklist.reagent, { status: 'abnormal', note: 'Lô hóa chất mới' });
+  assert.deepEqual(checklist.reagent, { status: 'abnormal', note: 'Lô hoá chất mới' });
   assert.deepEqual(checklist.lotChange, { status: 'na', note: '' });
   assert.equal(JSON.parse(a1.legacy_json).id, 'a1', 'giữ nguyên dòng cũ');
   assert.match(JSON.parse(a1.legacy_json).detail_json, /approvedBy/);

@@ -30,7 +30,7 @@ export function DialogHost() {
   function close() { closeDialog(); }
 
   if (dialog.kind === 'confirm') {
-    const { title = '', message, confirmLabel = 'Đồng ý', cancelLabel = 'Hủy', danger = true } = dialog.opts;
+    const { title = '', message, confirmLabel = 'Đồng ý', cancelLabel = 'Huỷ', danger = true } = dialog.opts;
     return createPortal(
       <div className="modal-bg dialog-layer" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) { dialog.resolve(false); close(); } }}>
         <div className="modal confirm-modal" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
@@ -54,7 +54,7 @@ export function DialogHost() {
   }
 
   if (dialog.kind === 'choice') {
-    const { title = '', message, options, cancelLabel = 'Hủy' } = dialog.opts;
+    const { title = '', message, options, cancelLabel = 'Huỷ' } = dialog.opts;
     return createPortal(
       <div className="modal-bg dialog-layer" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) { dialog.resolve(null); close(); } }}>
         <div className="modal confirm-modal" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
@@ -172,7 +172,7 @@ function ReauthForm({ title, message, onResolve }: { title: string; message?: st
         {error && <p className="field-error" role="alert">{error}</p>}
       </form>
       <div className="confirm-modal-actions">
-        <button type="button" className="btn ghost" onClick={() => onResolve(false)}>Hủy</button>
+        <button type="button" className="btn ghost" onClick={() => onResolve(false)}>Huỷ</button>
         <button type="button" className="btn teal" disabled={busy} onClick={submit}>Xác thực</button>
       </div>
     </>

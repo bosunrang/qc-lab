@@ -226,7 +226,7 @@ export function createSigmaHandlers(db: Db) {
    * không có snapshot nào — theo nguồn ĐANG KHAI của xét nghiệm.
    *
    * Vì sao cần bậc thứ hai: kỳ được tạo lúc nguồn TEa còn chưa giải được (vd
-   * chọn "TEa chuẩn hóa của PXN" mà chưa có hồ sơ) sẽ chốt `tea = null`. Một
+   * chọn "TEa chuẩn hoá của PXN" mà chưa có hồ sơ) sẽ chốt `tea = null`. Một
    * snapshot NULL không phải lịch sử cần bảo vệ — nó có nghĩa "chưa bao giờ
    * giải được". Nếu vẫn ghim vào nó thì kỳ đó vĩnh viễn không tính được Sigma
    * kể cả sau khi phòng xét nghiệm đã khai nguồn TEa, và người dùng không có
@@ -344,7 +344,7 @@ export function createSigmaHandlers(db: Db) {
     // nguyên ≥ 1, nên gọi thẳng IPC với `level: 7` cho một xét nghiệm 1 mức là
     // lưu được, và dòng ma đó cũng tính vào số mức chọn bảng Sigma Rules.
     // Chỉ chặn mức chưa từng có trong kỳ: mức đã chốt nhưng sau đó bị gỡ khỏi
-    // cấu hình vẫn cần sửa được CV/Bias/MU để hồ sơ không bị khóa cứng.
+    // cấu hình vẫn cần sửa được CV/Bias/MU để hồ sơ không bị khoá cứng.
     const declaredLevels = new Set((db.prepare('SELECT level FROM test_levels WHERE test_id=?').all(testId) as { level: number }[]).map((row) => row.level));
     const priorLevels = new Set(prior.map((level) => level.level));
     const unknown = stored.filter((level) => !declaredLevels.has(level.level) && !priorLevels.has(level.level)).map((level) => level.level);
@@ -421,7 +421,7 @@ export function createSigmaHandlers(db: Db) {
         }
       }
     }
-    // Mã nguồn được chuẩn hóa riêng, mô tả tiêu chí nằm trong snapshot mức.
+    // Mã nguồn được chuẩn hoá riêng, mô tả tiêu chí nằm trong snapshot mức.
     // Luồng "+ Thêm kỳ" chọn trực tiếp tháng/năm nhưng tuyệt đối không ghi đè
     // bản đã có. Cổng lưu chung vẫn cho phép cập nhật CV/Bias/MU của kỳ đã chốt.
     w.commit((tx) => {
@@ -438,7 +438,7 @@ export function createSigmaHandlers(db: Db) {
   });
 
   /** Đổi kỳ phải là một giao dịch duy nhất. Không dùng "lưu mới rồi xoá bản trước"
-   * vì KTV được sửa Sigma nhưng không có quyền xóa kỳ, dễ để lại hai bản ghi. */
+   * vì KTV được sửa Sigma nhưng không có quyền xoá kỳ, dễ để lại hai bản ghi. */
   const renamePeriod = writeCommand(db, 'renamePeriod', 'write', (w, input: { id?: unknown; period?: unknown }): IpcResult<SigmaPeriodView> => {
     const id = cleanText(input?.id, 200).trim();
     const period = cleanText(input?.period, 7).trim();

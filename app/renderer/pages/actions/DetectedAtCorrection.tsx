@@ -12,7 +12,7 @@ export function DetectedAtCorrection(props: SectionProps) {
   const [draft, setDraft] = useState<{ detectedAt: string; reason: string; version: number } | null>(null);
   async function save() {
     if (!draft) return;
-    if (!(await confirmDialog(`Đính chính ngày phát hiện từ ${dateText(record.detected_at)} thành ${dateText(draft.detectedAt)}? Chỉ ghi ngày thực tế có căn cứ, không lùi ngày để nhận QC cũ. Ngày lập hồ sơ, ngày QC và thời điểm quyết định không đổi.`, { title: 'Đính chính ngày phát hiện', confirmLabel: 'Lưu đính chính', danger: false }))) return;
+    if (!(await confirmDialog(`Đính chính ngày phát hiện từ ${dateText(record.detected_at)} thành ${dateText(draft.detectedAt)}? Chỉ ghi ngày thực tế có căn cứ, không lùi ngày để nhận QC cũ. Ngày lập hồ sơ, ngày QC và thời điểm quyết định không đổi.`, { title: 'Đính chính ngày phát hiện', confirmLabel: 'Lưu đính chính', cancelLabel: 'Quay lại', danger: false }))) return;
     if (await props.run((base) => update({ ...base, expectedVersion: draft.version, patch: {}, detectedAtCorrection: { detectedAt: draft.detectedAt, reason: draft.reason } }))) setDraft(null);
   }
   return <div className="nce-date-correction">
@@ -24,7 +24,7 @@ export function DetectedAtCorrection(props: SectionProps) {
       <DateField label="Ngày phát hiện thực tế" id="nceCorrectDetected" value={draft.detectedAt} onChange={(detectedAt) => setDraft({ ...draft, detectedAt })} />
       <Field label="Lý do và căn cứ đính chính" htmlFor="nceCorrectReason" wide><textarea id="nceCorrectReason" rows={2} value={draft.reason} placeholder="Ví dụ: nhập nhầm ngày lập hồ sơ thay cho ngày phát hiện; đối chiếu nhật ký số…" onChange={(e) => setDraft({ ...draft, reason: e.target.value })} /></Field>
       {draft.version !== record.row_version && <p className="nce-editor-warning">Hồ sơ đã được cập nhật ở nơi khác</p>}
-      <div className="nce-form-actions nce-field-wide"><button type="button" className="btn ghost sm" onClick={() => setDraft(null)}>Hủy đính chính</button><button type="button" className="btn sm" disabled={props.busy || draft.reason.trim().length < 10 || !draft.detectedAt || draft.detectedAt === record.detected_at} onClick={() => void save()}>Lưu đính chính</button></div>
+      <div className="nce-form-actions nce-field-wide"><button type="button" className="btn ghost sm" onClick={() => setDraft(null)}>Bỏ qua</button><button type="button" className="btn sm" disabled={props.busy || draft.reason.trim().length < 10 || !draft.detectedAt || draft.detectedAt === record.detected_at} onClick={() => void save()}>Lưu đính chính</button></div>
     </div></> : !can.release && <p className="nce-note">Đính chính ngày chỉ mở khi hồ sơ đang xử lý và tài khoản có quyền cho hoạt động trở lại. Mọi đính chính đều lưu lý do và lịch sử trước–sau.</p>}
   </div>;
 }

@@ -1,6 +1,6 @@
 // Các phần QUYẾT ĐỊNH của hồ sơ (append-only, có người chịu trách nhiệm):
 // ảnh hưởng kết quả bệnh nhân, cho phép hoạt động trở lại, đánh giá hiệu lực,
-// nộp duyệt/duyệt/trả lại/hủy. Điều kiện của từng bước do main kiểm.
+// nộp duyệt/duyệt/trả lại/huỷ. Điều kiện của từng bước do main kiểm.
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { DateField } from '../../components/DateField';
@@ -125,7 +125,7 @@ export function TechnicalAssessmentSection(props: SectionProps) {
         </div>}
 
         <Field label="Kết luận kỹ thuật" htmlFor="techConclusion" wide><textarea id="techConclusion" rows={3} value={form.technicalConclusion} onChange={(event) => set('technicalConclusion', event.target.value)} placeholder="Nêu sai số đã được kiểm soát hay chưa và căn cứ chuyển sang rà soát bệnh nhân." /></Field>
-        <div className="nce-form-actions"><button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Hủy</button><button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Ghi đánh giá kỹ thuật</button></div>
+        <div className="nce-form-actions"><button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Bỏ qua</button><button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Ghi đánh giá kỹ thuật</button></div>
       </div>}
     </Section>
   );
@@ -232,7 +232,7 @@ export function PatientImpactSection(props: SectionProps) {
             <Field label="Đã thông báo cho ai, khi nào, qua kênh nào" htmlFor="impNotified" wide><input id="impNotified" value={form.notified} onChange={(e) => setForm({ ...form, notified: e.target.value })} /></Field>
           </>}
           <div className="nce-form-actions nce-field-wide">
-            <button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Hủy</button>
+            <button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Bỏ qua</button>
             <button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Ghi quyết định</button>
           </div>
         </div>
@@ -312,7 +312,7 @@ export function ReleaseSection(props: SectionProps) {
 
   async function submit() {
     const target = chosen ? `Từ lần chạy ${chosen.label}, luật Westgard nhiều lần chạy và CUSUM bắt đầu chuỗi mới; ` : '';
-    if (!(await confirmDialog(`${target}hồ sơ sẽ không hủy được nữa. Cho phép hoạt động trở lại?`, { title: 'Cho phép hoạt động trở lại', confirmLabel: 'Cho phép' }))) return;
+    if (!(await confirmDialog(`${target}hồ sơ sẽ không huỷ được nữa. Cho phép hoạt động trở lại?`, { title: 'Cho phép hoạt động trở lại', confirmLabel: 'Cho phép', cancelLabel: 'Quay lại' }))) return;
     await props.run((base) => release({ ...base, expectedVersion: draftVersion ?? record.row_version, release: { reason, rerun: chosen ? { date: chosen.date, runId: chosen.runId } : null, lotChangeNote, notApplicable: !chosen && notApplicable } }));
   }
 
@@ -487,7 +487,7 @@ export function EffectivenessSection(props: SectionProps) {
             <Field label="Căn cứ đánh giá lại" htmlFor="revB"><input id="revB" value={form.residualBasis} onChange={(e) => setForm({ ...form, residualBasis: e.target.value })} /></Field>
           </>}
           <div className="nce-form-actions nce-field-wide">
-            <button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Hủy</button>
+            <button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Bỏ qua</button>
             <button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Ghi đánh giá</button>
           </div>
         </div>
@@ -518,14 +518,14 @@ export function ReviewSection(props: SectionProps) {
     // Giữ đúng phiên bản đang được xác nhận, kể cả khi dữ liệu tự nạp lại
     // trong lúc hộp thoại chờ câu trả lời của người dùng.
     const expectedVersion = noteVersion ?? record.row_version;
-    if (!(await confirmDialog('Hủy hồ sơ này? Hồ sơ vẫn được lưu để truy xuất.', { title: 'Hủy hồ sơ NCE', danger: true, confirmLabel: 'Hủy hồ sơ', cancelLabel: 'Quay lại' }))) return;
+    if (!(await confirmDialog('Huỷ hồ sơ này? Hồ sơ vẫn được lưu để truy xuất.', { title: 'Huỷ hồ sơ NCE', danger: true, confirmLabel: 'Huỷ hồ sơ', cancelLabel: 'Quay lại' }))) return;
     await decide((base) => cancel({ ...base, expectedVersion, reason: note }));
   }
 
   return (
     <Section title="Nộp duyệt và phê duyệt">
       {approval && <Facts items={[['Đã duyệt đóng', `${approval.actor_name} · ${timeText(approval.decided_at)}`], ['Ghi chú', payload<{ note?: string }>(approval).note ?? '']]} />}
-      {cancelled && <Facts items={[['Đã hủy', `${cancelled.actor_name} · ${timeText(cancelled.decided_at)}`], ['Lý do', payload<{ reason?: string }>(cancelled).reason ?? '']]} />}
+      {cancelled && <Facts items={[['Đã huỷ', `${cancelled.actor_name} · ${timeText(cancelled.decided_at)}`], ['Lý do', payload<{ reason?: string }>(cancelled).reason ?? '']]} />}
       {lastReturn && record.status === 'released' && <div className="alert warn">Bị trả lại bởi {lastReturn.actor_name} ({timeText(lastReturn.decided_at)}): {payload<{ note?: string }>(lastReturn).note}</div>}
       {record.status === 'released' && (
         can.submit
@@ -548,8 +548,8 @@ export function ReviewSection(props: SectionProps) {
       )}
       {record.status === 'open' && can.cancel && (
         <div className="nce-form-grid nce-cancel">
-          <Field label="Lý do hủy (hồ sơ lập nhầm, trùng)" htmlFor="cancelReason" wide><input id="cancelReason" value={note} onChange={(e) => { setNoteVersion((v) => v ?? record.row_version); setNote(e.target.value); }} /></Field>
-          <div className="nce-form-actions nce-field-wide"><button type="button" className="btn danger sm" disabled={props.busy} onClick={() => void doCancel()}>Hủy hồ sơ</button></div>
+          <Field label="Lý do huỷ (hồ sơ lập nhầm, trùng)" htmlFor="cancelReason" wide><input id="cancelReason" value={note} onChange={(e) => { setNoteVersion((v) => v ?? record.row_version); setNote(e.target.value); }} /></Field>
+          <div className="nce-form-actions nce-field-wide"><button type="button" className="btn danger sm" disabled={props.busy} onClick={() => void doCancel()}>Huỷ hồ sơ</button></div>
         </div>
       )}
     </Section>

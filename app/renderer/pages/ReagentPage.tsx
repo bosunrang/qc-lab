@@ -1,4 +1,4 @@
-// So sánh hóa chất — workspace Clinical Precision, giữ tên class nghiệp vụ:
+// So sánh hoá chất — workspace Clinical Precision, giữ tên class nghiệp vụ:
 // "Thiết lập so sánh"
 // (`rc-toolbar-panel`) → lưới 2 cột `rc-entry-grid` gồm "Thông tin đánh giá"
 // (`rc-info-panel`, 10 trường) và "Dữ liệu đo bắt cặp" (`rc-pair-panel`, lưới
@@ -52,7 +52,7 @@ const fmtT = (value: unknown): string => {
 const equation = (slope: number, intercept: number) =>
   `y = ${fmt(slope, 4)}x ${intercept >= 0 ? '+' : '−'} ${fmt(Math.abs(intercept), 4)}`;
 
-/** Nhãn 1 phép so sánh trong ô chọn, dạng "<hóa chất> — <lô
+/** Nhãn 1 phép so sánh trong ô chọn, dạng "<hoá chất> — <lô
  * cũ>→<lô mới>". */
 function comparisonLabel(row: ReagentComparisonView): string {
   const lots = [row.lot_old, row.lot_new].filter(Boolean).join('→');
@@ -80,7 +80,7 @@ function verdictOf(result: ReagentComparisonResult): { cls: string; icon: string
     };
   }
   return {
-    cls: 'no', icon: '✕', title: 'Kết luận: Hai lô hóa chất có khác biệt',
+    cls: 'no', icon: '✕', title: 'Kết luận: Hai lô hoá chất có khác biệt',
     desc: 'Độ chệch (%Bias) vượt giới hạn cho phép. Không đưa lô mới vào sử dụng cho mẫu bệnh nhân; tiến hành điều tra, xử lý theo quy trình.',
   };
 }
@@ -240,7 +240,7 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
           <span><b>{name}</b></span>
           <span className="acts">
             <button type="button" className="btn teal sm" onClick={() => onPick(name)}>Chọn</button>
-            <RowActionButton kind="delete" label={`Xóa ${name}`} onClick={() => removeItem(i)} />
+            <RowActionButton kind="delete" label={`Xoá ${name}`} onClick={() => removeItem(i)} />
           </span>
         </div>
       ))}
@@ -269,7 +269,7 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
             <span><b>{comparisonLabel(comparison)}</b><div className="hint flow-tight">{comparison.unit || 'Chưa có đơn vị'} {comparison.rows.length ? `· ${comparison.rows.length} dòng` : ''}</div></span>
             <span className="acts">
               <button className={`btn ${comparison.id === currentId ? 'teal' : 'ghost'} sm`} onClick={() => onSelect(comparison.id)}>{comparison.id === currentId ? 'Đang chọn' : 'Chọn'}</button>
-              {canDelete && comparisons.length > 1 && <RowActionButton kind="delete" label={`Xóa ${comparison.reagent}`} onClick={() => onRemove(comparison.id)} />}
+              {canDelete && comparisons.length > 1 && <RowActionButton kind="delete" label={`Xoá ${comparison.reagent}`} onClick={() => onRemove(comparison.id)} />}
             </span>
           </div>
         )) : <EmptyState size="compact">Không có phép so sánh phù hợp.</EmptyState>}
@@ -299,10 +299,10 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
   }
 
   return (
-    <Modal title="Thêm hóa chất" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hóa chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." autoFocus />
+    <Modal title="Thêm hoá chất" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hoá chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hoá chất mới..." autoFocus />
       <div className="flow-control">
-        <button className="refrow rc-create-typed" onClick={() => create(query.trim() || 'Hóa chất mới')}>+ Tạo {query.trim() ? `"${query.trim()}"` : 'hóa chất trống'}</button>
+        <button className="refrow rc-create-typed" onClick={() => create(query.trim() || 'Hoá chất mới')}>+ Tạo {query.trim() ? `"${query.trim()}"` : 'hoá chất trống'}</button>
       </div>
       <div className="refcat">Danh mục TEa tham chiếu</div>
       {Object.keys(groups).length ? Object.entries(groups).map(([section, items]) => (
@@ -338,7 +338,7 @@ export function ReagentPage() {
   if (!current) {
     return (
       <div>
-        <PageHeader title="So sánh 2 lô hóa chất" subtitle="Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP" />
+        <PageHeader title="So sánh hoá chất" subtitle="Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP" />
         <div className="panel"><EmptyState>Chưa có phép so sánh nào. Tạo mới để bắt đầu.</EmptyState></div>
       </div>
     );
@@ -361,7 +361,7 @@ export function ReagentPage() {
   const commitRows = (rows: [string, string][]) => { setRowsDraft(rows); store.saveRows(current.id, rows); };
 
   async function removeCurrent() {
-    if (!(await confirmDialog(`Xóa phép so sánh "${current.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xóa phép so sánh', danger: true, confirmLabel: 'Xóa' }))) return;
+    if (!(await confirmDialog(`Xoá phép so sánh "${current.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xoá phép so sánh', danger: true, confirmLabel: 'Xoá' }))) return;
     const r = await store.remove(current.id);
     if (!r.ok) await errorDialog(r.error.message);
     else setCurrentId('');
@@ -369,7 +369,7 @@ export function ReagentPage() {
 
   async function removeFromPicker(id: string) {
     const comparison = store.comparisons.find((item) => item.id === id);
-    if (!comparison || !(await confirmDialog(`Xóa phép so sánh "${comparison.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xóa phép so sánh', danger: true, confirmLabel: 'Xóa' }))) return;
+    if (!comparison || !(await confirmDialog(`Xoá phép so sánh "${comparison.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xoá phép so sánh', danger: true, confirmLabel: 'Xoá' }))) return;
     const removed = await store.remove(id);
     if (!removed.ok) await errorDialog(removed.error.message);
     else if (id === current.id) setCurrentId('');
@@ -396,12 +396,12 @@ export function ReagentPage() {
         + `<td>${r ? r.N : '—'}</td><td>${r ? fmt(r.bias, 3) + '%' : '—'}</td><td>${r ? fmt(r.r, 4) : '—'}</td>`
         + `<td>${r ? verdictOf(r).title.replace('Kết luận: ', '') : 'Chưa đủ dữ liệu'}</td></tr>`;
     }).join('');
-    const title = summary ? 'So sánh hóa chất — báo cáo tổng hợp' : `So sánh hóa chất — ${current.reagent}`;
+    const title = summary ? 'So sánh hoá chất — báo cáo tổng hợp' : `So sánh hoá chất — ${current.reagent}`;
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${title}</title>
       <style>body{font:13px system-ui,sans-serif;color:#163541;padding:18px}h1{font-size:17px}
       table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9e0;padding:5px 7px;text-align:left}
       th{background:#eef4f7;print-color-adjust:exact;-webkit-print-color-adjust:exact}</style></head>
-      <body><h1>${title}</h1><table><thead><tr><th>Hóa chất</th><th>Lô cũ → mới</th><th>Ngày</th><th>n</th><th>%Bias</th><th>r</th><th>Kết luận</th></tr></thead>
+      <body><h1>${title}</h1><table><thead><tr><th>Hoá chất</th><th>Lô cũ → mới</th><th>Ngày</th><th>n</th><th>%Bias</th><th>r</th><th>Kết luận</th></tr></thead>
       <tbody>${body}</tbody></table></body></html>`;
     const error = await printHtmlToPdf(html, summary ? 'so-sanh-hoa-chat-tong-hop.pdf' : `so-sanh-${current.reagent}.pdf`);
     if (error) await errorDialog(error);
@@ -409,26 +409,26 @@ export function ReagentPage() {
 
   return (
     <div>
-      <PageHeader title="So sánh 2 lô hóa chất" subtitle="Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP" />
+      <PageHeader title="So sánh hoá chất" subtitle="Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP" />
 
       <div className="panel rc-toolbar-panel">
         <h2 className="panel-title">Thiết lập so sánh</h2>
         <div className="rc-toolbar">
           <div className="field rc-toolbar-selcol">
-            <label htmlFor="rcSel">Chọn hóa chất</label>
-            <select id="rcSel" aria-label="Chọn hóa chất" value={current.id} onChange={(e) => setCurrentId(e.target.value)}>
+            <label htmlFor="rcSel">Chọn hoá chất</label>
+            <select id="rcSel" aria-label="Chọn hoá chất" value={current.id} onChange={(e) => setCurrentId(e.target.value)}>
               {store.comparisons.map((c) => <option key={c.id} value={c.id}>{comparisonLabel(c)}</option>)}
             </select>
           </div>
           {writable && (
             <div className="rc-toolbar-primary"><div>
               <button className="btn teal rc-add-btn" onClick={() => setCreating(true)}>+ Thêm</button>
-              {admin && <button className="btn danger rc-delete-btn" onClick={removeCurrent} disabled={store.comparisons.length <= 1} title={store.comparisons.length <= 1 ? 'Cần giữ lại ít nhất một phép so sánh' : undefined}><ReagentToolIcon type="trash" /> Xóa</button>}
+              {admin && <button className="btn danger rc-delete-btn" onClick={removeCurrent} disabled={store.comparisons.length <= 1} title={store.comparisons.length <= 1 ? 'Cần giữ lại ít nhất một phép so sánh' : undefined}><ReagentToolIcon type="trash" /> Xoá</button>}
             </div></div>
           )}
           <div className="rc-toolbar-secondary">
             {writable && <button className="btn ghost rc-find-btn" onClick={() => setPicking(true)}><ReagentToolIcon type="search" /> Tìm</button>}
-            <button className="btn teal rc-report-btn" onClick={() => printComparison(false)}><ReagentToolIcon type="print" /> In hóa chất này</button>
+            <button className="btn teal rc-report-btn" onClick={() => printComparison(false)}><ReagentToolIcon type="print" /> In hoá chất này</button>
             <button className="btn teal rc-report-main" onClick={() => printComparison(true)}><ReagentToolIcon type="report" /> Báo cáo tổng hợp</button>
           </div>
         </div>
@@ -438,7 +438,7 @@ export function ReagentPage() {
         <div className="panel rc-info-panel">
           <h2 className="panel-title">Thông tin đánh giá</h2>
           <div className="rc-info-grid">
-            <div className="field rc-field"><label htmlFor="rc-reagent">Tên hóa chất</label><input {...wp} id="rc-reagent" defaultValue={current.reagent} placeholder="Tên hóa chất / xét nghiệm" onBlur={(e) => meta({ reagent: e.target.value })} /></div>
+            <div className="field rc-field"><label htmlFor="rc-reagent">Tên hoá chất</label><input {...wp} id="rc-reagent" defaultValue={current.reagent} placeholder="Tên hoá chất / xét nghiệm" onBlur={(e) => meta({ reagent: e.target.value })} /></div>
             <div className="field rc-field"><label htmlFor="rc-unit">Đơn vị</label><input {...wp} id="rc-unit" defaultValue={current.unit} placeholder="mmol/L..." onBlur={(e) => meta({ unit: e.target.value })} /></div>
             <div className="field rc-field"><label htmlFor="rc-lot-old">Số lô cũ</label><input {...wp} id="rc-lot-old" aria-label="Số lô cũ" defaultValue={current.lot_old} onBlur={(e) => meta({ lotOld: e.target.value })} /></div>
             <div className="field rc-field"><label htmlFor="rc-lot-new">Số lô mới</label><input {...wp} id="rc-lot-new" aria-label="Số lô mới" defaultValue={current.lot_new} onBlur={(e) => meta({ lotNew: e.target.value })} /></div>
@@ -498,7 +498,7 @@ export function ReagentPage() {
                   <div className="rc-calc">{both ? fmtFixed((o + nv) / 2) : '–'}</div>
                   <div className={`rc-calc dif${dif != null && dif < 0 ? ' neg' : ''}`}>{dif != null ? fmtFixed(dif) : '–'}</div>
                   {writable
-                    ? <RowActionButton kind="delete" label={`Xóa dòng mẫu ${i + 1}`} onClick={() => commitRows(rowsDraft.filter((_, j) => j !== i))} />
+                    ? <RowActionButton kind="delete" label={`Xoá dòng mẫu ${i + 1}`} onClick={() => commitRows(rowsDraft.filter((_, j) => j !== i))} />
                     : <span></span>}
                 </div>
               );
@@ -507,7 +507,7 @@ export function ReagentPage() {
           {writable && (
             <div className="rc-pair-actions">
               <button className="btn ghost sm" onClick={() => commitRows([...rowsDraft, ['', '']])}>+ Thêm mẫu</button>{' '}
-              <button className="btn ghost sm" onClick={async () => { if (await confirmDialog('Xóa toàn bộ dữ liệu đã nhập của phép so sánh này?', { danger: true, confirmLabel: 'Xóa' })) commitRows([['', ''], ['', ''], ['', ''], ['', ''], ['', '']]); }}>Xóa dữ liệu</button>
+              <button className="btn ghost sm" onClick={async () => { if (await confirmDialog('Xoá toàn bộ dữ liệu đã nhập của phép so sánh này?', { danger: true, confirmLabel: 'Xoá' })) commitRows([['', ''], ['', ''], ['', ''], ['', ''], ['', '']]); }}>Xoá dữ liệu</button>
             </div>
           )}
           <div className="hint rc-pair-hint">
@@ -568,8 +568,8 @@ function teaChoiceName(name: string, abbreviation = ''): string {
 }
 
 /** Danh mục của modal tạo PHẢI dùng đúng nguồn dữ liệu tab TEa: catalog mặc
- * định cộng các analyte TEa do PXN thêm/cập nhật, không có danh sách hóa chất
- * riêng cho So sánh hóa chất. */
+ * định cộng các analyte TEa do PXN thêm/cập nhật, không có danh sách hoá chất
+ * riêng cho So sánh hoá chất. */
 function makeTeaChoices(refs: TeaRef[]): TeaChoice[] {
   const byKey = new Map<string, TeaChoice>();
   for (const row of TEA_CATALOG) {

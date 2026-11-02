@@ -69,7 +69,7 @@ test('phục hồi dữ liệu từ phiên bản mới hơn: huỷ cả lần ph
   assert.equal(readSchemaVersion(target), SCHEMA_VERSION);
 });
 
-test('phục hồi từ tệp backup SQLite cũ: dữ liệu được nâng cấp ngay', async () => {
+test('phục hồi từ tệp sao lưu SQLite cũ: dữ liệu được nâng cấp ngay', async () => {
   const { mkdtempSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { tmpdir } = await import('node:os');

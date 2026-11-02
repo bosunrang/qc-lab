@@ -195,7 +195,7 @@ test('NCE: tìm không dấu, chuyển bước giữ bản nháp và chặn ghi 
     await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
     stored = await page.evaluate(id => window.qcApi.getNce(id), created.record.id);
     assert.equal(stored.actions[0].description, 'Người B đã cập nhật hành động khắc phục');
-    await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Bỏ qua', exact: true }).click();
     await page.locator('.nce-dossier-error', { hasText: 'Hồ sơ vừa được người khác cập nhật' }).waitFor();
     assert.deepEqual(errors, []);
   } finally {
@@ -203,7 +203,7 @@ test('NCE: tìm không dấu, chuyển bước giữ bản nháp và chặn ghi 
   }
 });
 
-test('NCE: modal hoàn thành và hủy không xác nhận hành động đã được người khác sửa', { timeout: 120_000 }, async () => {
+test('NCE: modal hoàn thành và huỷ không xác nhận hành động đã được người khác sửa', { timeout: 120_000 }, async () => {
   const { app, page, errors } = await launchApp();
   try {
     await bootstrapAndLogin(page);
@@ -215,7 +215,7 @@ test('NCE: modal hoàn thành và hủy không xác nhận hành động đã đ
         return result.data;
       };
       let dossier = must(await api.createNce({ data: { source: 'other', description: 'Kiểm tra xác nhận hành động khi hồ sơ thay đổi', correction: 'Đã kiểm soát sự cố ban đầu', holdResults: false, detectedAt: date, ownerUserId: user.id } }));
-      for (const description of ['Hành động kiểm tra modal hoàn thành', 'Hành động kiểm tra modal hủy bỏ']) {
+      for (const description of ['Hành động kiểm tra modal hoàn thành', 'Hành động kiểm tra modal huỷ bỏ']) {
         dossier = must(await api.addNceAction({ data: { id: dossier.record.id, expectedVersion: dossier.record.row_version, action: { kind: 'corrective', description, ownerUserId: user.id, dueDate: date } } }));
       }
       return dossier;
@@ -227,16 +227,16 @@ test('NCE: modal hoàn thành và hủy không xác nhận hành động đã đ
     const actions = page.getByRole('region', { name: 'Hành động khắc phục và phòng ngừa' });
 
     for (const mode of ['complete', 'cancel']) {
-      const original = mode === 'complete' ? 'Hành động kiểm tra modal hoàn thành' : 'Hành động kiểm tra modal hủy bỏ';
+      const original = mode === 'complete' ? 'Hành động kiểm tra modal hoàn thành' : 'Hành động kiểm tra modal huỷ bỏ';
       const action = created.actions.find((item) => item.description === original);
       assert.ok(action, `có hành động cho ca ${mode}`);
       const row = actions.locator('tbody tr', { hasText: original });
-      await row.getByRole('button', { name: mode === 'complete' ? 'Hoàn thành' : 'Hủy', exact: true }).click();
+      await row.getByRole('button', { name: mode === 'complete' ? 'Hoàn thành' : 'Huỷ', exact: true }).click();
       let dialog = page.getByRole('dialog');
       const input = mode === 'complete' ? '#actEvidence' : '#actCancel';
-      const draft = mode === 'complete' ? 'Bằng chứng đang nhập của người A' : 'Lý do đang nhập của người A để hủy hành động';
-      const confirm = mode === 'complete' ? 'Xác nhận hoàn thành' : 'Hủy hành động';
-      const close = mode === 'complete' ? 'Hủy' : 'Quay lại';
+      const draft = mode === 'complete' ? 'Bằng chứng đang nhập của người A' : 'Lý do đang nhập của người A để huỷ hành động';
+      const confirm = mode === 'complete' ? 'Xác nhận hoàn thành' : 'Huỷ hành động';
+      const close = mode === 'complete' ? 'Bỏ qua' : 'Quay lại';
       await dialog.locator(input).fill(draft);
 
       // Mô phỏng người B qua đúng IPC, để cả dữ liệu và thông báo thay đổi
@@ -256,13 +256,13 @@ test('NCE: modal hoàn thành và hủy không xác nhận hành động đã đ
       await page.locator('.nce-dossier-error', { hasText: 'Hồ sơ vừa được người khác cập nhật' }).waitFor();
       let stored = await page.evaluate((id) => window.qcApi.getNce(id), created.record.id);
       assert.equal(stored.record.row_version, changed.record.row_version, 'lệnh cũ không tạo thêm phiên bản');
-      assert.deepEqual(stored.actions.find((item) => item.id === action.id), changedAction, 'lệnh cũ không hoàn thành, hủy hoặc ghi bằng chứng lên hành động mới');
+      assert.deepEqual(stored.actions.find((item) => item.id === action.id), changedAction, 'lệnh cũ không hoàn thành, huỷ hoặc ghi bằng chứng lên hành động mới');
       assert.equal(changedAction.status, 'open');
       await dialog.getByRole('button', { name: close, exact: true }).click();
 
       // Người dùng xem lại nội dung hiện hành, mở xác nhận mới thì vẫn có
-      // thể hoàn thành/hủy bình thường, không bị kẹt bởi xung đột trước đó.
-      await actions.locator('tbody tr', { hasText: changedAction.description }).getByRole('button', { name: mode === 'complete' ? 'Hoàn thành' : 'Hủy', exact: true }).click();
+      // thể hoàn thành/huỷ bình thường, không bị kẹt bởi xung đột trước đó.
+      await actions.locator('tbody tr', { hasText: changedAction.description }).getByRole('button', { name: mode === 'complete' ? 'Hoàn thành' : 'Huỷ', exact: true }).click();
       dialog = page.getByRole('dialog');
       const finalEvidence = mode === 'complete' ? 'Phiếu xác minh sau khi đã rà soát nội dung mới' : 'Đã rà soát nội dung mới và xác nhận không còn cần hành động';
       await dialog.locator(input).fill(finalEvidence);
@@ -352,7 +352,7 @@ test('NCE: kiểm tra nhanh phủ đủ khung, lưu bằng chứng và không tr
     assert.ok(stored.missing.some((item) => item.code === 'check-note-reagent'), 'không áp dụng vẫn bắt buộc lý do trước khi qua cổng');
     await checks.getByRole('button', { name: 'Sửa', exact: true }).click();
     const abnormalNote = `Lọ QC bất thường đã được cách ly; đối chiếu nhật ký và thay lọ mới. ${'MaThamChieuDaiKhongCoKhoangTrang'.repeat(12)}`;
-    const naNote = 'Không thay đổi hóa chất trong ca; đã đối chiếu nhật ký nhận và sử dụng hóa chất.';
+    const naNote = 'Không thay đổi hoá chất trong ca; đã đối chiếu nhật ký nhận và sử dụng hoá chất.';
     await evidence.nth(0).fill(abnormalNote);
     await evidence.nth(1).fill(naNote);
     await checks.locator('.nce-checklist-summary', { hasText: '7/7 mục đã đánh giá' }).waitFor();

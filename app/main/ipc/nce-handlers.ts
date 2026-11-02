@@ -157,7 +157,7 @@ export function createNceHandlers(db: Db) {
     // chọn mốc khôi phục. Khi duyệt lại, không lấy sự kiện SAU release cũ.
     const latestOtherFailure = !alreadyCut && trigger ? nceRunOutcomes(db, testId, [{ date: run.date, runId: run.runId }])
       .filter((r) => r.rejected && compareRun(r, trigger) > 0).sort(compareRun).at(-1) : undefined;
-    // Chỉ cần khóa lần hỏng cuối để kiểm thứ tự, không đánh giá lại toàn bộ
+    // Chỉ cần khoá lần hỏng cuối để kiểm thứ tự, không đánh giá lại toàn bộ
     // CSDL thêm một lần cho từng lần hỏng. Snapshot này không được lưu.
     const additional: NceRunSnapshot[] = latestOtherFailure ? [{ testId, date: latestOtherFailure.date, runId: latestOtherFailure.runId, points: [] }] : [];
     const result = checkNceRerun({
@@ -357,7 +357,7 @@ export function createNceHandlers(db: Db) {
     if (!action) return fail('action-not-found', 'Không tìm thấy hành động.');
     const checked = validateNceActionCancel({ status: action.status }, data.reason);
     if (!checked.ok) return fail(checked.code, checked.message);
-    return commitEdit(w, loaded, version, ['Hủy hành động NCE', `${action.description.slice(0, 100)} · lý do: ${checked.data.reason}`], {}, (_tx, now) => {
+    return commitEdit(w, loaded, version, ['Huỷ hành động NCE', `${action.description.slice(0, 100)} · lý do: ${checked.data.reason}`], {}, (_tx, now) => {
       db.prepare("UPDATE nce_actions SET status='cancelled', cancel_reason=? WHERE id=?").run(checked.data.reason, action.id);
       insertNceRevision(db, loaded.row.id, { [`action:${action.id}:cancel`]: [null, checked.data.reason] }, w.actor, now);
     });
@@ -422,11 +422,11 @@ export function createNceHandlers(db: Db) {
     if (missing.length) return fail('gate', `Chưa đủ điều kiện cho phép hoạt động trở lại: ${missingText(missing)}.`);
     const rerun = release.data.rerun;
     // Ghi mốc cắt có thể đổi verdict của các điểm từ rerun trở đi, kể cả
-    // kỳ khóa nằm SAU ngày rerun. Không chỉ kiểm tháng chứa mốc cắt.
+    // kỳ khoá nằm SAU ngày rerun. Không chỉ kiểm tháng chứa mốc cắt.
     if (rerun && dossier.testId) {
       const dates = db.prepare('SELECT DISTINCT date FROM qc_points WHERE test_id=? AND date>=?').all(dossier.testId, rerun.date) as { date: string }[];
       if (isDateInLockedPeriod(db, rerun.date) || dates.some((row) => isDateInLockedPeriod(db, row.date))) {
-        return fail('period-locked', 'Mốc bắt đầu lại QC ảnh hưởng dữ liệu thuộc kỳ đã khóa. Cần người có thẩm quyền mở khóa và rà soát trước.');
+        return fail('period-locked', 'Mốc bắt đầu lại QC ảnh hưởng dữ liệu thuộc kỳ đã khoá. Cần người có thẩm quyền mở khoá và rà soát trước.');
       }
     }
     return commitEdit(w, loaded, version,
@@ -454,7 +454,7 @@ export function createNceHandlers(db: Db) {
       (_tx, now) => insertNceDecision(db, loaded.row.id, 'submit', {}, w.actor, now));
   });
 
-  /** Kiểm lại bằng chứng rerun trên dữ liệu hiện tại (điểm có thể đã bị hủy
+  /** Kiểm lại bằng chứng rerun trên dữ liệu hiện tại (điểm có thể đã bị huỷ
    * sau khi cho chạy lại). Mốc cắt đã ghi nên không thêm mốc giả định. */
   function recheckRelease(dossier: NceDossier): NceRerunResult | null {
     const rerun = dossier.release?.rerun;
@@ -497,11 +497,11 @@ export function createNceHandlers(db: Db) {
     const opened = open(data, null); if (isFailure(opened)) return opened;
     const { loaded, version } = opened;
     const target = transitionTo(loaded, 'cancel');
-    if (!target) return fail('status', 'Chỉ hủy được hồ sơ chưa cho phép hoạt động trở lại.');
+    if (!target) return fail('status', 'Chỉ huỷ được hồ sơ chưa cho phép hoạt động trở lại.');
     const allowed = canCancelNce(actorLike(w.actor), loaded.dossier); if (!allowed.ok) return fail(allowed.code, allowed.message);
     const reason = String(data.reason ?? '').trim().slice(0, 2000);
-    if (textLength(reason) < 10) return fail('missing-reason', 'Hủy hồ sơ phải ghi lý do (ít nhất 10 ký tự).');
-    return commitEdit(w, loaded, version, ['Hủy hồ sơ NCE', reason], { status: target },
+    if (textLength(reason) < 10) return fail('missing-reason', 'Huỷ hồ sơ phải ghi lý do (ít nhất 10 ký tự).');
+    return commitEdit(w, loaded, version, ['Huỷ hồ sơ NCE', reason], { status: target },
       (_tx, now) => insertNceDecision(db, loaded.row.id, 'cancel', { reason }, w.actor, now));
   });
 

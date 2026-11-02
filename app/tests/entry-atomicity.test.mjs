@@ -41,13 +41,13 @@ const voided = entry.voidPoint({ data: { pointId: point.id, kind: 'analytical', 
 assert.equal(voided.ok, true, JSON.stringify(voided));
 assert.equal(voided.data.nceId, `${prefix}-04`);
 
-// Nếu audit của thao tác hủy lỗi, cả cờ voided và NCE mới đều phải rollback.
+// Nếu audit của thao tác huỷ lỗi, cả cờ voided và NCE mới đều phải rollback.
 const second = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-03', val: 14.2 } }, actor).data;
 const actionCount = db.prepare('SELECT COUNT(*) n FROM actions').get().n;
-db.exec("CREATE TRIGGER fail_void_audit BEFORE INSERT ON activity WHEN NEW.type='Hủy điểm QC' BEGIN SELECT RAISE(FAIL, 'void-audit-failed'); END");
+db.exec("CREATE TRIGGER fail_void_audit BEFORE INSERT ON activity WHEN NEW.type='Huỷ điểm QC' BEGIN SELECT RAISE(FAIL, 'void-audit-failed'); END");
 assert.throws(() => entry.voidPoint({ data: { pointId: second.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor), /void-audit-failed/);
 assert.equal(db.prepare('SELECT voided FROM qc_points WHERE id=?').get(second.id).voided, 0);
-assert.equal(db.prepare('SELECT COUNT(*) n FROM actions').get().n, actionCount, 'hủy lỗi không được tạo NCE dở dang');
+assert.equal(db.prepare('SELECT COUNT(*) n FROM actions').get().n, actionCount, 'huỷ lỗi không được tạo NCE dở dang');
 
 console.log('app entry atomicity + NCE id regression tests passed');
 

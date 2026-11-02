@@ -33,7 +33,7 @@ export function nceFilterCounts(records: readonly NceRecordRow[], userId: string
 export interface NceRunOption extends NceRunKeyView {
   key: string;
   label: string;
-  /** Mức có điểm (chưa hủy) trong lần chạy. */
+  /** Mức có điểm (chưa huỷ) trong lần chạy. */
   levels: number[];
 }
 
@@ -67,7 +67,7 @@ export function nceRerunChoices(points: readonly Pick<QcPointView, 'date' | 'run
   return [...byRun.values()].map((o) => ({ ...o, levels: o.levels.sort((a, b) => a - b), exclusionReasons: [
     ...(o.date < notBeforeDate ? [`Trước ngày phát hiện ${nceRunLabel({ date: notBeforeDate, runId: '' })}`] : []),
     ...(latest && compareQcRunKey(o.key, latest) <= 0 ? ['Không sau lần chạy bị loại gần nhất đã gắn hồ sơ'] : []),
-    ...(!o.levels.length ? ['Tất cả điểm của lần chạy đã hủy'] : []),
+    ...(!o.levels.length ? ['Tất cả điểm của lần chạy đã huỷ'] : []),
   ] })).sort((a, b) => compareQcRunKey(b.key, a.key));
 }
 
@@ -80,7 +80,7 @@ const STEP_LABEL: Record<(typeof STEP_ORDER)[number], string> = {
 };
 
 /** Thanh bước theo trạng thái. Bước "hiện tại" là việc phải làm tiếp; hồ sơ đã
- * hủy không có bước hiện tại. */
+ * huỷ không có bước hiện tại. */
 export function nceSteps(status: NceRecordRow['status']): NceStepView[] {
   // Trạng thái → chỉ số bước đang phải làm: đang xử lý thì làm bước cho chạy
   // lại; đã cho chạy lại thì làm điều tra/CAPA rồi nộp; chờ duyệt thì duyệt.
@@ -130,7 +130,7 @@ function revisionDetail(row: NceRevisionRow): string {
   }
   return Object.keys(changes).map((key) => {
     if (key === 'legacy') return 'chuyển từ hồ sơ phiên bản cũ';
-    if (key.startsWith('action:')) return key.endsWith(':done') ? 'hoàn thành hành động' : key.endsWith(':cancel') ? 'hủy hành động' : Array.isArray(changes[key]) && (changes[key] as unknown[])[0] === null ? 'thêm hành động' : 'sửa hành động';
+    if (key.startsWith('action:')) return key.endsWith(':done') ? 'hoàn thành hành động' : key.endsWith(':cancel') ? 'huỷ hành động' : Array.isArray(changes[key]) && (changes[key] as unknown[])[0] === null ? 'thêm hành động' : 'sửa hành động';
     return `sửa ${FIELD_LABEL[key] ?? key}`;
   }).join(', ');
 }

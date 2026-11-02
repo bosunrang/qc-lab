@@ -49,7 +49,7 @@ export function createWestgardHandlers(db: Db) {
   /** Mức QC ĐANG VẬN HÀNH của một xét nghiệm — hai cổng nằm ở
    * `db/operational-levels.ts` (nguồn DUY NHẤT, dùng chung với Nhập QC; lý do
    * và ca lệch đã đo được ghi ở đầu file đó). Ở đây chỉ còn phần riêng của
-   * trang này: nạp điểm chưa hủy của đúng lô đang gán từng mức.
+   * trang này: nạp điểm chưa huỷ của đúng lô đang gán từng mức.
    * Nhóm lô đã dừng/lưu trữ có tab riêng (`listArchivedGroupTests`), đây
    * không phải chỗ hiển thị chúng. */
   function activeLevels(testId: string): ActiveLevel[] {

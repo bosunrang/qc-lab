@@ -26,7 +26,7 @@ const TEA_LAB_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: 'pt', label: 'Chương trình ngoại kiểm / PT' },
   { value: 'eflm', label: 'EFLM Biological Variation' },
   { value: 'ricos', label: 'Ricos / Westgard BV (nguồn cũ)' },
-  { value: 'professional', label: 'Hiệp hội / ủy ban chuyên môn' },
+  { value: 'professional', label: 'Hiệp hội / uỷ ban chuyên môn' },
   { value: 'other', label: 'Nguồn khác đã thẩm định' },
 ];
 
@@ -147,9 +147,9 @@ export function TeaRefsTab() {
 
 
   async function removeLabProfile(id: string, name: string) {
-    if (!(await confirmDialog(`Xoá hồ sơ TEa chuẩn hóa của "${name}"?`, { title: 'Xóa TEa chuẩn hóa', confirmLabel: 'Xóa', danger: true }))) return;
+    if (!(await confirmDialog(`Xoá hồ sơ TEa chuẩn hoá của "${name}"?`, { title: 'Xoá TEa chuẩn hoá', confirmLabel: 'Xoá', danger: true }))) return;
     const result = await removeTeaLabProfile(id);
-    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa xóa được' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa xoá được' }); return; }
     setEditing(null);
   }
 
@@ -169,7 +169,7 @@ export function TeaRefsTab() {
       <div className="tea-source-registry">{TEA_SOURCE_CARDS.map((source) => <div className={`tea-source-card ${source.tone}`} key={source.label}><div><b>{source.label}</b><span className={`tag ${source.tone === 'dynamic' ? 'ok' : source.tone === 'retired' ? 'warn' : 'none'}`}>{source.tag}</span></div><p>{source.detail}</p><a href={source.url} target="_blank" rel="noreferrer">Mở nguồn chính thức</a></div>)}</div>
       <div className="panel rcfg-list tea-ref-panel">
       {visibleCatalog.length || visibleCustomRefs.length ? <table className="tea-ref-table">
-        <thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hóa %</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hoá %</th><th>Trạng thái</th></tr></thead>
         <tbody>
           {visibleCatalog.map((ref) => {
             const override = overrideByAnalyte.get(ref.id);
@@ -210,12 +210,12 @@ export function TeaRefsTab() {
               </tr>
             );
           })}
-          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td><b>{ref.lab_level_defaults?.length ? 'Theo mức QC' : formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className={`tag ${hasLabProfile(ref) ? 'ok' : 'none'}`}>{hasLabProfile(ref) ? 'TEa PXN' : 'Tự thêm'}</span><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => openProfile(ref)} /><RowActionButton kind="delete" label={`Xóa TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
+          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td><b>{ref.lab_level_defaults?.length ? 'Theo mức QC' : formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className={`tag ${hasLabProfile(ref) ? 'ok' : 'none'}`}>{hasLabProfile(ref) ? 'TEa PXN' : 'Tự thêm'}</span><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => openProfile(ref)} /><RowActionButton kind="delete" label={`Xoá TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
         </tbody>
       </table> : <EmptyState title="Không tìm thấy xét nghiệm">Thử tìm lại theo tên, đơn vị hoặc nhóm xét nghiệm.</EmptyState>}
       </div>
       {adding && <Modal busy={addingAnalyte.busy} title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} size="lg" className="rcfg-modal"
-        footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Hủy</button><button className="btn teal" type="submit" form="tea-add-form" disabled={addingAnalyte.busy}>{addingAnalyte.busy ? 'Đang lưu…' : 'Thêm xét nghiệm'}</button></>}>
+        footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Huỷ</button><button className="btn teal" type="submit" form="tea-add-form" disabled={addingAnalyte.busy}>{addingAnalyte.busy ? 'Đang lưu…' : 'Thêm xét nghiệm'}</button></>}>
         <form id="tea-add-form" ref={addFormRef} onSubmit={(event) => { event.preventDefault(); void addingAnalyte.run(event.currentTarget); }}>
           {addErr && <p id={addErrorId} className="field-error" role="alert">{addErr.message}</p>}
           <div className="grid2">
@@ -224,7 +224,7 @@ export function TeaRefsTab() {
           </div>
           <div className="grid2">
             <div className="field"><label htmlFor="tea-add-unit">Đơn vị</label><input id="tea-add-unit" name="unit" placeholder="U/L" /></div>
-            <div className="field"><label htmlFor="tea-add-section">Nhóm</label><input id="tea-add-section" name="section" placeholder="Hóa sinh" /></div>
+            <div className="field"><label htmlFor="tea-add-section">Nhóm</label><input id="tea-add-section" name="section" placeholder="Hoá sinh" /></div>
           </div>
           <div className="grid2">
             <div className="field"><label htmlFor="tea-add-clia">TEa CLIA %</label><input id="tea-add-clia" name="clia" type="number" step="any" /></div>
@@ -236,12 +236,12 @@ export function TeaRefsTab() {
           </div>
           <div className="field"><label htmlFor="tea-add-clia-absolute-unit">Đơn vị giới hạn tuyệt đối</label><input id="tea-add-clia-absolute-unit" name="cliaAbsoluteUnit" placeholder="Mặc định dùng đơn vị xét nghiệm" /></div>
           <div className="hint flow-note">Chỉ khai giới hạn tuyệt đối khi nguồn CLIA của analyte quy định đơn vị đo; hệ thống sẽ chỉ dùng khi đơn vị tương thích.</div>
-          <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div>
+          <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hoá được lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
       </Modal>}
-      {editing && <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hóa' : 'Sửa hồ sơ TEa chuẩn hóa'} onClose={() => { setEditing(null); setPrefill(null); }} size="lg" className="tea-lab-profile-modal" footer={<>
-          {current && hasLabProfile(current) ? <button type="button" className="btn danger" onClick={() => removeLabProfile(current.id, current.name)}>Xóa TEa chuẩn hóa</button> : null}
-          <button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button>
+      {editing && <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hoá' : 'Sửa hồ sơ TEa chuẩn hoá'} onClose={() => { setEditing(null); setPrefill(null); }} size="lg" className="tea-lab-profile-modal" footer={<>
+          {current && hasLabProfile(current) ? <button type="button" className="btn danger" onClick={() => removeLabProfile(current.id, current.name)}>Xoá TEa chuẩn hoá</button> : null}
+          <button className="btn ghost" onClick={() => setEditing(null)}>Huỷ</button>
           <button className="btn teal" type="submit" form="tearef-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm hồ sơ TEa' : 'Lưu thay đổi'}</button>
         </>}>
         <form id="tearef-form" ref={profileFormRef} onSubmit={(event) => { event.preventDefault(); void saving.run(event.currentTarget); }}>

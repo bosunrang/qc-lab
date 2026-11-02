@@ -16,7 +16,7 @@ const CV_ACTS = [
   'Bảo trì định kỳ thiết bị (đèn, bơm, hệ quang).',
   'Kiểm tra lô thuốc thử & vật liệu QC (bảo quản, hạn dùng, độ đồng nhất).',
   'Ổn định nhiệt độ phòng/điện áp; tránh rung động.',
-  'Chuẩn hóa thao tác (pipet, thời gian ủ); giảm khác biệt giữa người làm.',
+  'Chuẩn hoá thao tác (pipet, thời gian ủ); giảm khác biệt giữa người làm.',
 ];
 
 export function ImprovementCard({ level, result, tea }: { level: number; result: SigmaLevelResult; tea: number | null }) {

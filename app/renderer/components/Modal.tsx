@@ -7,10 +7,10 @@ import { decideModalClose, FIELD_EDIT_EVENT } from '../lib/modal-close';
 import { confirmDialog } from '../state/dialog-store';
 
 /** Nút CHÍNH của modal = nút `.btn.teal` trong `.modal-f`, đúng quy ước màu
- * của app (teal = hành động chính, ghost = phụ/hủy, danger = phá hủy).
+ * của app (teal = hành động chính, ghost = phụ/huỷ, danger = phá huỷ).
  *
- * CỐ Ý không nhận `danger`: Enter là phím dễ bấm nhầm, còn "Hủy điểm này" hay
- * "Xác nhận mở khóa" là thao tác không rút lại được — những modal đó phải bấm
+ * CỐ Ý không nhận `danger`: Enter là phím dễ bấm nhầm, còn "Huỷ điểm này" hay
+ * "Xác nhận mở khoá" là thao tác không rút lại được — những modal đó phải bấm
  * chuột. Modal chỉ có nút "Đóng" (picker, hướng dẫn) cũng không có gì để chạy,
  * nên Enter không làm gì. */
 function primaryButton(box: HTMLElement | null): HTMLButtonElement | null {
@@ -49,7 +49,7 @@ export function Modal({ title, onClose, children, footer, size = 'md', className
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => { busyPropRef.current = busy; }, [busy]);
 
-  /** Esc, nút ✕ và bấm ra nền đi qua đây (U3, U7); nút "Hủy/Đóng" ở chân
+  /** Esc, nút ✕ và bấm ra nền đi qua đây (U3, U7); nút "Huỷ/Đóng" ở chân
    * form gọi thẳng `onClose` vì đó là chủ ý bỏ. */
   const requestClose = useCallback(async () => {
     const decision = decideModalClose({ busy: busyRef.current > 0 || busyPropRef.current, dirty: dirtyRef.current, guarded: guardUnsaved });

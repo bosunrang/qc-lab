@@ -484,7 +484,7 @@ export function createCatalogConfigHandlers(db: Db) {
     if (usedByTransition) {
       return {
         ok: false,
-        error: { code: 'used-by-transition', message: 'Panel này đang có lịch sử chuyển tiếp lô. Hãy xóa/chuyển các dòng chuyển tiếp trước.' },
+        error: { code: 'used-by-transition', message: 'Panel này đang có lịch sử chuyển tiếp lô. Hãy xoá/chuyển các dòng chuyển tiếp trước.' },
       };
     }
     try {

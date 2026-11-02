@@ -1,7 +1,7 @@
 // Hàng chờ sự cố NCE tính theo LẦN CHẠY (D-01, D-14; sửa R-07, R-17).
 // Mỗi dòng là một lần chạy có ít nhất một mức bị loại; cảnh báo không vào hàng
 // chờ. Lần chạy đã thuộc hồ sơ ĐÃ ĐÓNG thì rời hàng chờ; thuộc hồ sơ đang xử
-// lý thì vẫn hiện để mở tiếp; hồ sơ đã hủy coi như chưa có hồ sơ.
+// lý thì vẫn hiện để mở tiếp; hồ sơ đã huỷ coi như chưa có hồ sơ.
 import type { RuleVerdict } from '../westgard-engine';
 import type { NceRunKey, NceStatus } from './types';
 import { compareRun, runKeyOf } from './format';

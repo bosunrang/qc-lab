@@ -1,4 +1,4 @@
-// "Điểm trong khoảng xem": bảng chi tiết từng cột kèm thống kê tích lũy, nút
+// "Điểm trong khoảng xem": bảng chi tiết từng cột kèm thống kê tích luỹ, nút
 // huỷ điểm và danh sách điểm đã huỷ trong khoảng xem.
 import { memo } from 'react';
 import { observedStats } from '../../../main/domain/observed-stats';
@@ -19,14 +19,14 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
   const voidedInWindow = inLjWindow(voidedPoints, ljFrom, ljTo);
   return (
     <section className="panel entry-secondary-panel qc-points-panel">
-      <div className="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã hủy</small></div>
+      <div className="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã huỷ</small></div>
       <div className="entry-secondary-body">
-        <div className="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT trên các lần chạy được chấp nhận; bảng bên dưới hiển thị theo khoảng xem {vnDate(ljFrom)} – {vnDate(ljTo)}.</div>
+        <div className="hint qc-cumulative-note">Thống kê tích luỹ tính từ đầu LOT trên các lần chạy được chấp nhận; bảng bên dưới hiển thị theo khoảng xem {vnDate(ljFrom)} – {vnDate(ljTo)}.</div>
         <div className="qc-table-grid">
           {displayColumns.map((column) => {
             const all = column.points;
             const active = inLjWindow(all.filter((p) => !p.voided), ljFrom, ljTo);
-            // Mean/SD/CV tích lũy chỉ tính trên LẦN CHẠY ĐƯỢC CHẤP
+            // Mean/SD/CV tích luỹ chỉ tính trên LẦN CHẠY ĐƯỢC CHẤP
             // NHẬN. Gộp cả dữ liệu mất kiểm soát vào thì chính sự
             // cố đó nống SD lên, và lần sau cùng một sự cố không
             // còn vượt ngưỡng nữa — hệ QC tự làm mù mình. Con số
@@ -41,9 +41,9 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
                 <h4><span>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="hint qc-table-count">{active.length} điểm trong khoảng</span></span></h4>
                 <div className="qc-cumulative">
                   <div><span>N dùng thống kê</span><b>{n}</b></div>
-                  <div><span>Mean tích lũy</span><b>{mean != null ? mean.toFixed(decimals) : '—'}</b></div>
-                  <div><span>SD tích lũy</span><b>{sd != null ? sd.toFixed(4) : '—'}</b></div>
-                  <div><span>CV tích lũy</span><b>{cv != null ? cv.toFixed(2) + '%' : '—'}</b></div>
+                  <div><span>Mean tích luỹ</span><b>{mean != null ? mean.toFixed(decimals) : '—'}</b></div>
+                  <div><span>SD tích luỹ</span><b>{sd != null ? sd.toFixed(4) : '—'}</b></div>
+                  <div><span>CV tích luỹ</span><b>{cv != null ? cv.toFixed(2) + '%' : '—'}</b></div>
                 </div>
                 <div className="hint qc-cumulative-source">Tổng ghi nhận {recorded.length}{excluded ? ` · ${excluded} điểm thuộc lần chạy bị loại, không vào thống kê` : ''}</div>
                 {active.length ? (
@@ -58,7 +58,7 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
                             {runExcludedNote(p) && <span className="qc-run-excluded" title="Lần chạy bị loại thì mọi mức trong lần chạy đó phải chạy lại; kết quả cũ không vào Mean/SD/CV thực.">{runExcludedNote(p)}</span>}
                           </td>
                           <td>{p.rules.length ? p.rules.map((r) => <span className="pill" key={r}>{r}</span>) : '—'}</td>
-                          <td className="qc-row-actions">{writable ? <button type="button" className="qc-row-void" title="Hủy điểm QC" aria-label={`Hủy điểm QC ngày ${vnDate(p.date)}`} onClick={() => onVoid(p)}><TrashIcon /></button> : <span className="hint">—</span>}</td>
+                          <td className="qc-row-actions">{writable ? <button type="button" className="qc-row-void" title="Huỷ điểm QC" aria-label={`Huỷ điểm QC ngày ${vnDate(p.date)}`} onClick={() => onVoid(p)}><TrashIcon /></button> : <span className="hint">—</span>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -70,9 +70,9 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
         </div>
         {voidedInWindow.length > 0 && (
           <div className="qc-voided-box">
-            <h4>Điểm đã hủy trong khoảng</h4>
+            <h4>Điểm đã huỷ trong khoảng</h4>
             <table className="qc-voided-table">
-              <thead><tr><th>Ngày</th><th>Mức / lô</th><th className="num">Giá trị</th><th>Lần chạy</th><th>Người hủy</th><th>Lý do</th></tr></thead>
+              <thead><tr><th>Ngày</th><th>Mức / lô</th><th className="num">Giá trị</th><th>Lần chạy</th><th>Người huỷ</th><th>Lý do</th></tr></thead>
               <tbody>{voidedInWindow.map((point) => (
                 <tr key={point.id}>
                   <td>{vnDate(point.date)}</td><td>Mức {point.level} · Lô {point.lot || '—'}</td>

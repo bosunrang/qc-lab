@@ -45,7 +45,7 @@ export function nceErrorClass(runs: readonly { role: string; snapshot: NceRunSna
 
 export interface NceRecurrenceCandidate { id: string; testId: string | null; source: NceSource; errorClass: string; detectedDate: string; cancelled: boolean }
 
-/** Có hồ sơ khác (không hủy) cùng xét nghiệm, cùng loại sai số, phát hiện
+/** Có hồ sơ khác (không huỷ) cùng xét nghiệm, cùng loại sai số, phát hiện
  * trong `windowDays` ngày trước hồ sơ đang xét. Thiếu xét nghiệm hoặc loại sai
  * số thì không kết luận tái diễn (không đoán). */
 export function nceIsRecurrence(current: NceRecurrenceCandidate, others: readonly NceRecurrenceCandidate[], windowDays: number): boolean {

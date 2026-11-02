@@ -51,15 +51,15 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     const removeWholeCatalog = assignments.length === 1;
     const instrument = instruments.find(item => item.id === selected.instrument_id);
     const targetLabel = removeWholeCatalog ? `xét nghiệm ${test.name}` : `${test.name} khỏi máy ${instrument?.name || 'đã chọn'}`;
-    const ok = await confirmDialog(`Xóa ${targetLabel}? Chỉ cấu hình chưa phát sinh dữ liệu QC hoặc lịch sử mới có thể xóa.`, {
-      title: removeWholeCatalog ? 'Xóa xét nghiệm' : 'Gỡ máy khỏi xét nghiệm',
-      confirmLabel: removeWholeCatalog ? 'Xóa xét nghiệm' : 'Gỡ khỏi máy', cancelLabel: 'Hủy', danger: true,
+    const ok = await confirmDialog(`Xoá ${targetLabel}? Chỉ cấu hình chưa phát sinh dữ liệu QC hoặc lịch sử mới có thể xoá.`, {
+      title: removeWholeCatalog ? 'Xoá xét nghiệm' : 'Gỡ máy khỏi xét nghiệm',
+      confirmLabel: removeWholeCatalog ? 'Xoá xét nghiệm' : 'Gỡ khỏi máy', cancelLabel: 'Huỷ', danger: true,
     });
     if (!ok) return;
-    if (!await reauthDialog({ title: 'Xác thực xóa xét nghiệm', message: `Nhập lại mật khẩu trước khi xóa ${targetLabel}.` })) return;
+    if (!await reauthDialog({ title: 'Xác thực xoá xét nghiệm', message: `Nhập lại mật khẩu trước khi xoá ${targetLabel}.` })) return;
     const result = await removeTest(selected.id, [selected.id]);
-    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa xóa được xét nghiệm' }); return; }
-    showToast(`Đã xóa ${targetLabel}.`);
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa xoá được xét nghiệm' }); return; }
+    showToast(`Đã xoá ${targetLabel}.`);
   }
 
   const [editing, setEditing] = useState<Test | 'new' | null>(null);
@@ -260,15 +260,15 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
         <div className="rcfg-toolbar">
           <div><h2>Danh mục xét nghiệm</h2><p>Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.</p></div>
           <div className="rcfg-tools">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, máy, đơn vị, phương pháp, hóa chất, TEa..." />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, máy, đơn vị, phương pháp, hoá chất, TEa..." />
             <button className="btn teal" onClick={openNew}>＋ Thêm xét nghiệm</button>
           </div>
       </div>
       <div className="panel rcfg-list">
         {!tests.length ? <EmptyState title="Chưa có xét nghiệm">{instruments.length ? 'Thêm xét nghiệm đầu tiên để tiếp tục cấu hình Panel QC, lô QC và Mean/SD.' : 'Thêm máy xét nghiệm trước, sau đó tạo danh mục xét nghiệm.'}</EmptyState>
-          : !visible.length ? <EmptyState title="Không tìm thấy xét nghiệm">Thử đổi từ khóa tìm kiếm hoặc xóa bộ lọc hiện tại.</EmptyState>
+          : !visible.length ? <EmptyState title="Không tìm thấy xét nghiệm">Thử đổi từ khoá tìm kiếm hoặc xoá bộ lọc hiện tại.</EmptyState>
           : <table className="assay-table">
-            <thead><tr><th className="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th className="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hoá chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
             {visible.map(({ key, test: t, assignments }, i) => {
               const selected = assignments.find(item => item.id === selectedAssignmentIds[key]) || assignments[0];
@@ -294,7 +294,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                 <td><span className={`tag ${selected.active ? 'ok' : 'none'}`}>{selected.active ? 'Đang dùng' : 'Ngừng dùng'}</span></td>
                 <td><div className="manage-actions">
                   <RowActionButton kind="edit" label={`Sửa ${selected.name} trên ${selectedInstrument?.name || 'máy đã chọn'}`} onClick={() => { setErr(null); setAssigningMachines(false); setEditingSingleAssignment(true); setEditing(selected); }} />
-                  <RowActionButton kind="delete" label={`Xóa ${selected.name} khỏi ${selectedInstrument?.name || 'máy đã chọn'}`} onClick={() => removeTestRow(t, assignments, selected)} />
+                  <RowActionButton kind="delete" label={`Xoá ${selected.name} khỏi ${selectedInstrument?.name || 'máy đã chọn'}`} onClick={() => removeTestRow(t, assignments, selected)} />
                 </div></td>
               </tr>
             } )}
@@ -303,7 +303,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
 
         {editing && (
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal rcfg-assay-modal"
-            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
+            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Huỷ</button><button className="btn teal" type="submit" form="test-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
             <form id="test-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <div className="assay-setup-layout">
@@ -355,7 +355,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                     <div className="assay-detail-grid">
                       <div className="field"><label htmlFor="test-method">Phương pháp</label><input id="test-method" name="method" defaultValue={editing !== 'new' ? editing.method : ''} /></div>
                       <div className="field"><label htmlFor="test-tea">TEa %</label><input id="test-tea" name="tea" type="number" step="0.01" defaultValue={editing !== 'new' ? editing.tea : ''} /></div>
-                      <div className="field"><label htmlFor="test-reagent">Hóa chất</label><input id="test-reagent" name="reagent" defaultValue={editing !== 'new' ? editing.reagent : ''} /></div>
+                      <div className="field"><label htmlFor="test-reagent">Hoá chất</label><input id="test-reagent" name="reagent" defaultValue={editing !== 'new' ? editing.reagent : ''} /></div>
                       <div className="field"><label htmlFor="test-decimal-places">Số thập phân</label><select id="test-decimal-places" name="decimalPlaces" defaultValue={editing !== 'new' ? editing.decimal_places : 2}>{[0, 1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
                     </div>
                   </div>
@@ -364,7 +364,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                   <div className="assay-card-head">
                     <span><b id="assay-machine-title">{assigningMachines ? 'Chọn máy mới' : editingSingleAssignment ? 'Máy đang cấu hình' : 'Máy áp dụng'} <span className="req">*</span></b><small>{assigningMachines ? 'Máy mới dùng thông số đang hiển thị bên trái' : editingSingleAssignment ? 'Thông số bên trái chỉ áp dụng cho máy này' : 'Chọn máy thực hiện xét nghiệm'}</small></span>
                     <div className="assay-machine-head-actions">
-                      {editingSingleAssignment && (assigningMachines || editingAssignments.length < instruments.length) && <button type="button" className="assay-add-machine" onClick={() => { setErr(null); setAssigningMachines(value => !value); }}>{assigningMachines ? 'Hủy gán thêm' : '＋ Gán thêm máy'}</button>}
+                      {editingSingleAssignment && (assigningMachines || editingAssignments.length < instruments.length) && <button type="button" className="assay-add-machine" onClick={() => { setErr(null); setAssigningMachines(value => !value); }}>{assigningMachines ? 'Huỷ gán thêm' : '＋ Gán thêm máy'}</button>}
                     </div>
                   </div>
                   <div className="assay-card-body assay-machine-body">
@@ -407,11 +407,11 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                 </div>
               </details>
               <details className="assay-advanced" open={editing !== 'new' && editing.cusum_on === 1}>
-                <summary><span><b>Giám sát xu hướng CUSUM</b><small>Tùy chọn hỗ trợ phát hiện trôi hoặc dịch chuyển kéo dài</small></span><span aria-hidden="true">+</span></summary>
+                <summary><span><b>Giám sát xu hướng CUSUM</b><small>Tuỳ chọn hỗ trợ phát hiện trôi hoặc dịch chuyển kéo dài</small></span><span aria-hidden="true">+</span></summary>
                 <div className="assay-advanced-body">
                   <label className="rcfg-check"><input type="checkbox" name="cusumOn" defaultChecked={editing !== 'new' && editing.cusum_on === 1} /> Bật biểu đồ CUSUM cho xét nghiệm này</label>
                   <div className="assay-cusum-grid">
-                    <div className="field"><label htmlFor="test-cusum-k">Ngưỡng tích lũy k (SD)</label><input id="test-cusum-k" name="cusumK" type="number" step="0.1" min="0.1" defaultValue={editing !== 'new' ? editing.cusum_k : 0.5} /></div>
+                    <div className="field"><label htmlFor="test-cusum-k">Ngưỡng tích luỹ k (SD)</label><input id="test-cusum-k" name="cusumK" type="number" step="0.1" min="0.1" defaultValue={editing !== 'new' ? editing.cusum_k : 0.5} /></div>
                     <div className="field"><label htmlFor="test-cusum-h">Ngưỡng cảnh báo h (SD)</label><input id="test-cusum-h" name="cusumH" type="number" step="0.5" min="0.5" defaultValue={editing !== 'new' ? editing.cusum_h : 4} /></div>
                   </div>
                 </div>

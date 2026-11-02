@@ -22,7 +22,7 @@ test('chỉ các chuyển trạng thái trong sơ đồ là hợp lệ', () => {
   assert.equal(nextNceStatus('closed', 'return'), null, 'hồ sơ đã đóng là bất biến');
 });
 
-test('ca 12: hồ sơ đã cho chạy lại không hủy được', () => {
+test('ca 12: hồ sơ đã cho chạy lại không huỷ được', () => {
   for (const status of ['released', 'pending_approval', 'closed', 'cancelled']) assert.equal(nextNceStatus(status, 'cancel'), null, status);
 });
 
@@ -33,8 +33,8 @@ test('thao tác sửa theo trạng thái', () => {
   assert.equal(canDoNceOperation('released', 'reviewEffectiveness'), true);
   assert.equal(canDoNceOperation('released', 'recordPatientImpact'), true, 'thông tin kết quả đã trả có thể đến muộn');
   for (const op of ['update', 'addAction', 'completeAction', 'recordPatientImpact']) {
-    assert.equal(canDoNceOperation('pending_approval', op), false, `chờ duyệt khóa ${op}`);
-    assert.equal(canDoNceOperation('closed', op), false, `đã đóng khóa ${op}`);
+    assert.equal(canDoNceOperation('pending_approval', op), false, `chờ duyệt khoá ${op}`);
+    assert.equal(canDoNceOperation('closed', op), false, `đã đóng khoá ${op}`);
   }
 });
 
@@ -76,7 +76,7 @@ test('ca 10: mọi người đã tham gia hồ sơ đều không được duyệ
   assert.equal(canApproveNce({ userId: 'u-owner', role: 'admin' }, d).ok, false);
 });
 
-test('người làm một hành động đã hủy không bị coi là đã tham gia', () => {
+test('người làm một hành động đã huỷ không bị coi là đã tham gia', () => {
   const d = dossier({ actions: [{ ...dossier().actions[0], status: 'cancelled', doneByUserId: 'u-x' }] });
   assert.deepEqual(nceParticipantRoles('u-x', d), []);
 });
@@ -91,7 +91,7 @@ test('ngoại lệ phân tách nhiệm vụ chỉ dùng được khi bật và c
   assert.deepEqual(result.conflicts, ['người phụ trách', 'người xác minh kỹ thuật', 'người đánh giá ảnh hưởng bệnh nhân']);
 });
 
-test('nộp duyệt và hủy theo vai trò trong hồ sơ', () => {
+test('nộp duyệt và huỷ theo vai trò trong hồ sơ', () => {
   const d = dossier({ status: 'open' });
   const tech = (userId) => ({ userId, role: 'technician', capabilities: [] });
   assert.equal(canSubmitNce(tech('u-owner'), d).ok, true);

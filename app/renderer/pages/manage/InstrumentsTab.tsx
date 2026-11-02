@@ -64,7 +64,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
       </div>
       <div className="panel rcfg-list">
         {!instruments.length ? <EmptyState title="Chưa có máy xét nghiệm">Thêm máy xét nghiệm đầu tiên để bắt đầu cấu hình QC.</EmptyState>
-          : !visible.length ? <EmptyState title="Không tìm thấy máy xét nghiệm">Thử đổi từ khóa tìm kiếm hoặc xóa bộ lọc hiện tại.</EmptyState>
+          : !visible.length ? <EmptyState title="Không tìm thấy máy xét nghiệm">Thử đổi từ khoá tìm kiếm hoặc xoá bộ lọc hiện tại.</EmptyState>
           : <table className="instrument-table">
             <thead><tr><th>Máy xét nghiệm</th><th>Khoa</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th className="num">Xét nghiệm</th><th className="num">Panel</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
@@ -77,19 +77,19 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
                   <td className="num">{testCountOf(i.id)}</td>
                   <td className="num">{panelCountOf(i.id)}</td>
                   <td><span className={`tag instrument-status ${i.active ? 'ok' : 'none'}`}>{i.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span></td>
-                  <td><div className="manage-actions"><RowActionButton kind="edit" label={`Sửa máy ${i.name}`} onClick={() => { setErr(null); setEditing(i); }} /><RowActionButton kind="delete" label={`Xóa máy ${i.name}`} onClick={() => remove(i)} /></div></td>
+                  <td><div className="manage-actions"><RowActionButton kind="edit" label={`Sửa máy ${i.name}`} onClick={() => { setErr(null); setEditing(i); }} /><RowActionButton kind="delete" label={`Xoá máy ${i.name}`} onClick={() => remove(i)} /></div></td>
                 </tr>
               ))}
             </tbody>
           </table>}
         {editing && (
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
-            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="instrument-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
+            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Huỷ</button><button className="btn teal" type="submit" form="instrument-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
             <form id="instrument-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <FieldRow>
                 <div className="field"><label htmlFor="instrument-name">Tên hiển thị</label><input id="instrument-name" name="name" placeholder="VD: AU5800-01" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
-                <div className="field"><label htmlFor="instrument-section">Khoa / Khu vực</label><input id="instrument-section" name="section" placeholder="Hóa sinh" defaultValue={editing !== 'new' ? editing.section : ''} /></div>
+                <div className="field"><label htmlFor="instrument-section">Khoa / Khu vực</label><input id="instrument-section" name="section" placeholder="Hoá sinh" defaultValue={editing !== 'new' ? editing.section : ''} /></div>
               </FieldRow>
               <FieldRow>
                 <div className="field"><label htmlFor="instrument-manufacturer">Nhà sản xuất</label><input id="instrument-manufacturer" name="manufacturer" placeholder="Beckman Coulter" defaultValue={editing !== 'new' ? editing.manufacturer : ''} /></div>

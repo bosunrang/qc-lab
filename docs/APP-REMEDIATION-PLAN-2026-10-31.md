@@ -335,8 +335,26 @@ dùng `--danger-accent`. Test: `app/tests/field-error.test.mjs`, e2e `modal-ux.e
 `AppShell` theo dõi `(max-width: 1050px)` để mục điều hướng có `title`/`aria-label` khi chỉ
 còn icon. Test: `design-system.test.mjs`.
 
-**Còn lại của GV9:** U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu) — đổi cách hiển thị
-trạng thái nên cần người dùng chốt trước.
+**U12 (thuộc GV11) — đã làm 02/11/2026:**
+- Dấu thanh đặt trên âm chính ở vần mở (QĐ 1989/QĐ-BGDĐT 2018): "Xoá", "Huỷ", "khoá", "hoá",
+  "tích luỹ"… trong mã nguồn, chú thích và test.
+- Chừa ra:
+  - phần EQA;
+  - `main/db/schema.ts`: SQL migration, tên migration đã ghi vào CSDL;
+  - mẫu băm cố định của `sha256-parity`.
+- Nhật ký cũ vẫn ghi "Hủy điểm QC": tìm kiếm so khớp đã bỏ dấu nên vẫn tìm thấy.
+- "backup" → "bản sao lưu", "app" → "phần mềm", "dữ liệu test" → "dữ liệu thử",
+  "Tìm test" → "Tìm xét nghiệm".
+- Khu Khắc phục sự cố: nút đóng biểu mẫu đổi "Huỷ" → "Bỏ qua", hộp xác nhận dùng "Quay lại".
+  Ở đây "Huỷ" là thao tác nghiệp vụ (huỷ hồ sơ, huỷ hành động).
+- Tiêu đề trang theo nhãn menu: "Nhập QC & Biểu đồ", "So sánh hoá chất", "Cài đặt & Đám mây",
+  "Người dùng".
+- Còn lại: tên "kỳ/đợt/vòng" và chữ "app" trong EQA, làm sau khi commit phần EQA.
+
+Test: `app/tests/vietnamese-text.test.mjs`.
+
+**Còn lại của GV9:** U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu): người dùng quyết định bỏ
+qua (02/11/2026).
 
 **Phương án gốc:**
 

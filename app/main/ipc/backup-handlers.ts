@@ -1,6 +1,6 @@
 // Xuất, kiểm tra và phục hồi dữ liệu của QC Lab.
 //
-// Tệp backup là một tệp SQLite (xem `BACKUP_FILE_FORMAT`). Trước 2026-09-25
+// Tệp sao lưu là một tệp SQLite (xem `BACKUP_FILE_FORMAT`). Trước 2026-09-25
 // backup là một chuỗi JSON dựng toàn bộ CSDL trong bộ nhớ và bị chặn ở 128 MB
 // khi nhập lại — khoảng 175.000 điểm QC kèm nhật ký, tức vài năm dữ liệu của
 // một phòng xét nghiệm. Tệp .json cũ vẫn phục hồi được (giữ ngưỡng 128 MB
@@ -17,7 +17,7 @@ import { writeCommand } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
 import { keepOperationMode, readOperationMode, type OperationModeState } from '../db/operation-mode';
 
-/** Ngưỡng chỉ còn áp cho tệp backup JSON cũ: phải đọc cả tệp thành chuỗi. */
+/** Ngưỡng chỉ còn áp cho tệp sao lưu JSON cũ: phải đọc cả tệp thành chuỗi. */
 const LEGACY_JSON_MAX_BYTES = 128 * 1024 * 1024;
 const SQLITE_HEADER = 'SQLite format 3\u0000';
 
@@ -52,14 +52,14 @@ function readHeader(filePath: string): string {
   }
 }
 
-/** Kiểm tra một tệp backup mà không chạm vào CSDL đang dùng. */
+/** Kiểm tra một tệp sao lưu mà không chạm vào CSDL đang dùng. */
 function inspectBackupFile(filePath: string): Inspected {
-  if (!filePath || !existsSync(filePath)) return { ok: false, code: 'not-found', message: 'Không tìm thấy tệp backup.' };
+  if (!filePath || !existsSync(filePath)) return { ok: false, code: 'not-found', message: 'Không tìm thấy tệp sao lưu.' };
   const bytes = statSync(filePath).size;
   const header = readHeader(filePath);
   if (header === SQLITE_HEADER) return inspectSqliteBackup(filePath, bytes);
   if (header.trimStart().startsWith('{')) return inspectJsonBackup(filePath, bytes);
-  return { ok: false, code: 'wrong-format', message: 'Tệp này không phải backup của QC Lab.' };
+  return { ok: false, code: 'wrong-format', message: 'Tệp này không phải bản sao lưu của QC Lab.' };
 }
 
 function inspectSqliteBackup(filePath: string, bytes: number): Inspected {
@@ -67,7 +67,7 @@ function inspectSqliteBackup(filePath: string, bytes: number): Inspected {
   try {
     source = openExistingDatabase(filePath, { readOnly: true });
   } catch {
-    return { ok: false, code: 'corrupt', message: 'Không mở được tệp backup — tệp có thể đã hỏng.' };
+    return { ok: false, code: 'corrupt', message: 'Không mở được tệp sao lưu — tệp có thể đã hỏng.' };
   }
   try {
     // Kiểm tra toàn vẹn TRƯỚC: trang hỏng có thể trúng ngay bảng mô tả, và khi
@@ -79,20 +79,20 @@ function inspectSqliteBackup(filePath: string, bytes: number): Inspected {
       integrity = [];
     }
     if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') {
-      return { ok: false, code: 'corrupt', message: 'Tệp backup không vượt qua kiểm tra toàn vẹn của SQLite — tệp có thể đã hỏng.' };
+      return { ok: false, code: 'corrupt', message: 'Tệp sao lưu không vượt qua kiểm tra toàn vẹn của SQLite — tệp có thể đã hỏng.' };
     }
     const info = new Map<string, string>();
     try {
       for (const row of source.prepare('SELECT key, value FROM backup_info').all() as { key: string; value: string }[]) info.set(row.key, row.value);
     } catch {
-      return { ok: false, code: 'wrong-format', message: 'Tệp SQLite này không phải backup của QC Lab (thiếu phần mô tả backup).' };
+      return { ok: false, code: 'wrong-format', message: 'Tệp SQLite này không phải bản sao lưu của QC Lab (thiếu phần mô tả bản sao lưu).' };
     }
     if (info.get('format') !== BACKUP_FILE_FORMAT) {
-      return { ok: false, code: 'wrong-format', message: `Tệp này không đúng định dạng backup được hỗ trợ (format="${info.get('format') ?? ''}").` };
+      return { ok: false, code: 'wrong-format', message: `Tệp này không đúng định dạng sao lưu được hỗ trợ (format="${info.get('format') ?? ''}").` };
     }
     const schemaVersion = Number(info.get('schemaVersion'));
     if (!Number.isInteger(schemaVersion) || schemaVersion > SCHEMA_VERSION) {
-      return { ok: false, code: 'unsupported-schema', message: 'Backup được tạo từ phiên bản mới hơn app hiện tại, không thể phục hồi.' };
+      return { ok: false, code: 'unsupported-schema', message: 'Bản sao lưu được tạo từ phiên bản mới hơn phần mềm hiện tại, không thể phục hồi.' };
     }
     const tables = (source.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name<>'backup_info'").all() as { name: string }[]).map((r) => r.name);
     let rows = 0;
@@ -100,7 +100,7 @@ function inspectSqliteBackup(filePath: string, bytes: number): Inspected {
     const points = tables.includes('qc_points') ? Number((source.prepare('SELECT COUNT(*) AS n FROM qc_points').get() as { n: number }).n) : 0;
     return { ok: true, kind: 'sqlite', summary: { tables: tables.length, rows, points, schemaVersion, createdAt: info.get('createdAt') ?? '', bytes, legacy: false } };
   } catch {
-    return { ok: false, code: 'corrupt', message: 'Không đọc được tệp backup — tệp có thể đã hỏng.' };
+    return { ok: false, code: 'corrupt', message: 'Không đọc được tệp sao lưu — tệp có thể đã hỏng.' };
   } finally {
     source.close();
   }
@@ -108,7 +108,7 @@ function inspectSqliteBackup(filePath: string, bytes: number): Inspected {
 
 function inspectJsonBackup(filePath: string, bytes: number): Inspected {
   if (bytes > LEGACY_JSON_MAX_BYTES) {
-    return { ok: false, code: 'too-large', message: `Tệp backup JSON vượt ngưỡng ${Math.round(LEGACY_JSON_MAX_BYTES / 1024 / 1024)} MB.` };
+    return { ok: false, code: 'too-large', message: `Tệp sao lưu JSON vượt ngưỡng ${Math.round(LEGACY_JSON_MAX_BYTES / 1024 / 1024)} MB.` };
   }
   let raw: unknown;
   try {
@@ -161,7 +161,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
       renameSync(partial, filePath);
     } catch (e) {
       try { if (existsSync(partial)) unlinkSync(partial); } catch { /* giữ lỗi gốc bên dưới */ }
-      return fail('export-failed', `Không ghi được tệp backup: ${e instanceof Error ? e.message : String(e)}`);
+      return fail('export-failed', `Không ghi được tệp sao lưu: ${e instanceof Error ? e.message : String(e)}`);
     }
     const bytes = statSync(filePath).size;
     const points = Number((db.prepare('SELECT COUNT(*) AS n FROM qc_points').get() as { n: number }).n);
@@ -170,7 +170,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     w.commit((tx) => {
       setMeta('lastBackupAt', nowIso());
       setMeta('lastBackupBytes', String(bytes));
-      tx.audit('Xuất backup', `Xuất backup ${(bytes / 1024 / 1024).toFixed(1)} MB, ${points} điểm QC`, '');
+      tx.audit('Xuất bản sao lưu', `Xuất bản sao lưu ${(bytes / 1024 / 1024).toFixed(1)} MB, ${points} điểm QC`, '');
       // Trước đây thiếu: trang Cài đặt đang mở không biết mốc sao lưu đã đổi.
       tx.changed(['app_meta']);
     });
@@ -199,10 +199,10 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     return { ok: true, data: inspected.summary };
   }
 
-  /** Phục hồi TOÀN BỘ dữ liệu từ tệp backup. Kiểm tra lại tệp ngay trước khi
+  /** Phục hồi TOÀN BỘ dữ liệu từ tệp sao lưu. Kiểm tra lại tệp ngay trước khi
    * ghi (tệp có thể đã đổi từ lúc người dùng xác nhận) và luôn chốt một bản
    * an toàn của dữ liệu hiện tại trước. */
-  const importBackupFrom = writeCommand(db, 'importBackupFrom', (actor) => (actor.role === 'admin' ? null : { ok: false as const, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được phục hồi từ backup.' } }), (w, filePath: string): IpcResult<{ preRestoreSnapshotPath: string }> => {
+  const importBackupFrom = writeCommand(db, 'importBackupFrom', (actor) => (actor.role === 'admin' ? null : { ok: false as const, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được phục hồi từ bản sao lưu.' } }), (w, filePath: string): IpcResult<{ preRestoreSnapshotPath: string }> => {
     const inspected = inspectBackupFile(filePath);
     if (!inspected.ok) return fail(inspected.code, inspected.message);
 
@@ -227,13 +227,13 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     // rộng hơn thường lệ để mọi trang đang mở refetch lại đúng, không cần khởi
     // động lại app mới thấy dữ liệu đã phục hồi.
     w.commit((tx) => {
-      tx.audit('Phục hồi từ backup', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
+      tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
       tx.changed(listTableNames(db));
     });
     return { ok: true, data: { preRestoreSnapshotPath: snapshotPath } };
   });
 
-  /** "Xóa sạch dữ liệu test" — xoá dữ liệu VẬN HÀNH, giữ lại tài khoản và
+  /** "Xoá sạch dữ liệu thử" — xoá dữ liệu VẬN HÀNH, giữ lại tài khoản và
    * nhật ký hoạt động. Bảng `lab` cũng được reset về default của schema chứ
    * không giữ tên đơn vị.
    *

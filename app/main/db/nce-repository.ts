@@ -200,14 +200,14 @@ export function insertNceRecord(db: Db, record: NceNewRecord, actor: NceActorRef
       actor.userId, actor.name || actor.username, record.errorClass, now, now);
 }
 
-/** Hồ sơ chưa đóng, chưa hủy đang chứa một lần chạy (bất kỳ vai trò nào trừ rerun). */
+/** Hồ sơ chưa đóng, chưa huỷ đang chứa một lần chạy (bất kỳ vai trò nào trừ rerun). */
 export function openRecordOfRun(db: Db, testId: string, date: string, runId: string): { id: string; nce_id: string; status: string } | undefined {
   return db.prepare(`SELECT n.id, n.nce_id, n.status FROM nce_runs r JOIN nce_records n ON n.id=r.nce_record_id
     WHERE r.test_id=? AND r.date=? AND r.run_id=? AND r.role<>'rerun' AND n.status NOT IN ('cancelled','closed')
     ORDER BY n.created_at DESC LIMIT 1`).get(testId, date, runId) as { id: string; nce_id: string; status: string } | undefined;
 }
 
-/** Hồ sơ không hủy (kể cả đã đóng) đang chứa một lần chạy hỏng. */
+/** Hồ sơ không huỷ (kể cả đã đóng) đang chứa một lần chạy hỏng. */
 export function recordOfRun(db: Db, testId: string, date: string, runId: string): { id: string; nce_id: string; status: string } | undefined {
   return db.prepare(`SELECT n.id, n.nce_id, n.status FROM nce_runs r JOIN nce_records n ON n.id=r.nce_record_id
     WHERE r.test_id=? AND r.date=? AND r.run_id=? AND r.role<>'rerun' AND n.status<>'cancelled'

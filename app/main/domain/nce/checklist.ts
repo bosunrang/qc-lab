@@ -1,6 +1,6 @@
 // Checklist điều tra theo NGUỒN sự cố (D-06, NCE-PLAN bước 4): không ép
 // checklist IQC cho sự cố EQA hay thiết bị. Danh mục mặc định dựa trên các
-// nhóm nguyên nhân thường rà soát khi QC hỏng (vật liệu QC, hóa chất, hiệu
+// nhóm nguyên nhân thường rà soát khi QC hỏng (vật liệu QC, hoá chất, hiệu
 // chuẩn, thiết bị, thao tác); phòng xét nghiệm đổi theo SOP thì sửa tại đây.
 import type { NceChecklistItem, NceMissing, NceSource } from './types';
 import { isOneOf, NCE_CHECK_STATUSES } from './types';
@@ -8,11 +8,11 @@ import { textLength } from './format';
 
 export const NCE_CHECK_LABELS: Readonly<Record<string, string>> = {
   qcMaterial: 'Vật liệu QC (hạn dùng, bảo quản, hoàn nguyên)',
-  reagent: 'Hóa chất (lô, hạn dùng, bảo quản)',
+  reagent: 'Hoá chất (lô, hạn dùng, bảo quản)',
   calibration: 'Hiệu chuẩn (lần gần nhất, calibrator)',
   instrument: 'Máy phân tích (bảo trì, cảnh báo, kim hút)',
   operator: 'Thao tác của người thực hiện',
-  lotChange: 'Thay lô hóa chất / vật liệu QC gần đây',
+  lotChange: 'Thay lô hoá chất / vật liệu QC gần đây',
   sampleHandling: 'Xử lý mẫu ngoại kiểm',
   transcription: 'Chép và gửi kết quả, đơn vị',
   method: 'Phương pháp / nhóm so sánh',

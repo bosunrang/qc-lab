@@ -27,11 +27,11 @@ test('thẻ lọc danh sách hồ sơ', () => {
   assert.deepEqual(nceFilterCounts(records, 'me'), { active: 3, mine: 2, approve: 1, overdue: 2, closed: 2, all: 5 });
 });
 
-test('ứng viên lần rerun: sau lần hỏng muộn nhất, bỏ điểm đã hủy, mới nhất trước', () => {
+test('ứng viên lần rerun: sau lần hỏng muộn nhất, bỏ điểm đã huỷ, mới nhất trước', () => {
   const p = (date, run_id, level, voided = 0) => ({ date, run_id, level, voided });
   const points = [p('2026-09-02', 'r1', 1), p('2026-09-02', 'r2', 1), p('2026-09-02', 'r2', 2), p('2026-09-02', 'r10', 1), p('2026-09-03', 'r1', 2, 1), p('2026-09-01', 'r9', 1)];
   const options = nceRerunOptions(points, [{ date: '2026-09-02', runId: 'r1' }, { date: '2026-09-02', runId: 'r2' }], '2026-09-02');
-  assert.deepEqual(options.map((o) => o.label), ['02/09/2026 · lần r10'], 'r10 sau r2 theo thứ tự tự nhiên; lần chỉ có điểm đã hủy không vào');
+  assert.deepEqual(options.map((o) => o.label), ['02/09/2026 · lần r10'], 'r10 sau r2 theo thứ tự tự nhiên; lần chỉ có điểm đã huỷ không vào');
   const verify = nceRerunOptions(points, [], '2026-09-02');
   assert.deepEqual(verify.map((o) => `${o.runId}:${o.levels.join('')}`), ['r10:1', 'r2:12', 'r1:1'], 'không có lần hỏng: từ ngày phát hiện');
 });
@@ -45,7 +45,7 @@ test('thanh bước theo trạng thái', () => {
   assert.equal(states('cancelled'), 'todo,todo,todo,todo');
 });
 
-test('giải thích lần QC bị lọc: trước ngày phát hiện, không sau lần hỏng cuối và toàn điểm đã hủy', () => {
+test('giải thích lần QC bị lọc: trước ngày phát hiện, không sau lần hỏng cuối và toàn điểm đã huỷ', () => {
   const choices = nceRerunChoices([
     { date: '2026-09-01', run_id: '1', level: 1, voided: 0 },
     { date: '2026-09-01', run_id: '2', level: 1, voided: 0 },
@@ -56,7 +56,7 @@ test('giải thích lần QC bị lọc: trước ngày phát hiện, không sau
   assert.deepEqual(choices.map((r) => `${r.date}/${r.runId}`), ['2026-10-14/2', '2026-10-14/1', '2026-09-01/2', '2026-09-01/1']);
   assert.deepEqual(choices[0].exclusionReasons, []);
   assert.deepEqual(choices[0].levels, [2]);
-  assert.match(choices[1].exclusionReasons.join(), /đã hủy/);
+  assert.match(choices[1].exclusionReasons.join(), /đã huỷ/);
   assert.match(choices[2].exclusionReasons.join(), /Trước ngày phát hiện 14\/10\/2026/);
   assert.equal(choices[3].exclusionReasons.length, 2);
 });

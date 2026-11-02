@@ -16,7 +16,7 @@ export interface ModalEnterEvent {
  *  - `isComposing`: bộ gõ tiếng Việt (Telex/VNI) dùng Enter để chốt ký tự
  *    đang gõ. Thiếu cổng này thì đang gõ giữa từ mà modal tự lưu.
  *  - `defaultPrevented`: ô nào tự xử lý Enter rồi (gợi ý tên xét nghiệm ở
- *    Cấu hình chung, thêm cặp mẫu ở So sánh hóa chất, ô ngày, ô năm của lịch)
+ *    Cấu hình chung, thêm cặp mẫu ở So sánh hoá chất, ô ngày, ô năm của lịch)
  *    thì handler của nó chạy TRƯỚC (bubble từ trong ra) và đã `preventDefault`
  *    — tôn trọng, không lưu đè lên.
  *  - `textarea`/`contenteditable`: Enter ở đó là xuống dòng.

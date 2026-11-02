@@ -116,7 +116,7 @@ test('hồ sơ: lệnh ghi bị từ chối vì điều kiện giữ dữ liệu
 });
 
 for (const mode of ['throw', 'internal-error']) {
-  test(`hồ sơ: ghi ${mode} giữ dữ liệu và khóa gửi lại đến khi đối chiếu thành công`, async (t) => {
+  test(`hồ sơ: ghi ${mode} giữ dữ liệu và khoá gửi lại đến khi đối chiếu thành công`, async (t) => {
     const session = await start(t);
     let writes = 0;
     const write = async () => {
@@ -157,7 +157,7 @@ for (const [name, invalid] of [
   });
 }
 
-test('hồ sơ: đối chiếu thất bại không mở khóa lệnh ghi chưa rõ kết quả', async (t) => {
+test('hồ sơ: đối chiếu thất bại không mở khoá lệnh ghi chưa rõ kết quả', async (t) => {
   let reads = 0;
   const session = await start(t, async () => {
     if (++reads > 1) throw new Error('LAN vẫn mất kết nối');
@@ -172,7 +172,7 @@ test('hồ sơ: đối chiếu thất bại không mở khóa lệnh ghi chưa r
   assert.equal(writes, 0);
 });
 
-test('hồ sơ: đọc nền không xóa cảnh báo lệch phiên bản hoặc lỗi lệnh ghi', async (t) => {
+test('hồ sơ: đọc nền không xoá cảnh báo lệch phiên bản hoặc lỗi lệnh ghi', async (t) => {
   let reads = 0;
   const session = await start(t, async () => { reads++; return view(3); });
   for (const code of ['stale', 'gate']) {

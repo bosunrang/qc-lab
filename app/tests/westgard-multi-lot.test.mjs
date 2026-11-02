@@ -46,7 +46,7 @@ assert.equal(summary.levels.find((item) => item.level === 1).worstVerdict, 'rej'
 assert.equal(summary.levels.find((item) => item.level === 2).worstVerdict, 'rej');
 
 // R4s chỉ có kênh liên mức; không được cho phép lưu scope "within" vì sẽ
-// làm luật tắt âm thầm. Muốn vô hiệu hóa luật phải dùng action rõ ràng.
+// làm luật tắt âm thầm. Muốn vô hiệu hoá luật phải dùng action rõ ràng.
 const invalidR4sScope = config.saveRuleScope(test.id, 'R4s', 'within', actor);
 assert.equal(invalidR4sScope.ok, false);
 assert.equal(invalidR4sScope.error.code, 'invalid-scope');
@@ -79,7 +79,7 @@ assert.equal(currentSummary.pointCount, 1);
 assert.equal(currentSummary.worstVerdict, 'ok');
 
 const oldStillStored = db.prepare('SELECT id,lot FROM qc_points WHERE id=?').get(high.data.id);
-assert.equal(oldStillStored.lot, 'LOT-L1-CU', 'đổi lô không được xóa hoặc sửa mất điểm lịch sử');
+assert.equal(oldStillStored.lot, 'LOT-L1-CU', 'đổi lô không được xoá hoặc sửa mất điểm lịch sử');
 
 console.log('current-lot + multi-level Westgard tests passed');
 

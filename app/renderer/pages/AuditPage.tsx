@@ -100,7 +100,7 @@ export function AuditPage() {
               <option value={25}>25 dòng</option><option value={50}>50 dòng</option><option value={100}>100 dòng</option>
             </select>
           </div>
-          {hasFilter && <button className="btn ghost sm audit-clear-filter" onClick={clearFilters}>Xóa bộ lọc</button>}
+          {hasFilter && <button className="btn ghost sm audit-clear-filter" onClick={clearFilters}>Xoá bộ lọc</button>}
           <div className="audit-filter-summary" role="status">{result.filteredCount}/{result.total} dòng</div>
         </div>
 
@@ -162,7 +162,7 @@ function AuditIntegrityStatus({
     return (
       <div className="audit-integrity-status">
         <span className="tag ok">Chuỗi hash hợp lệ</span>
-        <span>{chain.checked} dòng đã khóa hash{chain.unhashed ? ` · ${chain.unhashed} dòng chưa có hash` : ''}</span>
+        <span>{chain.checked} dòng đã khoá hash{chain.unhashed ? ` · ${chain.unhashed} dòng chưa có hash` : ''}</span>
       </div>
     );
   }
@@ -189,7 +189,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     }
     const firstConfirm = await confirmDialog(
       `Xuất CSV rồi gỡ ${preview.data.removedCount} dòng nhật ký cũ hơn ${months} tháng? Còn lại ${preview.data.retainedCount} dòng trong hệ thống. File CSV giữ nguyên PrevHash/Hash để nối tiếp và kiểm chứng chuỗi còn lại.`,
-      { title: 'Lưu trữ nhật ký cũ', confirmLabel: 'Lưu trữ', cancelLabel: 'Hủy', danger: true },
+      { title: 'Lưu trữ nhật ký cũ', confirmLabel: 'Lưu trữ', cancelLabel: 'Huỷ', danger: true },
     );
     if (!firstConfirm) return;
     const ok = await reauthDialog({ message: 'Lưu trữ (xoá) nhật ký cũ là thao tác không thể hoàn tác — xác thực lại mật khẩu.' });
@@ -215,7 +215,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Lưu trữ nhật ký cũ" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
       {err && <p className="field-error" role="alert">{err}</p>}
       <p className="audit-archive-copy">Xuất CSV của đúng phần sẽ lưu trữ, gồm PrevHash/Hash để đối chiếu chuỗi. Sau khi xác thực lại, hệ thống chỉ xoá khi bạn xác nhận đã kiểm tra file tải về.</p>
       <div className="field">

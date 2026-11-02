@@ -1,7 +1,7 @@
 // Máy trạng thái hồ sơ NCE (kế hoạch mục 4). Trạng thái chỉ đổi qua các
 // chuyển hợp lệ dưới đây; renderer không tự suy trạng thái từ dữ liệu đã nhập.
 // Đường chính: đang xử lý → cho chạy lại → chờ duyệt → đã đóng. Người duyệt
-// trả lại thì hồ sơ về bước "đã cho chạy lại"; chỉ hồ sơ đang xử lý mới hủy.
+// trả lại thì hồ sơ về bước "đã cho chạy lại"; chỉ hồ sơ đang xử lý mới huỷ.
 import type { NceStatus } from './types';
 
 export type NceTransition = 'release' | 'submit' | 'approve' | 'return' | 'cancel';
@@ -11,7 +11,7 @@ const TRANSITIONS: Readonly<Record<NceTransition, { from: NceStatus; to: NceStat
   submit: { from: 'released', to: 'pending_approval' },
   approve: { from: 'pending_approval', to: 'closed' },
   return: { from: 'pending_approval', to: 'released' },
-  // Hồ sơ đã cho chạy lại không được hủy: mốc cắt Westgard đã có hiệu lực (D-10).
+  // Hồ sơ đã cho chạy lại không được huỷ: mốc cắt Westgard đã có hiệu lực (D-10).
   cancel: { from: 'open', to: 'cancelled' },
 };
 
@@ -53,7 +53,7 @@ export const NCE_STATUS_LABEL: Readonly<Record<NceStatus, string>> = {
   released: 'Đã cho chạy lại',
   pending_approval: 'Chờ duyệt',
   closed: 'Đã đóng',
-  cancelled: 'Đã hủy',
+  cancelled: 'Đã huỷ',
 };
 
 export function isTerminalNceStatus(status: NceStatus): boolean { return status === 'closed' || status === 'cancelled'; }

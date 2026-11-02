@@ -3,7 +3,7 @@
 //
 // "SE — Sai số hệ thống", luồng quản lý dải ghi "Quản lý dải kiểm soát"; mà
 // trang Hành động so `=== 'SE'` nên hai nguồn sau hiện NGƯỢC thành "Sai số
-// ngẫu nhiên". File này khóa hằng nhãn, cổng ghi, chuẩn hóa dữ liệu và hiển thị.
+// ngẫu nhiên". File này khoá hằng nhãn, cổng ghi, chuẩn hoá dữ liệu và hiển thị.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
@@ -86,7 +86,7 @@ test('mọi cổng ghi chỉ lưu mã SE/RE/rỗng', t => {
   db.prepare("UPDATE test_levels SET applied='lab', mfg_mean=100, mfg_sd=2 WHERE test_id=? AND level=1").run(assay.id);
   const reverted = entry.revertManufacturerRange({ data: { testId: assay.id, level: 1, reason: 'Hoàn dải theo SOP để đối chiếu' } }, actor);
   assert.equal(reverted.ok, true, JSON.stringify(reverted));
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM nce_records').get().n, 1, 'chỉ có hồ sơ của lần hủy điểm');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM nce_records').get().n, 1, 'chỉ có hồ sơ của lần huỷ điểm');
 
   // 3. Lập hồ sơ IQC: loại sai số do main đọc từ luật của lần chạy (2-2s → SE),
   // client gửi kèm nhãn dài hay mã khác cũng bị bỏ qua.

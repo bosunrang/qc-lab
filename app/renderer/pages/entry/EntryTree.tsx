@@ -47,7 +47,7 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
   const [openTests, setOpenTests] = useState<Set<string>>(new Set());
 
   const tree = useMemo(() => {
-    // Tìm không dấu, theo cả tên xét nghiệm lẫn tên máy (placeholder hứa "Tìm test, máy...").
+    // Tìm không dấu, theo cả tên xét nghiệm lẫn tên máy (placeholder hứa "Tìm xét nghiệm, máy…").
     const needle = normalizeSearch(search);
     const bySearch = (s: TestSummary) => !needle || normalizeSearch(`${s.testName} ${s.instrumentName}`).includes(needle);
     const machines = new Map<string, Map<string, { name: string; tests: TestSummary[] }>>();
@@ -92,7 +92,7 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
           title="Ẩn danh mục nội kiểm" aria-label="Ẩn danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
       </div>
       <div className="tree-tools">
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm test, máy..." />
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm xét nghiệm, máy…" />
         <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}>
           <option value="">Tất cả máy</option>
           {instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}

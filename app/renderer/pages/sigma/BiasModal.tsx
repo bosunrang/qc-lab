@@ -37,7 +37,7 @@ export function BiasModal({ initialRounds, onClose, onSubmit }: {
 
   return (
     <Modal title="Tính Bias% từ EQA/EQC" onClose={onClose} size="md"
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Áp dụng Bias%</AsyncButton></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Áp dụng Bias%</AsyncButton></>}>
       <div className="sg-eqa-table-wrap">
         <table className="sg-eqa-table">
           <thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th>Thao tác</th></tr></thead>
@@ -51,7 +51,7 @@ export function BiasModal({ initialRounds, onClose, onSubmit }: {
                   <td><input type="number" step="any" value={v.lab} onChange={(e) => setRounds((r) => r.map((x, j) => (j === i ? { ...x, lab: e.target.value } : x)))} /></td>
                   <td><input type="number" step="any" value={v.target} onChange={(e) => setRounds((r) => r.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))} /></td>
                   <td className="sg-eqa-bias" style={{ color: bias != null ? (Math.abs(bias) > 10 ? 'var(--danger-text)' : 'var(--accent)') : undefined }}>{bias != null ? `${bias.toFixed(2)}%` : '—'}</td>
-                  <td><RowActionButton kind="delete" label={`Xóa vòng EQA ${i + 1}`} className="sg-eqa-del" onClick={() => setRounds((r) => r.filter((_, j) => j !== i))} disabled={rounds.length <= 1} /></td>
+                  <td><RowActionButton kind="delete" label={`Xoá vòng EQA ${i + 1}`} className="sg-eqa-del" onClick={() => setRounds((r) => r.filter((_, j) => j !== i))} disabled={rounds.length <= 1} /></td>
                 </tr>
               );
             })}

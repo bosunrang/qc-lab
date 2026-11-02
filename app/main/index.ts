@@ -33,8 +33,8 @@ import { describeError, logEvent, setLogSink } from './logging/log-sink';
 
 // Test end-to-end (`app/e2e/`) chạy app thật trên thư mục dữ liệu tạm và một
 // cổng LAN riêng, để không đụng CSDL của người dùng và chạy được cả khi
-// QC Lab thật đang mở. Khóa một phiên chạy (`requestSingleInstanceLock`) gắn
-// với thư mục dữ liệu, nên phải đặt trước khi xin khóa.
+// QC Lab thật đang mở. Khoá một phiên chạy (`requestSingleInstanceLock`) gắn
+// với thư mục dữ liệu, nên phải đặt trước khi xin khoá.
 if (process.env.QCLAB_USER_DATA_DIR) app.setPath('userData', process.env.QCLAB_USER_DATA_DIR);
 const LAN_PORT = Number(process.env.QCLAB_LAN_PORT) || 3200;
 
@@ -235,7 +235,7 @@ async function createWindow(): Promise<void> {
       session: { get: () => sessionActor, set: (actor) => { sessionActor = actor; } },
       pickBackupSavePath: async (defaultName) => {
         const picked = await dialog.showSaveDialog(win, {
-          title: 'Xuất backup QC Lab',
+          title: 'Xuất bản sao lưu QC Lab',
           defaultPath: defaultName,
           filters: [{ name: 'Backup QC Lab', extensions: ['sqlite'] }],
         });
@@ -243,7 +243,7 @@ async function createWindow(): Promise<void> {
       },
       pickBackupOpenPath: async () => {
         const picked = await dialog.showOpenDialog(win, {
-          title: 'Chọn tệp backup để phục hồi',
+          title: 'Chọn tệp sao lưu để phục hồi',
           properties: ['openFile'],
           filters: [{ name: 'Backup QC Lab', extensions: ['sqlite', 'json'] }],
         });

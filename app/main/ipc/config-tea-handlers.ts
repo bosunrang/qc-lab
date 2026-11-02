@@ -94,7 +94,7 @@ export function createTeaRefHandlers(db: Db) {
         db.prepare(`UPDATE tea_refs SET name=?,unit=?,section=?,lab=?,lab_source=?,lab_prepared_by=?,lab_next_review_date=?,sources_json=? WHERE id=?`)
           .run(name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson, existing.id);
         writeLevels(existing.id);
-        tx.audit(isNew ? 'Thiết lập TEa chuẩn hóa' : 'Cập nhật TEa chuẩn hóa', detailOf(existing.lab, beforeLevels), name);
+        tx.audit(isNew ? 'Thiết lập TEa chuẩn hoá' : 'Cập nhật TEa chuẩn hoá', detailOf(existing.lab, beforeLevels), name);
         tx.changed(['tea_refs', 'tea_ref_level_defaults']);
         return teaRefById(existing.id);
       });
@@ -105,7 +105,7 @@ export function createTeaRefHandlers(db: Db) {
       db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json)
         VALUES (?,?,?,?,?,?,?,?,?,?)`).run(newId, analyteId, name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson);
       writeLevels(newId);
-      tx.audit('Thiết lập TEa chuẩn hóa', detailOf(null, []), name);
+      tx.audit('Thiết lập TEa chuẩn hoá', detailOf(null, []), name);
       tx.changed(['tea_refs', 'tea_ref_level_defaults']);
       return teaRefById(newId);
     });
@@ -225,7 +225,7 @@ export function createTeaRefHandlers(db: Db) {
       db.prepare(`UPDATE tea_refs SET lab=NULL, lab_source='', lab_prepared_by='', lab_next_review_date='', sources_json='{}' WHERE id=?`).run(id);
       db.prepare('DELETE FROM tea_ref_level_defaults WHERE tea_ref_id=?').run(id);
       if (removedRecord) db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);
-      tx.audit('Xóa TEa chuẩn hóa', `${existing.name} · TEa chung ${existing.lab == null ? '—' : `${Number(existing.lab).toFixed(2)}%`} · Theo mức ${levelText(levelsBefore)}`, existing.name);
+      tx.audit('Xoá TEa chuẩn hoá', `${existing.name} · TEa chung ${existing.lab == null ? '—' : `${Number(existing.lab).toFixed(2)}%`} · Theo mức ${levelText(levelsBefore)}`, existing.name);
       tx.changed(['tea_refs', 'tea_ref_level_defaults']);
     });
     return { ok: true, data: { id, removedRecord } };

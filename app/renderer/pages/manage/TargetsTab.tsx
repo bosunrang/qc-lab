@@ -123,7 +123,7 @@ export function TargetsTab() {
         message: `${switching.length} dòng (${switching.map((item) => item.name).join(', ')}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:`,
         options: [
           { key: 'planned', label: 'Dự kiến', variant: 'ghost', hint: 'chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.' },
-          { key: 'switch', label: 'Chuyển qua nhóm lô này', variant: 'teal', hint: 'áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).' },
+          { key: 'switch', label: 'Chuyển qua nhóm lô này', variant: 'teal', hint: 'áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khoá).' },
         ],
       });
       if (!choice) return;
@@ -165,7 +165,7 @@ export function TargetsTab() {
     }
   }
 
-  /** Nhãn ô chọn Panel QC gồm cả tên máy ("Panel Hóa sinh ·
+  /** Nhãn ô chọn Panel QC gồm cả tên máy ("Panel Hoá sinh ·
    * EasyLyte Expand") — cùng một tên panel có thể tồn tại trên 2 máy. */
   const panelLabel = (item: QcPanel) => {
     const instrument = instruments.find((machine) => machine.id === item.instrument_id);
@@ -174,7 +174,7 @@ export function TargetsTab() {
 
   return (
     <>
-      <div className="rcfg-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." /></div></div>
+      <div className="rcfg-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, phần mềm tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." /></div></div>
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.</EmptyState> : <>
       <div className="target-selector target-config-selector">

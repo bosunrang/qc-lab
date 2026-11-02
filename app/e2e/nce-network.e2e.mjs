@@ -111,7 +111,7 @@ test('NCE LAN: thử lại khi tải lỗi, giữ nháp khi mất phản hồi g
     assert.equal(committed.record.row_version, created.record.row_version + 1);
     assert.equal(writes, 1, 'không tự gửi lại lệnh ghi');
 
-    // Lần đối chiếu lỗi không được đóng bản nháp hoặc gỡ khóa chưa rõ kết quả.
+    // Lần đối chiếu lỗi không được đóng bản nháp hoặc gỡ khoá chưa rõ kết quả.
     readMode = 'fail';
     await station.getByRole('button', { name: 'Tải dữ liệu mới', exact: true }).click();
     await station.getByRole('dialog').getByRole('button', { name: 'Tải dữ liệu mới', exact: true }).click();

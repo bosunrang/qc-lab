@@ -124,7 +124,7 @@ export function SigmaPage() {
   // thân dòng "TEa đang dùng: chưa có" không nói phải làm gì để có. Nói luôn
   // hai đường xử lý: đổi nguồn, hoặc tạo hồ sơ TEa PXN ở Cấu hình chung.
   const teaMissingHint = teaResolution?.value == null && !(teaSource === 'lab' && labTeaByLevel.length)
-    ? ' Chưa có TEa thì KHÔNG tính được Sigma dù đã nhập đủ CV và Bias. Cách xử lý: đổi “Nguồn TEa” sang CLIA/Ricos/EFLM (xét nghiệm phải được gán analyte trong Bảng TEa tham chiếu), hoặc tạo hồ sơ TEa chuẩn hóa của phòng xét nghiệm ở Cấu hình chung → Bảng TEa tham chiếu.'
+    ? ' Chưa có TEa thì KHÔNG tính được Sigma dù đã nhập đủ CV và Bias. Cách xử lý: đổi “Nguồn TEa” sang CLIA/Ricos/EFLM (xét nghiệm phải được gán analyte trong Bảng TEa tham chiếu), hoặc tạo hồ sơ TEa chuẩn hoá của phòng xét nghiệm ở Cấu hình chung → Bảng TEa tham chiếu.'
     : '';
   const teaHint = teaSource === 'clia'
     ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`
@@ -212,7 +212,7 @@ export function SigmaPage() {
   }
 
   async function removePeriodRow(period: SigmaPeriodView) {
-    if (!(await confirmDialog(`Xóa kỳ ${vnPeriod(period.period)}? Số liệu CV/Bias của kỳ này sẽ mất.`, { title: 'Xóa kỳ Six Sigma', danger: true, confirmLabel: 'Xóa' }))) return;
+    if (!(await confirmDialog(`Xoá kỳ ${vnPeriod(period.period)}? Số liệu CV/Bias của kỳ này sẽ mất.`, { title: 'Xoá kỳ Six Sigma', danger: true, confirmLabel: 'Xoá' }))) return;
     const result = await removePeriod(period.id, testId);
     if (!result.ok) await errorDialog(result.error.message);
   }
@@ -472,7 +472,7 @@ export function SigmaPage() {
               <div className="sg-period-workbench-foot">
                 <button className="btn ghost sm" title={`Xuất Excel riêng kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => exportPeriod(displayPeriod)}><DownloadIcon />Excel</button>
                 <button className="btn ghost sm" title={`Tạo bản in PDF riêng kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => printPeriod(displayPeriod)}><PrintIcon />In PDF</button>
-                {admin && <RowActionButton kind="delete" label={`Xóa kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => removePeriodRow(displayPeriod)} />}
+                {admin && <RowActionButton kind="delete" label={`Xoá kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => removePeriodRow(displayPeriod)} />}
               </div>
             </section>
           </div> : <EmptyState

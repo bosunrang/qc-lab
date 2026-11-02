@@ -189,7 +189,7 @@ assert.equal(h.listTeaRefs()[0].lab_level_defaults[0].tea, 8.5, 'listTeaRefs ph�
 
 // Nhật ký phải ghi giá trị từng mức trước → sau, không chỉ đếm số mức.
 const lastAudit = () => db.prepare('SELECT type, detail FROM activity ORDER BY seq DESC LIMIT 1').get();
-const teaAuditCount = () => db.prepare("SELECT COUNT(*) n FROM activity WHERE type LIKE '%TEa chuẩn hóa%'").get().n;
+const teaAuditCount = () => db.prepare("SELECT COUNT(*) n FROM activity WHERE type LIKE '%TEa chuẩn hoá%'").get().n;
 const teaUpdated = h.saveTeaRef({ id: tea.data.id, data: { ...teaData, levelValues: [{ level: 1, tea: 9 }, { level: 2, tea: 9.5 }] } }, actor);
 assert.equal(teaUpdated.ok, true);
 assert.match(lastAudit().detail, /Theo mức M1 8\.5%, M2 9\.5% → M1 9%, M2 9\.5%/);

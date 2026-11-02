@@ -204,7 +204,7 @@ test('bước tiếp theo theo trạng thái', () => {
   assert.deepEqual(nceNextStep(dossier({ status: 'closed' })), { step: null, missing: [] });
 });
 
-test('hành động: người chịu trách nhiệm, hạn, bằng chứng hoàn thành, lý do hủy', () => {
+test('hành động: người chịu trách nhiệm, hạn, bằng chứng hoàn thành, lý do huỷ', () => {
   assert.equal(validateNceActionDraft({ kind: 'corrective', description: 'ngắn', ownerUserId: 'u', dueDate: '2026-10-05' }, '2026-10-01').code, 'missing-description');
   assert.equal(validateNceActionDraft({ kind: 'corrective', description: 'Đào tạo lại về hiệu chuẩn', ownerUserId: '', dueDate: '2026-10-05' }, '2026-10-01').code, 'missing-owner');
   assert.equal(validateNceActionDraft({ kind: 'corrective', description: 'Đào tạo lại về hiệu chuẩn', ownerUserId: 'u', dueDate: '2026-09-30' }, '2026-10-01').code, 'due-before-detected');

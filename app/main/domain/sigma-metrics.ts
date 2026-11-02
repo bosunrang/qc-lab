@@ -67,17 +67,17 @@ export function sigmaQualityDesign(value: unknown, levelCount?: unknown): SigmaQ
 
   if (levels === 3) {
     if (sigma >= 6) return { ...base, capable: true, tier: '≥6', rules: ['1-3s'], n: 3, r: 1, alternatives: [], risk: 'Thấp', plan: 'Một quy tắc là đủ. Vẫn thiết kế tần suất QC theo đánh giá nguy cơ, không tự động giảm.' };
-    if (sigma >= 5) return { ...base, capable: true, tier: '5–6', rules: ['1-3s', '2of3-2s', 'R4s'], n: 3, r: 1, alternatives: [], risk: 'Thấp–trung bình', plan: 'Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hóa QC.' };
+    if (sigma >= 5) return { ...base, capable: true, tier: '5–6', rules: ['1-3s', '2of3-2s', 'R4s'], n: 3, r: 1, alternatives: [], risk: 'Thấp–trung bình', plan: 'Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hoá QC.' };
     if (sigma >= 4) return { ...base, capable: true, tier: '4–5', rules: ['1-3s', '2of3-2s', 'R4s', '3-1s'], n: 3, r: 1, alternatives: [], risk: 'Trung bình', plan: 'Đa quy tắc là bắt buộc; tăng giám sát theo nguy cơ lâm sàng.' };
     if (sigma >= 3) return { ...base, capable: true, tier: '3–4', rules: ['1-3s', '2of3-2s', 'R4s', '3-1s', '6x'], n: 6, r: 1, alternatives: [{ n: 3, r: 2 }, { n: 3, r: 3, note: 'dùng 9x thay 6x' }], risk: 'Cao', plan: 'Tăng số phép đo QC và ưu tiên cải thiện phương pháp.' };
-    return { ...base, capable: false, tier: '<3', rules: ['1-3s', '2of3-2s', 'R4s', '3-1s', '6x'], n: 6, r: 1, alternatives: [{ n: 3, r: 2 }], risk: 'Rất cao', plan: 'Không dùng Sigma để hợp thức hóa vận hành; phải khắc phục phương pháp.' };
+    return { ...base, capable: false, tier: '<3', rules: ['1-3s', '2of3-2s', 'R4s', '3-1s', '6x'], n: 6, r: 1, alternatives: [{ n: 3, r: 2 }], risk: 'Rất cao', plan: 'Không dùng Sigma để hợp thức hoá vận hành; phải khắc phục phương pháp.' };
   }
 
   if (sigma >= 6) return { ...base, capable: true, tier: '≥6', rules: ['1-3s'], n: 2, r: 1, alternatives: [], risk: 'Thấp', plan: 'Một quy tắc là đủ. Vẫn thiết kế tần suất QC theo đánh giá nguy cơ, không tự động giảm.' };
-  if (sigma >= 5) return { ...base, capable: true, tier: '5–6', rules: ['1-3s', '2-2s', 'R4s'], n: 2, r: 1, alternatives: [], risk: 'Thấp–trung bình', plan: 'Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hóa QC.' };
+  if (sigma >= 5) return { ...base, capable: true, tier: '5–6', rules: ['1-3s', '2-2s', 'R4s'], n: 2, r: 1, alternatives: [], risk: 'Thấp–trung bình', plan: 'Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hoá QC.' };
   if (sigma >= 4) return { ...base, capable: true, tier: '4–5', rules: ['1-3s', '2-2s', 'R4s', '4-1s'], n: 4, r: 1, alternatives: [{ n: 2, r: 2 }], risk: 'Trung bình', plan: 'Đa quy tắc là bắt buộc; tăng giám sát theo nguy cơ lâm sàng.' };
   if (sigma >= 3) return { ...base, capable: true, tier: '3–4', rules: ['1-3s', '2-2s', 'R4s', '4-1s', '8x'], n: 4, r: 2, alternatives: [{ n: 2, r: 4 }], risk: 'Cao', plan: 'Tăng số phép đo QC và ưu tiên cải thiện phương pháp.' };
-  return { ...base, capable: false, tier: '<3', rules: ['1-3s', '2-2s', 'R4s', '4-1s', '8x'], n: 4, r: 2, alternatives: [{ n: 2, r: 4 }], risk: 'Rất cao', plan: 'Không dùng Sigma để hợp thức hóa vận hành; phải khắc phục phương pháp.' };
+  return { ...base, capable: false, tier: '<3', rules: ['1-3s', '2-2s', 'R4s', '4-1s', '8x'], n: 4, r: 2, alternatives: [{ n: 2, r: 4 }], risk: 'Rất cao', plan: 'Không dùng Sigma để hợp thức hoá vận hành; phải khắc phục phương pháp.' };
 }
 
 export function sigmaMetric(tea: unknown, bias: unknown, cv: unknown): SigmaMetricResult | null {

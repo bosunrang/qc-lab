@@ -1,5 +1,5 @@
 /**
- * Mã lần chạy phải là khóa CHUNG của các mức QC trong cùng đợt chạy.
+ * Mã lần chạy phải là khoá CHUNG của các mức QC trong cùng đợt chạy.
  * Không lấy `runs.length + 1` riêng cho từng ô: một mức bị nhập thiếu sẽ
  * khiến R4s/2-2s liên mức không còn ghép được với những mức còn lại.
  */

@@ -57,7 +57,7 @@ test('backup và bản an toàn là tệp SQLite thường, chứa cả dữ li�
 
     // Byte 18–19 của phần đầu tệp SQLite: 1 là journal thường, 2 là WAL.
     const header = readFileSync(backupPath).subarray(18, 20);
-    assert.deepEqual([...header], [1, 1], 'tệp backup không mang cờ WAL');
+    assert.deepEqual([...header], [1, 1], 'tệp sao lưu không mang cờ WAL');
 
     const copy = new DatabaseSync(backupPath, { readOnly: true });
     try {
@@ -65,7 +65,7 @@ test('backup và bản an toàn là tệp SQLite thường, chứa cả dữ li�
     } finally {
       copy.close();
     }
-    assert.deepEqual(readdirSync(backupDir), ['backup.sqlite'], 'đọc tệp backup không để lại -wal/-shm');
+    assert.deepEqual(readdirSync(backupDir), ['backup.sqlite'], 'đọc tệp sao lưu không để lại -wal/-shm');
 
     // Phục hồi vào chính CSDL WAL: tạo bản an toàn rồi chép lại từ tệp.
     config.saveInstrument({ data: { name: 'Máy thêm sau backup' } }, actor);

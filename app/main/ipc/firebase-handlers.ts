@@ -101,7 +101,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     if (!value) return { ok: false, message: 'empty' };
     const row = value as Partial<FirebasePayload>;
     if (row._format !== 'qclab-firebase' || !row.backup) {
-      return { ok: false, message: 'Dữ liệu Firebase này không đúng định dạng backup được hỗ trợ.' };
+      return { ok: false, message: 'Dữ liệu Firebase này không đúng định dạng sao lưu được hỗ trợ.' };
     }
     const checked = validateBackupEnvelope(row.backup, SCHEMA_VERSION);
     return checked.ok ? { ok: true, data: row as FirebasePayload } : { ok: false, message: checked.message };
@@ -139,7 +139,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
       if (hadPending != null && dirtySince == null) dirtySince = hadPending;
       if (dirtySince != null) schedule();
       if (result.code === 'too-large') {
-        const text = `${TOO_LARGE_PREFIX}: gói đồng bộ ${formatMb(result.bytes ?? 0)} vượt giới hạn ${formatMb(FIREBASE_MAX_WRITE_BYTES)} mỗi lần ghi của Firebase. Dữ liệu vẫn lưu cục bộ; hãy dùng Xuất backup (.sqlite).`;
+        const text = `${TOO_LARGE_PREFIX}: gói đồng bộ ${formatMb(result.bytes ?? 0)} vượt giới hạn ${formatMb(FIREBASE_MAX_WRITE_BYTES)} mỗi lần ghi của Firebase. Dữ liệu vẫn lưu cục bộ; hãy dùng Xuất bản sao lưu (.sqlite).`;
         setStatus(text);
         throw new Error(text);
       }

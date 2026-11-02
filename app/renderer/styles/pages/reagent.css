@@ -1,4 +1,4 @@
-/* So sánh hóa chất — quy tắc riêng cho ReagentPage.tsx: khối KPI thống
+/* So sánh hoá chất — quy tắc riêng cho ReagentPage.tsx: khối KPI thống
    kê (`.rc-stat-*`), khối tiêu chí chấp nhận (`.rc-crit-*`), khối kết luận
    (`.rc-verdict*`), khối biểu đồ (`.rc-charts`/`.rc-chart-box`/`.rc-chart-legend`).
 
@@ -55,7 +55,7 @@
 .rc-pair-panel > .rc-pair-hint{margin:8px var(--panel-content-gap) var(--panel-content-gap);}
 
 /* Các control chi tiết của thẻ này từng nằm lẫn trong `pages.css`. Giữ chúng
-   cạnh markup `.rc-*` để một thay đổi ở So sánh hóa chất không ảnh hưởng
+   cạnh markup `.rc-*` để một thay đổi ở So sánh hoá chất không ảnh hưởng
    ngầm tới Westgard/Sigma hay các trang khác. */
 .rc-toolbar-panel{padding:0;}
 .rc-toolbar-panel>.rc-toolbar{margin-top:var(--panel-content-gap);margin-bottom:var(--panel-content-gap);}
@@ -155,7 +155,7 @@
 .mrow.on{border-color:var(--accent);background:var(--surface-sunken);}
 .mrow .acts{display:flex;gap:6px;align-items:center;}
 /* Danh sách chọn nhanh là vùng thao tác trong modal, không phải hàng bảng:
-   nút xóa cùng mật độ 36px với nút Chọn bên cạnh. */
+   nút xoá cùng mật độ 36px với nút Chọn bên cạnh. */
 .mrow .btn.sm,.mrow .row-action{height:var(--control-h);min-height:var(--control-h);}
 .mrow .row-action{width:var(--control-h);flex-basis:var(--control-h);}
 .mrow b{color:var(--text-primary);font-size:var(--text-base);font-weight:700;}

@@ -30,7 +30,7 @@ export function buildLogBundle(logDir: string, info: LogBundleInfo, now = new Da
     'Gói log QC Lab',
     `Xuất lúc: ${now.toLocaleString('vi-VN')} (${now.toISOString()})`,
     `Người xuất: ${info.exportedBy}`,
-    `Phiên bản app: ${info.appVersion}`,
+    `Phiên bản phần mềm: ${info.appVersion}`,
     `Electron: ${info.electronVersion} · Node ${process.versions.node}`,
     `Hệ điều hành: ${os.type()} ${os.release()} (${os.arch()})`,
     `Số tệp log/crash: ${files}`,

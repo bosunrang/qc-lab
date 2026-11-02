@@ -44,7 +44,7 @@ export interface WgRuleDef {
 const REGISTRY: WgRuleDef[] = [
   { id: '1-2s', desc: '1 điểm QC vượt ±2SD', err: '', defaultOn: true, alert: true, scope: 'within', scopeMin: 2, priority: 13, run: null, fix: 'Theo dõi điểm kế tiếp, chưa loại bỏ nếu không kèm luật khác.' },
   { id: '1-3s', desc: '1 điểm QC vượt ±3SD', err: 'RE', defaultOn: true, alert: false, scope: 'within', scopeMin: 2, priority: 1, run: null, fix: 'Kiểm tra sai số ngẫu nhiên: thao tác, bọt khí, pipet, QC pha/bảo quản.' },
-  { id: '2-2s', desc: '2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 3, run: [2, z => z > 2, z => z < -2], fix: 'Nghi sai số hệ thống: hiệu chuẩn, lô QC/hóa chất, nhiệt độ, máy.' },
+  { id: '2-2s', desc: '2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 3, run: [2, z => z > 2, z => z < -2], fix: 'Nghi sai số hệ thống: hiệu chuẩn, lô QC/hoá chất, nhiệt độ, máy.' },
   { id: 'R4s', desc: 'Cùng lần chạy có 1 mức > +2SD và 1 mức < -2SD, chênh nhau trên 4SD', err: 'RE', defaultOn: true, alert: false, scope: 'across', scopeMin: 2, priority: 2, run: null, fix: 'Nghi sai số ngẫu nhiên lớn: hút mẫu, bọt khí, thao tác, điện áp.' },
   { id: '3-1s', desc: '3 điểm liên tiếp hoặc 3 mức cùng phía vượt ±1SD', err: 'SE', defaultOn: false, alert: false, scope: 'both', scopeMin: 3, priority: 5, run: [3, z => z > 1, z => z < -1], fix: 'Nghi dịch chuyển hệ thống nhỏ; kiểm tra hiệu chuẩn và lô thuốc thử.' },
   { id: '4-1s', desc: '4 điểm liên tiếp cùng phía vượt ±1SD', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 6, run: [4, z => z > 1, z => z < -1], fix: 'Nghi lệch hệ thống nhẹ, kiểm tra xu hướng và hiệu chuẩn.' },
@@ -146,8 +146,8 @@ export function normalizeErrorClass(value: unknown): 'SE' | 'RE' | '' {
   return '';
 }
 
-/** Quét zs[]: mỗi rule bật, mọi cửa sổ N liên tiếp mà TẤT CẢ thỏa pos (hoặc
- * tất cả thỏa neg) → onHit(mảngChỉSố, tên luật). */
+/** Quét zs[]: mỗi rule bật, mọi cửa sổ N liên tiếp mà TẤT CẢ thoả pos (hoặc
+ * tất cả thoả neg) → onHit(mảngChỉSố, tên luật). */
 export function wgScanRuns(
   zs: readonly number[],
   rules: readonly [string, number, (z: number) => boolean, (z: number) => boolean][],

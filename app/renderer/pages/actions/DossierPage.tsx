@@ -76,7 +76,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
   }
 
   async function reloadDrafts() {
-    if (!(await confirmDialog('Tải dữ liệu mới sẽ bỏ các bản nháp đang mở trong hồ sơ này. Bạn có thể sao chép nội dung cần giữ trước khi tải lại.', { title: 'Hồ sơ đã được cập nhật', confirmLabel: 'Tải dữ liệu mới' }))) return;
+    if (!(await confirmDialog('Tải dữ liệu mới sẽ bỏ các bản nháp đang mở trong hồ sơ này. Bạn có thể sao chép nội dung cần giữ trước khi tải lại.', { title: 'Hồ sơ đã được cập nhật', confirmLabel: 'Tải dữ liệu mới', cancelLabel: 'Quay lại' }))) return;
     if (await reload()) setEditorEpoch((value) => value + 1);
   }
 
@@ -128,7 +128,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
             <ul className="nce-workflow-missing-list">{missing.map((item) => <li key={item.code}><button type="button" onClick={() => openStage(stageForMissing(item))}>{item.message}<span aria-hidden="true">→</span></button></li>)}</ul>
           </details>}
           <button type="button" className={`btn ghost sm nce-view-all${showAll ? ' on' : ''}`} aria-pressed={showAll} onClick={() => { setShowAll((value) => !value); workspace.current?.scrollIntoView({ block: 'start' }); }}>{showAll ? 'Quay về từng bước' : 'Xem toàn bộ hồ sơ'}</button>
-          <p className="nce-note">{record.status === 'pending_approval' ? 'Hồ sơ đang khóa sửa để người duyệt rà soát.' : terminal ? 'Hồ sơ chỉ đọc, giữ nguyên nội dung và lịch sử.' : 'Nội dung đã lưu được giữ khi chuyển bước.'}</p>
+          <p className="nce-note">{record.status === 'pending_approval' ? 'Hồ sơ đang khoá sửa để người duyệt rà soát.' : terminal ? 'Hồ sơ chỉ đọc, giữ nguyên nội dung và lịch sử.' : 'Nội dung đã lưu được giữ khi chuyển bước.'}</p>
         </nav>
         {/* Giữ các phần được gắn trong DOM để chuyển bước không làm mất bản
             nháp. Chỉ tải lại có xác nhận mới đặt lại các form đang mở. */}

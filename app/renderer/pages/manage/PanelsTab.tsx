@@ -24,12 +24,12 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
 
 
   async function removePanelRow(panel: QcPanel) {
-    const ok = await confirmDialog(`Xóa Panel QC ${panel.name}? Các xét nghiệm vẫn được giữ nguyên.`, {
-      title: 'Xóa Panel QC', confirmLabel: 'Xóa Panel QC', cancelLabel: 'Hủy', danger: true,
+    const ok = await confirmDialog(`Xoá Panel QC ${panel.name}? Các xét nghiệm vẫn được giữ nguyên.`, {
+      title: 'Xoá Panel QC', confirmLabel: 'Xoá Panel QC', cancelLabel: 'Huỷ', danger: true,
     });
     if (!ok) return;
     const result = await removePanel(panel.id);
-    if (!result.ok) await errorDialog(result.error.message, { title: 'Chưa xóa được Panel QC' });
+    if (!result.ok) await errorDialog(result.error.message, { title: 'Chưa xoá được Panel QC' });
   }
 
   const [editing, setEditing] = useState<QcPanel | 'new' | null>(null);
@@ -87,7 +87,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
       </div>
       <div className="panel rcfg-list">
         {!panels.length ? <EmptyState title="Chưa có Panel QC">Tạo Panel QC sau khi đã có máy và xét nghiệm để bắt đầu thiết lập lô QC.</EmptyState>
-          : !visiblePanels.length ? <EmptyState title="Không tìm thấy Panel QC">Thử đổi từ khóa tìm kiếm hoặc xóa bộ lọc hiện tại.</EmptyState>
+          : !visiblePanels.length ? <EmptyState title="Không tìm thấy Panel QC">Thử đổi từ khoá tìm kiếm hoặc xoá bộ lọc hiện tại.</EmptyState>
           : <table className="panel-qc-table">
             <thead><tr><th>Tên panel</th><th>Máy xét nghiệm</th><th>Xét nghiệm trong panel</th><th>Số vị trí</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
@@ -105,18 +105,18 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
                   })()}</td>
                   <td className="num">{p.testIds.length}</td>
                   <td><span className={`tag ${p.active ? 'ok' : 'none'}`}>{p.active ? 'Đang dùng' : 'Ngừng'}</span></td>
-                  <td><div className="manage-actions"><RowActionButton kind="edit" label={`Sửa Panel QC ${p.name}`} onClick={() => openEdit(p)} /><RowActionButton kind="delete" label={`Xóa Panel QC ${p.name}`} onClick={() => removePanelRow(p)} /></div></td>
+                  <td><div className="manage-actions"><RowActionButton kind="edit" label={`Sửa Panel QC ${p.name}`} onClick={() => openEdit(p)} /><RowActionButton kind="delete" label={`Xoá Panel QC ${p.name}`} onClick={() => removePanelRow(p)} /></div></td>
                 </tr>
               ))}
             </tbody>
           </table>}
         {editing && (
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
-            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="panel-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
+            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Huỷ</button><button className="btn teal" type="submit" form="panel-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
             <form id="panel-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <div className="grid2 panel-qc-main-grid">
-                <div className="field"><label htmlFor="panel-name">Tên Panel QC</label><input id="panel-name" name="name" placeholder="VD: Sinh hóa AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
+                <div className="field"><label htmlFor="panel-name">Tên Panel QC</label><input id="panel-name" name="name" placeholder="VD: Sinh hoá AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
                 <div className="field">
                   <label htmlFor="panel-instrument">Máy xét nghiệm</label>
                   <select id="panel-instrument" data-field="instrumentId" value={instrumentId} onChange={(e) => {

@@ -87,7 +87,7 @@ export function SnapshotTable({ points }: { points: readonly SnapshotPoint[] }) 
     <table className="nce-table nce-snapshot-table">
       <thead><tr><th scope="col">Mức</th><th scope="col">Lô</th><th scope="col">Giá trị</th><th scope="col">z</th><th scope="col">Kết luận</th><th scope="col">Luật</th></tr></thead>
       <tbody>{points.map((p) => {
-        const verdict = p.voided ? { label: 'Đã hủy', tone: 'none' } : VERDICT[p.verdict] ?? VERDICT.none;
+        const verdict = p.voided ? { label: 'Đã huỷ', tone: 'none' } : VERDICT[p.verdict] ?? VERDICT.none;
         return (
           <tr key={`${p.level}-${p.lot}`}>
             <td>M{p.level}</td><td>{p.lot || '—'}</td><td>{p.val}</td><td>{p.z == null ? '—' : p.z.toFixed(2)}</td>

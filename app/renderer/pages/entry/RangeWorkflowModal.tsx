@@ -107,7 +107,7 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
           {rangeCandidate.safety.needed && (
             <div className="alert warn range-safety-gate">
               <b>Cổng an toàn sai số hệ thống {rangeCandidate.safety.nceId ? `· ${rangeCandidate.safety.nceId}` : ''}</b>
-              <p>TEa/4 là chính sách hiện hành của app, chưa được xác nhận bằng SOP trong đợt rà soát này; không phải ngưỡng ISO bắt buộc cho mọi xét nghiệm. Không đổi Mean/SD chỉ để che sai số.</p>
+              <p>TEa/4 là chính sách hiện hành của phần mềm, chưa được xác nhận bằng SOP trong đợt rà soát này; không phải ngưỡng ISO bắt buộc cho mọi xét nghiệm. Không đổi Mean/SD chỉ để che sai số.</p>
               <label><input type="checkbox" checked={rangeCauseConfirmed} onChange={(e) => setRangeCauseConfirmed(e.target.checked)} /> Đã xác nhận và xử lý nguyên nhân hệ thống</label>
               <label className="field"><span>Bias đo được (%) · yêu cầu trong ±{rangeCandidate.safety.biasThreshold?.toFixed(2) ?? '—'}% (TEa/4)</span><input type="number" step="any" value={rangeBias} onChange={(e) => setRangeBias(e.target.value)} /></label>
             </div>

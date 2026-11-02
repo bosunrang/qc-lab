@@ -126,7 +126,7 @@ export function nceContentMissing(dossier: NceDossier, suspect?: NceSuspectWindo
 
   const live = dossier.actions.filter((action) => action.status !== 'cancelled');
   const open = live.filter((action) => action.status === 'open');
-  if (open.length) add('actions-open', `Còn ${open.length} hành động chưa hoàn thành (hoàn thành hoặc hủy có lý do).`);
+  if (open.length) add('actions-open', `Còn ${open.length} hành động chưa hoàn thành (hoàn thành hoặc huỷ có lý do).`);
 
   if (dossier.tier === 'capa') {
     if (!dossier.causeStatus) add('cause', 'Chưa kết luận nguyên nhân (đã xác định, nghi ngờ hoặc chưa xác định).');
@@ -157,7 +157,7 @@ export function nceSubmitMissing(dossier: NceDossier, suspect?: NceSuspectWindow
 // ---------------------------------------------------------- 5.5 Duyệt
 
 /** `releaseRecheck`: kết quả kiểm lại lần rerun trên dữ liệu hiện tại (ví dụ
- * điểm rerun bị hủy sau khi cho chạy lại); `null` với hồ sơ không phải IQC. */
+ * điểm rerun bị huỷ sau khi cho chạy lại); `null` với hồ sơ không phải IQC. */
 export function nceApproveMissing(dossier: NceDossier, releaseRecheck: NceRerunResult | null, suspect?: NceSuspectWindow | null): NceMissing[] {
   if (dossier.status !== 'pending_approval') return [{ code: 'status', message: 'Chỉ duyệt hồ sơ đang chờ duyệt.' }];
   const missing = nceContentMissing(dossier, suspect);

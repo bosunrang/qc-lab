@@ -69,7 +69,7 @@ const pointsAfterVoid = entry.queryPoints(test.id, 1);
 assert.equal(pointsAfterVoid.length, 1);
 assert.equal(pointsAfterVoid[0].id, p1.data.id);
 const voidedRows = entry.listVoidedPoints(test.id);
-assert.equal(voidedRows.length, 1, 'điểm đã hủy phải có endpoint tra cứu riêng');
+assert.equal(voidedRows.length, 1, 'điểm đã huỷ phải có endpoint tra cứu riêng');
 assert.equal(voidedRows[0].id, p2.data.id);
 assert.equal(voidedRows[0].voided_by, actor.username);
 assert.match(voidedRows[0].void_reason, /Nhap sai gia tri/);
@@ -79,11 +79,11 @@ assert.equal(voidAgain.ok, false);
 assert.equal(voidAgain.error.code, 'already-voided');
 
 const rerunAfterVoid = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-02', val: 10.2, runId: '2026-08-02-1' } }, actor);
-assert.equal(rerunAfterVoid.ok, true, 'điểm đã hủy không được chặn lần chạy thay thế cùng run ID');
+assert.equal(rerunAfterVoid.ok, true, 'điểm đã huỷ không được chặn lần chạy thay thế cùng run ID');
 
-// 8) Audit: 3 lần thêm điểm thành công + 1 lần hủy thành công = 4 dòng (không
+// 8) Audit: 3 lần thêm điểm thành công + 1 lần huỷ thành công = 4 dòng (không
 const activity = listActivity(db);
-const entryRelated = activity.filter(a => a.type === 'Nhập QC' || a.type === 'Hủy điểm QC');
+const entryRelated = activity.filter(a => a.type === 'Nhập QC' || a.type === 'Huỷ điểm QC');
 assert.equal(entryRelated.length, 4, 'chi thao tac thanh cong moi ghi audit');
 
 const p3 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-04', val: 14, runId: '2026-08-04-1' } }, actor);
@@ -98,7 +98,7 @@ assert.ok(opened, 'ho so NCE vua mo phai doc lai duoc');
 assert.equal(opened.source, 'iqc');
 assert.equal(opened.error_class, 'RE');
 assert.equal(opened.status, 'open');
-// Hồ sơ tự mở có người phụ trách (người hủy) và hạn, nên được tính quá hạn (sửa R-11).
+// Hồ sơ tự mở có người phụ trách (người huỷ) và hạn, nên được tính quá hạn (sửa R-11).
 assert.equal(opened.owner_user_id, actor.userId);
 assert.match(opened.due_date, /^\d{4}-\d{2}-\d{2}$/);
 assert.equal(opened.hold_results, null, 'chưa biết có giữ kết quả hay không, phải ghi trước khi cho chạy lại');
@@ -107,7 +107,7 @@ assert.equal(openedDossier.runs.length, 1);
 assert.equal(openedDossier.runs[0].role, 'trigger');
 assert.equal(openedDossier.runs[0].run_id, '2026-08-04-1');
 const triggerPoint = JSON.parse(openedDossier.runs[0].snapshot_json).points.find((p) => p.pointId === p3.data.id);
-assert.equal(triggerPoint.verdict, 'rej', 'snapshot chụp TRƯỚC khi hủy nên còn kết luận loại');
+assert.equal(triggerPoint.verdict, 'rej', 'snapshot chụp TRƯỚC khi huỷ nên còn kết luận loại');
 assert.deepEqual(triggerPoint.rules, ['1-3s']);
 assert.equal(triggerPoint.voided, false);
 

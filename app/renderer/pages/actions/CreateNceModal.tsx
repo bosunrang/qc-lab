@@ -50,11 +50,11 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
 
   return (
     <Modal title={prefill ? `Lập hồ sơ NCE — ${prefill.testName}` : 'Lập hồ sơ NCE từ nguồn khác'} size="lg" onClose={onClose} busy={saving}
-      footer={<><button type="button" className="btn ghost" onClick={onClose}>Hủy</button><button type="button" className="btn teal" disabled={saving} onClick={submit}>{saving ? 'Đang lưu…' : 'Lập hồ sơ'}</button></>}>
+      footer={<><button type="button" className="btn ghost" onClick={onClose}>Bỏ qua</button><button type="button" className="btn teal" disabled={saving} onClick={submit}>{saving ? 'Đang lưu…' : 'Lập hồ sơ'}</button></>}>
       {error && <div className="alert rej" role="alert">{error}</div>}
       {prefill
         ? <div className="alert info">Lần chạy {nceRunLabel(prefill)} bị loại. Mức, lô, luật và kết luận Westgard được chụp tự động từ lần chạy này.</div>
-        : <div className="hint">Dùng cho sự cố không bắt đầu từ một lần chạy QC bị loại: ngoại kiểm, thiết bị, hóa chất, hiệu chuẩn, tín hiệu CUSUM hoặc sai sót khác.</div>}
+        : <div className="hint">Dùng cho sự cố không bắt đầu từ một lần chạy QC bị loại: ngoại kiểm, thiết bị, hoá chất, hiệu chuẩn, tín hiệu CUSUM hoặc sai sót khác.</div>}
       <div className="nce-form-grid">
         {!prefill && <>
           <Field label="Nguồn phát hiện" htmlFor="nceSource"><OptionSelect id="nceSource" value={source} options={OTHER_SOURCES} onChange={(v) => setSource(v as NceSource)} /></Field>

@@ -1,7 +1,7 @@
 // Đánh giá Westgard phục vụ hồ sơ NCE: chụp snapshot một lần chạy, liệt kê
 // lần chạy bị loại cho hàng chờ, và kết luận từng lần chạy cho khoảng nghi
 // ngờ. Tập điểm giống hệt trang Phân tích Westgard (`activeLevels()` trong
-// `ipc/westgard-handlers.ts`): mức đang vận hành, điểm chưa hủy của đúng lô
+// `ipc/westgard-handlers.ts`): mức đang vận hành, điểm chưa huỷ của đúng lô
 // đang gán. Kiểm lại bằng chứng đã chốt dùng đúng chuỗi lô lịch sử của nó.
 // Mốc cắt đọc từ `nce_cuts`, cộng mốc giả định khi đánh giá rerun.
 import type { Db } from './sqlite-like';
@@ -52,12 +52,12 @@ function verdictOf(flag: CombinedPointFlag | undefined): NceRunPoint['verdict'] 
   return flag && Number.isFinite(flag.z) ? flag.level : 'none';
 }
 
-/** Snapshot MỌI điểm của một lần chạy (mọi mức, kể cả đã hủy hay khác lô).
+/** Snapshot MỌI điểm của một lần chạy (mọi mức, kể cả đã huỷ hay khác lô).
  * Điểm ngoài tập đang vận hành mang kết luận `none`. `extraCuts` để đánh giá
  * lần rerun trong giai đoạn mới (D-04). */
 export function nceRunSnapshot(db: Db, testId: string, run: NceRunKey, extraCuts: readonly QcCut[] = [], reference?: NceRunSnapshot): NceRunSnapshot {
   // Khi kiểm lại bằng chứng đã cho chạy lại, dùng đúng chuỗi lô đã chốt,
-  // không dùng lô hiện hành có thể đã đổi. Vẫn đọc giá trị/điểm hủy hiện tại
+  // không dùng lô hiện hành có thể đã đổi. Vẫn đọc giá trị/điểm huỷ hiện tại
   // và tính lại bằng engine chung, không tin verdict đã lưu trong snapshot.
   const { sets, byPoint } = reference ? evaluateReference(db, testId, reference, extraCuts) : evaluate(db, testId, extraCuts);
   const flagById = new Map<string, { flag: CombinedPointFlag; mean: number | null; sd: number | null }>();
@@ -94,7 +94,7 @@ export function nceRejectedPoints(db: Db): NceQueuePoint[] {
     }
   }
   // Đổi lô không được làm biến mất công việc chưa đóng. Snapshot sự kiện là
-  // bằng chứng đã ghi nhận; chỉ bổ sung các điểm còn tồn tại, chưa bị hủy.
+  // bằng chứng đã ghi nhận; chỉ bổ sung các điểm còn tồn tại, chưa bị huỷ.
   const known = new Set(out.map((p) => p.pointId));
   const pending = db.prepare(`SELECT r.snapshot_json FROM nce_runs r JOIN nce_records n ON n.id=r.nce_record_id
     WHERE r.role<>'rerun' AND n.status NOT IN ('closed','cancelled')`).all() as { snapshot_json: string }[];
@@ -153,7 +153,7 @@ export function nceSuspectChain(db: Db, testId: string, trigger: NceRunSnapshot)
   return { rules: [...rules].sort(), levels: [...levels].sort((a, b) => a - b) };
 }
 
-/** Lần chạy QC mới nhất đang có của xét nghiệm (mọi mức, chưa hủy). */
+/** Lần chạy QC mới nhất đang có của xét nghiệm (mọi mức, chưa huỷ). */
 export function nceLatestRun(db: Db, testId: string): NceRunKey | null {
   const rows = db.prepare('SELECT DISTINCT date, run_id FROM qc_points WHERE test_id=? AND voided=0').all(testId) as { date: string; run_id: string }[];
   const keys = rows.map((row) => ({ date: row.date, runId: row.run_id }));

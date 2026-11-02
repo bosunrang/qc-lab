@@ -1,6 +1,6 @@
 // Toàn vẹn nhật ký (gói GV3 của kế hoạch khắc phục 2026-10-31):
 // - lần đăng nhập sai cũng ghi nhật ký, kèm nơi thử (máy chính / `lan:<ip>`);
-// - chế độ vận hành bật một chiều, chặn "Xoá sạch dữ liệu test", và không bị
+// - chế độ vận hành bật một chiều, chặn "Xoá sạch dữ liệu thử", và không bị
 //   tắt khi phục hồi một backup cũ hơn lúc bật.
 // Phần "vượt ngưỡng không tự xoá nhật ký" nằm ở audit-handlers.test.mjs.
 import assert from 'node:assert/strict';

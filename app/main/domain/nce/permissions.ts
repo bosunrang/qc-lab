@@ -44,11 +44,11 @@ export function canSubmitNce(actor: NceActorLike, dossier: Pick<NceDossier, 'own
     : { ok: false, code: 'forbidden-submit', message: 'Chỉ người phụ trách hoặc người báo cáo được nộp duyệt hồ sơ.' };
 }
 
-/** Hủy (chỉ khi còn `open`): người báo cáo, người phụ trách hoặc người có quyền duyệt. */
+/** Huỷ (chỉ khi còn `open`): người báo cáo, người phụ trách hoặc người có quyền duyệt. */
 export function canCancelNce(actor: NceActorLike, dossier: Pick<NceDossier, 'ownerUserId' | 'reportedByUserId'>): NceDecision {
   const denied = canWriteNce(actor); if (!denied.ok) return denied;
   return actor.userId === dossier.ownerUserId || actor.userId === dossier.reportedByUserId || hasNceCapability(actor, 'nce.approve') ? ALLOW
-    : { ok: false, code: 'forbidden-cancel', message: 'Chỉ người báo cáo, người phụ trách hoặc người duyệt được hủy hồ sơ.' };
+    : { ok: false, code: 'forbidden-cancel', message: 'Chỉ người báo cáo, người phụ trách hoặc người duyệt được huỷ hồ sơ.' };
 }
 
 export function canReturnNce(actor: NceActorLike): NceDecision {

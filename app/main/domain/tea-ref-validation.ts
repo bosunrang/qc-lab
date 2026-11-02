@@ -15,7 +15,7 @@ export const TEA_LAB_SOURCE_LABELS: Record<string, string> = {
   pt: 'Chương trình ngoại kiểm / PT',
   eflm: 'EFLM Biological Variation',
   ricos: 'Ricos / Westgard BV (nguồn cũ)',
-  professional: 'Hiệp hội / ủy ban chuyên môn',
+  professional: 'Hiệp hội / uỷ ban chuyên môn',
   other: 'Nguồn khác đã thẩm định',
 };
 

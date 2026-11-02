@@ -24,7 +24,7 @@ export function CohortModal({ period, cohorts, onClose, onSubmit }: {
     if (!result.ok) await errorDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC' });
   }
   return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} size="xl"
-    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</AsyncButton></>}>
+    footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</AsyncButton></>}>
     <div className="sg-cohort-table-wrap"><table className="sg-cohort-table"><thead><tr><th className="sg-cohort-level">Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th className="num">n</th><th className="num">CV</th><th>Trạng thái</th></tr></thead><tbody>
       {period.levels.flatMap((level) => {
         const rows = byLevel.get(level.level) || [];

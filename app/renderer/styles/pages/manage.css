@@ -103,7 +103,7 @@ main:has(.config-shell){padding-bottom:16px;}
 /* Nút thao tác HIỆN THƯỜNG TRỰC (chốt 2026-09-13). Bản trước cho cụm icon
    `opacity:0` và chỉ hiện khi rê chuột/Tab tới — bảng lúc nghỉ sạch hơn,
    nhưng cột thao tác thành một mảng trống và không còn dấu hiệu nào cho biết
-   hàng sửa/xóa được, trong khi đây là đường DUY NHẤT để sửa một bản ghi.
+   hàng sửa/xoá được, trong khi đây là đường DUY NHẤT để sửa một bản ghi.
    Đừng thêm lại cơ chế ẩn theo hover. */
 
 .manage-actions{display:flex;gap:6px;justify-content:center;flex-wrap:nowrap;white-space:nowrap;}

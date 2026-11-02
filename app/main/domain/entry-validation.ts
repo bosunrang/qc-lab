@@ -1,4 +1,4 @@
-// Xác thực dữ liệu thêm và hủy điểm QC tại cổng ghi của module Nhập QC.
+// Xác thực dữ liệu thêm và huỷ điểm QC tại cổng ghi của module Nhập QC.
 import { cleanId, cleanText, finiteNumber } from './text-utils';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

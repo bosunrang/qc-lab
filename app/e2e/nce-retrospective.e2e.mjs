@@ -67,10 +67,10 @@ test('NCE hồi cứu: đính chính có lịch sử, giải thích QC bị lọ
     await live.waitFor({ state: 'attached' });
     await release.locator('#relRun').selectOption(await live.getAttribute('value'));
     await release.locator('.alert.ok', { hasText: 'Lần chạy đạt' }).waitFor();
-    // Hủy một điểm ở cửa sổ khác: preview đang chọn phải tự đánh giá lại.
+    // Huỷ một điểm ở cửa sổ khác: preview đang chọn phải tự đánh giá lại.
     await page.evaluate(async (testId) => {
       const point = (await window.qcApi.queryPoints(testId, 2)).find((p) => p.run_id === '3-live');
-      const r = await window.qcApi.voidPoint({ data: { pointId: point.id, reason: 'Hủy dữ liệu thử nhập sai', kind: 'data-entry' } });
+      const r = await window.qcApi.voidPoint({ data: { pointId: point.id, reason: 'Huỷ dữ liệu thử nhập sai', kind: 'data-entry' } });
       if (!r.ok) throw new Error(JSON.stringify(r.error));
     }, seeded.testId);
     await release.locator('.alert.rej', { hasText: 'thiếu mức M2' }).waitFor();

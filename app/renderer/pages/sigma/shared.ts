@@ -10,7 +10,7 @@ export const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getF
 /** Nguồn TEa được hỗ trợ. Cấu hình được chụp vào kỳ Sigma khi tạo để lịch sử
  * không bị thay đổi ngầm. */
 export const TEA_SOURCES: ReadonlyArray<{ value: SigmaTeaSource; label: string }> = [
-  { value: 'lab', label: 'TEa chuẩn hóa của phòng xét nghiệm' },
+  { value: 'lab', label: 'TEa chuẩn hoá của phòng xét nghiệm' },
   { value: 'eflm', label: 'EFLM - nhập từ database' },
   { value: 'clia', label: 'CLIA PT (CMS-3355-F)' },
   { value: 'ricos', label: 'Ricos / Westgard biological variation' },

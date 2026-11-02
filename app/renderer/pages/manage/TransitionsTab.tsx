@@ -63,7 +63,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   }
 
   async function removeTransition(tr: LotTransition) {
-    if (!(await confirmDialog('Xóa dòng chuyển tiếp lô này?', { title: 'Xóa dòng chuyển tiếp lô', danger: true, confirmLabel: 'Xóa' }))) return;
+    if (!(await confirmDialog('Xoá dòng chuyển tiếp lô này?', { title: 'Xoá dòng chuyển tiếp lô', danger: true, confirmLabel: 'Xoá' }))) return;
     const result = await removeLotTransition(tr.id);
     if (!result.ok) await errorDialog(result.error.message);
   }
@@ -174,7 +174,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                     setErr(null); setDraftPanelId(tr.panel_id); setDraftFromLotId(tr.from_lot_id);
                     setDraftToLotId(tr.to_lot_id); setTargetQuery(''); setCreating(tr);
                   }} />
-                  <RowActionButton kind="delete" label={`Xóa hồ sơ chuyển lô ${fromLotLabel} sang ${toLotLabel}`} onClick={() => removeTransition(tr)} />
+                  <RowActionButton kind="delete" label={`Xoá hồ sơ chuyển lô ${fromLotLabel} sang ${toLotLabel}`} onClick={() => removeTransition(tr)} />
                 </div></td>
               </tr>;
             })}
@@ -182,7 +182,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
         </table> : <EmptyState title="Chưa có hồ sơ chuyển lô">Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.</EmptyState>}
         {creating && (
           <Modal busy={saving.busy} title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
-            footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Hủy</button><button className="btn teal" type="submit" form="transition-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
+            footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Huỷ</button><button className="btn teal" type="submit" form="transition-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
             <form id="transition-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
               <div className="lot-trans-row3">

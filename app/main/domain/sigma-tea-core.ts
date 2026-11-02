@@ -115,7 +115,7 @@ export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: re
     // rơi về TEa chung, không bao giờ mượn giá trị của mức khác.
     const levelTea = Number.isInteger(level) ? ref?.lab_level_defaults?.find((item) => item.level === level) : undefined;
     const value = Number(levelTea?.tea ?? ref?.lab);
-    return { value: Number.isFinite(value) && value > 0 ? value : null, criterion: ref?.lab_source || 'Hồ sơ TEa chuẩn hóa của phòng xét nghiệm', catalog, note: null, criterionDetail: null };
+    return { value: Number.isFinite(value) && value > 0 ? value : null, criterion: ref?.lab_source || 'Hồ sơ TEa chuẩn hoá của phòng xét nghiệm', catalog, note: null, criterionDetail: null };
   }
   if (source === 'ricos') ref = matchingRefs.find((item) => item.ricos != null) || ref;
   if (source === 'clia') ref = matchingRefs.find((item) => item.clia != null || item.clia_absolute != null || !!item.clia_rule) || ref;

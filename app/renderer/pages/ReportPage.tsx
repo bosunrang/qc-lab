@@ -1,5 +1,5 @@
 // Báo cáo & Biểu mẫu — bố cục Clinical Precision.
-// Bộ lọc, tuỳ chọn xuất và thao tác được gom thành các vùng rõ ràng; khóa kỳ
+// Bộ lọc, tuỳ chọn xuất và thao tác được gom thành các vùng rõ ràng; khoá kỳ
 // giữ dạng điều khiển theo tháng/năm và danh sách kỳ, không dùng bảng dữ liệu.
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -203,13 +203,13 @@ export function ReportPage() {
   async function submitLock() {
     const label = monthVN(lockYm);
     if (!(await confirmDialog(
-      'Sau khi khóa, không ai (kể cả admin) sửa/hủy được điểm QC trong kỳ này ở bất kỳ xét nghiệm nào cho tới khi mở khóa. Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức của kỳ.',
-      { title: `Khóa kỳ ${label}?`, confirmLabel: 'Khóa kỳ', cancelLabel: 'Hủy', danger: false },
+      'Sau khi khoá, không ai (kể cả admin) sửa/huỷ được điểm QC trong kỳ này ở bất kỳ xét nghiệm nào cho tới khi mở khoá. Chỉ nên khoá sau khi đã xuất xong báo cáo chính thức của kỳ.',
+      { title: `Khoá kỳ ${label}?`, confirmLabel: 'Khoá kỳ', cancelLabel: 'Huỷ', danger: false },
     ))) return;
-    if (!(await reauthDialog({ title: 'Xác thực khóa kỳ', message: `Nhập lại mật khẩu để khóa kỳ ${label}.` }))) return;
+    if (!(await reauthDialog({ title: 'Xác thực khoá kỳ', message: `Nhập lại mật khẩu để khoá kỳ ${label}.` }))) return;
     const result = await lock(lockYm, '');
     if (!result.ok) { await errorDialog(result.error.message); return; }
-    showToast(`Đã khóa kỳ ${label}.`);
+    showToast(`Đã khoá kỳ ${label}.`);
   }
 
   async function saveTemplateSettings() {
@@ -269,9 +269,9 @@ export function ReportPage() {
       )}
 
       <div className="panel">
-        <h2 className="panel-title">Khóa kỳ báo cáo</h2>
+        <h2 className="panel-title">Khoá kỳ báo cáo</h2>
         <div className="report-panel-body">
-          <div className="report-lock-description">Khóa một kỳ theo tháng sẽ chặn sửa hoặc hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b>. Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức.</div>
+          <div className="report-lock-description">Khoá một kỳ theo tháng sẽ chặn sửa hoặc huỷ điểm QC của kỳ đó ở <b>mọi xét nghiệm</b>. Chỉ nên khoá sau khi đã xuất xong báo cáo chính thức.</div>
           <div className="report-lock-controls">
             <div className="field">
               <label htmlFor="report-lock-month">Tháng</label>
@@ -287,8 +287,8 @@ export function ReportPage() {
             </div>
             <div className="report-lock-action">
               {admin
-                ? (already ? <button className="btn ghost" disabled>Kỳ này đã khóa</button> : <button className="btn teal" onClick={submitLock}>Khóa kỳ này</button>)
-                : <span className="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>}
+                ? (already ? <button className="btn ghost" disabled>Kỳ này đã khoá</button> : <button className="btn teal" onClick={submitLock}>Khoá kỳ này</button>)
+                : <span className="hint">Chỉ admin mới khoá/mở khoá được kỳ báo cáo.</span>}
             </div>
           </div>
           <div className="report-lock-list-wrap">
@@ -296,46 +296,46 @@ export function ReportPage() {
               <div className="period-lock-list">
                 {locks.map((l) => (
                   <div className="period-lock-row" key={l.ym}>
-                    <div><b>Kỳ {monthVN(l.ym)}</b><span className="hint"> · Khóa bởi {l.locked_by || '—'}{l.locked_at ? ` lúc ${dateTimeVN(l.locked_at)}` : ''}</span></div>
-                    {admin ? <button className="btn ghost sm" onClick={() => setUnlocking(l.ym)}>Mở khóa</button> : null}
+                    <div><b>Kỳ {monthVN(l.ym)}</b><span className="hint"> · Khoá bởi {l.locked_by || '—'}{l.locked_at ? ` lúc ${dateTimeVN(l.locked_at)}` : ''}</span></div>
+                    {admin ? <button className="btn ghost sm" onClick={() => setUnlocking(l.ym)}>Mở khoá</button> : null}
                   </div>
                 ))}
               </div>
-            ) : <div className="report-empty-note" role="status">Chưa khóa kỳ nào</div>}
+            ) : <div className="report-empty-note" role="status">Chưa khoá kỳ nào</div>}
           </div>
         </div>
       </div>
 
       {unlocking && <UnlockModal ym={unlocking} onClose={() => setUnlocking(null)}
         onDone={async (note) => {
-          if (!(await reauthDialog({ title: 'Xác thực mở khóa', message: `Nhập lại mật khẩu để mở khóa kỳ ${monthVN(unlocking)}.` }))) return false;
+          if (!(await reauthDialog({ title: 'Xác thực mở khoá', message: `Nhập lại mật khẩu để mở khoá kỳ ${monthVN(unlocking)}.` }))) return false;
           const result = await unlock(unlocking, note);
           if (!result.ok) { await errorDialog(result.error.message); return false; }
-          showToast(`Đã mở khóa kỳ ${monthVN(unlocking)}.`);
+          showToast(`Đã mở khoá kỳ ${monthVN(unlocking)}.`);
           return true;
         }} />}
     </>
   );
 }
 
-/** Mở khóa đi qua modal nhập lý do (bắt buộc có lý do); main cũng đòi ghi
+/** Mở khoá đi qua modal nhập lý do (bắt buộc có lý do); main cũng đòi ghi
  * chú ≥5 ký tự, nên đây là cùng một cổng ở 2 tầng. */
 function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void; onDone: (note: string) => Promise<boolean> }) {
   const [note, setNote] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
-    if (note.trim().length < 5) { setErr('Nhập lý do mở khóa (ít nhất 5 ký tự) để lưu vào nhật ký.'); return; }
+    if (note.trim().length < 5) { setErr('Nhập lý do mở khoá (ít nhất 5 ký tự) để lưu vào nhật ký.'); return; }
     if (await onDone(note.trim())) onClose();
   }
 
   return (
-    <Modal title={`Mở khóa kỳ ${monthVN(ym)}`} onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submit}>Xác nhận mở khóa</AsyncButton></>}>
+    <Modal title={`Mở khoá kỳ ${monthVN(ym)}`} onClose={onClose}
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submit}>Xác nhận mở khoá</AsyncButton></>}>
       {err && <p className="field-error" role="alert">{err}</p>}
-      <div className="hint">Mở khóa kỳ {monthVN(ym)} sẽ cho phép sửa/hủy lại điểm QC của kỳ này ở mọi xét nghiệm. Lý do được ghi vào nhật ký hoạt động.</div>
+      <div className="hint">Mở khoá kỳ {monthVN(ym)} sẽ cho phép sửa/huỷ lại điểm QC của kỳ này ở mọi xét nghiệm. Lý do được ghi vào nhật ký hoạt động.</div>
       <div className="field">
-        <label htmlFor="unlockReasonInput">Lý do mở khóa</label>
+        <label htmlFor="unlockReasonInput">Lý do mở khoá</label>
         <textarea id="unlockReasonInput" autoFocus rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
       </div>
     </Modal>

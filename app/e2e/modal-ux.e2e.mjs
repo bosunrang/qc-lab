@@ -63,7 +63,7 @@ test('modal: focus, Esc theo lớp, hỏi khi bỏ dữ liệu, chặn lưu trù
     assert.ok(errorId && (await nameInput.getAttribute('aria-describedby'))?.split(' ').includes(errorId), 'ô tên trỏ tới dòng lỗi');
     await page.keyboard.type(' 2');
     assert.equal(await nameInput.getAttribute('aria-invalid'), null, 'sửa ô thì gỡ dấu lỗi');
-    await modal.getByRole('button', { name: 'Hủy' }).click();
+    await modal.getByRole('button', { name: 'Huỷ' }).click();
     await modal.waitFor({ state: 'detached' });
 
     // U3: Esc khi lịch chọn ngày đang mở trong modal chỉ đóng lịch.

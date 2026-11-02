@@ -1,4 +1,4 @@
-// Phiên làm việc của một hồ sơ: tuần tự hóa ghi, bỏ phản hồi đọc cũ và giữ
+// Phiên làm việc của một hồ sơ: tuần tự hoá ghi, bỏ phản hồi đọc cũ và giữ
 // nguyên lỗi/bản nháp cho tới khi người dùng chủ động đối chiếu dữ liệu mới.
 import { createStore } from 'zustand/vanilla';
 import type { IpcResult, NceDossierView, NceWriteBase } from '../../../shared/qc-api';
@@ -19,7 +19,7 @@ interface DossierSession {
   clearError: () => void;
 }
 
-/** Giới hạn thời gian chờ ở giao diện, không hủy/khẳng định kết quả giao dịch
+/** Giới hạn thời gian chờ ở giao diện, không huỷ/khẳng định kết quả giao dịch
  * phía máy chính. Promise về muộn vẫn được bắt, nhưng không cập nhật state. */
 function withDeadline<T>(work: () => Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -82,7 +82,7 @@ export function createDossierSession(
       } catch (error) {
         if (!active || request !== generation) return false;
         report(error);
-        // Đọc nền không xóa lỗi stale hoặc làm mất cảnh báo chưa biết kết quả
+        // Đọc nền không xoá lỗi stale hoặc làm mất cảnh báo chưa biết kết quả
         // lệnh ghi. Chỉ tải lại thành công có xác nhận mới gỡ những lỗi đó.
         const previous = state().error;
         const detail = `Không tải được hồ sơ: ${messageOf(error)}`;
@@ -99,7 +99,7 @@ export function createDossierSession(
     },
     async run(write) {
       const current = state();
-      // Khóa ngay trong cùng nhịp xử lý, không đợi React vẽ lại nút disabled.
+      // Khoá ngay trong cùng nhịp xử lý, không đợi React vẽ lại nút disabled.
       if (!active || !current.dossier || current.busy || current.error?.kind === 'uncertain') return false;
       const startedIn = lifecycle;
       generation++;

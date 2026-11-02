@@ -139,7 +139,7 @@ export interface NceEffectivenessReview {
 export interface NceDossier {
   status: NceStatus; source: NceSource; testId: string | null;
   reportedByUserId: string; ownerUserId: string; detectedAt: string; dueDate: string;
-  /** `null` = chưa xác định (hồ sơ tự mở khi hủy điểm); phải chọn trước khi cho chạy lại. */
+  /** `null` = chưa xác định (hồ sơ tự mở khi huỷ điểm); phải chọn trước khi cho chạy lại. */
   description: string; correction: string; holdResults: boolean | null;
   containmentNote: string; occurredNote: string;
   tier: NceTier | ''; tierReason: string;

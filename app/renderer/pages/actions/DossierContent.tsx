@@ -34,7 +34,7 @@ export function useEditor<T extends Patch>(props: SectionProps, initial: () => T
     if (await props.run((base) => update({ ...base, expectedVersion: draftVersion, patch }))) setDraft(null);
   };
   const actions = (canEdit: boolean): ReactNode => !canEdit ? null : draft
-    ? <>{draftVersion !== props.dossier.record.row_version && <span className="nce-editor-warning">Hồ sơ đã được cập nhật ở nơi khác</span>}<button type="button" className="btn ghost sm" onClick={() => setDraft(null)}>Hủy</button><button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Lưu</button></>
+    ? <>{draftVersion !== props.dossier.record.row_version && <span className="nce-editor-warning">Hồ sơ đã được cập nhật ở nơi khác</span>}<button type="button" className="btn ghost sm" onClick={() => setDraft(null)}>Bỏ qua</button><button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Lưu</button></>
     : <button type="button" className="btn ghost sm" onClick={() => { setDraft(initial()); setDraftVersion(props.dossier.record.row_version); }}>Sửa</button>;
   return { draft, set, actions };
 }

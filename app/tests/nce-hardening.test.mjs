@@ -99,7 +99,7 @@ test('NCE-R02: đính chính chặn sai quyền, sai ngày, thiếu lý do, tr�
   assert.equal(nce.getNce(view.record.id, admin).record.detected_at, corrected.record.detected_at);
 });
 
-test('NCE-R03: đính chính không áp dụng sau release, chờ duyệt, đóng hoặc hủy', () => {
+test('NCE-R03: đính chính không áp dụng sau release, chờ duyệt, đóng hoặc huỷ', () => {
   for (const status of ['released', 'pending_approval', 'closed', 'cancelled']) {
     const { db, nce, create } = fixture();
     const view = create('2026-10-14');
@@ -110,7 +110,7 @@ test('NCE-R03: đính chính không áp dụng sau release, chờ duyệt, đón
   }
 });
 
-test('NCE-R04: lỗi ghi lịch sử hủy toàn bộ đính chính, không tăng phiên bản hay ghi audit', () => {
+test('NCE-R04: lỗi ghi lịch sử huỷ toàn bộ đính chính, không tăng phiên bản hay ghi audit', () => {
   const { db, nce, create } = fixture();
   const view = create('2026-10-14');
   const before = db.prepare('SELECT COUNT(*) n FROM activity').get().n;
@@ -179,7 +179,7 @@ test('NCE-H03: lần chạy thiếu mức không được làm mốc QC đạt c
   assert.equal(nceSuspectWindow(outcomes, trigger, null).lastAccepted, null);
 });
 
-test('NCE-H04: kỳ khóa tại hoặc sau rerun chặn ghi mốc cắt, không ghi dở', () => {
+test('NCE-H04: kỳ khoá tại hoặc sau rerun chặn ghi mốc cắt, không ghi dở', () => {
   for (const month of ['2026-09', '2026-10']) {
     const { db, nce, create, addRun } = fixture();
     if (month === '2026-10') addRun('2026-10-01', 0, 0);
@@ -211,7 +211,7 @@ test('NCE-H05: thay lô sau release không làm mất bằng chứng rerun hay h
   assert.equal(view.record.status, 'closed');
 });
 
-test('NCE-H06: điểm rerun của lô cũ bị hủy vẫn chặn duyệt', () => {
+test('NCE-H06: điểm rerun của lô cũ bị huỷ vẫn chặn duyệt', () => {
   const { db, nce, readyLow, testId } = fixture();
   let view = readyLow();
   db.prepare('UPDATE test_levels SET qc_lot_id=NULL WHERE test_id=?').run(testId);

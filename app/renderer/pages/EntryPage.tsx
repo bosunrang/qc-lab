@@ -308,7 +308,7 @@ export function EntryPage() {
 
   return (
     <div>
-      <PageHeader title="Nhập QC" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
+      <PageHeader title="Nhập QC & Biểu đồ" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
       {emptyState ? (
         <div className="panel">
           <EmptyState

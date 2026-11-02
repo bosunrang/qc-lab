@@ -199,7 +199,7 @@ export function SettingsPage() {
     const result = await exportBackup();
     if (!result.ok) { await showError(result.error.message); return; }
     if (!result.data) return;
-    await infoDialog(`Đã xuất backup ${formatMb(result.data.bytes)} (${result.data.points} điểm QC) tại:\n${result.data.path}`, { type: 'success' });
+    await infoDialog(`Đã xuất bản sao lưu ${formatMb(result.data.bytes)} (${result.data.points} điểm QC) tại:\n${result.data.path}`, { type: 'success' });
   }
 
   /** Log và tệp crash chỉ lưu tại máy; người quản trị mở thư mục để gửi kèm
@@ -218,14 +218,14 @@ export function SettingsPage() {
 
   async function pickBackupFile() {
     const verified = await chooseBackupFile();
-    if (!verified.ok) { await errorDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`); return; }
+    if (!verified.ok) { await errorDialog(`Tệp sao lưu KHÔNG hợp lệ: ${verified.error.message}`); return; }
     if (!verified.data) return;
     const created = verified.data.createdAt ? ` tạo lúc ${new Date(verified.data.createdAt).toLocaleString('vi-VN')}` : '';
     if (!(await confirmDialog(
       `File ${verified.data.fileName} hợp lệ (${verified.data.points} điểm QC${created}). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè. Tiếp tục?`,
-      { title: 'Phục hồi từ backup', danger: true, confirmLabel: 'Phục hồi' },
+      { title: 'Phục hồi từ bản sao lưu', danger: true, confirmLabel: 'Phục hồi' },
     ))) return;
-    if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ backup là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
+    if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ bản sao lưu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
     const result = await importBackup();
     if (!result.ok) { await showError(result.error.message); return; }
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
@@ -251,14 +251,14 @@ export function SettingsPage() {
       if (!result.ok) { await showError(result.error.message); return; }
       if (result.data.state === 'conflict') {
         const push = await confirmDialog(
-          'Cả máy này và Firebase đều có dữ liệu khác nhau. Chọn “Đẩy dữ liệu máy” để ghi đè bản đám mây. Chọn “Hủy” để giữ nguyên và chọn tải dữ liệu đám mây ở bước tiếp theo.',
+          'Cả máy này và Firebase đều có dữ liệu khác nhau. Chọn “Đẩy dữ liệu máy” để ghi đè bản đám mây. Chọn “Huỷ” để giữ nguyên và chọn tải dữ liệu đám mây ở bước tiếp theo.',
           { title: 'Chọn hướng đồng bộ', danger: true, confirmLabel: 'Đẩy dữ liệu máy' },
         );
         if (push) {
           const synced = await syncFirebase('push');
           if (!synced.ok) { await showError(synced.error.message); return; }
           showToast('Đã ghi dữ liệu trên máy lên Firebase.');
-        } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một backup an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
+        } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một bản sao lưu an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
           if (!(await reauthDialog({ title: 'Xác thực trước khi tải Firebase', message: 'Tải dữ liệu đám mây sẽ thay thế dữ liệu cục bộ — xác thực lại mật khẩu.' }))) return;
           const synced = await syncFirebase('pull');
           if (!synced.ok) { await showError(synced.error.message); return; }
@@ -313,16 +313,16 @@ export function SettingsPage() {
     return days <= 0 ? 'Sao lưu gần nhất: hôm nay.' : `Sao lưu gần nhất: ${days} ngày trước.`;
   }
   function backupCapacityText(): string {
-    return backupInfo?.lastBackupBytes ? `Backup gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
+    return backupInfo?.lastBackupBytes ? `Bản sao lưu gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
   }
 
-  /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký.
+  /** "Xoá sạch dữ liệu thử" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký.
    * Không thể hoàn tác nên đi qua đủ confirm + reauth, và main tự chốt 1 bản
    * an toàn ra đĩa trước. */
   async function resetAll() {
     if (!(await confirmDialog(
       'Toàn bộ máy xét nghiệm, xét nghiệm, mức QC, điểm QC, hồ sơ NCE, so sánh hoá chất, kỳ Sigma, khoá kỳ báo cáo và bảng TEa sẽ bị xoá. Tài khoản người dùng và nhật ký hoạt động được giữ lại. Một bản sao lưu an toàn sẽ được tạo tự động trước khi xoá. Tiếp tục?',
-      { title: 'Xóa sạch dữ liệu test', danger: true, confirmLabel: 'Xóa sạch' },
+      { title: 'Xoá sạch dữ liệu thử', danger: true, confirmLabel: 'Xoá sạch' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi xoá', message: 'Xoá sạch dữ liệu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
     const result = await resetOperationalData();
@@ -334,20 +334,20 @@ export function SettingsPage() {
   /** Bật chế độ vận hành: một chiều, nên đi qua confirm + reauth như xoá sạch. */
   async function turnOnOperationMode() {
     if (!(await confirmDialog(
-      'Sau khi bật, "Xóa sạch dữ liệu test" bị khoá vĩnh viễn trên máy này; dữ liệu QC chỉ còn thay đổi qua các quy trình có nhật ký (huỷ điểm, lưu trữ nhật ký…). Phục hồi backup hay tải từ Firebase cũng không tắt được chế độ này. Chỉ bật khi đã bắt đầu dùng dữ liệu QC thật. Tiếp tục?',
+      'Sau khi bật, "Xoá sạch dữ liệu thử" bị khoá vĩnh viễn trên máy này; dữ liệu QC chỉ còn thay đổi qua các quy trình có nhật ký (huỷ điểm, lưu trữ nhật ký…). Phục hồi bản sao lưu hay tải từ Firebase cũng không tắt được chế độ này. Chỉ bật khi đã bắt đầu dùng dữ liệu QC thật. Tiếp tục?',
       { title: 'Bật chế độ vận hành', danger: true, confirmLabel: 'Bật chế độ vận hành' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực bật chế độ vận hành', message: 'Bật chế độ vận hành là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
     const result = await enableOperationMode();
     if (!result.ok) { await showError(result.error.message); return; }
-    await infoDialog('Đã bật chế độ vận hành. "Xóa sạch dữ liệu test" không còn dùng được.', { type: 'success' });
+    await infoDialog('Đã bật chế độ vận hành. "Xoá sạch dữ liệu thử" không còn dùng được.', { type: 'success' });
   }
   const operationMode = backupInfo?.operationMode ?? null;
   const auditWarning = backupInfo ? auditSizeWarning(backupInfo.activityRows) : null;
 
   return (
     <>
-      <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
+      <PageHeader title="Cài đặt & Đám mây" subtitle="Thông tin đơn vị, sao lưu và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">
           <h2 className="panel-title settings-panel-title"><UnitProfileIcon />Thông tin đơn vị</h2>
@@ -398,14 +398,14 @@ export function SettingsPage() {
         {auditWarning && <div className="alert warn" role="status">{auditWarning} Mở trang Nhật ký hoạt động để lưu trữ.</div>}
         <div className="admin-tools">
           <div className="admin-tool">
-            <b>Xuất backup</b>
+            <b>Xuất bản sao lưu</b>
             <span>Lưu toàn bộ dữ liệu ra một tệp .sqlite. {backupStatusText()} {backupCapacityText()}</span>
-            <button className="btn ghost" onClick={exportBackupFile}>Xuất backup</button>
+            <button className="btn ghost" onClick={exportBackupFile}>Xuất bản sao lưu</button>
           </div>
           <div className="admin-tool">
-            <b>Nhập backup</b>
+            <b>Nhập bản sao lưu</b>
             <span>Chọn file để kiểm tra tự động rồi khôi phục dữ liệu. Chỉ quản trị viên được nhập.</span>
-            <button className="btn ghost" onClick={pickBackupFile}>Chọn file backup</button>
+            <button className="btn ghost" onClick={pickBackupFile}>Chọn tệp sao lưu</button>
           </div>
           <div className="admin-tool">
             <b>Nhật ký lỗi của ứng dụng</b>
@@ -418,18 +418,18 @@ export function SettingsPage() {
           {operationMode ? (
             <div className="admin-tool">
               <b>Chế độ vận hành</b>
-              <span>Đã bật lúc {formatAuditDateTimeVN(operationMode.enabledAt)}{operationMode.enabledBy ? ` bởi ${operationMode.enabledBy}` : ''}. "Xóa sạch dữ liệu test" đã bị khoá; dữ liệu QC chỉ thay đổi qua các quy trình có nhật ký.</span>
+              <span>Đã bật lúc {formatAuditDateTimeVN(operationMode.enabledAt)}{operationMode.enabledBy ? ` bởi ${operationMode.enabledBy}` : ''}. "Xoá sạch dữ liệu thử" đã bị khoá; dữ liệu QC chỉ thay đổi qua các quy trình có nhật ký.</span>
             </div>
           ) : (
             <>
               <div className="admin-tool">
-                <b>Xóa sạch dữ liệu test</b>
-                <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
-                <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
+                <b>Xoá sạch dữ liệu thử</b>
+                <span>Xoá toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
+                <button className="btn danger" onClick={resetAll}>Xoá sạch dữ liệu</button>
               </div>
               <div className="admin-tool">
                 <b>Chế độ vận hành</b>
-                <span>Bật khi bắt đầu dùng dữ liệu QC thật: khoá vĩnh viễn "Xóa sạch dữ liệu test". Không thể tắt lại.</span>
+                <span>Bật khi bắt đầu dùng dữ liệu QC thật: khoá vĩnh viễn "Xoá sạch dữ liệu thử". Không thể tắt lại.</span>
                 <button className="btn ghost" onClick={turnOnOperationMode}>Bật chế độ vận hành</button>
               </div>
             </>

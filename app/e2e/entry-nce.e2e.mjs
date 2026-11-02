@@ -47,12 +47,12 @@ test('nhập điểm, điểm vi phạm, lập NCE, huỷ điểm', { timeout: 1
 
     // Huỷ điểm mức 1 do nhập sai: điểm được giữ lại với dấu huỷ, không mở NCE.
     await openPage(page, 'Nhập QC & Biểu đồ');
-    await page.getByRole('button', { name: `Hủy điểm QC ngày ${ddmmyyyy(today)}` }).first().click();
-    const dialog = page.locator('.modal[role=dialog]', { hasText: 'Hủy điểm QC' });
+    await page.getByRole('button', { name: `Huỷ điểm QC ngày ${ddmmyyyy(today)}` }).first().click();
+    const dialog = page.locator('.modal[role=dialog]', { hasText: 'Huỷ điểm QC' });
     await dialog.locator('#voidKindInput').selectOption('data-entry');
     await dialog.locator('#voidReasonInput').fill('Gõ nhầm giá trị khi nhập tay.');
-    await dialog.getByRole('button', { name: 'Hủy điểm này' }).click();
-    await page.locator('.alert.warn', { hasText: 'Đã hủy điểm QC' }).waitFor();
+    await dialog.getByRole('button', { name: 'Huỷ điểm này' }).click();
+    await page.locator('.alert.warn', { hasText: 'Đã huỷ điểm QC' }).waitFor();
 
     const voided = await page.evaluate(async (testId) => {
       const active = await window.qcApi.queryPoints(testId, 1);

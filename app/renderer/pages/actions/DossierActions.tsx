@@ -1,5 +1,5 @@
 // Phần 6 — hành động khắc phục nhiều dòng: mỗi dòng có loại, người chịu trách
-// nhiệm (tài khoản), hạn; hoàn thành phải kèm bằng chứng, hủy phải có lý do.
+// nhiệm (tài khoản), hạn; hoàn thành phải kèm bằng chứng, huỷ phải có lý do.
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Modal } from '../../components/Modal';
@@ -14,7 +14,7 @@ import { dateText, Field, OptionSelect, Section, UserSelect } from './shared';
 interface ActionDraft { kind: string; description: string; ownerUserId: string; dueDate: string }
 
 const STATUS: Record<NceActionRow['status'], { label: string; tone: string }> = {
-  open: { label: 'Chưa xong', tone: 'warn' }, done: { label: 'Hoàn thành', tone: 'ok' }, cancelled: { label: 'Đã hủy', tone: 'none' },
+  open: { label: 'Chưa xong', tone: 'warn' }, done: { label: 'Hoàn thành', tone: 'ok' }, cancelled: { label: 'Đã huỷ', tone: 'none' },
 };
 
 export function ActionsSection(props: SectionProps) {
@@ -51,7 +51,7 @@ export function ActionsSection(props: SectionProps) {
               <td>{NCE_ACTION_KIND_LABEL[action.kind] ?? action.kind}</td>
               <td className="nce-col-text">{action.description}
                 {action.status === 'done' && <div className="nce-sub">Bằng chứng: {action.evidence}</div>}
-                {action.status === 'cancelled' && <div className="nce-sub">Lý do hủy: {action.cancel_reason}</div>}
+                {action.status === 'cancelled' && <div className="nce-sub">Lý do huỷ: {action.cancel_reason}</div>}
               </td>
               <td>{action.owner_name || '—'}<div className={`nce-sub${action.overdue_days > 0 ? ' nce-overdue' : ''}`}>hạn {dateText(action.due_date)}{action.overdue_days > 0 ? ` · quá hạn ${action.overdue_days} ngày` : ''}</div></td>
               <td><span className={`tag ${STATUS[action.status].tone}`}>{STATUS[action.status].label}</span>{action.status === 'done' && <div className="nce-sub">{dateText(action.done_at)} · {action.done_by_name}</div>}</td>
@@ -59,7 +59,7 @@ export function ActionsSection(props: SectionProps) {
                 <div className="nce-row-actions">
                   <button type="button" className="btn sm" onClick={() => setCompleting({ id: action.id, version: props.dossier.record.row_version, description: action.description, doneAt: todayIso(), evidence: '' })}>Hoàn thành</button>
                   <button type="button" className="btn ghost sm" onClick={() => setEditing({ id: action.id, version: props.dossier.record.row_version, draft: { kind: action.kind, description: action.description, ownerUserId: action.owner_user_id, dueDate: action.due_date } })}>Sửa</button>
-                  <button type="button" className="btn ghost sm" onClick={() => setCancelling({ id: action.id, version: props.dossier.record.row_version, description: action.description, reason: '' })}>Hủy</button>
+                  <button type="button" className="btn ghost sm" onClick={() => setCancelling({ id: action.id, version: props.dossier.record.row_version, description: action.description, reason: '' })}>Huỷ</button>
                 </div>
               )}</td>
             </tr>
@@ -69,7 +69,7 @@ export function ActionsSection(props: SectionProps) {
 
       {editing && (
         <Modal busy={props.busy} title={editing.id ? 'Sửa hành động' : 'Thêm hành động'} onClose={() => setEditing(null)}
-          footer={<><button type="button" className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void saveDraft()}>Lưu</button></>}>
+          footer={<><button type="button" className="btn ghost" onClick={() => setEditing(null)}>Bỏ qua</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void saveDraft()}>Lưu</button></>}>
           {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
           <div className="nce-form-grid">
             <Field label="Loại hành động" htmlFor="actKind" wide><OptionSelect id="actKind" value={editing.draft.kind} options={NCE_ACTION_KIND_LABEL} onChange={(v) => setEditing({ ...editing, draft: { ...editing.draft, kind: v } })} /></Field>
@@ -81,7 +81,7 @@ export function ActionsSection(props: SectionProps) {
       )}
       {completing && (
         <Modal busy={props.busy} title="Hoàn thành hành động" onClose={() => setCompleting(null)}
-          footer={<><button type="button" className="btn ghost" onClick={() => setCompleting(null)}>Hủy</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void complete()}>Xác nhận hoàn thành</button></>}>
+          footer={<><button type="button" className="btn ghost" onClick={() => setCompleting(null)}>Bỏ qua</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void complete()}>Xác nhận hoàn thành</button></>}>
           <p className="nce-note">Hành động đang xác nhận: {completing.description}</p>
           {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
           {completing.version !== props.dossier.record.row_version && <p className="nce-editor-warning" role="alert">Hồ sơ đã được cập nhật ở nơi khác. Đóng hộp thoại và rà soát nội dung mới trước khi xác nhận.</p>}
@@ -92,12 +92,12 @@ export function ActionsSection(props: SectionProps) {
         </Modal>
       )}
       {cancelling && (
-        <Modal busy={props.busy} title="Hủy hành động" size="sm" onClose={() => setCancelling(null)}
-          footer={<><button type="button" className="btn ghost" onClick={() => setCancelling(null)}>Quay lại</button><button type="button" className="btn danger" disabled={props.busy} onClick={() => void cancelAction()}>Hủy hành động</button></>}>
+        <Modal busy={props.busy} title="Huỷ hành động" size="sm" onClose={() => setCancelling(null)}
+          footer={<><button type="button" className="btn ghost" onClick={() => setCancelling(null)}>Quay lại</button><button type="button" className="btn danger" disabled={props.busy} onClick={() => void cancelAction()}>Huỷ hành động</button></>}>
           <p className="nce-note">Hành động đang xác nhận: {cancelling.description}</p>
           {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
           {cancelling.version !== props.dossier.record.row_version && <p className="nce-editor-warning" role="alert">Hồ sơ đã được cập nhật ở nơi khác. Đóng hộp thoại và rà soát nội dung mới trước khi xác nhận.</p>}
-          <Field label="Lý do hủy" htmlFor="actCancel"><textarea id="actCancel" rows={3} value={cancelling.reason} onChange={(e) => setCancelling({ ...cancelling, reason: e.target.value })} /></Field>
+          <Field label="Lý do huỷ" htmlFor="actCancel"><textarea id="actCancel" rows={3} value={cancelling.reason} onChange={(e) => setCancelling({ ...cancelling, reason: e.target.value })} /></Field>
         </Modal>
       )}
     </Section>

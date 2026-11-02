@@ -6,7 +6,7 @@
 // sẽ để chuỗi trước khắc phục (4-1s, 10x…) loại oan lần rerun.
 //
 // Hồ sơ IQC so với lần chạy khởi đầu. Hồ sơ nguồn khác có xét nghiệm (hiệu
-// chuẩn, thiết bị, hóa chất, tín hiệu CUSUM…) có thể dùng một lần chạy QC xác
+// chuẩn, thiết bị, hoá chất, tín hiệu CUSUM…) có thể dùng một lần chạy QC xác
 // minh: khi đó không có lần chạy khởi đầu, nên phải chạy từ ngày phát hiện trở
 // đi và đủ mọi mức đang vận hành.
 import type { NceMissing, NceRunKey, NceRunPoint, NceRunSnapshot } from './types';
@@ -60,12 +60,12 @@ export function checkNceRerun(input: NceRerunInput): NceRerunResult {
 
   const active = activePoints(candidate);
   const byLevel = new Map(active.map((point) => [point.level, point]));
-  // Đủ mọi mức có mặt trong lần chạy khởi đầu, kể cả điểm sau đó bị hủy: mức
+  // Đủ mọi mức có mặt trong lần chạy khởi đầu, kể cả điểm sau đó bị huỷ: mức
   // đó đã được chạy khi sự cố xảy ra nên phải được chạy lại.
   const requiredLevels = [...new Set(input.requiredLevels ?? trigger?.points.map((point) => point.level) ?? [])].sort((a, b) => a - b);
   if (!requiredLevels.length) add('rerun-no-levels', 'Chưa xác định được các mức QC phải chạy lại.');
   const missingLevels = requiredLevels.filter((level) => !byLevel.has(level));
-  if (missingLevels.length) add('rerun-missing-level', `Lần chạy rerun thiếu mức ${levelList(missingLevels)} (điểm chưa nhập hoặc đã hủy).`);
+  if (missingLevels.length) add('rerun-missing-level', `Lần chạy rerun thiếu mức ${levelList(missingLevels)} (điểm chưa nhập hoặc đã huỷ).`);
 
   const rejected = active.filter((point) => point.verdict === 'rej').map((point) => point.level);
   if (rejected.length) add('rerun-rejected', `Lần chạy rerun vẫn bị loại ở mức ${levelList(rejected)}.`);

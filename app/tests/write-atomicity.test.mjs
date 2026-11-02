@@ -88,7 +88,7 @@ test('tài khoản: tạo, sửa, đặt lại mật khẩu, xoá đều nguyên
   assertAtomic(db, ['users'], 'deleteUser', () => auth.deleteUser({ id: user.id }, actor));
 });
 
-test('NCE: tạo, sửa, hành động, quyết định, cho chạy lại, hủy đều nguyên tử; mã không trùng khi có khoảng trống', () => {
+test('NCE: tạo, sửa, hành động, quyết định, cho chạy lại, huỷ đều nguyên tử; mã không trùng khi có khoảng trống', () => {
   const db = openDatabase(':memory:');
   const config = createConfigHandlers(db);
   const entry = createEntryHandlers(db);

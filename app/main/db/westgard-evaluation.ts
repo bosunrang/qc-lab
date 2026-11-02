@@ -8,7 +8,7 @@ import { ruleConfigVersions, ruleVersionIndexOf, runEntrySeqs, type RuleConfigVe
 /** Mốc bắt đầu lại chuỗi của một xét nghiệm (`domain/qc-cuts.ts`). Mốc được
  * ghi khi cho phép hoạt động trở lại một hồ sơ NCE (lần chạy rerun), hoặc do
  * migration chuyển từ hồ sơ phiên bản cũ đã duyệt và hiệu quả (mốc theo ngày).
- * Hồ sơ đã cho chạy lại không hủy được, nên mốc không bị gỡ ngược. */
+ * Hồ sơ đã cho chạy lại không huỷ được, nên mốc không bị gỡ ngược. */
 export function qcCuts(db: Db, testId: string): QcCut[] {
   const rows = db.prepare('SELECT date, run_id FROM nce_cuts WHERE test_id=? ORDER BY date, run_id').all(testId) as { date: string; run_id: string | null }[];
   return rows.map((row) => ({ date: row.date, runId: row.run_id }));

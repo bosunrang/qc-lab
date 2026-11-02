@@ -93,7 +93,7 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   assert.equal(m2.tea, 10);
 }
 
-// 6) TEa chuẩn hóa theo số mức QC của analyte thắng TEa chung và không phụ
+// 6) TEa chuẩn hoá theo số mức QC của analyte thắng TEa chung và không phụ
 //    thuộc cấu hình test–máy. Đây là đường đọc thật từ SQLite.
 {
   const { db, sigma, test } = scenario({ source: 'lab', periodTea: 10 });
@@ -114,7 +114,7 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   assert.equal(m2.tea, 10, 'muc thieu Mean roi ve TEa cap ky');
 }
 
-// Kỳ được tạo lúc nguồn TEa CHƯA giải được (chọn "TEa chuẩn hóa của PXN" mà
+// Kỳ được tạo lúc nguồn TEa CHƯA giải được (chọn "TEa chuẩn hoá của PXN" mà
 // chưa có hồ sơ) chốt `tea = null`. Một snapshot NULL không phải lịch sử cần
 // bảo vệ — nó có nghĩa "chưa bao giờ giải được". Trước 2026-09-11 kỳ đó ghim
 // vĩnh viễn vào nguồn đã chốt, nên sau khi phòng xét nghiệm đổi nguồn sang

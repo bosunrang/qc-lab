@@ -209,7 +209,7 @@ export function validateTestLevel(input: TestLevelInput, _existingLevels: readon
 
 export interface MeanSdHistoryEntry {
   at: string; mean: number | null; sd: number | null; qcLotId: string;
-  /** Ảnh chụp nghiệp vụ của chính mốc cũ. Các trường tùy chọn giữ khả năng
+  /** Ảnh chụp nghiệp vụ của chính mốc cũ. Các trường tuỳ chọn giữ khả năng
    * đọc dữ liệu đã tạo trước khi lịch sử được làm đầy đủ. */
   lot?: string; low?: number | null; high?: number | null;
   effectiveFrom?: string; effectiveTo?: string; source?: 'mfg' | 'lab';

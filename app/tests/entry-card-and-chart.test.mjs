@@ -281,7 +281,7 @@ test('EN10: ô nhắc chạy lại mở cho MỌI mức của lần chạy bị 
   assert.match(css, /\.qc-value-cell\.warn\.run-excluded\{border-color:var\(--warning-border\);\}/);
 });
 
-test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại và nói rõ đã bỏ bao nhiêu', () => {
+test('EN11: thống kê tích luỹ bỏ điểm thuộc lần chạy bị loại và nói rõ đã bỏ bao nhiêu', () => {
   const { db, test: subject, entry } = twoOperationalLevels();
   const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
   const days = ['2026-09-01', '2026-09-02', '2026-09-03'];
@@ -290,7 +290,7 @@ test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại
     ins.run('b' + i, subject.id, 2, date, date + '-1', i % 2 ? 199.5 : 200.5, 'A2', 200, 4);
   });
   const rows = entry.queryPoints(subject.id, 2);
-  // Đúng phép lọc của khối "Thống kê tích lũy" trong EntryPage.
+  // Đúng phép lọc của khối "Thống kê tích luỹ" trong EntryPage.
   const recorded = rows.filter((p) => !p.voided);
   const cumulative = recorded.filter((p) => p.accepted !== false);
   assert.equal(recorded.length, 3, 'tổng ghi nhận giữ nguyên cho truy vết');

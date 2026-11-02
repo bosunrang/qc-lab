@@ -22,7 +22,7 @@ export function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
   }
 
   return <Modal title="Thêm kỳ Sigma" onClose={onClose} size="sm"
-    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Thêm kỳ</AsyncButton></>}>
+    footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Thêm kỳ</AsyncButton></>}>
     <div className="sg-add-period-form">
       <p className="hint">Chọn trực tiếp kỳ cần nhập, kể cả kỳ trước đó. Kỳ đã tồn tại sẽ không bị ghi đè.</p>
       <div className="sg-add-period-picker">

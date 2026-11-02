@@ -32,7 +32,7 @@ export function validateNceActionDraft(raw: unknown, detectedDate: string): NceV
 export interface NceActionCompletion { doneAt: string; evidence: string }
 
 export function validateNceActionCompletion(action: Pick<NceAction, 'status'>, raw: unknown, detectedDate: string, today: string): NceValidation<NceActionCompletion> {
-  if (action.status !== 'open') return { ok: false, code: 'action-not-open', message: 'Hành động đã hoàn thành hoặc đã hủy.' };
+  if (action.status !== 'open') return { ok: false, code: 'action-not-open', message: 'Hành động đã hoàn thành hoặc đã huỷ.' };
   const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const doneAt = cleanDate(input.doneAt);
   if (!doneAt) return { ok: false, code: 'invalid-done-date', message: 'Ngày hoàn thành không hợp lệ.' };
@@ -43,9 +43,9 @@ export function validateNceActionCompletion(action: Pick<NceAction, 'status'>, r
 }
 
 export function validateNceActionCancel(action: Pick<NceAction, 'status'>, reason: unknown): NceValidation<{ reason: string }> {
-  if (action.status !== 'open') return { ok: false, code: 'action-not-open', message: 'Chỉ hủy được hành động chưa hoàn thành.' };
+  if (action.status !== 'open') return { ok: false, code: 'action-not-open', message: 'Chỉ huỷ được hành động chưa hoàn thành.' };
   const text = String(reason ?? '').trim().slice(0, 2000);
-  return text.length < 10 ? { ok: false, code: 'missing-reason', message: 'Hủy hành động phải ghi lý do (ít nhất 10 ký tự).' } : { ok: true, data: { reason: text } };
+  return text.length < 10 ? { ok: false, code: 'missing-reason', message: 'Huỷ hành động phải ghi lý do (ít nhất 10 ký tự).' } : { ok: true, data: { reason: text } };
 }
 
 /** Ngày hoàn thành muộn nhất trong các hành động đã xong; rỗng nếu chưa có. */

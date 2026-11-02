@@ -26,7 +26,7 @@ test('ca 20: lần chạy chỉ có cảnh báo không vào hàng chờ', () => 
   assert.deepEqual(rows, []);
 });
 
-test('lần chạy thuộc hồ sơ đã đóng rời hàng chờ; đang xử lý thì hiện để mở tiếp; đã hủy coi như chưa có', () => {
+test('lần chạy thuộc hồ sơ đã đóng rời hàng chờ; đang xử lý thì hiện để mở tiếp; đã huỷ coi như chưa có', () => {
   const points = [qp('T1', '2026-10-01', '1', 2, 'rej', ['1-3s'])];
   const run = { date: '2026-10-01', runId: '1' };
   assert.deepEqual(buildNceQueue(points, [{ id: 'r1', nceId: 'NCE-1', status: 'closed', testId: 'T1', runs: [run] }]), []);
@@ -50,7 +50,7 @@ test('hàng chờ xếp lần chạy mới nhất lên trước, mã run theo th
   assert.deepEqual(rows.map((row) => `${row.date}/${row.runId}`), ['2026-10-01/10', '2026-10-01/9', '2026-09-30/1']);
 });
 
-test('tái diễn: cùng xét nghiệm, cùng loại sai số, trong cửa sổ, không tính hồ sơ hủy', () => {
+test('tái diễn: cùng xét nghiệm, cùng loại sai số, trong cửa sổ, không tính hồ sơ huỷ', () => {
   const current = { id: 'c', testId: 'T1', source: 'iqc', errorClass: 'SE', detectedDate: '2026-10-01', cancelled: false };
   const other = (over) => ({ id: 'o', testId: 'T1', source: 'iqc', errorClass: 'SE', detectedDate: '2026-08-01', cancelled: false, ...over });
   assert.equal(nceIsRecurrence(current, [other()], 90), true);

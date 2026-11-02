@@ -193,7 +193,7 @@ test('ca 10, 11, 19: nộp duyệt, phân tách nhiệm vụ, đóng hồ sơ v�
   assert.deepEqual(nce.listNceQueue().map((r) => r.run_id), [], 'lần chạy của hồ sơ đã đóng rời hàng chờ');
 });
 
-test('duyệt kiểm lại bằng chứng rerun: điểm rerun bị hủy sau khi cho chạy lại thì chặn', () => {
+test('duyệt kiểm lại bằng chứng rerun: điểm rerun bị huỷ sau khi cho chạy lại thì chặn', () => {
   const { nce, entry, testId, ids } = fixture();
   let dossier = createFromB(nce, testId);
   dossier = must(nce.updateNce({ data: { ...ref(dossier), patch: {
@@ -202,25 +202,25 @@ test('duyệt kiểm lại bằng chứng rerun: điểm rerun bị hủy sau kh
   dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
   dossier = must(nce.releaseNce({ data: { ...ref(dossier), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại');
   dossier = must(nce.submitNce({ data: ref(dossier) }, owner), 'nộp duyệt');
-  must(entry.voidPoint({ data: { pointId: ids['2026-09-03-1:2'], kind: 'data-entry', reason: 'Nhập nhầm' } }, admin), 'hủy điểm rerun');
+  must(entry.voidPoint({ data: { pointId: ids['2026-09-03-1:2'], kind: 'data-entry', reason: 'Nhập nhầm' } }, admin), 'huỷ điểm rerun');
   assert.match(nce.approveNce({ data: ref(dossier) }, approver).error.message, /Bằng chứng rerun không còn hợp lệ/);
 });
 
-test('ca 12: chỉ hủy hồ sơ chưa cho chạy lại, có lý do; trả lại về bước đã cho chạy lại', () => {
+test('ca 12: chỉ huỷ hồ sơ chưa cho chạy lại, có lý do; trả lại về bước đã cho chạy lại', () => {
   const { nce, testId } = fixture();
   const open = createFromB(nce, testId);
   assert.equal(nce.cancelNce({ data: { ...ref(open), reason: 'trùng' } }, owner).error.code, 'missing-reason');
   assert.equal(nce.cancelNce({ data: { ...ref(open), reason: 'Hồ sơ lập trùng với NCE khác' } }, tech).error.code, 'forbidden-cancel');
-  const cancelled = must(nce.cancelNce({ data: { ...ref(open), reason: 'Hồ sơ lập trùng với NCE khác' } }, owner), 'hủy');
+  const cancelled = must(nce.cancelNce({ data: { ...ref(open), reason: 'Hồ sơ lập trùng với NCE khác' } }, owner), 'huỷ');
   assert.equal(cancelled.record.status, 'cancelled');
   assert.equal(JSON.parse(cancelled.decisions.at(-1).payload_json).reason, 'Hồ sơ lập trùng với NCE khác');
-  assert.ok(nce.listNce().some((r) => r.id === open.record.id), 'hồ sơ hủy vẫn tìm thấy');
+  assert.ok(nce.listNce().some((r) => r.id === open.record.id), 'hồ sơ huỷ vẫn tìm thấy');
   // Lần chạy B được giải phóng: lập hồ sơ mới cho nó được.
   let again = createFromB(nce, testId);
   again = must(nce.recordNcePatientImpact({ data: { ...ref(again), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
   // W đứng trước lần hỏng C nên không còn là bằng chứng khôi phục hiện hành.
   again = must(nce.releaseNce({ data: { ...ref(again), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại bằng D sau lần hỏng cuối');
-  assert.equal(nce.cancelNce({ data: { ...ref(again), reason: 'Muốn hủy sau khi đã cho chạy lại' } }, owner).error.code, 'status');
+  assert.equal(nce.cancelNce({ data: { ...ref(again), reason: 'Muốn huỷ sau khi đã cho chạy lại' } }, owner).error.code, 'status');
 });
 
 test('cấu hình NCE và phân quyền NCE chỉ quản trị viên', () => {

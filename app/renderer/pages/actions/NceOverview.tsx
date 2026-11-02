@@ -103,7 +103,7 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
 
   async function attach(row: NceQueueRowView) {
     if (!row.attach_to) return;
-    if (!(await confirmDialog(`Gắn lần chạy ${nceRunLabel({ date: row.date, runId: row.run_id })} vào hồ sơ ${row.attach_to.nce_id}? QC tiếp tục bị loại sau xử lý tức thời nên hồ sơ sẽ phải xử lý theo CAPA đầy đủ.`, { title: 'Gắn vào hồ sơ đang mở', confirmLabel: 'Gắn vào hồ sơ', danger: false }))) return;
+    if (!(await confirmDialog(`Gắn lần chạy ${nceRunLabel({ date: row.date, runId: row.run_id })} vào hồ sơ ${row.attach_to.nce_id}? QC tiếp tục bị loại sau xử lý tức thời nên hồ sơ sẽ phải xử lý theo CAPA đầy đủ.`, { title: 'Gắn vào hồ sơ đang mở', confirmLabel: 'Gắn vào hồ sơ', cancelLabel: 'Quay lại', danger: false }))) return;
     const current = await get(row.attach_to.id);
     if (!current) return;
     const result = await attachRun({ id: current.record.id, expectedVersion: current.record.row_version, run: { date: row.date, runId: row.run_id } });

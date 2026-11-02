@@ -1,5 +1,5 @@
 // Chế độ vận hành (GV3, kế hoạch khắc phục 2026-10-31): cờ một chiều trong
-// `app_meta`. Khi đã bật, main chặn "Xoá sạch dữ liệu test" — dữ liệu QC thật
+// `app_meta`. Khi đã bật, main chặn "Xoá sạch dữ liệu thử" — dữ liệu QC thật
 // chỉ còn đổi qua các quy trình có nhật ký (huỷ điểm, lưu trữ nhật ký…).
 // Không có thao tác tắt; phục hồi backup hay tải từ Firebase cũng giữ cờ này
 // (xem `keepOperationMode`), để không thể "tắt" bằng cách nạp dữ liệu cũ.

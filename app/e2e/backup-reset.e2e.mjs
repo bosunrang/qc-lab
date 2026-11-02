@@ -55,30 +55,30 @@ test('xuất backup, xoá sạch dữ liệu rồi phục hồi lại từ tệp
 
     // Huỷ hộp thoại lưu: không có tệp, không có thông báo.
     await app.evaluate(() => { globalThis.__cancelNext = true; });
-    await page.getByRole('button', { name: 'Xuất backup', exact: true }).click();
+    await page.getByRole('button', { name: 'Xuất bản sao lưu', exact: true }).click();
     await page.waitForTimeout(300);
     assert.equal(existsSync(backupPath), false, 'huỷ thì không ghi tệp');
     assert.equal(await page.locator('.modal[role=dialog]').count(), 0);
 
-    await page.getByRole('button', { name: 'Xuất backup', exact: true }).click();
-    const exported = await closeInfo(page, 'Đã xuất backup');
+    await page.getByRole('button', { name: 'Xuất bản sao lưu', exact: true }).click();
+    const exported = await closeInfo(page, 'Đã xuất bản sao lưu');
     assert.match(exported, new RegExp(backupPath.replace(/[\\.]/g, '\\$&')));
-    assert.ok(statSync(backupPath).size > 0, 'tệp backup có nội dung');
+    assert.ok(statSync(backupPath).size > 0, 'tệp sao lưu có nội dung');
     const { save } = await app.evaluate(() => globalThis.__dialogs);
     assert.match(save.at(-1), /^qclab-backup-\d{4}-\d{2}-\d{2}\.sqlite$/, 'tên gợi ý của hộp thoại lưu');
 
-    await page.getByRole('button', { name: 'Xóa sạch dữ liệu' }).click();
-    await confirmIn(page, 'Xóa sạch dữ liệu test', 'Xóa sạch');
+    await page.getByRole('button', { name: 'Xoá sạch dữ liệu' }).click();
+    await confirmIn(page, 'Xoá sạch dữ liệu thử', 'Xoá sạch');
     await reauth(page);
     const reset = await closeInfo(page, 'Đã xoá');
     const resetSnapshot = reset.match(/Bản sao lưu trước khi xoá: (.+)$/m)?.[1].trim();
     assert.ok(resetSnapshot && existsSync(resetSnapshot), 'main chốt bản an toàn trước khi xoá');
     assert.deepEqual(await testNames(page), [], 'xét nghiệm đã bị xoá');
 
-    await page.getByRole('button', { name: 'Chọn file backup' }).click();
-    const confirm = dialogTitled(page, 'Phục hồi từ backup');
+    await page.getByRole('button', { name: 'Chọn tệp sao lưu' }).click();
+    const confirm = dialogTitled(page, 'Phục hồi từ bản sao lưu');
     assert.match(await confirm.innerText(), /e2e-backup\.sqlite hợp lệ/);
-    await confirmIn(page, 'Phục hồi từ backup', 'Phục hồi');
+    await confirmIn(page, 'Phục hồi từ bản sao lưu', 'Phục hồi');
     await reauth(page);
     const restored = await closeInfo(page, 'Đã phục hồi thành công');
     const restoreSnapshot = restored.match(/được lưu tại:\s*(.+)$/m)?.[1].trim();

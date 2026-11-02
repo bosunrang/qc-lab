@@ -1,7 +1,7 @@
 // Quyết định khi người dùng muốn đóng một modal (U3, U7 của đánh giá
 // 2026-10-31). Tách khỏi `Modal.tsx` thành hàm thuần để test thẳng trên `.ts`.
 
-/** Nguồn yêu cầu đóng. Nút "Hủy/Đóng" ở chân form gọi thẳng `onClose` của
+/** Nguồn yêu cầu đóng. Nút "Huỷ/Đóng" ở chân form gọi thẳng `onClose` của
  * modal (người dùng chủ ý bỏ), nên không đi qua đây. */
 export type ModalCloseSource = 'escape' | 'close-button' | 'backdrop';
 

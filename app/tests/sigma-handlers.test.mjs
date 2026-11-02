@@ -97,7 +97,7 @@ assert.equal(afterResave.filter((period) => period.period === '2026-08').length,
 assert.equal(afterResave.find((period) => period.period === '2026-08').levels[0].cv, 4);
 
 // 4b) Đổi kỳ là một giao dịch riêng: không được tạo bản mới rồi để lại bản
-// cũ (KTV có quyền sửa nhưng không có quyền xóa kỳ).
+// cũ (KTV có quyền sửa nhưng không có quyền xoá kỳ).
 const renamed = sigmaHandlers.renamePeriod({ id: resaved.data.id, period: '2026-07' }, actor);
 assert.equal(renamed.ok, true);
 assert.equal(renamed.data.period, '2026-07');

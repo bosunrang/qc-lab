@@ -217,7 +217,7 @@ export function HistoryTab() {
             <h4 className="history-detail-heading">Mean/SD đã dùng</h4>
             {historyEntries.length ? (
               <table className="history-detail-table hist-meansd-table">
-                <thead><tr><th>Lô QC</th><th className="num">Mean</th><th className="num">SD</th><th className="num">Mean tích lũy</th><th className="num">SD tích lũy</th><th className="num">CV tích lũy</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead>
+                <thead><tr><th>Lô QC</th><th className="num">Mean</th><th className="num">SD</th><th className="num">Mean tích luỹ</th><th className="num">SD tích luỹ</th><th className="num">CV tích luỹ</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead>
                 <tbody>{historyEntries.map((row) => {
                   const vals = points.filter((p) => p.level === row.level && (row.lotNo ? (p.lot || '') === row.lotNo : true) && (!row.to || p.date <= row.to)).map((p) => p.val);
                   const st = statsOf(vals);

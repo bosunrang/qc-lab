@@ -166,8 +166,8 @@ function UserActions({ user, current, onPerms, onReset }: {
     <>
       <RowActionButton kind="edit" label={`Sửa quyền ${user.name}`} onClick={onPerms} />{' '}
       <button className="btn ghost sm" onClick={onReset}>Đặt lại MK</button>{' '}
-      <button className="btn ghost sm" onClick={toggle}>{user.active === false ? 'Mở khóa' : 'Khóa'}</button>{' '}
-      <RowActionButton kind="delete" label={`Xóa người dùng ${user.name}`} onClick={removeUser} />
+      <button className="btn ghost sm" onClick={toggle}>{user.active === false ? 'Mở khoá' : 'Khoá'}</button>{' '}
+      <RowActionButton kind="delete" label={`Xoá người dùng ${user.name}`} onClick={removeUser} />
     </>
   );
 }
@@ -183,7 +183,7 @@ export function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Quản lý người dùng" subtitle="Phân quyền thao tác và kiểm soát tài khoản" />
+      <PageHeader title="Người dùng" subtitle="Phân quyền thao tác và kiểm soát tài khoản" />
       <div className="users-layout">
         <CreatePanel />
         <div className="panel users-list-panel">
@@ -198,7 +198,7 @@ export function UsersPage() {
                     <td>{roleLabel(user.role)}{user.role !== 'admin' && user.capabilities.length > 0 && (
                       <div className="hint">{CAPABILITY_OPTIONS.filter(([id]) => user.capabilities.includes(id)).map(([, label]) => label).join(' · ')}</div>
                     )}</td>
-                    <td>{user.active === false ? <span className="tag rej">Khóa</span> : <span className="tag ok">Hoạt động</span>}</td>
+                    <td>{user.active === false ? <span className="tag rej">Khoá</span> : <span className="tag ok">Hoạt động</span>}</td>
                     <td><div className="user-row-actions">
                       <UserActions user={user} current={user.id === me?.id} onPerms={() => setPermsFor(user)} onReset={() => setResetFor(user)} />
                     </div></td>
@@ -241,7 +241,7 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
 
   return (
     <Modal title="Sửa quyền người dùng" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Lưu quyền</AsyncButton></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu quyền</AsyncButton></>}>
       <div className="hint"><b>{user.name || user.username}</b> · @{user.username}</div>
       <div className="field">
         <label htmlFor="editUserRole">Vai trò</label>
@@ -290,7 +290,7 @@ function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () =
 
   return (
     <Modal title={`Đặt lại mật khẩu — ${user.username}`} onClose={onClose}
-      footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Đặt lại</AsyncButton></>}>
+      footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Đặt lại</AsyncButton></>}>
       {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
       {done ? <p>Đã đặt lại mật khẩu — người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp.</p> : (
         <div className="field" ref={fieldRef}><label htmlFor="resetUserPassword">Mật khẩu mới (≥8 ký tự)</label><input id="resetUserPassword" data-field="password" autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)}

@@ -238,7 +238,7 @@ test('nhãn đứng trên control dùng thang form chung', () => {
   assert.match(appCss, /label\{[^}]*font-size:var\(--text-sm\)[^}]*color:var\(--text-secondary\)[^}]*font-weight:var\(--weight-semibold\);\}/,
     'nhãn field toàn app dùng token 13px/600/màu phụ — 12px làm dấu tiếng Việt chồng lên nhau khó đọc');
   assert.match(reagent, /\.rc-field label\s*\{\s*display:\s*block;\s*margin:\s*0 0 var\(--field-label-gap\);\s*\}/,
-    'nhãn field So sánh hóa chất dùng khoảng cách chuẩn');
+    'nhãn field So sánh hoá chất dùng khoảng cách chuẩn');
   assert.doesNotMatch(reagent, /\.rc-field label,.rc-toolbar-selcol label\{[^}]*font-size/,
     'Reagent không tự nâng nhãn control lên 13px/700');
   // `.field>label` đã bỏ margin-top ở mọi nơi. Rule trang chỉ để đặt lại
@@ -284,12 +284,12 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
     'ô tìm nhanh dùng chiều cao control gọn của header');
 });
 
-test('thao tác xóa kỳ dùng RowActionButton chung', () => {
+test('thao tác xoá kỳ dùng RowActionButton chung', () => {
   const sigmaPage = readSigmaPageSources();
   assert.match(
     sigmaPage,
-    /<RowActionButton kind="delete" label=\{`Xóa kỳ \$\{vnPeriod\(displayPeriod\.period\)\}`\} onClick=\{\(\) => removePeriodRow\(displayPeriod\)\} \/>/,
-    'Xóa kỳ là thao tác của workspace, không dùng nút danger có chữ riêng',
+    /<RowActionButton kind="delete" label=\{`Xoá kỳ \$\{vnPeriod\(displayPeriod\.period\)\}`\} onClick=\{\(\) => removePeriodRow\(displayPeriod\)\} \/>/,
+    'Xoá kỳ là thao tác của workspace, không dùng nút danger có chữ riêng',
   );
 });
 
@@ -376,7 +376,7 @@ test('mật độ control dùng token component, không viết lại số chuẩ
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .matchAll(common)]
     .map((m) => `${relative(ROOT, file)}: ${m[0]}`));
-  assert.deepEqual(raw, [], 'dùng --control-h* cho mật độ control đã chuẩn hóa');
+  assert.deepEqual(raw, [], 'dùng --control-h* cho mật độ control đã chuẩn hoá');
 });
 
 test('mọi var() trong CSS đều có định nghĩa và không tham chiếu vòng', () => {

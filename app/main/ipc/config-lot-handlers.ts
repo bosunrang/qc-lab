@@ -502,7 +502,7 @@ export function createLotConfigHandlers(db: Db) {
       { id: string; status: string; from_lot_id: string; to_lot_id: string } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ chuyển lô.' } };
     if (existing.status === 'accepted') {
-      return { ok: false, error: { code: 'accepted-applied', message: 'Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xóa trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công.' } };
+      return { ok: false, error: { code: 'accepted-applied', message: 'Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xoá trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công.' } };
     }
     const detail = `${lotLabel(existing.from_lot_id)} → ${lotLabel(existing.to_lot_id)}`;
     w.commit((tx) => {

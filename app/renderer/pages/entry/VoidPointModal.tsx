@@ -29,24 +29,24 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   const reasonMin = voidReasonMinimum(voidKind, runRejected);
 
   async function submitVoid() {
-    if (voidReason.trim().length < reasonMin) { setVoidErr(`Cần ghi lý do hủy tối thiểu ${reasonMin} ký tự.`); return; }
+    if (voidReason.trim().length < reasonMin) { setVoidErr(`Cần ghi lý do huỷ tối thiểu ${reasonMin} ký tự.`); return; }
     const openNce = voidChoice.forced ? voidChoice.openNce : voidOpenNce;
     const result = await voidPoint(point.id, voidReason.trim(), voidKind, openNce);
     if (!result.ok) { setVoidErr(result.error.message); return; }
     const followup = result.data.nceId
       ? (result.data.reusedAction ? ' Đã giữ liên kết với hồ sơ NCE đang mở.' : ` Đã mở hồ sơ ${result.data.nceId} để tiếp tục điều tra.`)
       : ' Không yêu cầu NCE/QC chạy lại.';
-    onVoided(`Đã hủy điểm QC ngày ${vnDate(point.date)}. Điểm không còn tham gia tính toán.${followup}`);
+    onVoided(`Đã huỷ điểm QC ngày ${vnDate(point.date)}. Điểm không còn tham gia tính toán.${followup}`);
   }
 
   return (
-    <Modal title="Hủy điểm QC" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submitVoid}>Hủy điểm này</AsyncButton></>}>
+    <Modal title="Huỷ điểm QC" onClose={onClose}
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submitVoid}>Huỷ điểm này</AsyncButton></>}>
       <div className="hint">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
       {runRejected && <div className="alert warn">Điểm này thuộc lần chạy bị loại{point.rules.length ? ` (luật ${point.rules.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
       <div className="field">
-        <label htmlFor="voidKindInput">Loại hủy</label>
-        <select id="voidKindInput" aria-label="Loại hủy điểm QC" value={voidKind}
+        <label htmlFor="voidKindInput">Loại huỷ</label>
+        <select id="voidKindInput" aria-label="Loại huỷ điểm QC" value={voidKind}
           onChange={(e) => { const k = e.target.value as VoidKind; setVoidKind(k); setVoidOpenNce(voidNceChoice(k).openNce); }}>
           <option value="analytical">Kết quả QC thực tế không hợp lệ</option>
           <option value="data-entry">Nhập sai dữ liệu</option>
@@ -58,11 +58,11 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
           onChange={(e) => setVoidOpenNce(e.target.checked)} /> Lập hồ sơ NCE và yêu cầu chạy lại QC</label>
         <div className="hint">{voidKind === 'analytical'
           ? 'Hệ thống sẽ lập hồ sơ NCE mới, hoặc dùng lại hồ sơ đang mở của điểm này, rồi chờ một kết quả QC chạy lại được chấp nhận.'
-          : voidKind === 'data-entry' ? 'Chỉ lưu dấu vết hủy; không mở NCE và không yêu cầu chạy lại QC.'
+          : voidKind === 'data-entry' ? 'Chỉ lưu dấu vết huỷ; không mở NCE và không yêu cầu chạy lại QC.'
           : 'Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.'}</div>
       </div>
       <div className="field">
-        <label htmlFor="voidReasonInput">{reasonMin ? `Lý do hủy (bắt buộc, tối thiểu ${reasonMin} ký tự)` : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>
+        <label htmlFor="voidReasonInput">{reasonMin ? `Lý do huỷ (bắt buộc, tối thiểu ${reasonMin} ký tự)` : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>
         <textarea id="voidReasonInput" autoFocus value={voidReason} onChange={(e) => setVoidReason(e.target.value)} rows={3}
           placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." />
         {voidErr && <p className="field-error" role="alert">{voidErr}</p>}

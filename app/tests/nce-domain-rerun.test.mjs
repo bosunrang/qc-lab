@@ -39,14 +39,14 @@ test('ca 3: rerun cùng ngày nhưng trước lần hỏng cuối bị từ ch�
   assert.equal(check(goodRerun('2026-10-01', '10'), { repeatRejects: [repeat] }).ok, true);
 });
 
-test('ca 3: thiếu mức, có mức bị loại, có điểm đã hủy hoặc mức chưa có Mean/SD đều bị từ chối', () => {
+test('ca 3: thiếu mức, có mức bị loại, có điểm đã huỷ hoặc mức chưa có Mean/SD đều bị từ chối', () => {
   assert.deepEqual(codes(check(run('2026-10-02', '1', [point(1)]))), ['rerun-missing-level']);
   assert.deepEqual(codes(check(run('2026-10-02', '1', [point(1), point(2, { verdict: 'rej', rules: ['1-3s'] })]))), ['rerun-rejected']);
   assert.deepEqual(codes(check(run('2026-10-02', '1', [point(1), point(2, { voided: true })]))), ['rerun-missing-level']);
   assert.deepEqual(codes(check(run('2026-10-02', '1', [point(1), point(2, { verdict: 'none' })]))), ['rerun-unassessed']);
 });
 
-test('ca 3: mức của lần khởi đầu bị hủy sau đó vẫn phải được chạy lại', () => {
+test('ca 3: mức của lần khởi đầu bị huỷ sau đó vẫn phải được chạy lại', () => {
   const trigger = triggerRun();
   const voidedTrigger = { ...trigger, points: [trigger.points[0], { ...trigger.points[1], voided: true }] };
   const result = checkNceRerun({ testId: 'T1', trigger: voidedTrigger, repeatRejects: [], candidate: run('2026-10-02', '1', [point(1)]), lotChangeNote: '' });

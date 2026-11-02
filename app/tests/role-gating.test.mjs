@@ -123,7 +123,7 @@ assert.equal(westgard.resetRuleSettings(admin).ok, true, 'admin phai khoi phuc d
 assert.equal(settings.saveLabProfile({ data: { name: 'Khoa Xet nghiem' } }, admin).ok, true, 'admin phai luu duoc ho so PXN');
 assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-03', val: 5.1, runId: 'r1' } }, admin).ok, true, 'admin phai them duoc diem QC');
 
-// ── 5b) Xuất backup: CHỈ admin — bản backup chứa cả chuỗi mật khẩu PBKDF2
+// ── 5b) Xuất bản sao lưu: CHỈ admin — bản backup chứa cả chuỗi mật khẩu PBKDF2
 // của mọi người dùng, không phải dữ liệu ai cũng được tải về.
 const backupDir = require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'qclab-role-'));
 const backupFile = require('node:path').join(backupDir, 'backup.sqlite');

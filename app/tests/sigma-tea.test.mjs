@@ -22,7 +22,7 @@ const customClia = resolveTea(
   [{ name: 'Marker X', aliases_json: '["marker-x"]', lab: null, lab_source: '', clia: 3, clia_rule: 'greater-of', clia_absolute: 0.05, clia_absolute_unit: 'L' }], [],
   'clia', 1,
 );
-assert.equal(customClia.value, 5, 'hồ sơ CLIA tự khai phải dùng alias, chuẩn hóa liter/L và giới hạn tuyệt đối');
+assert.equal(customClia.value, 5, 'hồ sơ CLIA tự khai phải dùng alias, chuẩn hoá liter/L và giới hạn tuyệt đối');
 assert.equal(findCatalog({ ...sodium, name: 'CK-MB', tea_ref_key: '' }, [{ id: 'ck', name: 'Creatine kinase', abbr: 'CK', unit: 'U/L', clia: 20, ricos: null }]), null, 'không được ghép mơ hồ CK-MB vào CK');
 
 const cliaNoMean = resolveTea(sodium, [], catalog, 'clia', null);

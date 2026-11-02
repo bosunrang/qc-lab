@@ -1,4 +1,4 @@
-// IPC handler cho module Entry (nhập/hủy điểm QC). Lô đang vận hành được đánh
+// IPC handler cho module Entry (nhập/huỷ điểm QC). Lô đang vận hành được đánh
 // giá đa mức; lô mới trong chuyển tiếp được đánh giá riêng từng mức và không
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
@@ -83,7 +83,7 @@ export function createEntryHandlers(db: Db) {
       WHERE ql.id=? AND ${OPERATIONAL_LOT_GROUP_SQL}`).get(qcLotId);
   }
 
-  /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa hủy thuộc đúng lô
+  /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa huỷ thuộc đúng lô
    * đang gán của từng mức, sắp lần chạy theo số tự nhiên, rồi ghép luật
    *
    * Tập mức lấy từ `db/operational-levels.ts` — cùng tập mà trang Phân tích
@@ -217,7 +217,7 @@ export function createEntryHandlers(db: Db) {
     });
   }
 
-  /** Toàn bộ điểm chưa hủy của một xét nghiệm, không giới hạn ở lô đang
+  /** Toàn bộ điểm chưa huỷ của một xét nghiệm, không giới hạn ở lô đang
    * vận hành. Trang Lịch sử dữ liệu cần nguồn này để điểm của lô cũ vẫn
    * còn nhìn thấy sau khi chấp nhận chuyển tiếp lô.
    *
@@ -235,7 +235,7 @@ export function createEntryHandlers(db: Db) {
       FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id`).all(testId) as unknown as HistoryQcPointView[];
   }
 
-  /** Danh sách audit điểm đã hủy dùng riêng cho khối tra cứu. Tách endpoint
+  /** Danh sách audit điểm đã huỷ dùng riêng cho khối tra cứu. Tách endpoint
    * khỏi `queryPoints()` để điểm voided tuyệt đối không lọt lại vào chuỗi
    * Westgard, biểu đồ, thống kê hay quyết định ngày. */
   function listVoidedPoints(testId: string) {
@@ -437,7 +437,7 @@ export function createEntryHandlers(db: Db) {
     return { ok: true, data: view };
   });
 
-  /** Hủy điểm QC. "kind" (nguyên nhân hủy) quyết định có tự mở/dùng lại hồ
+  /** Huỷ điểm QC. "kind" (nguyên nhân huỷ) quyết định có tự mở/dùng lại hồ
    * sơ NCE hay không (`voidNceChoice()`). */
   const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }> => {
     const actor = w.actor;
@@ -479,7 +479,7 @@ export function createEntryHandlers(db: Db) {
     const kindLabel = kind === 'analytical' ? 'Kết quả QC thực tế không hợp lệ' : kind === 'data-entry' ? 'Nhập sai dữ liệu' : '';
     const composedReason = kindLabel ? (reason ? `${kindLabel} — ${reason}` : kindLabel) : reason;
     // Hồ sơ NCE theo LẦN CHẠY (D-01): dùng lại hồ sơ đang xử lý của chính lần
-    // chạy này; không có thì chụp lần chạy TRƯỚC khi đánh dấu hủy để làm lần
+    // chạy này; không có thì chụp lần chạy TRƯỚC khi đánh dấu huỷ để làm lần
     // khởi đầu. Điểm ngoài tập đang vận hành (lô song song/lịch sử) lấy kết
     // luận đã tính ở trên.
     const existingNce = openNce ? openRecordOfRun(db, point.test_id, point.date, point.run_id) : undefined;
@@ -495,14 +495,14 @@ export function createEntryHandlers(db: Db) {
       const rejectionNote = runRejected
         ? ` · Thuộc lần chạy ${point.run_id || '(không mã)'} bị loại${view?.rules.length ? ` (luật ${view.rules.join(', ')})` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
         : '';
-      tx.audit('Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}${rejectionNote}`, test ? test.name : '');
+      tx.audit('Huỷ điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}${rejectionNote}`, test ? test.name : '');
       let nceId: string | null = null, reusedAction = false, createdAction = false;
       if (openNce && existingNce) { nceId = existingNce.nce_id; reusedAction = true; }
       else if (openNce && snapshot) {
         const id = uid(), now = nowIso(), today = isoLocalDate();
         nceId = nextNceId(db, today);
-        const label = `Hủy điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}`;
-        // Người hủy là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
+        const label = `Huỷ điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}`;
+        // Người huỷ là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
         // tự mở không còn lọt khỏi cảnh báo quá hạn (sửa R-11). Có giữ kết quả
         // hay không thì chưa biết, phải ghi trước khi cho chạy lại.
         insertNceRecord(db, {
@@ -512,7 +512,7 @@ export function createEntryHandlers(db: Db) {
           errorClass: nceErrorClass([{ role: 'trigger', snapshot }]), checklistJson: JSON.stringify(emptyChecklist('iqc')),
         }, actor, now);
         insertNceRun(db, id, 'trigger', snapshot, actor, now);
-        tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ hủy điểm QC`, test ? test.name : '');
+        tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ huỷ điểm QC`, test ? test.name : '');
         createdAction = true;
       }
       tx.changed(createdAction ? ['qc_points', 'nce_records'] : ['qc_points'], [point.test_id]);

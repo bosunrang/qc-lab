@@ -16,7 +16,7 @@ export const AUDIT_SIZE_WARNING_ROWS = 50_000;
 /** Lời nhắc dùng chung cho trang Nhật ký và Cài đặt; `null` khi chưa tới ngưỡng. */
 export function auditSizeWarning(total: number): string | null {
   if (!(total > AUDIT_SIZE_WARNING_ROWS)) return null;
-  return `Nhật ký đã có ${total.toLocaleString('vi-VN')} dòng, vượt mức khuyến nghị ${AUDIT_SIZE_WARNING_ROWS.toLocaleString('vi-VN')}. App không tự xoá nhật ký; hãy dùng "Lưu trữ nhật ký cũ" (xuất CSV trước khi gỡ) để trang Nhật ký và gói đồng bộ không phình mãi.`;
+  return `Nhật ký đã có ${total.toLocaleString('vi-VN')} dòng, vượt mức khuyến nghị ${AUDIT_SIZE_WARNING_ROWS.toLocaleString('vi-VN')}. Phần mềm không tự xoá nhật ký; hãy dùng "Lưu trữ nhật ký cũ" (xuất CSV trước khi gỡ) để trang Nhật ký và gói đồng bộ không phình mãi.`;
 }
 
 /** Ngày của dòng nhật ký theo GIỜ ĐỊA PHƯƠNG — đúng ngày bảng Nhật ký hiện

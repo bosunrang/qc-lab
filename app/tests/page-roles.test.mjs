@@ -18,7 +18,7 @@ assert.deepEqual(
 // Nhãn hiện ở 2 nơi nhìn thấy được (sidebar + lưới "Thẻ được phép dùng") nên
 // khoá luôn từng chuỗi — kể cả "Cài đặt & Đám mây".
 assert.deepEqual(PAGE_DEFS.map((p) => p.label), [
-  'Tổng quan', 'Nhập QC & Biểu đồ', 'Phân tích Westgard', 'Six Sigma & Sai số', 'So sánh hóa chất',
+  'Tổng quan', 'Nhập QC & Biểu đồ', 'Phân tích Westgard', 'Six Sigma & Sai số', 'So sánh hoá chất',
   'Phân tích ngoại kiểm', 'Khắc phục sự cố', 'Báo cáo & Biểu mẫu', 'Cấu hình chung', 'Người dùng', 'Nhật ký hoạt động', 'Cài đặt & Đám mây',
 ]);
 assert.deepEqual([...ROLE_LIST], ['admin', 'technician', 'viewer']);

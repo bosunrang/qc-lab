@@ -61,7 +61,7 @@ test('huỷ "nhập sai dữ liệu" điểm Loại bỏ: bắt buộc lý do �
   const evidence = JSON.parse(row(failing).void_rejection_json);
   assert.deepEqual(evidence.rules, ['1-3s']);
   const audit = listActivity(db, 1)[0];
-  assert.equal(audit.type, 'Hủy điểm QC');
+  assert.equal(audit.type, 'Huỷ điểm QC');
   assert.match(audit.detail, /Thuộc lần chạy 2026-09-03-1 bị loại \(luật 1-3s\)/);
 });
 
