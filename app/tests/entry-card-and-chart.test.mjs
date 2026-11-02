@@ -9,6 +9,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { readEntryPageSources } from './helpers/page-source.mjs';
+import * as qcMarker from '../renderer/lib/qc-marker.ts';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -116,15 +117,15 @@ function drawLjCircles(points, mean, sd) {
     source.slice(source.indexOf('function geometry('), source.indexOf('const MULTI_COLORS')),
   ].join('\n');
   const LJ = { okBand: 'band', okMid: 'band', warnBand: 'band', rejectBand: 'band', grid: 'grid', mean: 'mean', line: 'line', okPoint: 'OK', warnPoint: 'WARN', rejectPoint: 'REJ' };
-  const context = vm.createContext({ vnDayMonth: (date) => date, LJ, BANDS: [] });
-  vm.runInContext(stripTypeScriptTypes(section), context);
   const circles = [];
+  // Mỗi điểm vẽ qua `traceMarker` (U6): ghi tâm và hình tại đó, còn ruột/viền
+  // ghi đúng lúc `fill()`/`stroke()` vì `drawPoint` đặt màu ngay trước mỗi lệnh.
+  const traceMarker = (ctx, shape, x, y) => circles.push({ x, y, shape, fill: null, stroke: null });
+  const context = vm.createContext({ vnDayMonth: (date) => date, LJ, BANDS: [], ...qcMarker, traceMarker });
+  vm.runInContext(stripTypeScriptTypes(section), context);
   const pen = { fillStyle: null, strokeStyle: null };
-  // `drawLJ` đặt `fillStyle` TRƯỚC `arc()` rồi mới đặt `strokeStyle` và gọi
-  // `stroke()`, nên viền phải ghi lại ở đúng lúc vẽ viền — đọc `strokeStyle`
-  // ngay tại `arc()` chỉ bắt được màu của đường kẻ lưới vẽ trước đó.
   const canvas = new Proxy({}, {
-    get: (_, key) => key === 'arc' ? (x, y) => circles.push({ x, y, fill: pen.fillStyle, stroke: null })
+    get: (_, key) => key === 'fill' ? () => { const last = circles.at(-1); if (last && last.fill === null) last.fill = pen.fillStyle; }
       : key === 'stroke' ? () => { const last = circles.at(-1); if (last && last.stroke === null) last.stroke = pen.strokeStyle; }
       : key === 'measureText' ? () => ({ width: 20 }) : () => {},
     set: (_, key, value) => { if (key in pen) pen[key] = value; return true; },
@@ -180,6 +181,14 @@ test('EN07: điểm đạt nhưng cả lần chạy bị loại được vẽ V�
   const rejected = drawLjCircles([{ ...base, verdict: 'rej', rules: ['1-3s'], accepted: false, runRejectedBy: [1] }], 100, 2).circles[0];
   assert.equal(rejected.fill, 'REJ');
   assert.equal(rejected.stroke, '#fff');
+  // U6: hình theo kết luận, kể cả điểm rỗng giữ hình của chính nó.
+  assert.equal(counted.shape, 'circle');
+  assert.equal(collateral.shape, 'circle');
+  assert.equal(rejected.shape, 'square');
+  const warnCollateral = drawLjCircles([{ ...base, verdict: 'warn', z: 2.5, rules: ['1-2s'], accepted: false, runRejectedBy: [2] }], 100, 2).circles[0];
+  assert.equal(warnCollateral.shape, 'triangle');
+  assert.equal(warnCollateral.fill, '#fff');
+  assert.equal(warnCollateral.stroke, 'WARN');
 });
 
 test('EN08: queryPoints trả kèm accepted + mức nào làm hỏng lần chạy', () => {

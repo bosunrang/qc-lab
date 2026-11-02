@@ -340,7 +340,8 @@ test('Nhập QC không rò kiểu dáng sang Sigma và không giữ dữ liệu 
     'CSS Nhập QC không được sở hữu selector của thẻ Sigma');
   assert.doesNotMatch(entry, /\.entrygrid>\.tree/,
     'cây Nhập QC dùng một rule hoàn chỉnh, không để cascade selector riêng đè lại');
-  assert.match(entry, /\.legend \.dot\.qc-legend-ok\{background:var\(--success-accent\);\}/,
+  // Chú giải L-J dùng chung (QcChartLegend, U6) nằm ở app.css.
+  assert.match(readFileSync(join(STYLE_DIR, 'app.css'), 'utf8'), /\.qc-mark\.ok\{[^}]*background:var\(--success-accent\);\}/,
     'legend trạng thái dùng token thay vì mã màu trong JSX');
   assert.doesNotMatch(page, /style=\{\{\s*background:/,
     'legend Nhập QC không được viết màu trực tiếp trong JSX');

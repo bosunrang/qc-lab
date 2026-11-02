@@ -376,8 +376,30 @@ Test: `design-system.test.mjs`. `eqa.css` chưa đổi vì thuộc phần EQA đ
 
 Test: `app/tests/vietnamese-text.test.mjs`.
 
-**Còn lại của GV9:** U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu): người dùng quyết định bỏ
-qua (02/11/2026).
+**U6 — đã làm 02/11/2026.** Biểu đồ không còn dùng màu làm tín hiệu duy nhất (WCAG 2.2 mục
+1.4.1); màu giữ nguyên.
+- Hình theo kết luận (`lib/qc-marker.ts`): Đạt tròn, Cảnh báo tam giác, Loại vuông. Điểm không
+  vào thống kê vì cả lần chạy bị loại vẽ rỗng cùng hình. Áp cho L-J một mức và nhiều mức. CUSUM
+  vượt ngưỡng h cũng vẽ vuông.
+- Biểu đồ nhiều mức tách mức bằng kiểu nét (liền, gạch, chấm); chú giải trên canvas vẽ đúng
+  kiểu nét đó.
+- L-J một mức ghi tên luật cạnh điểm Loại, tối đa hai luật. Nhãn đặt về phía giữa biểu đồ,
+  nhãn đè lên nhau thì bỏ (tooltip vẫn có đủ luật).
+- Chú giải HTML dùng chung `QcChartLegend` ở Nhập QC và Westgard (cả nhóm lô đã dừng).
+  Bỏ CSS `.legend` của entry.css.
+- Nhãn chú giải nói theo luật, không theo khoảng SD (người dùng duyệt 02/11/2026). "Trong ±2SD",
+  "Cảnh báo 2–3SD", "Loại bỏ ngoài 3SD" đổi thành:
+  - "Đạt · không vi phạm luật đang bật"
+  - "Cảnh báo · vi phạm luật chỉ cảnh báo (thường là 1-2s)"
+  - "Loại bỏ theo luật Westgard · kèm tên luật"
+
+  Lý do: điểm trong ±3SD vẫn bị loại theo 2-2s/R-4s, còn 1-2s có thể cấu hình thành luật loại.
+- Chưa làm: cam cảnh báo đậm hơn để đạt 3:1 (đổi sắc độ màu trạng thái, cần người dùng duyệt).
+  Biểu đồ EQA dùng chung `QcChart` nên đổi hình theo, nhưng chưa có chú giải.
+
+Test: `app/tests/qc-marker.test.mjs`.
+
+**Còn lại của GV9:** U5 (màu Sigma): người dùng quyết định bỏ qua (02/11/2026).
 
 **Phương án gốc:**
 

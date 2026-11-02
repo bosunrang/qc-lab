@@ -162,18 +162,6 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .lj-qc-stat.control{background:var(--surface-subtle);}
 .lj-qc-stat.control .v{color:var(--accent-text);}
 .lj-qc-stat:not(.control)+.lj-qc-stat.control{border-left:2px solid var(--accent-border-soft);}
-.legend{display:flex;gap:var(--space-4);flex-wrap:wrap;margin:var(--space-2-5) var(--space-6) var(--space-3-5);color:var(--text-tertiary);font-size:var(--text-xs);}
-/* Mỗi mục là flex căn giữa: `vertical-align: middle` của chấm tròn căn theo
-   nửa chiều cao chữ thường nên lệch khỏi chữ (tuỳ phông). */
-.legend>span{display:inline-flex;align-items:center;gap:var(--space-1-5);}
-.legend .dot{flex:none;width:9px;height:9px;border-radius:50%;}
-.legend .dot.qc-legend-ok{background:var(--success-accent);}
-.legend .dot.qc-legend-warn{background:var(--warning-accent);}
-.legend .dot.qc-legend-rej{background:var(--danger-accent);}
-/* Vòng rỗng = điểm không vào Mean/SD/CV thực vì CẢ lần chạy bị loại. Giữ
-   nguyên màu theo kết luận của chính điểm (ở đây là màu Đạt) — phần rỗng mới
-   là thứ mang nghĩa "không dùng thống kê". Trùng đúng cách `drawLJ()` vẽ. */
-.legend .dot.qc-legend-excluded{background:var(--surface);box-shadow:inset 0 0 0 2px var(--success-accent);}
 
 /* Nhãn phụ cạnh thẻ kết luận trong bảng "Điểm trong khoảng xem". Không dùng
    màu cảnh báo: điểm này KHÔNG vi phạm, nó chỉ không được tính. */

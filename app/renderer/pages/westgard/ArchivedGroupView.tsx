@@ -1,7 +1,7 @@
 // Tab "Nhóm lô đã dừng/lưu trữ" của trang Phân tích Westgard: phần chọn nằm
 // trong panel "Thiết lập phân tích", phần kết quả nằm bên dưới. Cả hai đọc
 // cùng trạng thái của `useArchivedWestgard`.
-import { QcMultiChart } from '../../components/QcChart';
+import { QcChartLegend, QcMultiChart } from '../../components/QcChart';
 import { EmptyState } from '../../components/EmptyState';
 import { WestgardPointTable, vnDate } from './shared';
 import { statText } from '../../lib/westgard-view';
@@ -62,6 +62,7 @@ export function ArchivedGroupResults({ state }: { state: ArchivedWestgardState }
           <div className="hint wg-panel-intro">Biểu đồ quy đổi từng mức về Z-score theo Mean/SD đã chốt của chính lô để so sánh trên cùng trục; kết luận được đánh giá lại theo bộ luật Westgard đang bật.</div>
           <div className="chart-scroll"><QcMultiChart className="wgLJMultiArchived" height={300} responsiveHeight decimals={archivedDecimals}
             series={archivedBlocks.map((b) => ({ level: b.level, lot: b.lotNo, points: b.analysis.points }))} /></div>
+          <QcChartLegend />
         </div>
       )}
 

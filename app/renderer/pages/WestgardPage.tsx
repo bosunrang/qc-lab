@@ -10,7 +10,7 @@ import { useWestgardStore } from '../store/westgard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
 import { isAdmin } from '../lib/permissions';
-import { QcChart, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
+import { QcChart, QcChartLegend, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
@@ -345,6 +345,7 @@ export function WestgardPage() {
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
           <div className="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
           <div className="chart-scroll"><QcMultiChart className="wgLJMulti" series={multiSeries} height={300} responsiveHeight decimals={currentSummary?.decimalPlaces ?? 2} /></div>
+          <QcChartLegend />
         </div>
       )}
       {view === 'current' && testId && chartMode === 'lj' && levels.map((l) => {

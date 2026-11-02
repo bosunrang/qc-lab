@@ -3,7 +3,7 @@
 // hoặc khoảng xem đổi.
 import { memo } from 'react';
 import { observedStats } from '../../../main/domain/observed-stats';
-import { QcChart } from '../../components/QcChart';
+import { QcChart, QcChartLegend } from '../../components/QcChart';
 import { DateField } from '../../components/DateField';
 import { formatQcValue, inLjWindow, vnDate, type DisplayColumn } from './shared';
 import type { LevelAnalysis, PreviousLotSeries, QcPointView } from '../../../shared/qc-api';
@@ -94,12 +94,7 @@ export const EntryLjPanel = memo(function EntryLjPanel({
           );
         })}
       </div>
-      <div className="legend">
-        <span><span className="dot qc-legend-ok" />Trong ±2SD</span>
-        <span><span className="dot qc-legend-warn" />Cảnh báo 2–3SD</span>
-        <span><span className="dot qc-legend-rej" />Loại bỏ ngoài 3SD</span>
-        <span><span className="dot qc-legend-excluded" />Vòng rỗng · lần chạy bị loại, không vào thống kê</span>
-      </div>
+      <QcChartLegend />
     </div>
   );
 });

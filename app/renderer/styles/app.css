@@ -340,6 +340,15 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 .stat-value.accent{color:var(--accent);}
 .stat-value.danger{color:var(--danger-text);}
 .stat-sub{margin-top:var(--space-1-5);color:var(--text-tertiary);font-size:var(--text-sm);font-weight:500;line-height:var(--leading-body);}
+/* Chú giải hình điểm dưới biểu đồ L-J (QcChartLegend). Hình trùng drawPoint():
+   tròn = Đạt, tam giác = Cảnh báo, vuông = Loại, rỗng = không vào thống kê. */
+.qc-legend{display:flex;flex-wrap:wrap;gap:var(--space-4);margin:var(--space-2-5) var(--space-6) var(--space-3-5);padding:0;list-style:none;color:var(--text-tertiary);font-size:var(--text-xs);}
+.qc-legend>li{display:inline-flex;align-items:center;gap:var(--space-1-5);}
+.qc-mark{flex:none;width:10px;height:10px;}
+.qc-mark.ok{border-radius:var(--radius-full);background:var(--success-accent);}
+.qc-mark.warn{width:12px;background:var(--warning-accent);clip-path:polygon(50% 0,100% 100%,0 100%);}
+.qc-mark.rej{background:var(--danger-accent);}
+.qc-mark.excluded{border-radius:var(--radius-full);background:var(--surface);box-shadow:inset 0 0 0 2px var(--success-accent);}
 
 
 

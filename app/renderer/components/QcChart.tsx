@@ -4,6 +4,7 @@ import { qcRunKey, compareQcRunKey } from '../../main/domain/sort-order';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { vnDate, vnDayMonth } from '../lib/format';
 import { CHART_TEAL } from '../lib/chart-colors';
+import { levelDash, markerShape, markerSize, pickRejectLabels, rejectRuleLabel, traceMarker } from '../lib/qc-marker';
 
 export interface QcChartPoint {
   date: string; runId: string; val: number; z: number;
@@ -22,6 +23,30 @@ export interface QcChartPoint {
 function isRunCollateral(point: QcChartPoint): boolean {
   return point.accepted === false && point.verdict !== 'rej' && !!point.runRejectedBy?.length;
 }
+/** Màu điểm theo kết luận; Đạt lấy màu của đường (teal ở biểu đồ một mức,
+ * màu của mức ở biểu đồ nhiều mức). */
+function verdictColor(verdict: QcChartPoint['verdict'], okColor: string): string {
+  return verdict === 'rej' ? LJ.rejectPoint : verdict === 'warn' ? LJ.warnPoint : okColor;
+}
+
+/** Vẽ một điểm QC: hình theo kết luận (`lib/qc-marker.ts`), viền trắng để
+ * tách khỏi đường nối. Điểm không vào thống kê vì CẢ lần chạy bị loại vẽ
+ * RỖNG cùng hình: màu và hình vẫn nói kết luận của chính điểm, phần rỗng nói
+ * nó không vào Mean/SD/CV. Điểm tự bị loại không bao giờ rỗng — đó là biến
+ * cố, không phải hệ quả. */
+function drawPoint(ctx: CanvasRenderingContext2D, point: QcChartPoint, px: number, py: number, color: string) {
+  const shape = markerShape(point.verdict), radius = markerSize(point.verdict);
+  ctx.setLineDash([]); ctx.lineJoin = 'miter';
+  traceMarker(ctx, shape, px, py, radius);
+  if (isRunCollateral(point)) {
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.stroke();
+    return;
+  }
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8; ctx.stroke();
+}
+
 export interface QcChartCusum {
   cPos: number[]; cNeg: number[]; flags: ('ok' | 'warn' | 'rej')[];
   /** Tham số thật của xét nghiệm, được IPC giữ nguyên từ domain CUSUM. */
@@ -58,6 +83,22 @@ const LJ = {
   grid: '#5d6b76', mean: '#17212b', line: CHART_TEAL,
   okPoint: CHART_TEAL, warnPoint: '#dd8b1f', rejectPoint: '#c5221f',
 } as const;
+
+/** Chú giải hình điểm dưới biểu đồ Levey-Jennings, viết bằng HTML để trình
+ * đọc màn hình đọc được (canvas thì không). Hình trùng `drawPoint()`.
+ * Nhãn nói theo LUẬT chứ không theo khoảng SD: kết luận do bộ luật Westgard
+ * đang bật của xét nghiệm quyết định (`westgard-engine.ts`). Một điểm trong
+ * ±3SD vẫn bị loại theo 2-2s hay R-4s; 1-2s có thể cấu hình thành luật loại
+ * hoặc tắt hẳn. Trước 02/11/2026 nhãn ghi "Trong ±2SD", "Cảnh báo 2–3SD",
+ * "Loại bỏ ngoài 3SD". */
+export function QcChartLegend() {
+  return <ul className="qc-legend" aria-label="Chú giải biểu đồ Levey-Jennings">
+    <li><span className="qc-mark ok" aria-hidden="true" />Đạt · không vi phạm luật đang bật</li>
+    <li><span className="qc-mark warn" aria-hidden="true" />Cảnh báo · vi phạm luật chỉ cảnh báo (thường là 1-2s)</li>
+    <li><span className="qc-mark rej" aria-hidden="true" />Loại bỏ theo luật Westgard · kèm tên luật</li>
+    <li><span className="qc-mark excluded" aria-hidden="true" />Hình rỗng · lần chạy bị loại, không vào thống kê</li>
+  </ul>;
+}
 
 /** Dải nền theo bậc SD — `leveyJenningsBandRects`, đúng thứ tự vẽ (dải sau
  * phủ lên dải trước, nên ±1SD trắng nằm cuối). */
@@ -321,25 +362,28 @@ function drawLJ(
     });
     ctx.stroke();
   }
-  points.forEach((p, i) => {
-    const radius = p.verdict === 'ok' ? 4 : 5;
+  const marks = points.map((p, i) => {
+    const radius = markerSize(p.verdict);
     // Giữ trọn marker trong vùng vẽ khi giá trị nằm ngoài ±3.25SD.
     const px = x(i), py = Math.max(padT + radius, Math.min(padT + ch - radius, clampY(valueOf(p))));
-    const color = p.verdict === 'rej' ? LJ.rejectPoint : p.verdict === 'warn' ? LJ.warnPoint : LJ.okPoint;
-    // Vòng RỖNG cho điểm bị loại theo lần chạy: màu vẫn nói đúng kết luận của
-    // chính điểm đó, phần rỗng nói nó không vào Mean/SD/CV. Không đổi hình
-    // điểm tự bị loại (đỏ đặc) — đó là biến cố, không phải hệ quả.
-    if (isRunCollateral(p)) {
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.stroke();
-      return;
-    }
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8; ctx.stroke();
+    drawPoint(ctx, p, px, py, verdictColor(p.verdict, LJ.okPoint));
+    return { p, px, py, radius };
   });
   ctx.restore();
+
+  // Tên luật cạnh điểm Loại, đặt về phía giữa biểu đồ để không ra khỏi vùng vẽ.
+  ctx.font = '700 10.5px Manrope,system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  const rejects = marks.filter((m) => m.p.verdict === 'rej' && m.p.rules.length);
+  const labels = rejects.map((m) => ({ text: rejectRuleLabel(m.p.rules), above: m.py > padT + ch / 2 }));
+  const picked = pickRejectLabels(rejects.map((m, i) => ({ x: m.px, above: labels[i].above, width: ctx.measureText(labels[i].text).width })));
+  for (const i of picked) {
+    const m = rejects[i], { text, above } = labels[i];
+    ctx.textBaseline = above ? 'bottom' : 'top';
+    const ty = above ? m.py - m.radius - 3 : m.py + m.radius + 3;
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round'; ctx.strokeText(text, m.px, ty);
+    ctx.fillStyle = LJ.rejectPoint; ctx.fillText(text, m.px, ty);
+  }
 
   ctx.fillStyle = '#536772'; ctx.font = '700 11.5px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -448,27 +492,19 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
     const color = MULTI_COLORS[li % MULTI_COLORS.length];
     const pts = s.points.filter((p) => dateIndex.has(qcRunKey(p)));
     if (pts.length > 1) {
-      ctx.strokeStyle = color; ctx.lineWidth = 2.1; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash([]);
+      // Mỗi mức một kiểu nét (liền/gạch/chấm) kèm màu: in đen trắng vẫn tách được mức.
+      ctx.strokeStyle = color; ctx.lineWidth = 2.1; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash(levelDash(li));
       ctx.beginPath();
       pts.forEach((p, j) => { const px = x(dateIndex.get(qcRunKey(p))!), py = clampY(p.z); if (j) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
       ctx.stroke();
     }
+    // Cùng quy ước với `drawLJ()`. Điểm rỗng là điểm không vào thống kê vì cả
+    // lần chạy bị loại. Bảng ngay dưới biểu đồ đã ghi "Lần chạy bị loại ở Mức N"
+    // cho đúng những điểm đó, nên biểu đồ và bảng phải nói cùng một chuyện.
     pts.forEach((p) => {
-      const px = x(dateIndex.get(qcRunKey(p))!), py = clampY(p.z);
-      const radius = p.verdict === 'ok' ? 4 : 5;
-      const dotColor = p.verdict === 'rej' ? LJ.rejectPoint : p.verdict === 'warn' ? LJ.warnPoint : color;
-      // Cùng quy ước với `drawLJ()`: vòng rỗng = không vào thống kê vì cả lần
-      // chạy bị loại. Bảng ngay dưới biểu đồ này đã ghi "Lần chạy bị loại ở
-      // Mức N" cho đúng những điểm đó, hai chỗ phải nói một chuyện.
-      if (isRunCollateral(p)) {
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = dotColor; ctx.lineWidth = 2.2; ctx.stroke();
-        return;
-      }
-      ctx.fillStyle = dotColor;
-      ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8; ctx.stroke();
+      const radius = markerSize(p.verdict);
+      const px = x(dateIndex.get(qcRunKey(p))!), py = Math.max(padT + radius, Math.min(padT + ch - radius, clampY(p.z)));
+      drawPoint(ctx, p, px, py, verdictColor(p.verdict, color));
     });
   });
   ctx.restore();
@@ -479,15 +515,17 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
   const tickIdx = total === 1 ? [0] : [...new Set(Array.from({ length: total }, (_, i) => Math.round((i * (n - 1)) / (total - 1))))];
   for (const i of tickIdx) { const raw = dates[i].split('\u0000')[0]; ctx.fillText(vnDayMonth(raw, raw.slice(0, 5)), x(i), padT + ch + 10); }
 
-  // Chú giải màu theo mức.
+  // Chú giải theo mức: đoạn nét cùng màu và kiểu nét của đường.
   let lx = padL + 8; const ly = 10;
   ctx.font = '800 11.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   series.forEach((s, li) => {
     const color = MULTI_COLORS[li % MULTI_COLORS.length];
     const label = s.label || `Mức ${s.level}`;
-    ctx.fillStyle = color; ctx.fillRect(lx, ly - 2, 18, 4);
-    ctx.fillStyle = '#17212b'; ctx.fillText(label, lx + 25, ly);
-    lx += 25 + ctx.measureText(label).width + 18;
+    ctx.strokeStyle = color; ctx.lineWidth = 2.6; ctx.lineCap = 'butt'; ctx.setLineDash(levelDash(li));
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 22, ly); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#17212b'; ctx.fillText(label, lx + 29, ly);
+    lx += 29 + ctx.measureText(label).width + 18;
   });
 }
 
@@ -555,7 +593,8 @@ function drawCusum(ctx: CanvasRenderingContext2D, width: number, height: number,
       if (!Number.isFinite(value)) continue;
       const exceeds = rejected && Math.abs(value) >= h - 1e-9;
       ctx.fillStyle = exceeds ? CUSUM_COLORS.rej : color;
-      ctx.beginPath(); ctx.arc(x(i), clampY(value), exceeds ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+      // Vượt ngưỡng h là tín hiệu loại: vuông đỏ như điểm Loại trên L-J.
+      traceMarker(ctx, exceeds ? 'square' : 'circle', x(i), clampY(value), exceeds ? 5 : 3); ctx.fill();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.stroke();
     }
   });
@@ -620,7 +659,7 @@ function drawMultiCusum(ctx: CanvasRenderingContext2D, width: number, height: nu
       for (const [value, color] of [[point.pos, positive], [point.neg, negative]] as const) {
         if (!Number.isFinite(value)) continue;
         const reject = point.flag === 'rej' && Math.abs(value) >= h - 1e-9;
-        ctx.fillStyle = reject ? CUSUM_COLORS.rej : color; ctx.beginPath(); ctx.arc(point.x, clampY(value), reject ? 5 : 3, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.stroke();
+        ctx.fillStyle = reject ? CUSUM_COLORS.rej : color; traceMarker(ctx, reject ? 'square' : 'circle', point.x, clampY(value), reject ? 5 : 3); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.stroke();
       }
     });
   });
