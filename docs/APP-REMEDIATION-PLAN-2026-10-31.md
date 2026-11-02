@@ -299,8 +299,15 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 - **Ghi nhận ngoài phạm vi:** e2e `reload-count` đỏ từ trước (đã thử lại trên commit
   `7e615d3` và `16e1a0d`): nhập một điểm làm `entry:queryPoints` chạy 4 lần thay vì 2.
 
-**Còn lại của GV9:** U4 (vòng focus), U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu) — đổi
-cách hiển thị trạng thái nên cần người dùng chốt trước.
+**U4 — đã làm 02/11/2026:** vòng focus 2px, nằm ngoài control 2px (`--focus-ring-offset`)
+nên nút teal đặc vẫn thấy vòng trên nền trang (teal-500: 4,97:1 trên trắng, 4,63:1 trên
+nền trang). Ô nhập liệu, `.datebox`, nút trong `.dayseg` và mọi thứ trong sidebar vẽ
+vòng vào trong (`--focus-ring-offset-inset: -2px`) để không thành hai viền và không bị
+khung cha cắt. Nền tối (sidebar, nút phân đoạn đang chọn) dùng `--focus-ring-on-dark` =
+dark-accent (6,4–8,6:1). Test: `design-system.test.mjs`.
+
+**Còn lại của GV9:** U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu) — đổi cách hiển thị
+trạng thái nên cần người dùng chốt trước.
 
 **Phương án gốc:**
 

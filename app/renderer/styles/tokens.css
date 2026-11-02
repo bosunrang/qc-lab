@@ -244,14 +244,20 @@
 
   /* Focus — MỘT vòng cho cả app. */
   /* teal-500 chứ không phải teal nhạt: vòng focus phải đạt 3:1 với nền
-     (WCAG 1.4.11).
+     (WCAG 1.4.11) — 4,97:1 trên trắng, 4,63:1 trên nền trang.
      Bàn phím chỉ dùng vòng này; click chuột chỉ đổi một viền accent, để
      không có hai đường teal song song quanh cùng một control. */
   --focus-ring:var(--teal-500);
-  --focus-ring-width:1px;
-  /* Âm đúng bằng độ dày vòng: vòng teal nằm đè lên viền control thay vì
-     bao thêm một lớp bên ngoài. Không đổi kích thước và không tạo hai viền. */
-  --focus-ring-offset:-1px;
+  /* Nền tối (sidebar, nút phân đoạn đang chọn): teal-500 chỉ còn 2,4–3,2:1,
+     dark-accent đạt 6,4–8,6:1. */
+  --focus-ring-on-dark:var(--dark-accent);
+  --focus-ring-width:2px;
+  /* Dương: vòng nằm NGOÀI control, trên nền trang. Nút teal đặc có nền trùng
+     màu vòng, nên vòng đè lên nút thì không thấy (U4, đánh giá 2026-10-31). */
+  --focus-ring-offset:2px;
+  /* Âm đúng bằng độ dày vòng: vòng nằm trọn trong control, đè lên viền — cho ô
+     nhập liệu (không tạo hai viền) và nơi khung cha cắt phần tràn. */
+  --focus-ring-offset-inset:-2px;
 
   /* Màu chữ theo vai trò hẹp — trước 2026-09-25 nằm ở lớp bí danh tạm. */
   --text-strong:var(--ink-strong);

@@ -410,6 +410,8 @@ test('mọi cặp màu chữ/nền đạt WCAG AA', () => {
   for (const fg of ['--sidebar-text', '--sidebar-text-muted', '--sidebar-icon']) need(fg, '--sidebar-bg', 4.5);
   need('--sidebar-active-accent', '--sidebar-bg', 3);
   need('--sidebar-active-ink', '--sidebar-active-bg', 4.5);
+  // Vòng focus trên nền tối: sidebar và nút phân đoạn đang chọn.
+  for (const bg of ['--sidebar-bg', '--sidebar-active-bg', '--surface-inverse-soft']) need('--focus-ring-on-dark', bg, 3);
 
   assert.deepEqual(fails, [],
     'mọi cặp màu vai trò phải đạt WCAG; Clinical Precision không giữ ngoại lệ');
@@ -465,8 +467,13 @@ test('mọi padding/margin/gap đều nằm trên thang khoảng cách', () => {
 
 test('chỉ có một vòng focus dùng chung', () => {
   const appCss = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
-  assert.equal(TOKEN['--focus-ring-offset'], '-1px',
-    'vòng focus phải nằm đè lên viền control, không bao thêm viền thứ hai');
+  // U4 (đánh giá 2026-10-31): vòng 1px đè lên nút teal đặc thì không thấy. Vòng
+  // 2px nằm ngoài control; ô nhập liệu vẽ vào trong, đè lên viền.
+  assert.equal(TOKEN['--focus-ring-width'], '2px');
+  assert.equal(TOKEN['--focus-ring-offset'], '2px', 'vòng nằm ngoài, trên nền trang');
+  assert.equal(TOKEN['--focus-ring-offset-inset'], '-2px',
+    'vòng của ô nhập liệu nằm trọn trong ô, không bao thêm viền thứ hai');
+  assert.match(appCss, /input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\):focus-visible,select:focus-visible,textarea:focus-visible,[^{]*\{outline-offset:var\(--focus-ring-offset-inset\);\}/);
   assert.match(
     appCss,
     /:focus-visible\{outline:var\(--focus-ring-width\) solid var\(--focus-ring\);outline-offset:var\(--focus-ring-offset\);\}/,

@@ -137,6 +137,10 @@ textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:v
 /* Vòng chỉ dẫn khi lấy nét dùng chung toàn hệ thống. Nơi cần điều chỉnh chỉ
    đổi `outline-offset`; không tắt vòng chỉ dẫn hoặc vẽ lại bằng `box-shadow`. */
 :focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:var(--focus-ring-offset);}
+/* Ô nhập liệu vẽ vòng vào trong, đè lên viền; nút trong nhóm phân đoạn và trong
+   sidebar cũng vậy vì khung cha cắt phần tràn. */
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,select:focus-visible,textarea:focus-visible,.dayseg button:focus-visible,aside :focus-visible{outline-offset:var(--focus-ring-offset-inset);}
+aside :focus-visible,.dayseg button.on:focus-visible{outline-color:var(--focus-ring-on-dark);}
 /* Click chuột chỉ đổi MỘT viền. Khi focus bằng bàn phím, `:focus-visible`
    để viền thường và chỉ hiện vòng tương phản ở trên — tránh hai đường teal
    song song như control trước đây. */
@@ -415,7 +419,7 @@ td .hint{margin-top:2px;color:var(--text-tertiary);}
    tránh hai vòng chỉ dẫn chồng lên nhau. */
 .datebox input.date-text:focus-visible{outline:none;}
 .datebox input.date-text:focus{border:none;box-shadow:none;}
-.datebox:has(input.date-text:focus-visible){outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:var(--focus-ring-offset);}
+.datebox:has(input.date-text:focus-visible){outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:var(--focus-ring-offset-inset);}
 /* Ô ngày là trường thật trong 1 form (`.field` bọc nó, có `label` riêng —
    khác các chỗ dùng compact/trần như dải lọc ngày) — kéo dài bằng các ô
    input/select khác cùng hàng `.grid2`, thay vì giữ bề rộng cố định hẹp
