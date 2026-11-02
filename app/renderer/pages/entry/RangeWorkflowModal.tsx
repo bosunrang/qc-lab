@@ -3,6 +3,7 @@
 // không vẽ lại bảng nhập và biểu đồ của trang.
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
+import { AsyncButton } from '../../components/AsyncButton';
 import { reauthDialog } from '../../state/dialog-store';
 import { useEntryStore } from '../../store/entry-store';
 import { useAuthStore } from '../../store/auth-store';
@@ -60,7 +61,7 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
 
   return (
     <Modal title={mode === 'apply' ? 'Thiết lập dải QC mới' : 'Hoàn dải QC nhà sản xuất'} onClose={onClose} size="lg" className="range-workflow-modal"
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className={`btn ${mode === 'apply' ? 'teal' : 'danger'}`} disabled={!canConfigure || (mode === 'apply' && !rangeCandidate.eligible)} onClick={submitRangeWorkflow}>{mode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className={`btn ${mode === 'apply' ? 'teal' : 'danger'}`} disabled={!canConfigure || (mode === 'apply' && !rangeCandidate.eligible)} onClick={submitRangeWorkflow}>{mode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</AsyncButton></>}>
       {mode === 'apply' && proposed && (
         <>
           <p className="range-workflow-meta">{testName || 'Xét nghiệm'} · Mức {rangeCandidate.level}{rangeCandidate.lot ? ` · Lô ${rangeCandidate.lot}` : ''}</p>

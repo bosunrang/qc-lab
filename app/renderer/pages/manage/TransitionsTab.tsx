@@ -18,6 +18,7 @@ import { todayIso } from '../../state/date-picker-store';
 import { EmptyState } from './shared';
 import { normalizeSearch } from '../../lib/useTestSelection';
 import type { LotTransition } from '../../../shared/qc-api';
+import { useAsyncAction } from '../../components/AsyncButton';
 
 /** Giờ:phút + ngày dạng Việt Nam; giá trị không hợp lệ thì trả rỗng. */
 function formatDateTimeVN(value: string): string {
@@ -101,6 +102,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
    * cùng 1 câu hỏi cho cả 2 trường hợp (không tách riêng "Xác thực chấp
    * nhận"/"Xác thực từ chối"). KHÔNG có confirmDialog trước reauth — đi
    * thẳng từ nút Lưu sang ô nhập mật khẩu. */
+  const saving = useAsyncAction(submit);
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
     const status = String(fd.get('status') || 'planned') as LotTransition['status'];
@@ -167,9 +169,9 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
           </tbody>
         </table> : <EmptyState title="Chưa có hồ sơ chuyển lô">Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.</EmptyState>}
         {creating && (
-          <Modal title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
-            footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Hủy</button><button className="btn teal" type="submit" form="transition-form">{creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
-            <form id="transition-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
+          <Modal busy={saving.busy} title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
+            footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Hủy</button><button className="btn teal" type="submit" form="transition-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
+            <form id="transition-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}
               <div className="lot-trans-row3">
                 <div className="field">

@@ -49,7 +49,7 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
   }
 
   return (
-    <Modal title={prefill ? `Lập hồ sơ NCE — ${prefill.testName}` : 'Lập hồ sơ NCE từ nguồn khác'} size="lg" onClose={onClose}
+    <Modal title={prefill ? `Lập hồ sơ NCE — ${prefill.testName}` : 'Lập hồ sơ NCE từ nguồn khác'} size="lg" onClose={onClose} busy={saving}
       footer={<><button type="button" className="btn ghost" onClick={onClose}>Hủy</button><button type="button" className="btn teal" disabled={saving} onClick={submit}>{saving ? 'Đang lưu…' : 'Lập hồ sơ'}</button></>}>
       {error && <div className="alert rej" role="alert">{error}</div>}
       {prefill

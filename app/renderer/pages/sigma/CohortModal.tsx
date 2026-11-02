@@ -4,6 +4,7 @@ import { Modal } from '../../components/Modal';
 import { confirmDialog, infoDialog } from '../../state/dialog-store';
 import { cohortStatusLabel, cohortStatusTone, vnDate, vnPeriod } from './shared';
 import type { SigmaCohortView, SigmaPeriodView } from '../../../shared/qc-api';
+import { AsyncButton } from '../../components/AsyncButton';
 
 export function CohortModal({ period, cohorts, onClose, onSubmit }: {
   period: SigmaPeriodView; cohorts: SigmaCohortView[]; onClose: () => void;
@@ -23,7 +24,7 @@ export function CohortModal({ period, cohorts, onClose, onSubmit }: {
     if (!result.ok) await infoDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC', type: 'warn' });
   }
   return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} size="xl"
-    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</button></>}>
+    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</AsyncButton></>}>
     <div className="sg-cohort-table-wrap"><table className="sg-cohort-table"><thead><tr><th className="sg-cohort-level">Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th className="num">n</th><th className="num">CV</th><th>Trạng thái</th></tr></thead><tbody>
       {period.levels.flatMap((level) => {
         const rows = byLevel.get(level.level) || [];

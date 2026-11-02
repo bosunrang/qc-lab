@@ -334,6 +334,7 @@ test('actual MU modal renders the edited draft, not stored MU, and marks incompl
     const MuModal = vm.runInNewContext(transformed.code + '\nMuModal', {
       React, uncertaintyBudget, useState: () => [drafts.shift(), () => {}],
       Modal: ({ children }) => React.createElement('section', null, children),
+      AsyncButton: ({ children }) => React.createElement('button', null, children),
     });
     return renderToStaticMarkup(React.createElement(MuModal, { level: { cv: 1, biasEqa: 0, tea: 10, mu: { U: 2 } } }));
   }

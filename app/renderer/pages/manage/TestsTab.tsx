@@ -11,6 +11,7 @@ import { EmptyState, WESTGARD_RULES, parseRuleConfig } from './shared';
 import { defaultRuleAction } from '../../../main/domain/westgard-rules';
 import { NOT_RETROACTIVE_NOTE } from '../../../main/domain/rule-config';
 import type { Test } from '../../../shared/qc-api';
+import { useAsyncAction } from '../../components/AsyncButton';
 
 function testCatalogKey(test: Test): string {
   // `analyte_id` là mã kỹ thuật từ các lần tạo/cập nhật trước. Một số bản ghi
@@ -169,6 +170,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     setNamePickerOpen(false);
   }
 
+  const saving = useAsyncAction(submit);
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
     const selectedInstrumentIds = fd.getAll('instrumentIds').map(String);
@@ -290,9 +292,9 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
           </table>}
 
         {editing && (
-          <Modal title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal rcfg-assay-modal"
-            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form">{editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
-            <form id="test-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
+          <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Sửa xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal rcfg-assay-modal"
+            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
+            <form id="test-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}
               <div className="assay-setup-layout">
                 <section className="assay-config-card assay-settings-column">
@@ -314,7 +316,9 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                           onBlur={closeNamePickerSoon}
                           onChange={(event) => changeTestName(event.currentTarget)}
                           onKeyDown={(event) => {
-                            if (event.key === 'Escape') { setNamePickerOpen(false); return; }
+                            // Esc khi danh sách gợi ý đang mở chỉ đóng danh sách; `preventDefault`
+                            // báo cho ngăn xếp lớp không đóng luôn modal.
+                            if (event.key === 'Escape' && namePickerOpen) { event.preventDefault(); setNamePickerOpen(false); return; }
                             if (event.key === 'ArrowDown') { event.preventDefault(); setNamePickerOpen(true); return; }
                             if (event.key === 'Enter' && namePickerOpen && matchingSuggestions.length) {
                               event.preventDefault(); chooseTeaSuggestion(matchingSuggestions[0]);

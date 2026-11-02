@@ -68,7 +68,7 @@ export function ActionsSection(props: SectionProps) {
       ) : <div className="nce-capa-empty"><div><p className="nce-eyebrow">Hành động cần theo dõi</p><h3>Chưa có hành động khắc phục hoặc phòng ngừa</h3><p>Tầng CAPA cần có ít nhất một hành động khắc phục đã hoàn thành trước khi nộp duyệt.</p></div>{can.edit && <span className="tag warn">Cần bổ sung</span>}</div>}
 
       {editing && (
-        <Modal title={editing.id ? 'Sửa hành động' : 'Thêm hành động'} onClose={() => setEditing(null)}
+        <Modal busy={props.busy} title={editing.id ? 'Sửa hành động' : 'Thêm hành động'} onClose={() => setEditing(null)}
           footer={<><button type="button" className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void saveDraft()}>Lưu</button></>}>
           {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
           <div className="nce-form-grid">
@@ -80,7 +80,7 @@ export function ActionsSection(props: SectionProps) {
         </Modal>
       )}
       {completing && (
-        <Modal title="Hoàn thành hành động" onClose={() => setCompleting(null)}
+        <Modal busy={props.busy} title="Hoàn thành hành động" onClose={() => setCompleting(null)}
           footer={<><button type="button" className="btn ghost" onClick={() => setCompleting(null)}>Hủy</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void complete()}>Xác nhận hoàn thành</button></>}>
           <p className="nce-note">Hành động đang xác nhận: {completing.description}</p>
           {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
@@ -92,7 +92,7 @@ export function ActionsSection(props: SectionProps) {
         </Modal>
       )}
       {cancelling && (
-        <Modal title="Hủy hành động" size="sm" onClose={() => setCancelling(null)}
+        <Modal busy={props.busy} title="Hủy hành động" size="sm" onClose={() => setCancelling(null)}
           footer={<><button type="button" className="btn ghost" onClick={() => setCancelling(null)}>Quay lại</button><button type="button" className="btn danger" disabled={props.busy} onClick={() => void cancelAction()}>Hủy hành động</button></>}>
           <p className="nce-note">Hành động đang xác nhận: {cancelling.description}</p>
           {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}

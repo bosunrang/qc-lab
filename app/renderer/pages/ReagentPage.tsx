@@ -233,7 +233,7 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
   }
 
   return (
-    <Modal title={`Chọn nhanh ${label}`} onClose={onClose}>
+    <Modal title={`Chọn nhanh ${label}`} onClose={onClose} guardUnsaved={false}>
       {!items.length && <EmptyState size="compact">Chưa có {label} trong danh sách.</EmptyState>}
       {items.map((name, i) => (
         <div className="mrow" key={name}>
@@ -261,7 +261,7 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
   const needle = query.trim().toLowerCase();
   const rows = comparisons.filter((c) => !needle || comparisonLabel(c).toLowerCase().includes(needle));
   return (
-    <Modal title="Chọn phép so sánh" onClose={onClose} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
+    <Modal title="Chọn phép so sánh" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." autoFocus />
       <div className="flow-control rc-picker-list">
         {rows.length ? rows.map((comparison) => (
@@ -299,7 +299,7 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
   }
 
   return (
-    <Modal title="Thêm hóa chất" onClose={onClose} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
+    <Modal title="Thêm hóa chất" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hóa chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." autoFocus />
       <div className="flow-control">
         <button className="refrow rc-create-typed" onClick={() => create(query.trim() || 'Hóa chất mới')}>+ Tạo {query.trim() ? `"${query.trim()}"` : 'hóa chất trống'}</button>

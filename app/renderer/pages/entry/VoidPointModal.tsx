@@ -7,6 +7,7 @@ import { useEntryStore } from '../../store/entry-store';
 import { voidNceChoice, voidReasonMinimum, type VoidKind } from '../../../main/domain/entry-validation';
 import { formatQcValue, vnDate } from './shared';
 import type { QcPointView } from '../../../shared/qc-api';
+import { AsyncButton } from '../../components/AsyncButton';
 
 export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   point: QcPointView;
@@ -40,7 +41,7 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
 
   return (
     <Modal title="Hủy điểm QC" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className="btn danger" onClick={submitVoid}>Hủy điểm này</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submitVoid}>Hủy điểm này</AsyncButton></>}>
       <div className="hint">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
       {runRejected && <div className="alert warn">Điểm này thuộc lần chạy bị loại{point.rules.length ? ` (luật ${point.rules.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
       <div className="field">

@@ -8,6 +8,7 @@ import { RowActionButton } from '../../components/RowActionButton';
 import { confirmDialog, infoDialog } from '../../state/dialog-store';
 import { EmptyState, FieldRow } from './shared';
 import type { Instrument } from '../../../shared/qc-api';
+import { useAsyncAction } from '../../components/AsyncButton';
 
 export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { createRequest?: number; onCreateRequestHandled?: () => void } = {}) {
   const { instruments, tests, panels, saveInstrument, removeInstrument } = useManageStore(useShallow((s) => ({ instruments: s.instruments, tests: s.tests, panels: s.panels, saveInstrument: s.saveInstrument, removeInstrument: s.removeInstrument })));
@@ -35,6 +36,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
     if (!result.ok) { setErr(result.error.message); return; }
     setEditing(null);
   }
+  const saving = useAsyncAction(submit);
   async function remove(i: Instrument) {
     if (!(await confirmDialog(`Xoá máy xét nghiệm "${i.name}"?`, { danger: true }))) return;
     const result = await removeInstrument(i.id);
@@ -74,9 +76,9 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
             </tbody>
           </table>}
         {editing && (
-          <Modal title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
-            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="instrument-form">{editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
-            <form id="instrument-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
+          <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
+            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="instrument-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
+            <form id="instrument-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}
               <FieldRow>
                 <div className="field"><label>Tên hiển thị</label><input name="name" placeholder="VD: AU5800-01" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>

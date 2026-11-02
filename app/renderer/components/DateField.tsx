@@ -1,6 +1,7 @@
 import { useRef, useState, type MouseEvent } from 'react';
 import { vnDate } from '../lib/format';
 import { openDatePicker } from '../state/date-picker-store';
+import { FIELD_EDIT_EVENT } from '../lib/modal-close';
 
 function CalendarIcon() {
   return (
@@ -47,6 +48,10 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   function commit(nextIso: string) {
     if (!isControlled) setOwnIso(nextIso);
     if (textRef.current) textRef.current.value = formatDateDisplay(nextIso);
+    // Báo modal chứa ô này là người dùng đã sửa form: chọn trên lịch (nằm ngoài
+    // khung modal) không phát `input` nào nổi bọt qua modal. Rời ô mà không
+    // đổi ngày (blur cũng gọi `commit`) thì không tính là sửa.
+    if (nextIso !== iso) textRef.current?.dispatchEvent(new Event(FIELD_EDIT_EVENT, { bubbles: true }));
     onChange?.(nextIso);
   }
 

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { PERIOD_YEARS, currentPeriod, vnPeriod } from './shared';
+import { AsyncButton } from '../../components/AsyncButton';
 
 export function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
   periods: string[]; onClose: () => void;
@@ -21,7 +22,7 @@ export function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
   }
 
   return <Modal title="Thêm kỳ Sigma" onClose={onClose} size="sm"
-    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Thêm kỳ</button></>}>
+    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Thêm kỳ</AsyncButton></>}>
     <div className="sg-add-period-form">
       <p className="hint">Chọn trực tiếp kỳ cần nhập, kể cả kỳ trước đó. Kỳ đã tồn tại sẽ không bị ghi đè.</p>
       <div className="sg-add-period-picker">

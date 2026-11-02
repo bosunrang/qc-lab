@@ -9,6 +9,7 @@ import { confirmDialog, infoDialog } from '../../state/dialog-store';
 import { useAuthStore } from '../../store/auth-store';
 import type { TeaRef } from '../../../shared/qc-api';
 import { EmptyState } from './shared';
+import { useAsyncAction } from '../../components/AsyncButton';
 
 
 const TEA_STATUS: Record<string, { cls: string; label: string }> = {
@@ -100,6 +101,21 @@ export function TeaRefsTab() {
     setEditing(null);
   }
 
+  async function submitAnalyte(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    const result = await addTeaAnalyte({
+      name: String(form.get('name') || ''), abbreviation: String(form.get('abbreviation') || ''),
+      unit: String(form.get('unit') || ''),
+      section: String(form.get('section') || ''), clia: String(form.get('clia') || ''), ricos: String(form.get('ricos') || ''),
+      cliaRule: String(form.get('cliaRule') || '') as 'percent' | 'absolute' | 'greater-of',
+      cliaAbsolute: String(form.get('cliaAbsolute') || ''), cliaAbsoluteUnit: String(form.get('cliaAbsoluteUnit') || ''),
+    });
+    if (!result.ok) { setAddErr(result.error.message); return; }
+    setAdding(false);
+  }
+
+  const saving = useAsyncAction(submit);
+  const addingAnalyte = useAsyncAction(submitAnalyte);
   async function remove(id: string, name: string) {
     if (await confirmDialog(`Xoá hồ sơ TEa "${name}"?`, { danger: true })) await removeTeaRef(id);
   }
@@ -173,21 +189,9 @@ export function TeaRefsTab() {
         </tbody>
       </table> : <EmptyState title="Không tìm thấy xét nghiệm">Thử tìm lại theo tên, đơn vị hoặc nhóm xét nghiệm.</EmptyState>}
       </div>
-      {adding && <Modal title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} size="lg" className="rcfg-modal"
-        footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Hủy</button><button className="btn teal" type="submit" form="tea-add-form">Thêm xét nghiệm</button></>}>
-        <form id="tea-add-form" onSubmit={async (event) => {
-          event.preventDefault();
-          const form = new FormData(event.currentTarget);
-          const result = await addTeaAnalyte({
-            name: String(form.get('name') || ''), abbreviation: String(form.get('abbreviation') || ''),
-            unit: String(form.get('unit') || ''),
-            section: String(form.get('section') || ''), clia: String(form.get('clia') || ''), ricos: String(form.get('ricos') || ''),
-            cliaRule: String(form.get('cliaRule') || '') as 'percent' | 'absolute' | 'greater-of',
-            cliaAbsolute: String(form.get('cliaAbsolute') || ''), cliaAbsoluteUnit: String(form.get('cliaAbsoluteUnit') || ''),
-          });
-          if (!result.ok) { setAddErr(result.error.message); return; }
-          setAdding(false);
-        }}>
+      {adding && <Modal busy={addingAnalyte.busy} title="Thêm xét nghiệm tham chiếu" onClose={() => setAdding(false)} size="lg" className="rcfg-modal"
+        footer={<><button className="btn ghost" onClick={() => setAdding(false)}>Hủy</button><button className="btn teal" type="submit" form="tea-add-form" disabled={addingAnalyte.busy}>{addingAnalyte.busy ? 'Đang lưu…' : 'Thêm xét nghiệm'}</button></>}>
+        <form id="tea-add-form" onSubmit={(event) => { event.preventDefault(); void addingAnalyte.run(event.currentTarget); }}>
           {addErr && <p className="field-error">{addErr}</p>}
           <div className="grid2">
             <div className="field"><label>Tên quốc tế <span className="req">*</span></label><input name="name" placeholder="VD: Creatine kinase-MB" autoFocus /></div>
@@ -210,12 +214,12 @@ export function TeaRefsTab() {
           <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
       </Modal>}
-      {editing && <Modal title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hóa' : 'Sửa hồ sơ TEa chuẩn hóa'} onClose={() => { setEditing(null); setPrefill(null); }} size="lg" className="tea-lab-profile-modal" footer={<>
+      {editing && <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hóa' : 'Sửa hồ sơ TEa chuẩn hóa'} onClose={() => { setEditing(null); setPrefill(null); }} size="lg" className="tea-lab-profile-modal" footer={<>
           {current && hasLabProfile(current) ? <button type="button" className="btn danger" onClick={() => removeLabProfile(current.id, current.name)}>Xóa TEa chuẩn hóa</button> : null}
           <button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button>
-          <button className="btn teal" type="submit" form="tearef-form">{editing === 'new' ? 'Thêm hồ sơ TEa' : 'Lưu thay đổi'}</button>
+          <button className="btn teal" type="submit" form="tearef-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm hồ sơ TEa' : 'Lưu thay đổi'}</button>
         </>}>
-        <form id="tearef-form" onSubmit={(event) => { event.preventDefault(); submit(event.currentTarget); }}>
+        <form id="tearef-form" onSubmit={(event) => { event.preventDefault(); void saving.run(event.currentTarget); }}>
           {err && <p className="field-error">{err}</p>}
           <input type="hidden" name="analyteId" value={profileAnalyteId} />
           <input type="hidden" name="section" value={current?.section || prefill?.section || ''} />

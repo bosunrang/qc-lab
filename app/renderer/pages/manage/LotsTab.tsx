@@ -11,6 +11,7 @@ import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-stor
 import { vnDate } from '../../lib/format';
 import { EmptyState, lotStatus } from './shared';
 import type { QcLot, LotGroup } from '../../../shared/qc-api';
+import { useAsyncAction } from '../../components/AsyncButton';
 
 const LOTS_PAGE_SIZE = 15;
 const LOT_GROUPS_PAGE_SIZE = 10;
@@ -179,6 +180,8 @@ export function LotsTab() {
     setEditingGroup(null);
   }
 
+  const savingLot = useAsyncAction(submitLot);
+  const savingGroup = useAsyncAction(submitGroup);
   async function openNewGroup() {
     if (!lots.length) { await infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.'); return; }
     setGroupErr(null); setGroupChecked(new Set()); setEditingGroup('new');
@@ -242,9 +245,9 @@ export function LotsTab() {
       </div>
 
       {editingLot && (
-        <Modal title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
-          footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-form">{editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
-          <form id="lot-form" onSubmit={(e) => { e.preventDefault(); submitLot(e.currentTarget); }}>
+        <Modal busy={savingLot.busy} title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
+          footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-form" disabled={savingLot.busy}>{savingLot.busy ? 'Đang lưu…' : editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
+          <form id="lot-form" onSubmit={(e) => { e.preventDefault(); void savingLot.run(e.currentTarget); }}>
             {lotErr && <p className="field-error">{lotErr}</p>}
             <div className="grid2">
               <div className="field"><label>Số lô</label><input name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
@@ -268,9 +271,9 @@ export function LotsTab() {
       )}
 
       {editingGroup && (
-        <Modal title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
-          footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-group-form">{editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
-          <form id="lot-group-form" onSubmit={(e) => { e.preventDefault(); submitGroup(e.currentTarget); }}>
+        <Modal busy={savingGroup.busy} title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
+          footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-group-form" disabled={savingGroup.busy}>{savingGroup.busy ? 'Đang lưu…' : editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
+          <form id="lot-group-form" onSubmit={(e) => { e.preventDefault(); void savingGroup.run(e.currentTarget); }}>
             {groupErr && <p className="field-error">{groupErr}</p>}
             <label className="lot-group-picker-label">Chọn các lô QC</label>
             <div className="lot-level-picker">

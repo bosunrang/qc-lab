@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { uncertaintyBudget } from '../../../main/domain/sigma-metrics';
 import type { SigmaLevelResult } from '../../../shared/qc-api';
+import { AsyncButton } from '../../components/AsyncButton';
 
 export function MuModal({ level, onClose, onSubmit }: {
   level: SigmaLevelResult; onClose: () => void;
@@ -21,7 +22,7 @@ export function MuModal({ level, onClose, onSubmit }: {
 
   return (
     <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} size="lg" className="sg-mu-modal"
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Áp dụng ngân sách MU</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Áp dụng ngân sách MU</AsyncButton></>}>
       {err && <p className="field-error">{err}</p>}
       <table className="sg-mu-detail-table">
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>

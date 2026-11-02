@@ -269,7 +269,40 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 - **N13:** ngưỡng so sánh lô hoá chất lấy từ TEa của xét nghiệm, đánh giá theo từng mức nồng độ.
 - **N14:** ngày hiệu lực của `applyLabRange` theo giờ địa phương.
 
-## GV9 — Modal, focus, màu (U2–U6, P1, M)
+## GV9 — Modal, focus, màu (U2–U6, P1, M) — phần U2, U3, U7 đã làm 02/11/2026
+
+**Đã làm (U2, U3 và U7 vốn thuộc GV11):**
+
+- `lib/layer-stack.ts`: một ngăn xếp lớp phủ (Modal, hộp xác nhận/xác thực lại,
+  lịch chọn ngày) thay cho ba bộ nghe Esc riêng; Esc chỉ đến lớp trên cùng, bỏ qua
+  khi ô bên trong đã tự xử lý (`preventDefault`), khi đang gõ dấu, khi danh sách
+  `select` đang mở. Danh sách gợi ý tên xét nghiệm `preventDefault` khi tự đóng.
+- `useFocusTrap`: chụp nút đã mở lớp ngay lần render đầu (trước khi React focus ô
+  `autoFocus`), giữ focus nếu đã nằm trong lớp, nếu chưa thì focus ô nhập đầu tiên
+  (không rơi vào ✕); đóng thì trả focus về nút đã mở.
+- `Modal`: Esc, ✕ và bấm ra nền đi qua `decideModalClose()` (`lib/modal-close.ts`) —
+  đang lưu thì bỏ qua, form đã sửa thì hỏi "Bỏ thay đổi chưa lưu?"; nút "Hủy/Đóng" ở
+  chân form vẫn đóng thẳng. "Đã sửa" = có sự kiện `input`/`change` trong modal, hoặc
+  `DateField` đổi ngày qua lịch (sự kiện `qc-field-edit`). `guardUnsaved={false}` cho
+  modal thao tác tức thì (Hoá chất: chọn nhanh/phép so sánh/thêm hoá chất; Ảnh đại
+  diện). Bấm ra nền khi lịch chọn ngày đang mở chỉ đóng lịch.
+- `AsyncButton` + `useAsyncAction` (`components/AsyncButton.tsx`): khoá thao tác tới
+  khi xong (kể cả hộp xác nhận/xác thực chen giữa), chặn cú bấm thứ hai trong cùng
+  khung hình bằng ref, báo Modal đang bận. Áp cho Nhật ký (lưu trữ), Huỷ điểm, Lập dải,
+  Mở khoá kỳ, 4 modal Sigma, 2 modal Người dùng và 7 form Cấu hình chung (máy, lô, nhóm
+  lô, Panel, xét nghiệm, chuyển lô, 2 form TEa). NCE truyền `busy` sẵn có vào Modal.
+  Hai modal EQA (nhập kỳ, huỷ kỳ) đã tự khoá nút nhưng chưa báo Modal — để nguyên vì
+  phân hệ EQA đang được làm dở.
+- **Test:** `app/tests/modal-layers.test.mjs`; e2e `app/e2e/modal-ux.e2e.mjs` (gõ ngay
+  vào ô đầu, Esc trên hộp hỏi không đóng form, bấm ra nền hỏi, hai cú bấm Lưu liền chỉ
+  tạo một máy, focus về nút mở, Esc khi lịch mở chỉ đóng lịch).
+- **Ghi nhận ngoài phạm vi:** e2e `reload-count` đỏ từ trước (đã thử lại trên commit
+  `7e615d3` và `16e1a0d`): nhập một điểm làm `entry:queryPoints` chạy 4 lần thay vì 2.
+
+**Còn lại của GV9:** U4 (vòng focus), U5 (màu Sigma), U6 (biểu đồ chỉ dùng màu) — đổi
+cách hiển thị trạng thái nên cần người dùng chốt trước.
+
+**Phương án gốc:**
 
 - `useFocusTrap`: nếu `activeElement` đã nằm trong modal (React đã focus ô
   `autoFocus`) thì giữ nguyên; trả focus về nút đã mở modal khi đóng.

@@ -19,6 +19,7 @@ import { confirmDialog, infoDialog } from '../state/dialog-store';
 import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/permissions';
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
+import { AsyncButton } from '../components/AsyncButton';
 
 /** Quyền nghiệp vụ cấp riêng cho KTV (danh sách mã ở `domain/capabilities.ts`;
  * main kiểm ở `ipc/shared.ts` và `domain/nce/permissions.ts`). */
@@ -219,7 +220,7 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
 
   return (
     <Modal title="Sửa quyền người dùng" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Lưu quyền</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Lưu quyền</AsyncButton></>}>
       <div className="hint"><b>{user.name || user.username}</b> · @{user.username}</div>
       <div className="field">
         <label htmlFor="editUserRole">Vai trò</label>
@@ -266,7 +267,7 @@ function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () =
 
   return (
     <Modal title={`Đặt lại mật khẩu — ${user.username}`} onClose={onClose}
-      footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Đặt lại</button></>}>
+      footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Đặt lại</AsyncButton></>}>
       {err && <p className="field-error">{err}</p>}
       {done ? <p>Đã đặt lại mật khẩu — người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp.</p> : (
         <div className="field"><label>Mật khẩu mới (≥8 ký tự)</label><input autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)}

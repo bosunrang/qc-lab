@@ -13,6 +13,7 @@ import { roleLabel } from '../lib/permissions';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../../main/domain/audit-format';
 import { auditSizeWarning } from '../../main/domain/audit-filter';
 import { downloadCsv } from '../lib/export';
+import { AsyncButton } from '../components/AsyncButton';
 
 const AUTO_VERIFY_MAX = 5000;
 
@@ -213,7 +214,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Lưu trữ nhật ký cũ" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Lưu trữ</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
       {err && <p className="field-error">{err}</p>}
       <p className="audit-archive-copy">Xuất CSV của đúng phần sẽ lưu trữ, gồm PrevHash/Hash để đối chiếu chuỗi. Sau khi xác thực lại, hệ thống chỉ xoá khi bạn xác nhận đã kiểm tra file tải về.</p>
       <div className="field">

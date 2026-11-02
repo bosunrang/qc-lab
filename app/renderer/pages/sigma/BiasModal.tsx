@@ -6,6 +6,7 @@ import { infoDialog } from '../../state/dialog-store';
 import { parseEqaDraft } from '../../lib/sigma-workflow';
 import { eqaRoundBias, eqaRoundsStats } from '../../../main/domain/sigma-metrics';
 import type { SigmaEqaRound } from '../../../shared/qc-api';
+import { AsyncButton } from '../../components/AsyncButton';
 
 export function BiasModal({ initialRounds, onClose, onSubmit }: {
   initialRounds: SigmaEqaRound[]; onClose: () => void;
@@ -36,7 +37,7 @@ export function BiasModal({ initialRounds, onClose, onSubmit }: {
 
   return (
     <Modal title="Tính Bias% từ EQA/EQC" onClose={onClose} size="md"
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Áp dụng Bias%</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><AsyncButton className="btn teal" onClick={submit}>Áp dụng Bias%</AsyncButton></>}>
       <div className="sg-eqa-table-wrap">
         <table className="sg-eqa-table">
           <thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th>Thao tác</th></tr></thead>

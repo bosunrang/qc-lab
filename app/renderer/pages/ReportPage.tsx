@@ -23,6 +23,7 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import type { NceRecordRow, ReportPointRow, TestSummary } from '../../shared/qc-api';
 import { NCE_SOURCE_LABEL, NCE_STATUS_LABEL, NCE_TIER_LABEL } from '../../main/domain/nce/labels';
+import { AsyncButton } from '../components/AsyncButton';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -329,7 +330,7 @@ function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void;
 
   return (
     <Modal title={`Mở khóa kỳ ${monthVN(ym)}`} onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className="btn danger" onClick={submit}>Xác nhận mở khóa</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submit}>Xác nhận mở khóa</AsyncButton></>}>
       {err && <p className="field-error">{err}</p>}
       <div className="hint">Mở khóa kỳ {monthVN(ym)} sẽ cho phép sửa/hủy lại điểm QC của kỳ này ở mọi xét nghiệm. Lý do được ghi vào nhật ký hoạt động.</div>
       <div className="field">

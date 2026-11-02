@@ -8,6 +8,7 @@ import { RowActionButton } from '../../components/RowActionButton';
 import { confirmDialog, infoDialog } from '../../state/dialog-store';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
+import { useAsyncAction } from '../../components/AsyncButton';
 
 export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => void; onGoInstruments?: () => void } = {}) {
   const { panels, instruments, tests, savePanel, removePanel } = useManageStore(useShallow((s) => ({ panels: s.panels, instruments: s.instruments, tests: s.tests, savePanel: s.savePanel, removePanel: s.removePanel })));
@@ -54,6 +55,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
     // người dùng thấy panel đang thừa một mục cần dọn.
     .map((id) => { const test = tests.find((t) => t.id === id); return { id, name: test ? test.name : id }; });
 
+  const saving = useAsyncAction(submit);
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
     const data = { name: String(fd.get('name') || ''), instrumentId, active: fd.get('active') === 'on', testIds: Array.from(checked) };
@@ -98,9 +100,9 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
             </tbody>
           </table>}
         {editing && (
-          <Modal title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
-            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="panel-form">{editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
-            <form id="panel-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
+          <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
+            footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="panel-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
+            <form id="panel-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}
               <div className="grid2 panel-qc-main-grid">
                 <div className="field"><label>Tên Panel QC</label><input name="name" placeholder="VD: Sinh hóa AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
