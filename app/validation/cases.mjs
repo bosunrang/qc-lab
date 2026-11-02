@@ -30,6 +30,7 @@ const REF = {
   wg16: 'Quyết định WG-16 (docs/WESTGARD-REVIEW-2026-09-22-lan2.md): lần chạy có điểm Loại bỏ thì mọi mức của lần chạy đó ra khỏi thống kê',
   wg19: 'Quyết định WG-19: luật đếm chuỗi không nối qua mốc đổi Mean/SD; điểm cũ giữ Mean/SD đã chốt lúc nhập',
   wg20: 'Quyết định WG-20: điểm vượt MỚI NHẤT trong cửa sổ mang kết luận 2of3-2s',
+  gv2: 'ISO 15189:2022 8.4; GV2 (docs/APP-REMEDIATION-PLAN-2026-10-31.md): đổi cấu hình luật chỉ áp cho lần chạy nhập sau thời điểm đổi, kết luận đã có không đổi',
   wg14: 'Quyết định WG-14: SD mẫu (mẫu số n − 1), cần ≥ 2 điểm; CV = SD / |Mean| × 100',
   sigmaRules: 'Westgard JO. "Westgard Sigma Rules" — westgard.com; bảng 2 mức và 3 mức QC',
   sigma: 'Sigma = (TEa − |Bias|) / CV; DPMO với dịch chuyển 1,5σ',
@@ -242,6 +243,15 @@ export const WESTGARD_CASES = [
       points: { '3/1': { verdict: 'warn', rules: ['1-2s'], z: 2.4 }, '4/1': { verdict: 'warn', rules: ['1-2s'], z: 2.4 } },
     },
     basis: `${REF.wg19}. Lần chạy 4 có Z = +2,4 so với Mean mới 102.`,
+  },
+  {
+    id: 'WG-32', title: 'Đổi 1-3s sang Cảnh báo giữa chuỗi: lần chạy đã có giữ kết luận Loại bỏ',
+    levels: [L1],
+    runs: [{ z: { 1: 0.5 } }, { z: { 1: -0.5 } }, { z: { 1: 3.5 } }, { setRule: { rule: '1-3s', action: 'alert' } }, { z: { 1: 0.4 } }, { z: { 1: -0.4 } }, { z: { 1: -3.5 } }],
+    expect: {
+      points: { '3/1': { verdict: 'rej', rules: ['1-3s'] }, '6/1': { verdict: 'warn', rules: ['1-3s'] } },
+    },
+    basis: `${REF.gv2}. Lần chạy 6 nhập sau khi đổi nên 1-3s chỉ còn cảnh báo.`,
   },
 ];
 

@@ -133,8 +133,13 @@ test('WG13: a failed audit rolls back global, reset, and per-test rule writes', 
   assert.deepEqual(wg.listRuleSettings(), before);
   assert.throws(() => wg.saveRuleAction(item.id, '1-3s', 'inactive', actor), /injected/);
   assert.equal(db.prepare('SELECT rule_actions_json FROM tests WHERE id=?').get(item.id).rule_actions_json, '{}');
+  // Khôi phục khi đã là mặc định không ghi gì (GV2), nên đặt sẵn một cấu
+  // hình khác mặc định để lần khôi phục phải ghi rồi bị huỷ.
+  db.prepare("INSERT INTO app_meta(key,value) VALUES('westgardRules',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify({ '1-3s': false }));
+  const customized = wg.listRuleSettings();
   assert.throws(() => wg.resetRuleSettings(actor), /injected/);
-  assert.deepEqual(wg.listRuleSettings(), before);
+  assert.deepEqual(wg.listRuleSettings(), customized);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM rule_config_history').get().n, 0, 'lịch sử cấu hình cũng được huỷ cùng lần ghi');
   assert.equal(wg.saveRuleSetting('1-3s', 'false', actor).ok, false);
   db.close();
 });

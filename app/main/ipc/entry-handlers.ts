@@ -3,7 +3,7 @@
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
 import { listOperationalLevels, isTestInActivePanel, countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
-import { evaluateQcSets } from '../db/westgard-evaluation';
+import { evaluateQcSets, ruleResolver } from '../db/westgard-evaluation';
 import { createHistoricalWestgard } from '../db/historical-westgard';
 import { listPreviousLotSeriesData } from '../db/lot-lineage';
 // 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
@@ -17,8 +17,6 @@ export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotS
 import { uid } from '../domain/text-utils';
 import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
-import { readGlobalRules } from '../db/rule-settings';
-import { parseRuleActions, makeIsOnLayered, makeRuleActionLayered, parseRuleScopes, makeScopeOf } from '../domain/rule-config';
 import { evaluateRangeCandidate, manualRangeDeviation, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
@@ -91,7 +89,6 @@ export function createEntryHandlers(db: Db) {
    * Tập mức lấy từ `db/operational-levels.ts` — cùng tập mà trang Phân tích
    * Westgard dùng, để hai màn hình luôn đánh giá trên cùng một tập dữ liệu. */
   function activeEvaluation(testId: string) {
-    const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
     const inActivePanel = isTestInActivePanel(db, testId);
     const levels: ActiveLevel[] = listOperationalLevels(db, testId).map((config) => {
       const rows = inActivePanel
@@ -100,19 +97,13 @@ export function createEntryHandlers(db: Db) {
       const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd })).sort(compareQcPointOrder);
       return { level: config.level, mean: config.mean, sd: config.sd, lot: config.lot_no, pts };
     });
-    // Cấu hình luật CHUNG đọc qua `db/rule-settings.ts` — module dùng chung
-    // được tách ra chính để không nơi nào tự dựng lại phép đọc khoá
-    // `app_meta` này (bản trước có một `globalRules()` riêng ở đây).
-    const overrides = parseRuleActions(test?.rule_actions_json);
-    const global = readGlobalRules(db);
-    const on = makeIsOnLayered(global, overrides);
-    const actionOf = makeRuleActionLayered(global, overrides);
-    const scope = makeScopeOf(parseRuleScopes(test?.rule_scopes_json), levels.length);
-    // Chỉ kênh TỪNG MỨC cần lộ ra ngoài (nhánh dựng lại verdict của điểm lô đã
-    // chuyển tiếp trong `voidPoint()`); kênh liên mức nằm trọn trong
-    const within = (rule: string) => on(rule) && ['within', 'both'].includes(scope(rule));
+    // Hàm luật theo LẦN CHẠY (GV2, không hồi tố): `rulesAt(point)` là cấu hình
+    // có hiệu lực tại lần chạy của điểm, cùng phép phân giải `evaluateQcSets()`
+    // dùng. Lộ ra cho cột "Vi phạm loại bỏ" và nhánh dựng lại verdict của điểm
+    // lô đã chuyển tiếp trong `voidPoint()`.
+    const rules = ruleResolver(db, testId, levels.length);
     const byPoint = evaluateQcSets(db, testId, levels);
-    return { levels, byPoint, within, actionOf };
+    return { levels, byPoint, rulesAt: rules.at };
   }
 
   function pointsForLot(testId: string, level: number, lot: string): ActivePoint[] {
@@ -219,7 +210,7 @@ export function createEntryHandlers(db: Db) {
       // bỏ" chỉ vì nó đứng cùng điểm với một luật loại bỏ khác.
       return {
         ...point, verdict: flag.level, rules: flag.rules,
-        rejectRules: rejectingRules(flag.rules, active.actionOf),
+        rejectRules: rejectingRules(flag.rules, active.rulesAt(point).actionOf),
         accepted: accepted.has(point),
         runRejectedBy: rejectedBy.get(qcRunKey(point)) || [],
       };
@@ -468,8 +459,8 @@ export function createEntryHandlers(db: Db) {
       // Hồ sơ chuyển lô có thể vừa kết thúc nhưng người dùng vẫn huỷ điểm lịch
       // sử. Khi đó đánh giá riêng đúng lô bằng snapshot đã chốt trên điểm.
       const history = pointsForLot(point.test_id, point.level, point.lot);
-      const active = activeEvaluation(point.test_id);
-      const result = westgardByPoint(history, point.qc_mean, point.qc_sd, active.within, active.actionOf);
+      const rules = activeEvaluation(point.test_id).rulesAt({ date: point.date, runId: point.run_id });
+      const result = westgardByPoint(history, point.qc_mean, point.qc_sd, rules.within, rules.actionOf);
       const index = history.findIndex((item) => item.id === pointId);
       if (index >= 0) view = { ...history[index], verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
     }

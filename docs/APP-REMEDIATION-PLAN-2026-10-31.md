@@ -83,7 +83,42 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   `role-gating.test.mjs` (KTV không còn đổi được hành động luật) và SG05 trong
   `sigma-review-regressions.test.mjs` (EFLM cần ngày tra).
 
-## GV2 — Kết luận QC không hồi tố (N2, P0, L)
+## GV2 — Kết luận QC không hồi tố (N2, P0, L) — đã làm 02/11/2026
+
+**Đã làm (khác phương án gốc bên dưới ở mốc hiệu lực):**
+
+- Bảng `rule_config_history` (migration 8): mỗi lần đổi cấu hình luật chung
+  (`saveRuleSetting`, `resetRuleSettings`) hoặc của một xét nghiệm (`saveRuleAction`,
+  `saveRuleScope`) ghi một phiên bản trong cùng transaction; phạm vi chưa có lịch sử
+  thì ghi trước cấu hình cũ làm dòng gốc, nên không cần nạp sẵn. Lưu lại đúng cấu
+  hình đang dùng không ghi gì (`noChange`), kể cả "Khôi phục mặc định" khi đã là
+  mặc định.
+- **Mốc theo thứ tự nhập, không theo ngày.** Cột mới `qc_points.entry_seq` (trigger
+  tự đánh số cho mọi đường chèn, kể cả phục hồi backup cũ). Lần chạy được đánh giá
+  bằng phiên bản đang hiệu lực lúc điểm đầu tiên của nó được nhập. Lần chạy đã có
+  lúc đổi — kể cả của hôm nay — giữ kết luận; lần chạy nhập sau thời điểm đổi dùng
+  cấu hình mới, kể cả nhập lùi ngày. Lý do bỏ "hiệu lực từ ngày": (1) không có giờ
+  nhập điểm, nên mốc theo ngày vẫn đổi kết luận các lần chạy đã có trong ngày đổi;
+  (2) phòng xét nghiệm thường cấu hình luật trước rồi mới nhập dữ liệu cũ — bộ thẩm
+  định làm đúng như vậy và hỏng toàn bộ khi thử mốc theo ngày.
+- Không chặn theo kỳ đã khoá: không lần chạy đã có nào đổi kết luận, nên kỳ đã khoá
+  không bị chạm.
+- `evaluateQcSets()` vẫn là nguồn duy nhất, không lưu kết luận: với mỗi phiên bản,
+  engine chạy trên chuỗi tới lần chạy cuối của phiên bản đó và chỉ lấy kết luận cho
+  lần chạy thuộc phiên bản. Không đổi chữ ký `isOn`/`actionOf` của engine như dự
+  kiến. `testRuleActionOf(db, testId, run)` và cột "Vi phạm loại bỏ" của Nhập QC dùng
+  phiên bản của đúng lần chạy; `nceSuspectChain` dùng phiên bản của lần chạy khởi đầu.
+- Nhật ký và lời nhắc ở panel luật chung (Westgard) và "Cấu hình Westgard nâng cao"
+  (Sửa xét nghiệm) ghi `NOT_RETROACTIVE_NOTE`.
+- **Chưa làm:** lý do bắt buộc khi đổi luật và màn hình lịch sử cấu hình. Cần hộp
+  thoại nhập lý do và đổi chữ ký 4 kênh IPC; gom vào GV9 (modal). Lịch sử đổi luật
+  hiện xem ở Nhật ký hoạt động (có người, giờ, trước → sau).
+- **Test:** `app/tests/rule-config-history.test.mjs`; ca thẩm định WG-32 (bước mới
+  `setRule` của `run-validation.mjs`); WG13 kiểm lịch sử cũng được huỷ khi ghi nhật
+  ký lỗi. `westgard-handlers` và `westgard-multi-lot` khẳng định điểm cũ giữ kết luận
+  rồi bỏ lịch sử để tiếp tục kiểm cách nối cấu hình vào engine.
+
+**Phương án gốc (31/10/2026):**
 
 - **Căn cứ:** ISO 15189:2022 8.4 (tính toàn vẹn hồ sơ); quyết định D-03 (không
   hồi tố); khoá kỳ báo cáo phải bất biến.

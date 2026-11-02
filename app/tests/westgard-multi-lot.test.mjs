@@ -51,6 +51,10 @@ const invalidR4sScope = config.saveRuleScope(test.id, 'R4s', 'within', actor);
 assert.equal(invalidR4sScope.ok, false);
 assert.equal(invalidR4sScope.error.code, 'invalid-scope');
 assert.equal(westgard.saveRuleAction(test.id, 'R4s', 'inactive', actor).ok, true);
+// GV2: lần chạy đã có giữ kết luận; tắt R4s chỉ áp cho lần chạy nhập sau.
+assert.equal(entry.queryPoints(test.id, 1)[0].verdict, 'rej');
+// Kiểm cách nối hành động vào engine như thể cấu hình áp từ đầu.
+db.exec('DELETE FROM rule_config_history');
 const withoutAcross = entry.queryPoints(test.id, 1)[0];
 assert.equal(withoutAcross.verdict, 'warn');
 assert.deepEqual(withoutAcross.rules, ['1-2s']);

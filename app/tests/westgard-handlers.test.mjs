@@ -54,7 +54,20 @@ assert.equal(actionSettings.find(r => r.id === '1-3s')?.on, false);
 assert.equal(actionSettings.find(r => r.id === '1-2s')?.on, true);
 db.prepare("DELETE FROM app_meta WHERE key='westgardRules'").run();
 
-const toggled = westgardHandlers.saveRuleAction(test.id, '1-3s', 'inactive', actor);
+// GV2: đổi luật không đổi kết luận của lần chạy đã có — điểm z=+4 vẫn Loại bỏ.
+// Phần còn lại của tệp kiểm cách nối cấu hình luật vào engine (ghi đè, bật/tắt,
+// CUSUM trên chuỗi chấp nhận), không kiểm dòng thời gian — đã có ở
+// rule-config-history.test.mjs — nên coi mỗi cấu hình như áp từ đầu bằng cách
+// bỏ lịch sử ngay sau khi lưu.
+const saveRuleActionFromStart = (...args) => {
+  const result = westgardHandlers.saveRuleAction(...args);
+  db.exec('DELETE FROM rule_config_history');
+  return result;
+};
+assert.equal(westgardHandlers.saveRuleAction(test.id, '1-3s', 'inactive', actor).ok, true);
+assert.equal(westgardHandlers.analyzeLevel(test.id, 1).points[0].verdict, 'rej', 'GV2: lần chạy đã có giữ kết luận');
+db.exec('DELETE FROM rule_config_history');
+const toggled = saveRuleActionFromStart(test.id, '1-3s', 'inactive', actor);
 assert.equal(toggled.ok, true);
 assert.equal(toggled.data.action, 'inactive');
 
@@ -66,21 +79,21 @@ const entryPoints = entry.queryPoints(test.id, 1);
 assert.equal(entryPoints[0].verdict, 'warn', 'Entry va Westgard phai tra CUNG mot verdict sau khi tat luat');
 assert.ok(!entryPoints[0].rules.includes('1-3s'));
 
-const alertOverride = westgardHandlers.saveRuleAction(test.id, '1-3s', 'alert', actor);
+const alertOverride = saveRuleActionFromStart(test.id, '1-3s', 'alert', actor);
 assert.equal(alertOverride.ok, true);
 assert.equal(alertOverride.data.action, 'alert');
 const analysisAsAlert = westgardHandlers.analyzeLevel(test.id, 1);
 assert.equal(analysisAsAlert.points[0].verdict, 'warn', '1-3s doi thanh canh bao khong duoc loai bo');
 assert.equal(analysisAsAlert.points[0].accepted, true, 'diem chi canh bao van nam trong chuoi chap nhan');
 
-const rejectOverride = westgardHandlers.saveRuleAction(test.id, '1-2s', 'reject', actor);
+const rejectOverride = saveRuleActionFromStart(test.id, '1-2s', 'reject', actor);
 assert.equal(rejectOverride.ok, true);
 const pointAt25Sd = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-02', val: 12.5, runId: '2026-08-02-1' } }, actor);
 assert.equal(pointAt25Sd.ok, true);
 const analysisAsReject = westgardHandlers.analyzeLevel(test.id, 1);
 assert.equal(analysisAsReject.points.at(-1).verdict, 'rej', '1-2s doi thanh loai bo phai reject diem 2.5SD');
 
-const followShared = westgardHandlers.saveRuleAction(test.id, '1-3s', '', actor);
+const followShared = saveRuleActionFromStart(test.id, '1-3s', '', actor);
 assert.equal(followShared.ok, true);
 assert.equal(followShared.data.action, '');
 const storedActions = JSON.parse(db.prepare('SELECT rule_actions_json FROM tests WHERE id=?').get(test.id).rule_actions_json);
@@ -101,7 +114,7 @@ assert.equal(beforeTrend.points.at(-1).cusumSignal, null, 'diem bi Westgard loai
 // vẫn bị `2-2s` loại (hai điểm liên tiếp cùng phía vượt 2SD), và đó đúng là
 // điều cần: cùng một dữ liệu, chỉ điểm NẰM TRONG chuỗi mới nuôi C+.
 for (const rule of ['1-3s', '1-2s']) {
-  const back = westgardHandlers.saveRuleAction(test.id, rule, 'alert', actor);
+  const back = saveRuleActionFromStart(test.id, rule, 'alert', actor);
   assert.equal(back.ok, true);
 }
 // Hai điểm z=+1.5: C+ = 3.5 → 4.0 → 5.0 → 6.0, chạm h=6 ở đúng điểm cuối.

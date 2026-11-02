@@ -65,9 +65,13 @@ function createCaseTest(ctx, item) {
 
 /** Nhập các lần chạy qua `addPoint`; các bước khác (đổi Mean/SD, NCE) chen giữa. */
 function enterRuns(ctx, item, created, inputs) {
-  const { config, entry, nce } = ctx;
+  const { config, entry, nce, westgard } = ctx;
   const runDates = [];
   for (const step of item.runs || []) {
+    if (step.setRule) {
+      must(westgard.saveRuleAction(created.testId, step.setRule.rule, step.setRule.action, ADMIN), `${item.id} đổi luật ${step.setRule.rule}`);
+      continue;
+    }
     if (step.setTarget) {
       const { level, mean, sd } = step.setTarget;
       must(config.saveTestLevel({ testId: created.testId, data: { level, mean, sd, qcLotId: created.lots[level].id } }, ADMIN), `${item.id} đổi Mean/SD`);
@@ -256,6 +260,7 @@ function describeInput(item) {
   const steps = (item.runs || []).map((step) => {
     if (step.setTarget) return `[đổi Mean/SD M${step.setTarget.level} → ${fmt(step.setTarget.mean)}/${fmt(step.setTarget.sd)}]`;
     if (step.nceRelease) return `[NCE cho chạy lại bằng lần ${step.nceRelease.verifyRun}]`;
+    if (step.setRule) return `[đổi luật ${step.setRule.rule} → ${step.setRule.action}]`;
     if (step.z) return Object.values(step.z).map((z) => (z > 0 ? '+' : '') + fmt(z)).join('|');
     return Object.values(step.val).map(fmt).join('|');
   });

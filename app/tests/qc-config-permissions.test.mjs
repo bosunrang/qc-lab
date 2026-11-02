@@ -20,6 +20,7 @@ const { createAuthHandlers } = require('../../app-dist/main/ipc/auth-handlers.js
 const { resolveTea } = require('../../app-dist/main/domain/sigma-tea-core.js');
 const { manualRangeDeviation, MANUAL_SD_RATIO_LIMIT } = require('../../app-dist/main/domain/range-workflow.js');
 const { hasUserCapability, parseUserCapabilities } = require('../../app-dist/main/domain/capabilities.js');
+const { NOT_RETROACTIVE_NOTE } = require('../../app-dist/main/domain/rule-config.js');
 
 const admin = { userId: 'u-admin', username: 'admin', name: 'Quản trị', role: 'admin', clientId: 't' };
 const tech = { userId: 'u-tech', username: 'ktv', name: 'KTV', role: 'technician', clientId: 't' };
@@ -73,12 +74,12 @@ test('Hành động luật theo xét nghiệm chỉ admin; nhật ký ghi trư�
   const { db, westgard, assay } = fixture(t);
   assert.equal(westgard.saveRuleAction(assay.id, '1-3s', 'alert', tech).error.code, 'forbidden');
   assert.equal(westgard.saveRuleAction(assay.id, '1-3s', 'alert', admin).ok, true);
-  assert.equal(listActivity(db)[0].detail, 'Luật 1-3s: theo cấu hình chung → cảnh báo');
+  assert.equal(listActivity(db)[0].detail, `Luật 1-3s: theo cấu hình chung → cảnh báo. ${NOT_RETROACTIVE_NOTE}`);
   const before = listActivity(db).length;
   assert.equal(westgard.saveRuleAction(assay.id, '1-3s', 'alert', admin).ok, true);
   assert.equal(listActivity(db).length, before, 'không ghi nhật ký khi không có gì đổi');
   assert.equal(westgard.saveRuleAction(assay.id, '1-3s', '', admin).ok, true);
-  assert.equal(listActivity(db)[0].detail, 'Luật 1-3s: cảnh báo → theo cấu hình chung');
+  assert.equal(listActivity(db)[0].detail, `Luật 1-3s: cảnh báo → theo cấu hình chung. ${NOT_RETROACTIVE_NOTE}`);
 });
 
 test('Mean/SD chỉnh tay lệch xa dải đề xuất được ghi rõ vào nhật ký', (t) => {

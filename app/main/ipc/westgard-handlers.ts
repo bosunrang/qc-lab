@@ -5,7 +5,8 @@ import { createHistoricalWestgard } from '../db/historical-westgard';
 import { evaluateQcSets, qcCuts } from '../db/westgard-evaluation';
 import { qcEpochOf } from '../domain/qc-cuts';
 import { cusumScan, acceptedRunPoints, rejectedLevelsByRun, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
-import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
+import { parseRuleActions, parseRuleScopes, serializeRuleActions, isRuleAction, globalRuleList, makeRuleActionLayered, NOT_RETROACTIVE_NOTE, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
+import { GLOBAL_RULE_SCOPE, recordRuleConfigChange } from '../db/rule-config-history';
 import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
@@ -64,6 +65,13 @@ export function createWestgardHandlers(db: Db) {
   }
 
   const globalRules = (): RuleActionsMap => readGlobalRules(db);
+  /** Hai cấu hình chung cho cùng hành động ở mọi luật — so theo kết quả phân
+   * giải, không theo chuỗi JSON (`{}` và bảng mặc định đầy đủ là một). Lưu lại
+   * đúng cấu hình đang dùng không phải một lần đổi, không ghi phiên bản mới. */
+  const sameResolvedRules = (a: RuleActionsMap, b: RuleActionsMap) => {
+    const actionA = makeRuleActionLayered(a, {}), actionB = makeRuleActionLayered(b, {});
+    return WG_RULE_REGISTRY.every(rule => actionA(rule.id) === actionB(rule.id));
+  };
 
   /** Cấu hình luật CHUNG (panel "Cấu hình chung của luật"): trạng thái bật/tắt
    * + mô tả + gợi ý xử lý của từng luật, KHÔNG phụ thuộc xét nghiệm nào. */
@@ -81,11 +89,14 @@ export function createWestgardHandlers(db: Db) {
   const saveRuleSetting = writeCommand(db, 'saveRuleSetting', 'admin', (w, ruleId: string, on: boolean): IpcResult<{ ruleId: string; on: boolean }> => {
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (typeof on !== 'boolean') return { ok: false, error: { code: 'invalid-value', message: 'Trạng thái luật không hợp lệ.' } };
+    const before = globalRules();
+    const map = { ...before, [ruleId]: on };
+    if (sameResolvedRules(before, map)) return w.noChange({ ruleId, on });
     w.commit((tx) => {
-      const map = globalRules(); map[ruleId] = on;
       writeGlobalRules(db, map);
-      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${on ? 'bật' : 'tắt'} (cấu hình chung)`, ruleId);
-      tx.changed(['app_meta']);
+      recordRuleConfigChange(db, GLOBAL_RULE_SCOPE, { rules: before, scopes: {} }, { rules: map, scopes: {} }, w.actor.name || w.actor.username);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${on ? 'bật' : 'tắt'} (cấu hình chung). ${NOT_RETROACTIVE_NOTE}`, ruleId);
+      tx.changed(['app_meta', 'rule_config_history']);
     });
     return { ok: true, data: { ruleId, on } };
   });
@@ -95,14 +106,17 @@ export function createWestgardHandlers(db: Db) {
   const resetRuleSettings = writeCommand(db, 'resetRuleSettings', 'admin', (w): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> => {
     const defaults: RuleActionsMap = {};
     for (const rule of WG_RULE_REGISTRY) defaults[rule.id] = rule.defaultOn;
-    w.commit((tx) => {
-      writeGlobalRules(db, defaults);
-      tx.audit('Sửa cấu hình luật Westgard', 'Khôi phục cấu hình chung của luật về mặc định', 'Westgard');
-      tx.changed(['app_meta']);
-    });
     const data = globalRuleList(defaults).map(r => {
       const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
       return { id: r.id, on: r.on, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
+    });
+    const before = globalRules();
+    if (sameResolvedRules(before, defaults)) return w.noChange(data);
+    w.commit((tx) => {
+      writeGlobalRules(db, defaults);
+      recordRuleConfigChange(db, GLOBAL_RULE_SCOPE, { rules: before, scopes: {} }, { rules: defaults, scopes: {} }, w.actor.name || w.actor.username);
+      tx.audit('Sửa cấu hình luật Westgard', `Khôi phục cấu hình chung của luật về mặc định. ${NOT_RETROACTIVE_NOTE}`, 'Westgard');
+      tx.changed(['app_meta', 'rule_config_history']);
     });
     return { ok: true, data };
   });
@@ -265,11 +279,12 @@ export function createWestgardHandlers(db: Db) {
    * đây cổng là `write`, nên KTV đổi được 1-3s thành "Cảnh báo" qua máy trạm
    * LAN dù giao diện chỉ mở ở trang Cấu hình chung của admin. */
   const saveRuleAction = writeCommand(db, 'saveRuleAction', 'admin', (w, testId: string, ruleId: string, value: RuleAction | ''): IpcResult<{ ruleId: string; action: RuleAction | '' }> => {
-    const test = db.prepare('SELECT id, name, rule_actions_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string } | undefined;
+    const test = db.prepare('SELECT id, name, rule_actions_json, rule_scopes_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string; rule_scopes_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (value !== '' && !isRuleAction(value)) return { ok: false, error: { code: 'invalid-action', message: 'Hành động luật không hợp lệ.' } };
     const overrides = parseRuleActions(test.rule_actions_json);
+    const before = { ...overrides }, scopes = parseRuleScopes(test.rule_scopes_json);
     const previous = overrides[ruleId];
     const action: RuleAction | '' = value;
     if ((previous ?? '') === action) return w.noChange({ ruleId, action });
@@ -279,8 +294,9 @@ export function createWestgardHandlers(db: Db) {
       : item === true ? 'bật (hành động mặc định)' : item === false || item === 'inactive' ? 'không dùng' : item === 'alert' ? 'cảnh báo' : 'loại bỏ';
     w.commit((tx) => {
       db.prepare('UPDATE tests SET rule_actions_json=? WHERE id=?').run(serializeRuleActions(overrides), testId);
-      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId}: ${labelOf(previous)} → ${labelOf(action)}`, test.name);
-      tx.changed(['tests'], [testId]);
+      recordRuleConfigChange(db, testId, { rules: before, scopes }, { rules: overrides, scopes }, w.actor.name || w.actor.username);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId}: ${labelOf(previous)} → ${labelOf(action)}. ${NOT_RETROACTIVE_NOTE}`, test.name);
+      tx.changed(['tests', 'rule_config_history'], [testId]);
     });
     return { ok: true, data: { ruleId, action } };
   });

@@ -9,9 +9,10 @@ import type { Db } from '../db/sqlite-like';
 import type { Instrument, QcPanel, Test, TestLevel } from '../../shared/qc-api';
 import { cleanId, cleanText, uid, sameText } from '../domain/text-utils';
 import { validateInstrument, validateTest, validateTestLevel, appendMeanSdHistory, validatePanel, type InstrumentInput, type TestInput, type PreparedTest, type TestLevelInput, type PanelInput } from '../domain/manage-validation';
-import { parseRuleScopes, serializeRuleScopes, parseRuleActions, effectiveRuleConfigList, type RuleScopesMap } from '../domain/rule-config';
+import { parseRuleScopes, serializeRuleScopes, parseRuleActions, effectiveRuleConfigList, NOT_RETROACTIVE_NOTE, type RuleScopesMap } from '../domain/rule-config';
 import { WG_RULE_REGISTRY, isAllowedRuleScope, type RuleScope } from '../domain/westgard-rules';
 import { readGlobalRules } from '../db/rule-settings';
+import { recordRuleConfigChange } from '../db/rule-config-history';
 import { countOperationalLevels, listOperationalLevels } from '../db/operational-levels';
 import { isoLocalDate } from '../domain/local-date';
 import { type IpcResult, nowIso } from './shared';
@@ -344,16 +345,19 @@ export function createCatalogConfigHandlers(db: Db) {
   }
 
   const saveRuleScope = writeCommand(db, 'saveRuleScope', 'admin', (w, testId: string, ruleId: string, scope: RuleScope | ''): IpcResult<{ ruleId: string; scope: RuleScope | '' }> => {
-    const test = db.prepare('SELECT id, name, rule_scopes_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_scopes_json: string } | undefined;
+    const test = db.prepare('SELECT id, name, rule_scopes_json, rule_actions_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_scopes_json: string; rule_actions_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (scope !== '' && !isAllowedRuleScope(ruleId, scope)) return { ok: false, error: { code: 'invalid-scope', message: 'Phạm vi này không được hỗ trợ bởi luật Westgard đã chọn.' } };
     const overrides: RuleScopesMap = parseRuleScopes(test.rule_scopes_json);
+    const before = { ...overrides }, actions = parseRuleActions(test.rule_actions_json);
+    if ((overrides[ruleId] ?? '') === scope) return w.noChange({ ruleId, scope });
     if (scope) overrides[ruleId] = scope; else delete overrides[ruleId];
     w.commit((tx) => {
       db.prepare('UPDATE tests SET rule_scopes_json=? WHERE id=?').run(serializeRuleScopes(overrides), testId);
-      tx.audit('Sửa phạm vi luật Westgard', `Luật ${ruleId} chuyển thành ${scope ? `phạm vi ${scope}` : 'phạm vi SOP khuyến nghị'}`, test.name);
-      tx.changed(['tests'], [testId]);
+      recordRuleConfigChange(db, testId, { rules: actions, scopes: before }, { rules: actions, scopes: overrides }, w.actor.name || w.actor.username);
+      tx.audit('Sửa phạm vi luật Westgard', `Luật ${ruleId}: ${before[ruleId] ? `phạm vi ${before[ruleId]}` : 'phạm vi SOP khuyến nghị'} → ${scope ? `phạm vi ${scope}` : 'phạm vi SOP khuyến nghị'}. ${NOT_RETROACTIVE_NOTE}`, test.name);
+      tx.changed(['tests', 'rule_config_history'], [testId]);
     });
     return { ok: true, data: { ruleId, scope } };
   });

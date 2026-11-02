@@ -138,11 +138,11 @@ export function nceRunOutcomes(db: Db, testId: string, extraCuts: readonly QcCut
   return [...runs.entries()].map(([key, run]) => ({ ...run, complete: sets.length > 0 && sets.every((set) => assessed.get(key)?.has(set.level)) }));
 }
 
-/** Luật LOẠI BỎ (theo hành động hiện hành của xét nghiệm) của các điểm bị
- * loại trong lần chạy khởi đầu, và các mức mang luật đó. Luật chỉ cảnh báo
- * không kéo dài khoảng nghi ngờ. */
+/** Luật LOẠI BỎ (theo hành động có hiệu lực tại lần chạy khởi đầu — GV2) của
+ * các điểm bị loại trong lần chạy đó, và các mức mang luật đó. Luật chỉ cảnh
+ * báo không kéo dài khoảng nghi ngờ. */
 export function nceSuspectChain(db: Db, testId: string, trigger: NceRunSnapshot): NceSuspectChain {
-  const actionOf = testRuleActionOf(db, testId);
+  const actionOf = testRuleActionOf(db, testId, { date: trigger.date, runId: trigger.runId });
   const rules = new Set<string>(), levels = new Set<number>();
   for (const point of trigger.points) {
     if (point.voided || point.verdict !== 'rej') continue;

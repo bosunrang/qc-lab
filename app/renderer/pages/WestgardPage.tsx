@@ -17,6 +17,7 @@ import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { infoDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
 import { observedStats } from '../../main/domain/observed-stats';
+import { NOT_RETROACTIVE_NOTE } from '../../main/domain/rule-config';
 import { displayedWestgardBlocks, statText, westgardExportRows, WESTGARD_EXPORT_HEADERS, escapeHtml } from '../lib/westgard-view';
 import { WestgardPointTable } from './westgard/shared';
 import { useArchivedWestgard } from './westgard/useArchivedWestgard';
@@ -243,6 +244,7 @@ export function WestgardPage() {
                     {!ruleSettingsEditable && <span className="hint-inline">{lanStation ? 'Chỉ đổi được trên máy chính.' : 'Chỉ quản trị viên đổi được.'}</span>}
                     {ruleSettingsEditable && <span className="wg-rule-reset"><button className="btn ghost sm" title="Khôi phục mặc định" aria-label="Khôi phục mặc định" onClick={resetRules}><RestoreIcon />Khôi phục</button></span>}
                   </div>
+                  {ruleSettingsEditable && <div className="hint">{NOT_RETROACTIVE_NOTE}</div>}
                 </div>
 
                 <details className="wg-guide">

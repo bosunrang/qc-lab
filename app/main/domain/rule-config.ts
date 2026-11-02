@@ -5,6 +5,11 @@
 import { WG_DEFAULT_ON, WG_RULES, WG_RULE_BY_ID, allowedRuleScopes, defaultRuleAction, defaultRuleScope, isAllowedRuleScope, type RuleScope } from './westgard-rules';
 
 export type RuleAction = 'inactive' | 'alert' | 'reject';
+
+/** Mọi thay đổi cấu hình luật chỉ áp cho lần chạy nhập sau thời điểm đổi
+ * (GV2, `db/rule-config-history.ts`). Câu này đi vào nhật ký và lời nhắc ở
+ * các màn hình cấu hình luật. */
+export const NOT_RETROACTIVE_NOTE = 'Áp dụng cho các lần chạy nhập sau thời điểm này; kết luận của các lần chạy đã có giữ nguyên.';
 export type RuleActionsMap = Record<string, boolean | RuleAction>;
 
 export function isRuleAction(value: unknown): value is RuleAction {

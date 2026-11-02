@@ -11,7 +11,7 @@ import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -222,7 +222,8 @@ CREATE TABLE IF NOT EXISTS qc_points (
   void_kind TEXT NOT NULL DEFAULT '',
   void_requires_rerun INTEGER NOT NULL DEFAULT 0,
   voided_at TEXT NOT NULL DEFAULT '',
-  voided_by TEXT NOT NULL DEFAULT ''
+  voided_by TEXT NOT NULL DEFAULT '',
+  entry_seq INTEGER NOT NULL DEFAULT 0 -- thứ tự nhập, xem POST_MIGRATION_SQL
 );
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_level_date ON qc_points(test_id, level, date);
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_run ON qc_points(test_id, run_id);
@@ -592,6 +593,36 @@ CREATE TABLE IF NOT EXISTS tea_ref_level_defaults (
   tea REAL NOT NULL CHECK (tea > 0),
   PRIMARY KEY (tea_ref_id, level)
 );
+
+-- Lịch sử cấu hình luật Westgard (GV2): mỗi lần đổi ghi một phiên bản, để
+-- kết luận của các lần chạy đã có không đổi theo cấu hình mới. scope =
+-- 'global' (cấu hình chung) hoặc id xét nghiệm. boundary_entry_seq: số thứ tự
+-- nhập lớn nhất của qc_points lúc đổi; NULL là dòng gốc (cấu hình trước lần
+-- đổi đầu tiên, áp từ đầu). Xem db/rule-config-history.ts.
+CREATE TABLE IF NOT EXISTS rule_config_history (
+  id TEXT PRIMARY KEY,
+  seq INTEGER NOT NULL,
+  scope TEXT NOT NULL,
+  rules_json TEXT NOT NULL DEFAULT '{}',
+  scopes_json TEXT NOT NULL DEFAULT '{}',
+  boundary_entry_seq INTEGER,
+  changed_at TEXT NOT NULL DEFAULT '',
+  changed_by TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_rule_config_history_scope ON rule_config_history(scope, seq);
+`;
+
+/** Chạy SAU mọi bước migration (cột `qc_points.entry_seq` có từ bước 8), mỗi
+ * lần mở và sau mỗi lần phục hồi. `entry_seq` là thứ tự nhập điểm QC trong
+ * toàn CSDL — DB không có giờ nhập, mà ngày của điểm có thể là ngày lùi.
+ * Trigger tự đánh số cho mọi đường chèn (nhập QC, LIS, phục hồi backup cũ
+ * thiếu cột này); dòng chèn kèm sẵn số (phục hồi backup mới) giữ nguyên. */
+const POST_MIGRATION_SQL = `
+CREATE INDEX IF NOT EXISTS idx_qc_points_entry_seq ON qc_points(entry_seq);
+CREATE TRIGGER IF NOT EXISTS qc_points_entry_seq AFTER INSERT ON qc_points WHEN NEW.entry_seq = 0
+BEGIN
+  UPDATE qc_points SET entry_seq = (SELECT COALESCE(MAX(entry_seq), 0) FROM qc_points) + 1 WHERE rowid = NEW.rowid;
+END;
 `;
 
 function hasColumn(db: SqliteLike, table: string, column: string): boolean {
@@ -684,6 +715,20 @@ const MIGRATIONS: Migration[] = [
     name: 'Bỏ bảng TEa theo xét nghiệm–máy của bản phát triển',
     up(db) { db.exec('DROP TABLE IF EXISTS tea_ref_levels;'); },
   },
+  {
+    version: 8,
+    // `rule_config_history` do SCHEMA_SQL tạo. Không nạp sẵn dòng gốc: lần
+    // đổi luật đầu tiên tự ghi cấu hình trước đó làm dòng gốc
+    // (`recordRuleConfigChange`). Điểm đã có lấy thứ tự theo rowid — thứ tự
+    // đúng giữa chúng không quan trọng vì mọi điểm này có trước mọi lần đổi.
+    // Bản cũ hơn — vốn tính lại mọi kết luận theo cấu hình hiện hành — từ chối
+    // mở CSDL từ bước này.
+    name: 'Lịch sử cấu hình luật Westgard (không hồi tố)',
+    up(db) {
+      addColumnIfMissing(db, 'qc_points', 'entry_seq', 'INTEGER NOT NULL DEFAULT 0');
+      db.exec('UPDATE qc_points SET entry_seq = rowid WHERE entry_seq = 0;');
+    },
+  },
 ];
 
 /** Chuyển các dòng `actions` sang mô hình NCE mới (kế hoạch mục 6.1). Chạy lại
@@ -773,6 +818,7 @@ export function applySchema(db: SqliteLike): void {
         .run(String(migration.version));
     });
   }
+  db.exec(POST_MIGRATION_SQL);
 }
 
 /** Chèn các dòng khởi tạo bắt buộc: dòng `lab` id=1 (hồ sơ phòng xét nghiệm,

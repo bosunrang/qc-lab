@@ -12,8 +12,10 @@ import type { StoreChangedPayload } from './shared';
  */
 
 /** Bảng mà mỗi dòng thuộc đúng một xét nghiệm, và mọi chỗ ghi các bảng này
- * báo kèm đủ `testIds` (đã rà từng lời gọi `notifyChanged`, 2026-09-26). */
-export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points', 'test_levels', 'tests', 'nce_cuts']);
+ * báo kèm đủ `testIds` (đã rà từng lời gọi `notifyChanged`, 2026-09-26).
+ * `rule_config_history`: dòng của cấu hình chung được báo KHÔNG kèm `testIds`
+ * nên vẫn bỏ toàn bộ, đúng phạm vi tác động. */
+export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points', 'test_levels', 'tests', 'nce_cuts', 'rule_config_history']);
 
 /** Bảng mà phần tóm tắt KHÔNG đọc tới (đã đối chiếu các câu SQL của
  * `listTestSummaries` và các hàm nó gọi). Bảng không có ở đây và cũng không ở

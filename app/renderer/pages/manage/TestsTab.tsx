@@ -9,6 +9,7 @@ import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-stor
 import { teaSuggestions, findTeaSuggestion, normalizeName, type TeaSuggestion } from '../../lib/tea-suggest';
 import { EmptyState, WESTGARD_RULES, parseRuleConfig } from './shared';
 import { defaultRuleAction } from '../../../main/domain/westgard-rules';
+import { NOT_RETROACTIVE_NOTE } from '../../../main/domain/rule-config';
 import type { Test } from '../../../shared/qc-api';
 
 function testCatalogKey(test: Test): string {
@@ -377,6 +378,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                 <div className="assay-advanced-body">
                   {/* Hành động và phạm vi đều lưu theo từng xét nghiệm. Engine
                       dùng cùng cấu hình này ở Nhập QC và Phân tích Westgard. */}
+                  <div className="hint">{NOT_RETROACTIVE_NOTE}</div>
                   <div className="assay-rule-head" aria-hidden="true"><span>Luật</span><span>Hành động</span><span>Phạm vi áp dụng</span></div>
                   <div className="assay-rule-grid">
                     {WESTGARD_RULES.map((id) => {

@@ -1,8 +1,9 @@
 import type { Db } from './sqlite-like';
-import { readGlobalRules } from './rule-settings';
-import { combinedWestgardByPoint, type MultiLevelSet, type QcPointLike } from '../domain/westgard-engine';
-import { makeIsOnLayered, makeRuleActionLayered, makeScopeOf, parseRuleActions, parseRuleScopes } from '../domain/rule-config';
+import { combinedWestgardByPoint, type CombinedPointFlag, type MultiLevelSet, type QcPointLike } from '../domain/westgard-engine';
+import { makeIsOnLayered, makeRuleActionLayered, makeScopeOf, type RuleAction } from '../domain/rule-config';
 import type { QcCut } from '../domain/qc-cuts';
+import { qcRunKey } from '../domain/sort-order';
+import { ruleConfigVersions, ruleVersionIndexOf, runEntrySeqs, type RuleConfigVersion } from './rule-config-history';
 
 /** Mốc bắt đầu lại chuỗi của một xét nghiệm (`domain/qc-cuts.ts`). Mốc được
  * ghi khi cho phép hoạt động trở lại một hồ sơ NCE (lần chạy rerun), hoặc do
@@ -13,27 +14,75 @@ export function qcCuts(db: Db, testId: string): QcCut[] {
   return rows.map((row) => ({ date: row.date, runId: row.run_id }));
 }
 
-function testRuleRow(db: Db, testId: string) {
-  return db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as
-    { rule_actions_json: string; rule_scopes_json: string } | undefined;
+/** Các hàm luật của MỘT phiên bản cấu hình: hành động, và hai kênh từng
+ * mức/liên mức theo phạm vi. */
+export interface RuleFunctions {
+  actionOf: (rule: string) => RuleAction;
+  within: (rule: string) => boolean;
+  across: (rule: string) => boolean;
 }
 
-/** Hành động của từng luật cho một xét nghiệm (mặc định chung + ghi đè), cùng
- * phép phân giải mà `evaluateQcSets()` dùng để kết luận loại bỏ. */
-export function testRuleActionOf(db: Db, testId: string) {
-  return makeRuleActionLayered(readGlobalRules(db), parseRuleActions(testRuleRow(db, testId)?.rule_actions_json));
+function ruleFunctions(version: RuleConfigVersion, levelCount: number): RuleFunctions {
+  const on = makeIsOnLayered(version.globalRules, version.actions);
+  const scope = makeScopeOf(version.scopes, levelCount);
+  return {
+    actionOf: makeRuleActionLayered(version.globalRules, version.actions),
+    within: (rule) => on(rule) && ['within', 'both'].includes(scope(rule)),
+    across: (rule) => on(rule) && ['across', 'both'].includes(scope(rule)),
+  };
+}
+
+type RunLike = { date?: unknown; runId?: unknown };
+
+/** Cấu hình luật theo LẦN CHẠY của một xét nghiệm (GV2, không hồi tố — xem
+ * `db/rule-config-history.ts`): `at(run)` trả các hàm luật đang hiệu lực lúc
+ * lần chạy đó được nhập. Chỉ đọc thứ tự nhập khi đã có lần đổi cấu hình. */
+export function ruleResolver(db: Db, testId: string, levelCount: number) {
+  const versions = ruleConfigVersions(db, testId);
+  const fns = versions.map((version) => ruleFunctions(version, levelCount));
+  const seqs = versions.length > 1 ? runEntrySeqs(db, testId) : new Map<string, number>();
+  const indexOf = (run: RunLike) => versions.length > 1 ? ruleVersionIndexOf(versions, seqs.get(qcRunKey(run))) : 0;
+  return { fns, indexOf, at: (run: RunLike) => fns[indexOf(run)], latest: fns[fns.length - 1] };
+}
+
+/** Hành động của từng luật cho một xét nghiệm (mặc định chung + ghi đè) tại
+ * một lần chạy — cùng phép phân giải mà `evaluateQcSets()` dùng để kết luận
+ * loại bỏ. Không truyền `run` thì lấy cấu hình hiện hành. */
+export function testRuleActionOf(db: Db, testId: string, run?: { date: string; runId: string }) {
+  const rules = ruleResolver(db, testId, 1);
+  return (run ? rules.at(run) : rules.latest).actionOf;
 }
 
 /** `extraCuts`: mốc giả định chưa ghi, để đánh giá lần rerun ứng viên TRONG
- * giai đoạn mới trước khi cho chạy lại (D-04). */
-export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], levelCount?: number, extraCuts: readonly QcCut[] = []) {
-  const test = testRuleRow(db, testId);
-  const global = readGlobalRules(db), overrides = parseRuleActions(test?.rule_actions_json);
-  const on = makeIsOnLayered(global, overrides), actionOf = makeRuleActionLayered(global, overrides);
+ * giai đoạn mới trước khi cho chạy lại (D-04).
+ *
+ * Mỗi lần chạy mang kết luận theo phiên bản cấu hình đang hiệu lực lúc nó
+ * được nhập. Với phiên bản k, engine chạy trên các điểm tới hết giai đoạn của
+ * k (luật nhiều lần chạy vẫn nhìn lại các lần chạy trước, kể cả của phiên bản
+ * cũ) và chỉ lấy kết luận cho điểm thuộc k. Thứ tự nhập có thể khác thứ tự
+ * ngày (nhập lùi ngày), nên "tới hết giai đoạn" là theo thứ tự ngày–lần chạy
+ * của chuỗi: điểm thuộc phiên bản sau vẫn có thể đứng trước. Kết luận của một
+ * điểm chỉ phụ thuộc các lần chạy đứng trước nó trong chuỗi, còn dấu "bằng
+ * chứng" mà lần chạy sau gắn ngược lên điểm trước phải do chính cấu hình của
+ * lần chạy sau quyết định. */
+export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], levelCount?: number, extraCuts: readonly QcCut[] = []): Map<T, CombinedPointFlag> {
   const configuredLevelCount = Number.isInteger(levelCount) && levelCount! > 0 ? levelCount! : new Set(sets.map(set => set.level)).size;
-  const scope = makeScopeOf(parseRuleScopes(test?.rule_scopes_json), configuredLevelCount);
-  return combinedWestgardByPoint(sets,
-    rule => on(rule) && ['within', 'both'].includes(scope(rule)),
-    rule => on(rule) && ['across', 'both'].includes(scope(rule)),
-    actionOf, [...qcCuts(db, testId), ...extraCuts]);
+  const rules = ruleResolver(db, testId, configuredLevelCount);
+  const cuts = [...qcCuts(db, testId), ...extraCuts];
+  const evaluate = (input: readonly MultiLevelSet<T>[], fns: RuleFunctions) => combinedWestgardByPoint(input, fns.within, fns.across, fns.actionOf, cuts);
+  if (rules.fns.length === 1) return evaluate(sets, rules.latest);
+  const versionOf = new Map<T, number>();
+  for (const set of sets) for (const point of set.pts) versionOf.set(point, rules.indexOf(point));
+  const used = [...new Set(versionOf.values())];
+  if (used.length === 1) return evaluate(sets, rules.fns[used[0]]);
+  const out = new Map<T, CombinedPointFlag>();
+  for (const version of used) {
+    // Cắt chuỗi ở lần chạy CUỐI CÙNG của phiên bản này (theo thứ tự chuỗi).
+    const upTo = sets.map((set) => {
+      const last = set.pts.reduce((end, point, index) => versionOf.get(point) === version ? index : end, -1);
+      return { ...set, pts: set.pts.slice(0, last + 1) };
+    });
+    for (const [point, flag] of evaluate(upTo, rules.fns[version])) if (versionOf.get(point) === version) out.set(point, flag);
+  }
+  return out;
 }
