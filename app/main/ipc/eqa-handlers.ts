@@ -5,8 +5,10 @@
 import type { Db } from '../db/sqlite-like';
 import type {
   EqaAttentionRow, EqaDecisionRow, EqaImportInput, EqaImportPreview, EqaInstrumentGridRow, EqaInstrumentSummary, EqaResultRow, EqaRoundRow,
-  EqaRoundView, EqaSeriesView,
+  EqaRoundView, EqaSeriesView, EqaProgramOption, EqaScheduleInstrument, EqaScheduleRow,
 } from '../../shared/qc-api';
+import { daysBetween, eqaScheduleStatus, validateEqaSchedule } from '../domain/eqa/schedule';
+import { isoLocalDate, viDate } from '../domain/local-date';
 import { cleanId, uid } from '../domain/text-utils';
 import {
   EQA_CLASS_LABEL, EQA_DEFAULT_CONFIG, eqaCounts, eqaNormalize, eqaPeerComparison, eqaRoundNumber,
@@ -334,11 +336,17 @@ export function createEqaHandlers(db: Db) {
 
   /** Máy chưa có báo cáo của từng đợt, theo các đợt cùng chương trình–năm. */
   function missingByRound(rounds: readonly Record<string, unknown>[], briefs: ReadonlyMap<string, readonly ResultBrief[]>): Map<string, EqaRoundRow['missing_instruments']> {
-    const names = new Map<string, string>();
-    for (const list of briefs.values()) for (const b of list) names.set(b.instrument_id, b.instrument_name);
+    const names = new Map((db.prepare('SELECT id, name FROM instruments').all() as { id: string; name: string }[]).map((r) => [r.id, r.name]));
+    const planned = new Map<string, string[]>();
+    for (const r of db.prepare(`SELECT s.program_id, s.year, s.round_no, si.instrument_id FROM eqa_schedule s
+      JOIN eqa_schedule_instruments si ON si.schedule_id=s.id`).all() as { program_id: string; year: number; round_no: number; instrument_id: string }[]) {
+      const key = `${r.program_id}\u0000${r.year}\u0000${r.round_no}`;
+      planned.set(key, [...(planned.get(key) ?? []), r.instrument_id]);
+    }
     const missing = eqaMissingInstruments(rounds.map((r) => ({
       id: String(r.id), programId: String(r.program_id), year: Number(r.year), status: String(r.status),
       instrumentIds: [...new Set((briefs.get(String(r.id)) ?? []).map((b) => b.instrument_id))],
+      expectedIds: planned.get(`${String(r.program_id)}\u0000${Number(r.year)}\u0000${Number(r.round_no)}`),
     })));
     return new Map([...missing].map(([roundId, ids]) => [roundId, ids
       .map((id) => ({ instrument_id: id, instrument_name: names.get(id) ?? '' }))
@@ -401,5 +409,211 @@ export function createEqaHandlers(db: Db) {
     };
   }
 
-  return { listEqaRounds, getEqaRound, getEqaSeries, getEqaInstrumentGrid, listEqaAttention, previewEqaImport, importEqaRound, cancelEqaRound };
+  // ---- Lịch đợt và hạn nộp ----
+
+  const SCHEDULE_SQL = `SELECT s.*, p.name AS program_name, p.provider, p.sample_type,
+      (SELECT r.id FROM eqa_rounds r WHERE r.program_id=s.program_id AND r.year=s.year AND r.round_no=s.round_no AND r.status='open' LIMIT 1) AS round_id
+    FROM eqa_schedule s JOIN eqa_programs p ON p.id=s.program_id`;
+  type ScheduleDbRow = Omit<EqaScheduleRow, 'status' | 'days_left' | 'instruments'>;
+  type ScheduleInstrumentDbRow = Omit<EqaScheduleInstrument, 'reported'> & { schedule_id: string };
+
+  /** Máy khai cho các đợt trong lịch (id đợt lịch → máy); `scheduleId` để đọc một đợt. */
+  function scheduleInstruments(scheduleId?: string): Map<string, ScheduleInstrumentDbRow[]> {
+    const rows = db.prepare(`SELECT si.schedule_id, si.instrument_id, i.name AS instrument_name, si.submitted_at, si.submitted_by
+      FROM eqa_schedule_instruments si JOIN instruments i ON i.id=si.instrument_id
+      ${scheduleId ? 'WHERE si.schedule_id=?' : ''} ORDER BY i.name`).all(...(scheduleId ? [scheduleId] : [])) as unknown as ScheduleInstrumentDbRow[];
+    const out = new Map<string, ScheduleInstrumentDbRow[]>();
+    for (const row of rows) out.set(row.schedule_id, [...(out.get(row.schedule_id) ?? []), row]);
+    return out;
+  }
+
+  /** Máy có kết quả ở phiên bản hiện hành của các đợt đang dùng (id đợt → máy). */
+  function reportedInstruments(roundId?: string): Map<string, Set<string>> {
+    const rows = db.prepare(`SELECT DISTINCT e.round_id, t.instrument_id FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version
+      JOIN tests t ON t.id=e.test_id WHERE r.status='open' ${roundId ? 'AND r.id=?' : ''}`).all(...(roundId ? [roundId] : [])) as { round_id: string; instrument_id: string }[];
+    const out = new Map<string, Set<string>>();
+    for (const row of rows) out.set(row.round_id, (out.get(row.round_id) ?? new Set()).add(row.instrument_id));
+    return out;
+  }
+
+  /** Đợt có khai máy: đã nộp khi mọi máy đã nộp hoặc đã có trong báo cáo; đã có
+   * báo cáo khi báo cáo của trung tâm có đủ mọi máy. Đợt không khai máy giữ cách
+   * tính cho cả đợt. */
+  function toScheduleRow(row: ScheduleDbRow, machines: readonly ScheduleInstrumentDbRow[], reported: ReadonlyMap<string, ReadonlySet<string>>, today: string): EqaScheduleRow {
+    const roundId = row.round_id || null;
+    const present = roundId ? reported.get(roundId) : undefined;
+    const instruments = machines.map(({ schedule_id: _scheduleId, ...m }) => ({ ...m, reported: !!present?.has(m.instrument_id) }));
+    let { submitted_at, submitted_by } = row;
+    if (instruments.length) {
+      const done = instruments.every((m) => m.submitted_at || m.reported);
+      const last = instruments.filter((m) => m.submitted_at).sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))[0];
+      submitted_at = done ? last?.submitted_at ?? '' : '';
+      submitted_by = done ? last?.submitted_by ?? '' : '';
+    }
+    const fullyReported = !!roundId && instruments.every((m) => m.reported);
+    return {
+      ...row, submitted_at, submitted_by, instruments, round_id: roundId, days_left: daysBetween(today, row.due_date),
+      status: eqaScheduleStatus({ due_date: row.due_date, submitted_at, reported: fullyReported }, today),
+    };
+  }
+
+  function listEqaSchedule(): EqaScheduleRow[] {
+    const today = isoLocalDate(), machines = scheduleInstruments(), reported = reportedInstruments();
+    return (db.prepare(`${SCHEDULE_SQL} ORDER BY s.due_date, p.name`).all() as unknown as ScheduleDbRow[])
+      .map((row) => toScheduleRow(row, machines.get(row.id) ?? [], reported, today));
+  }
+  const scheduleById = (id: string) => {
+    const row = db.prepare(`${SCHEDULE_SQL} WHERE s.id=?`).get(id) as unknown as ScheduleDbRow | undefined;
+    return row ? toScheduleRow(row, scheduleInstruments(id).get(id) ?? [], row.round_id ? reportedInstruments(row.round_id) : new Map(), isoLocalDate()) : null;
+  };
+
+  /** Chương trình kèm máy gợi sẵn cho đợt mới: máy của đợt gần nhất có khai máy
+   * trong lịch; chưa có thì máy có kết quả ở báo cáo gần nhất. Chỉ gợi máy đang hoạt động. */
+  function listEqaPrograms(): EqaProgramOption[] {
+    const programs = db.prepare('SELECT id, name, provider, sample_type FROM eqa_programs ORDER BY name').all() as unknown as Omit<EqaProgramOption, 'instrument_ids'>[];
+    const latest = (rows: { program_id: string; owner: string; instrument_id: string }[]) => {
+      const owner = new Map<string, string>(), out = new Map<string, string[]>();
+      for (const r of rows) {
+        if (!owner.has(r.program_id)) owner.set(r.program_id, r.owner);
+        if (owner.get(r.program_id) === r.owner) out.set(r.program_id, [...(out.get(r.program_id) ?? []), r.instrument_id]);
+      }
+      return out;
+    };
+    const fromSchedule = latest(db.prepare(`SELECT s.program_id, s.id AS owner, si.instrument_id FROM eqa_schedule s
+      JOIN eqa_schedule_instruments si ON si.schedule_id=s.id JOIN instruments i ON i.id=si.instrument_id AND i.active=1
+      ORDER BY s.year DESC, s.round_no DESC, s.id`).all() as { program_id: string; owner: string; instrument_id: string }[]);
+    const fromReports = latest(db.prepare(`SELECT DISTINCT r.program_id, r.id AS owner, t.instrument_id, r.year, r.round_no FROM eqa_rounds r
+      JOIN eqa_results e ON e.round_id=r.id AND e.version=r.version JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id AND i.active=1
+      WHERE r.status='open' ORDER BY r.year DESC, r.round_no DESC, r.id`).all() as { program_id: string; owner: string; instrument_id: string }[]);
+    return programs.map((p) => ({ ...p, instrument_ids: fromSchedule.get(p.id) ?? fromReports.get(p.id) ?? [] }));
+  }
+
+  const instrumentNames = (ids: readonly string[]) => {
+    const names = new Map((db.prepare('SELECT id, name FROM instruments').all() as { id: string; name: string }[]).map((r) => [r.id, r.name]));
+    return ids.map((id) => names.get(id) ?? id);
+  };
+
+  /** Thêm/sửa một đợt trong lịch. Chương trình mới tạo theo tên + đơn vị tổ
+   * chức, khớp với lần nhập báo cáo PDF sau đó theo đúng `findProgram()`. Loại
+   * mẫu lưu ở chương trình; máy lưu theo đợt. */
+  const saveEqaSchedule = writeCommand(db, 'saveEqaSchedule', 'write', (w, raw: unknown): IpcResult<EqaScheduleRow> => {
+    const input = objectInput(raw);
+    const id = cleanId(input.id);
+    const result = validateEqaSchedule(objectInput(input.data));
+    if (!result.ok) return fail(result.code, result.message);
+    const d = result.data;
+    const existing = id ? db.prepare('SELECT * FROM eqa_schedule WHERE id=?').get(id) as Record<string, unknown> | undefined : undefined;
+    if (id && !existing) return fail('not-found', 'Không tìm thấy đợt trong lịch.');
+    let programId = d.programId;
+    if (programId && !db.prepare('SELECT 1 FROM eqa_programs WHERE id=?').get(programId)) return fail('not-found', 'Không tìm thấy chương trình ngoại kiểm.');
+    if (!programId) programId = findProgram({ program: d.programName, provider: d.provider })?.id ?? '';
+    const duplicate = programId ? db.prepare('SELECT id FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=? AND id<>?').get(programId, d.year, d.roundNo, id) as { id: string } | undefined : undefined;
+    if (duplicate) return fail('duplicate-round', `Lịch đã có ${d.round}/${d.year} của chương trình này.`);
+    const known = new Set((db.prepare('SELECT id FROM instruments').all() as { id: string }[]).map((r) => r.id));
+    if (d.instrumentIds.some((iid) => !known.has(iid))) return fail('invalid-instrument', 'Không tìm thấy máy xét nghiệm.');
+    const before = id ? db.prepare('SELECT instrument_id, submitted_at, submitted_by FROM eqa_schedule_instruments WHERE schedule_id=?').all(id) as { instrument_id: string; submitted_at: string; submitted_by: string }[] : [];
+    // Phiếu đã nộp là hồ sơ: phải bỏ đánh dấu trước khi gỡ máy khỏi đợt.
+    const removedSubmitted = before.filter((m) => m.submitted_at && !d.instrumentIds.includes(m.instrument_id));
+    if (removedSubmitted.length) return fail('locked', `${instrumentNames(removedSubmitted.map((m) => m.instrument_id)).join(', ')} đã nộp kết quả; bỏ đánh dấu đã nộp trước khi gỡ máy khỏi đợt.`);
+    const currentSample = programId ? (db.prepare('SELECT sample_type FROM eqa_programs WHERE id=?').get(programId) as { sample_type: string }).sample_type : '';
+    const sampleChanged = !!programId && currentSample !== d.sampleType;
+    const sameInstruments = before.length === d.instrumentIds.length && before.every((m) => d.instrumentIds.includes(m.instrument_id));
+    const fields = [d.year, d.round, d.roundNo, d.receiveDate, d.runDate, d.dueDate, d.assignee, d.note];
+    if (existing && existing.program_id === programId && !sampleChanged && sameInstruments
+      && fields.every((value, i) => existing[['year', 'round', 'round_no', 'receive_date', 'run_date', 'due_date', 'assignee', 'note'][i]] === value)) {
+      return w.noChange(scheduleById(id)!);
+    }
+    const savedId = id || uid();
+    w.commit((tx) => {
+      const now = nowIso();
+      if (!programId) {
+        programId = uid();
+        db.prepare('INSERT INTO eqa_programs(id,name,provider,program_code,unit_code,created_at,sample_type) VALUES (?,?,?,?,?,?,?)').run(programId, d.programName, d.provider, '', '', now, d.sampleType);
+      } else if (sampleChanged) {
+        db.prepare('UPDATE eqa_programs SET sample_type=? WHERE id=?').run(d.sampleType, programId);
+      }
+      if (existing) {
+        db.prepare(`UPDATE eqa_schedule SET program_id=?,year=?,round=?,round_no=?,receive_date=?,run_date=?,due_date=?,assignee=?,note=?,updated_at=? WHERE id=?`)
+          .run(programId, ...fields, now, savedId);
+      } else {
+        db.prepare(`INSERT INTO eqa_schedule(id,program_id,year,round,round_no,receive_date,run_date,due_date,assignee,note,created_at,updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(savedId, programId, ...fields, now, now);
+      }
+      for (const m of before) {
+        if (!d.instrumentIds.includes(m.instrument_id)) db.prepare('DELETE FROM eqa_schedule_instruments WHERE schedule_id=? AND instrument_id=?').run(savedId, m.instrument_id);
+      }
+      // Đợt đã đánh dấu nộp cả đợt trước khi khai máy: lần nộp đó phủ mọi máy.
+      const inherited = !before.length && existing?.submitted_at ? [String(existing.submitted_at), String(existing.submitted_by ?? '')] : ['', ''];
+      for (const iid of d.instrumentIds) {
+        if (!before.some((m) => m.instrument_id === iid)) db.prepare('INSERT INTO eqa_schedule_instruments(schedule_id,instrument_id,submitted_at,submitted_by) VALUES (?,?,?,?)').run(savedId, iid, ...inherited);
+      }
+      const name = (db.prepare('SELECT name FROM eqa_programs WHERE id=?').get(programId) as { name: string }).name;
+      const parts = [name, `${d.round}/${d.year}`, d.sampleType, `hạn nộp ${viDate(d.dueDate)}`,
+        d.instrumentIds.length ? `máy: ${instrumentNames(d.instrumentIds).join(', ')}` : '', d.assignee ? `phụ trách ${d.assignee}` : ''];
+      tx.audit(existing ? 'Sửa lịch ngoại kiểm' : 'Thêm lịch ngoại kiểm', parts.filter(Boolean).join(' · '), name);
+      tx.changed(['eqa_schedule', 'eqa_programs']);
+    });
+    return { ok: true, data: scheduleById(savedId)! };
+  });
+
+  /** Đánh dấu đã nộp kết quả cho trung tâm (hoặc bỏ đánh dấu khi bấm nhầm).
+   * Đợt có khai máy ghi theo từng máy: `instrumentIds` là các máy đã nộp. */
+  const markEqaSubmitted = writeCommand(db, 'markEqaSubmitted', 'write', (w, raw: unknown): IpcResult<EqaScheduleRow> => {
+    const input = objectInput(objectInput(raw).data);
+    const id = cleanId(input.id), submitted = input.submitted === true;
+    const row = scheduleById(id);
+    if (!row) return fail('not-found', 'Không tìm thấy đợt trong lịch.');
+    const actor = w.actor.name || w.actor.username;
+    const late = row.days_left < 0 ? ` · nộp trễ ${-row.days_left} ngày` : '';
+    const where = `${row.program_name} · ${row.round}/${row.year}`;
+    if (!row.instruments.length) {
+      if (!!row.submitted_at === submitted) return w.noChange(row);
+      w.commit((tx) => {
+        db.prepare('UPDATE eqa_schedule SET submitted_at=?, submitted_by=?, updated_at=? WHERE id=?')
+          .run(submitted ? nowIso() : '', submitted ? actor : '', nowIso(), id);
+        tx.audit(submitted ? 'Đã nộp kết quả ngoại kiểm' : 'Bỏ đánh dấu đã nộp ngoại kiểm',
+          `${where} · hạn nộp ${viDate(row.due_date)}${submitted ? late : ''}`, row.program_name);
+        tx.changed(['eqa_schedule']);
+      });
+      return { ok: true, data: scheduleById(id)! };
+    }
+    const ids = Array.isArray(input.instrumentIds) ? new Set(input.instrumentIds.map((v) => cleanId(v))) : null;
+    if (ids && [...ids].some((iid) => !row.instruments.some((m) => m.instrument_id === iid))) return fail('invalid-instrument', 'Máy không thuộc đợt này.');
+    const want = (iid: string) => (ids ? ids.has(iid) : submitted);
+    const marking = row.instruments.filter((m) => !m.submitted_at && want(m.instrument_id));
+    const clearing = row.instruments.filter((m) => m.submitted_at && !want(m.instrument_id));
+    if (!marking.length && !clearing.length) return w.noChange(row);
+    w.commit((tx) => {
+      const now = nowIso();
+      const set = db.prepare('UPDATE eqa_schedule_instruments SET submitted_at=?, submitted_by=? WHERE schedule_id=? AND instrument_id=?');
+      for (const m of marking) set.run(now, actor, id, m.instrument_id);
+      for (const m of clearing) set.run('', '', id, m.instrument_id);
+      db.prepare('UPDATE eqa_schedule SET updated_at=? WHERE id=?').run(now, id);
+      if (marking.length) tx.audit('Đã nộp kết quả ngoại kiểm', `${where} · máy: ${marking.map((m) => m.instrument_name).join(', ')} · hạn nộp ${viDate(row.due_date)}${late}`, row.program_name);
+      if (clearing.length) tx.audit('Bỏ đánh dấu đã nộp ngoại kiểm', `${where} · máy: ${clearing.map((m) => m.instrument_name).join(', ')}`, row.program_name);
+      tx.changed(['eqa_schedule']);
+    });
+    return { ok: true, data: scheduleById(id)! };
+  });
+
+  /** Xoá một đợt khỏi lịch (lập nhầm). Đợt đã nộp (dù chỉ một máy) hoặc đã có
+   * báo cáo là hồ sơ, không xoá. */
+  const removeEqaSchedule = writeCommand(db, 'removeEqaSchedule', 'write', (w, raw: unknown): IpcResult<{ id: string }> => {
+    const id = cleanId(objectInput(objectInput(raw).data).id);
+    const row = scheduleById(id);
+    if (!row) return fail('not-found', 'Không tìm thấy đợt trong lịch.');
+    if (row.status === 'submitted' || row.status === 'reported' || row.round_id || row.instruments.some((m) => m.submitted_at)) {
+      return fail('locked', 'Đợt đã nộp hoặc đã có báo cáo là hồ sơ, không xoá được.');
+    }
+    w.commit((tx) => {
+      db.prepare('DELETE FROM eqa_schedule_instruments WHERE schedule_id=?').run(id);
+      db.prepare('DELETE FROM eqa_schedule WHERE id=?').run(id);
+      tx.audit('Xoá lịch ngoại kiểm', `${row.program_name} · ${row.round}/${row.year} · hạn nộp ${viDate(row.due_date)}`, row.program_name);
+      tx.changed(['eqa_schedule']);
+    });
+    return { ok: true, data: { id } };
+  });
+
+  return { listEqaRounds, getEqaRound, getEqaSeries, getEqaInstrumentGrid, listEqaAttention, previewEqaImport, importEqaRound, cancelEqaRound,
+    listEqaSchedule, listEqaPrograms, saveEqaSchedule, markEqaSubmitted, removeEqaSchedule };
 }

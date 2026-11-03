@@ -26,7 +26,7 @@ export const SUMMARY_IGNORED_TABLES: ReadonlySet<string> = new Set([
   // Tóm tắt chỉ đọc mốc cắt `nce_cuts`; nội dung hồ sơ NCE không đổi kết quả Westgard.
   'nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions',
   // Ngoại kiểm không đổi kết quả Westgard của nội kiểm.
-  'eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions',
+  'eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions', 'eqa_schedule', 'eqa_schedule_instruments',
 ]);
 
 export class TestSummaryCache<T> {

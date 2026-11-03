@@ -11,7 +11,7 @@ import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -427,7 +427,8 @@ CREATE TABLE IF NOT EXISTS eqa_programs (
   provider TEXT NOT NULL DEFAULT '',
   program_code TEXT NOT NULL DEFAULT '',
   unit_code TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT ''
+  created_at TEXT NOT NULL DEFAULT '',
+  sample_type TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS eqa_test_map (
   id TEXT PRIMARY KEY,
@@ -498,6 +499,36 @@ CREATE TABLE IF NOT EXISTS eqa_results (
 );
 CREATE INDEX IF NOT EXISTS idx_eqa_results_round ON eqa_results(round_id, version);
 CREATE INDEX IF NOT EXISTS idx_eqa_results_test ON eqa_results(test_id);
+-- Lịch đợt ngoại kiểm: ngày nhận mẫu, ngày chạy, hạn nộp kết quả cho trung tâm.
+-- Gắn với đợt có báo cáo (eqa_rounds) theo chương trình + năm + số đợt. Nộp trễ
+-- hạn thì đợt bị tính không đạt, nên app nhắc trước hạn.
+CREATE TABLE IF NOT EXISTS eqa_schedule (
+  id TEXT PRIMARY KEY,
+  program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+  year INTEGER NOT NULL,
+  round TEXT NOT NULL,
+  round_no INTEGER NOT NULL,
+  receive_date TEXT NOT NULL DEFAULT '',
+  run_date TEXT NOT NULL DEFAULT '',
+  due_date TEXT NOT NULL,
+  assignee TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  submitted_at TEXT NOT NULL DEFAULT '',
+  submitted_by TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  UNIQUE(program_id, year, round_no)
+);
+CREATE INDEX IF NOT EXISTS idx_eqa_schedule_due ON eqa_schedule(due_date);
+-- Máy chạy mẫu của một đợt trong lịch. Mỗi máy nộp phiếu kết quả riêng (mã đơn
+-- vị riêng), nên "đã nộp" ghi theo từng máy; đợt chỉ tính đã nộp khi đủ máy.
+CREATE TABLE IF NOT EXISTS eqa_schedule_instruments (
+  schedule_id TEXT NOT NULL REFERENCES eqa_schedule(id),
+  instrument_id TEXT NOT NULL REFERENCES instruments(id),
+  submitted_at TEXT NOT NULL DEFAULT '',
+  submitted_by TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY(schedule_id, instrument_id)
+);
 -- Quyết định append-only của kỳ: nhập, bổ sung máy, nhập lại, huỷ.
 CREATE TABLE IF NOT EXISTS eqa_decisions (
   id TEXT PRIMARY KEY,
@@ -787,6 +818,11 @@ const MIGRATIONS: Migration[] = [
     // vì điểm đã ra khỏi chuỗi đánh giá.
     name: 'Điểm huỷ giữ bằng chứng lần chạy bị loại',
     up(db) { addColumnIfMissing(db, 'qc_points', 'void_rejection_json', "TEXT NOT NULL DEFAULT ''"); },
+  },
+  {
+    version: 10,
+    name: 'Loại mẫu của chương trình ngoại kiểm',
+    up(db) { addColumnIfMissing(db, 'eqa_programs', 'sample_type', "TEXT NOT NULL DEFAULT ''"); },
   },
 ];
 

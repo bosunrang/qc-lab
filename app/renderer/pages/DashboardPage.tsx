@@ -2,7 +2,7 @@
 // `view-models/dashboard-view-model.ts` (đọc ghi chú
 // đầu file đó: báo động theo ĐIỂM CUỐI, 1 dòng cho mỗi MỨC, % hoàn tất theo
 // XÉT NGHIỆM) — file này chỉ dựng JSX.
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { SUMMARY_TABLES } from '../lib/useCatalog';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,6 +18,8 @@ import {
 } from '../view-models/dashboard-view-model';
 import { useAuthStore } from '../store/auth-store';
 import { isAdmin } from '../lib/permissions';
+import { needsAction } from '../../main/domain/eqa/schedule';
+import type { EqaScheduleRow } from '../../shared/qc-api';
 
 // Kiểu read-model đã gắn sẵn hồ sơ NCE của store (`OverdueAction` = NceRecordRow
 // + `testName` đã join) — `ReturnType<typeof f>` trần sẽ suy generic về đúng
@@ -177,6 +179,21 @@ function LoadingView({ subtitle }: { subtitle: string }) {
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <StatCard key={label} label={label} value="—" />)}</div></div></>;
 }
 
+/** Nhắc hạn nộp ngoại kiểm ngay trên Tổng quan: nộp trễ thì đợt bị tính không
+ * đạt. Tự nạp khi lịch hoặc đợt ngoại kiểm đổi; không có đợt cần nộp thì ẩn. */
+function EqaDueAlert() {
+  const [rows, setRows] = useState<EqaScheduleRow[]>([]);
+  const reload = () => { void window.qcApi.listEqaSchedule().then((all) => setRows(all.filter(needsAction))).catch(() => setRows([])); };
+  useEffect(reload, []);
+  useStoreInvalidation(['eqa_schedule', 'eqa_rounds'], undefined, reload);
+  if (!rows.length) return null;
+  const overdue = rows.filter((r) => r.status === 'overdue').length;
+  return <div className={`alert ${overdue ? 'rej' : 'warn'} dash-eqa-alert`} role="status">
+    <span><b>Ngoại kiểm:</b> {rows.length} đợt cần nộp kết quả{overdue ? `, ${overdue} đợt đã quá hạn` : ''} — {rows.slice(0, 3).map((r) => `${r.program_name} ${r.round}/${r.year}`).join('; ')}{rows.length > 3 ? '; …' : ''}</span>
+    <Link className="btn ghost sm" to="/eqa?view=lich">Mở lịch ngoại kiểm</Link>
+  </div>;
+}
+
 export function DashboardPage() {
   const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore(useShallow((s) => ({ testSummaries: s.testSummaries, overdueActions: s.overdueActions, lots: s.lots, loading: s.loading, error: s.error, load: s.load })));
   const { profile, load: loadProfile } = useSettingsStore(useShallow((s) => ({ profile: s.profile, load: s.load })));
@@ -195,7 +212,7 @@ export function DashboardPage() {
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{([
     ['Xét nghiệm', model.tests.length], ['Điểm QC', model.kpi.totalPoints], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'accent'],
-  ] as [string, number, StatTone?][]).map(([label, value, tone]) => <StatCard key={label} label={label} value={value} tone={tone} />)}</div></div><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
+  ] as [string, number, StatTone?][]).map(([label, value, tone]) => <StatCard key={label} label={label} value={value} tone={tone} />)}</div></div><EqaDueAlert /><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
 }
 
 

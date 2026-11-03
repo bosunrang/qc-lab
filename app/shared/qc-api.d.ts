@@ -692,6 +692,38 @@ export interface EqaAttentionRow {
   /** Kết quả nặng nhất trong đợt mới nhất, kèm hợp mọi tín hiệu của đợt. */
   latest: { round_id: string; year: number; round: string; sample: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
 }
+/** Một đợt trong lịch ngoại kiểm. `status` do main suy ra: đã có báo cáo của
+ * trung tâm > đã nộp > quá hạn > chưa nộp. `days_left`: số ngày tới hạn nộp (âm = đã quá). */
+export type EqaScheduleStatus = 'planned' | 'overdue' | 'submitted' | 'reported';
+/** Một máy chạy mẫu của đợt: đã nộp phiếu kết quả chưa, đã có báo cáo chưa. */
+export interface EqaScheduleInstrument {
+  instrument_id: string; instrument_name: string; submitted_at: string; submitted_by: string;
+  /** Báo cáo của trung tâm đã có kết quả của máy này (coi như đã nộp). */
+  reported: boolean;
+}
+export interface EqaScheduleRow {
+  id: string; program_id: string; program_name: string; provider: string; sample_type: string;
+  year: number; round: string; round_no: number;
+  receive_date: string; run_date: string; due_date: string; assignee: string; note: string;
+  /** Đợt có khai máy: lần nộp cuối khi đã đủ máy, ngược lại rỗng. */
+  submitted_at: string; submitted_by: string;
+  /** Máy chạy mẫu; rỗng = đợt không khai máy, "đã nộp" ghi cho cả đợt. */
+  instruments: EqaScheduleInstrument[];
+  /** Đợt đã có báo cáo của trung tâm (eqa_rounds đang dùng), nếu có. */
+  round_id: string | null;
+  status: EqaScheduleStatus; days_left: number;
+}
+export interface EqaProgramOption {
+  id: string; name: string; provider: string; sample_type: string;
+  /** Máy gợi sẵn cho đợt mới: máy của đợt gần nhất trong lịch, nếu chưa có thì
+   * máy có kết quả ở báo cáo gần nhất của chương trình. */
+  instrument_ids: string[];
+}
+export interface EqaScheduleInput {
+  programId?: string; programName?: string; provider?: string; year: number; round: string;
+  receiveDate?: string; runDate?: string; dueDate: string; assignee?: string; note?: string;
+  sampleType?: string; instrumentIds?: string[];
+}
 export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
 export interface EqaRoundView {
   round: EqaRoundRow; results: EqaResultRow[]; decisions: EqaDecisionRow[];
@@ -849,6 +881,13 @@ export interface QcApi {
   /** Xét nghiệm đang có tín hiệu hoặc không thành công ở đợt mới nhất. */
   listEqaAttention(): Promise<EqaAttentionRow[]>;
   getEqaInstrumentGrid(input: { programId: string; year: number; instrumentId: string }): Promise<EqaInstrumentGridRow[]>;
+  listEqaSchedule(): Promise<EqaScheduleRow[]>;
+  listEqaPrograms(): Promise<EqaProgramOption[]>;
+  saveEqaSchedule(input: { id?: string; data: EqaScheduleInput }): Promise<IpcResult<EqaScheduleRow>>;
+  /** Đợt có khai máy: `instrumentIds` là các máy đã nộp (máy khác bỏ đánh dấu);
+   * không gửi thì `submitted` áp cho mọi máy. */
+  markEqaSubmitted(input: { data: { id: string; submitted?: boolean; instrumentIds?: string[] } }): Promise<IpcResult<EqaScheduleRow>>;
+  removeEqaSchedule(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
   /** Kiểm và tính thử một lần nhập; không ghi gì. */
   previewEqaImport(input: { data: EqaImportInput }): Promise<IpcResult<EqaImportPreview>>;
   importEqaRound(input: { data: EqaImportInput }): Promise<IpcResult<EqaRoundView>>;

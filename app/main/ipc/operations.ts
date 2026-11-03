@@ -131,7 +131,7 @@ const DATA_API_NAMES = [
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
-  'listReagentComparisons', 'listEqaRounds', 'getEqaRound', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'getEqaRound', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
@@ -275,6 +275,12 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     previewEqaImport: { channel: 'eqa:previewImport', lan: true, run: (ctx, input) => { nceReader(ctx); return eqa.previewEqaImport(input); } },
     importEqaRound: { channel: 'eqa:importRound', lan: true, run: (ctx, input) => eqa.importEqaRound(input, ctx.actor()) },
     cancelEqaRound: { channel: 'eqa:cancelRound', lan: true, run: (ctx, input) => eqa.cancelEqaRound(input, ctx.actor()) },
+    // Lịch và hạn nộp ngoại kiểm: việc của KTV, cùng nhóm với nhập báo cáo.
+    listEqaSchedule: { channel: 'eqa:listSchedule', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaSchedule(); } },
+    listEqaPrograms: { channel: 'eqa:listPrograms', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaPrograms(); } },
+    saveEqaSchedule: { channel: 'eqa:saveSchedule', lan: true, run: (ctx, input) => eqa.saveEqaSchedule(input, ctx.actor()) },
+    markEqaSubmitted: { channel: 'eqa:markSubmitted', lan: true, run: (ctx, input) => eqa.markEqaSubmitted(input, ctx.actor()) },
+    removeEqaSchedule: { channel: 'eqa:removeSchedule', lan: true, run: (ctx, input) => eqa.removeEqaSchedule(input, ctx.actor()) },
     createNce: { channel: 'nce:create', lan: true, run: (ctx, input) => nce.createNce(input, ctx.actor()) },
     attachNceRun: { channel: 'nce:attachRun', lan: true, run: (ctx, input) => nce.attachNceRun(input, ctx.actor()) },
     updateNce: { channel: 'nce:update', lan: true, run: (ctx, input) => nce.updateNce(input, ctx.actor()) },

@@ -107,7 +107,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 150);
+  assert.equal(handlers.size, 155);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -132,16 +132,16 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
     'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
     // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
     'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
-    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAttention', 'listEqaRounds', 'listInstruments',
+    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAttention', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
     'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
     'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
     'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listReagentComparisons',
     'listReagentQuickValues', 'listRuleScopes', 'listRuleSettings', 'listSigmaCohorts',
     'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
-    'listVoidedEntryPoints', 'previewEqaImport', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
-    'queryReport', 'recordNcePatientImpact', 'recordNceTechnicalAssessment', 'rejectLisResult', 'releaseNce', 'removeReagentQuickValue',
+    'listVoidedEntryPoints', 'markEqaSubmitted', 'previewEqaImport', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
+    'queryReport', 'recordNcePatientImpact', 'recordNceTechnicalAssessment', 'rejectLisResult', 'releaseNce', 'removeEqaSchedule', 'removeReagentQuickValue',
     'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewNceEffectiveness',
-    'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',
+    'saveEqaSchedule', 'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',
     'setDayNote', 'submitNce', 'updateNce', 'updateNceAction', 'verifyOwnPassword', 'voidPoint',
   ]);
 });

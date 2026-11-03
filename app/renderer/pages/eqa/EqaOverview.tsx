@@ -10,9 +10,13 @@ import { EmptyState } from '../../components/EmptyState';
 import { EqaImportModal } from './EqaImportModal';
 import { EqaSeriesModal } from './EqaSeriesModal';
 import { ClassTag, numText, pctText, roundLabel, RoundStatusTag, StatCard, TrendTags } from './shared';
+import { needsAction } from '../../../main/domain/eqa/schedule';
+import { daysLeftText } from './EqaSchedule';
 
-export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
-  const { rounds, attention, loading, error, load } = useEqaStore(useShallow((s) => ({ rounds: s.rounds, attention: s.attention, loading: s.loading, error: s.error, load: s.load })));
+export function EqaOverview({ onOpen, onOpenSchedule }: { onOpen: (id: string) => void; onOpenSchedule: () => void }) {
+  const { rounds, attention, schedule, loading, error, load } = useEqaStore(useShallow((s) => ({ rounds: s.rounds, attention: s.attention, schedule: s.schedule, loading: s.loading, error: s.error, load: s.load })));
+  // Đợt quá hạn hoặc sắp đến hạn nộp: nhắc ngay đầu trang (lịch ở thẻ Lịch).
+  const dueRows = useMemo(() => schedule.filter(needsAction), [schedule]);
   const [seriesTest, setSeriesTest] = useState('');
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const [importing, setImporting] = useState(false);
@@ -36,6 +40,13 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
           </div>
         )}
       </div>
+
+      {dueRows.length > 0 && (
+        <div className={`alert ${dueRows.some((r) => r.status === 'overdue') ? 'rej' : 'warn'} eqa-due-alert`} role="status">
+          <span><b>{dueRows.length} đợt cần nộp kết quả:</b> {dueRows.slice(0, 4).map((r) => `${r.program_name} ${r.round}/${r.year} (${daysLeftText(r).toLowerCase()})`).join('; ')}{dueRows.length > 4 ? '; …' : ''}</span>
+          <button type="button" className="btn ghost sm" onClick={onOpenSchedule}>Mở lịch</button>
+        </div>
+      )}
 
       <div className="eqa-stats">
         <StatCard tone="info" label="Kỳ đang theo dõi" value={active.length} detail={cancelledCount ? `${cancelledCount} kỳ đã huỷ` : 'Không tính kỳ đã huỷ'} />

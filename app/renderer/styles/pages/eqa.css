@@ -85,7 +85,51 @@
 .eqa-import-grid{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr);gap:var(--field-gap);align-items:end;}
 .eqa-details summary{cursor:pointer;color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
 
+/* Lịch đợt và hạn nộp. Thanh chuyển Tổng quan/Lịch dùng `.dayseg` chung. */
+.eqa-view-switch{margin-bottom:var(--space-4);}
+.eqa-due-alert{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-4);}
+.eqa-schedule{min-width:0;}
+.eqa-schedule-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:var(--space-5);align-items:start;margin-bottom:var(--space-5);}
+.eqa-cal-nav{display:flex;align-items:center;gap:var(--space-1);}
+.eqa-year-select{width:auto;min-width:96px;}
+.eqa-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:var(--space-1);}
+.eqa-cal-head{padding:var(--space-1) 0;color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-semibold);text-align:center;}
+.eqa-cal-day{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:var(--space-1);min-height:var(--table-row-h);padding:var(--space-1);border:1px solid var(--surface-divider);border-radius:var(--radius-sm);background:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);font-variant-numeric:tabular-nums;cursor:pointer;transition:background var(--motion-fast) ease,border-color var(--motion-fast) ease;}
+.eqa-cal-day:hover{background:var(--surface-subtle);}
+.eqa-cal-day.is-out{color:var(--text-disabled);background:var(--surface-subtle);}
+.eqa-cal-day.is-today{border-color:var(--accent);font-weight:var(--weight-bold);}
+.eqa-cal-day.is-selected{background:var(--accent-surface);border-color:var(--accent);}
+.eqa-cal-dots{display:flex;gap:var(--space-0-5);}
+.eqa-cal-dot{width:var(--space-1-5);height:var(--space-1-5);border-radius:var(--radius-full);background:var(--neutral-accent);}
+.eqa-cal-dot.is-overdue{background:var(--danger-accent);}
+.eqa-cal-dot.is-soon{background:var(--warning-accent);}
+.eqa-cal-dot.is-done{background:var(--success-accent);}
+.eqa-cal-dot.is-run{background:var(--info-accent);}
+.eqa-cal-detail{display:grid;gap:var(--space-2);}
+.eqa-cal-detail h3{margin:0;font-size:var(--title-sub);font-weight:var(--weight-semibold);color:var(--text-primary);}
+/* Nhịp form chuẩn như Cấu hình chung: row-gap của form là nguồn khoảng cách
+   duy nhất giữa các hàng, nên bỏ margin-top mà quy tắc chung của modal cộng
+   vào .field đứng trực tiếp trong form (nếu không sẽ thành 24px). */
+.eqa-form{display:grid;row-gap:var(--field-gap);}
+.modal-b .eqa-form>.field,.modal-b .eqa-form>.field-error{margin:0;}
+.eqa-form-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--field-gap);}
+.eqa-form-program{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:var(--field-gap);}
+.eqa-field-hint{margin-top:var(--space-1);}
+/* Chọn máy chạy mẫu / máy đã nộp: lưới ô tích, mỗi ô tên máy và dòng phụ. */
+.eqa-machine-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--space-2);}
+.eqa-machine-picker label{display:flex;align-items:flex-start;gap:var(--space-2);margin:0;padding:var(--space-2) var(--space-3);border:1px solid var(--surface-divider);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;}
+.eqa-machine-picker label:has(input:checked){border-color:var(--accent-border);background:var(--accent-surface);}
+.eqa-machine-picker label:has(input:disabled){cursor:default;}
+.eqa-machine-picker input{margin-top:var(--space-0-5);}
+.eqa-machine-picker span{display:grid;gap:var(--space-0-5);min-width:0;}
+.eqa-machine-picker b{color:var(--text-primary);font-weight:var(--weight-semibold);}
+.eqa-machine-picker small{color:var(--text-tertiary);font-size:var(--text-xs);}
+.eqa-submit-head{margin:0 0 var(--space-3);}
+.eqa-sample-type{margin:0 0 0 var(--space-2);}
+.eqa-machine-tags{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:var(--space-1);}
+
 @media (max-width:1100px){
+  .eqa-schedule-grid,.eqa-form-dates,.eqa-form-program{grid-template-columns:1fr;}
   .eqa-stats,.eqa-stats.is-five{grid-template-columns:repeat(2,minmax(0,1fr));}
   .eqa-facts{grid-template-columns:repeat(2,minmax(0,1fr));}
 }

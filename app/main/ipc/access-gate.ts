@@ -38,6 +38,8 @@ const CHANNEL_PAGES: Readonly<Record<string, readonly string[]>> = {
   'nce:list': [], 'nce:getConfig': ['settings'], 'nce:saveConfig': ['settings'],
   // Six Sigma in báo cáo theo mẫu của trang Báo cáo.
   'report:getTemplateSettings': ['report', 'sigma'],
+  // Tổng quan nhắc hạn nộp ngoại kiểm.
+  'eqa:listSchedule': ['eqa', 'dash'],
   'settings:saveLabProfile': ['settings'], 'settings:enableOperationMode': ['settings'],
   'lis:saveSettings': ['settings'], 'lis:pullQueue': ['settings'], 'lis:importResult': ['settings'], 'lis:rejectResult': ['settings'],
   'firebase:connect': ['settings'], 'firebase:sync': ['settings'], 'firebase:disconnect': ['settings'],

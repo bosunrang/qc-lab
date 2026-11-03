@@ -23,7 +23,7 @@ export const PREVIOUS_LOT_IGNORED_TABLES: ReadonlySet<string> = new Set([
   'activity', 'users', 'lab', 'tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions', 'qc_month_reviews', 'reagent_tests', 'report_templates',
   'period_locks', 'sigma_data', 'planned_targets',
   'nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions',
-  'eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions',
+  'eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions', 'eqa_schedule', 'eqa_schedule_instruments',
 ]);
 
 /** Bảng mà mỗi dòng thuộc đúng một xét nghiệm và mọi chỗ ghi đều báo kèm
