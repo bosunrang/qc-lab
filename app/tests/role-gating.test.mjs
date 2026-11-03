@@ -117,7 +117,7 @@ assert.equal(westgard.listRuleSettings().find((rule) => rule.id === '1-2s').on, 
 
 // ── 5) admin: làm được cả 2 nhóm ──────────────────────────────────────────
 assert.equal(config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 5, sd: 0.2, qcLotId: operational.lotIds[0] } }, admin).ok, true, 'admin phai luu duoc Mean/SD');
-assert.equal(report.lockPeriod({ data: { ym: '2026-10' } }, admin).ok, true, 'admin phai khoa duoc ky bao cao');
+assert.equal(report.lockPeriod({ data: { ym: '2026-10', acknowledge: true } }, admin).ok, true, 'admin phai khoa duoc ky bao cao');
 assert.equal(westgard.saveRuleSetting('1-2s', false, admin).ok, true, 'admin phai tat duoc luat chung');
 assert.equal(westgard.resetRuleSettings(admin).ok, true, 'admin phai khoi phuc duoc luat chung');
 assert.equal(settings.saveLabProfile({ data: { name: 'Khoa Xet nghiem' } }, admin).ok, true, 'admin phai luu duoc ho so PXN');

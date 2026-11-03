@@ -27,6 +27,7 @@ import type { NceRecordRow, ReportForm, ReportFormKind, ReportPointRow, ReportTe
 import { REPORT_FORM_KINDS, REPORT_FORM_LABELS } from '../../main/domain/report-template-validation';
 import { NCE_SOURCE_LABEL, NCE_STATUS_LABEL, NCE_TIER_LABEL } from '../../main/domain/nce/labels';
 import { AsyncButton } from '../components/AsyncButton';
+import { MonthlyReviewPanel } from './report/MonthlyReviewPanel';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -289,6 +290,8 @@ export function ReportPage() {
           action={admin && <Link className="btn teal" to="/manage" state={{ tab: 'targets' }}>Cấu hình Mean/SD</Link>}
         >Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.</EmptyState></div>
       )}
+
+      <MonthlyReviewPanel />
 
       <div className="panel">
         <h2 className="panel-title">Khoá kỳ báo cáo</h2>

@@ -561,10 +561,34 @@ export interface StorageInfo {
   storageMode: 'file' | 'memory' | 'browser-preview';
 }
 /** Loại PDF có biểu mẫu kiểm soát riêng: nội kiểm, Westgard, Six Sigma, so sánh hoá chất. */
-export type ReportFormKind = 'iqc' | 'westgard' | 'sigma' | 'reagent';
+export type ReportFormKind = 'iqc' | 'westgard' | 'sigma' | 'reagent' | 'review';
 /** Thông tin kiểm soát tài liệu in ở đầu PDF. `effectiveDate` là `YYYY-MM-DD` hoặc rỗng. */
 export interface ReportForm { formCode: string; version: string; effectiveDate: string }
 export type ReportTemplateSettings = Record<ReportFormKind, ReportForm>;
+/** Một dòng biên bản xem xét QC tháng: một xét nghiệm × mức × lô (GV4 mục 2). */
+export interface QcMonthlyReviewRow {
+  test_id: string; test_name: string; instrument_name: string; unit: string; decimal_places: number; level: number; lot: string;
+  n: number; accepted: number; rejected: number; unevaluated: number;
+  mean: number | null; sd: number | null; cv: number | null;
+  target_mean: number | null; target_sd: number | null; target_cv: number | null; target_changed: boolean;
+  shift_sd: number | null; bias_pct: number | null;
+  /** Điểm đã huỷ trong tháng; trong đó thuộc lần chạy bị loại. */
+  voided: number; voided_rejected: number;
+}
+export interface QcMonthlyReviewNce { nce_id: string; test_name: string; status: string; error_class: string; detected_at: string }
+export type QcReviewConclusion = 'ok' | 'monitor' | 'action';
+export interface QcMonthlyReviewSignature {
+  id: string; ym: string; conclusion: QcReviewConclusion; note: string;
+  reviewer_name: string; reviewer_username: string; reviewed_at: string;
+}
+export interface QcMonthlyReview {
+  ym: string; rows: QcMonthlyReviewRow[]; nce: QcMonthlyReviewNce[];
+  totals: { points: number; accepted: number; rejected: number; rejected_runs: number; voided: number; voided_rejected: number; nce: number; nce_open: number };
+  /** Việc còn tồn của kỳ (lần chạy bị loại chưa có NCE, NCE chưa đóng); rỗng nếu không còn. */
+  open_items: string;
+  /** Các lần ký, cũ trước; lần cuối là kết luận hiện hành. */
+  signatures: QcMonthlyReviewSignature[];
+}
 export interface FirebaseSettings {
   labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
 }
@@ -868,6 +892,8 @@ export interface QcApi {
   disconnectFirebase(): Promise<IpcResult<null>>;
   listPeriodLocks(): Promise<PeriodLockRow[]>;
   /** `acknowledge`: đã xem việc còn tồn của kỳ (lỗi `period-open-items`) và vẫn khoá. */
+  getQcMonthlyReview(ym: string): Promise<QcMonthlyReview>;
+  signQcMonthlyReview(input: { data: { ym: string; conclusion: QcReviewConclusion; note?: string } }): Promise<IpcResult<QcMonthlyReviewSignature>>;
   lockPeriod(input: { data: { ym: string; note?: string; acknowledge?: boolean } }): Promise<IpcResult<PeriodLockRow>>;
   unlockPeriod(input: { data: { ym: string; note: string } }): Promise<IpcResult<{ ym: string }>>;
   queryReport(input: { testId: string; from?: string; to?: string }): Promise<ReportPointRow[]>;

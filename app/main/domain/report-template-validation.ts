@@ -5,13 +5,14 @@ import type { ReportForm, ReportFormKind, ReportTemplateSettings } from '../../s
  * được nhận diện duy nhất, có phiên bản, ngày hiệu lực và đánh số trang).
  * Mỗi loại báo cáo một mã riêng: dùng chung một mã cho mọi PDF thì không
  * phân biệt được bản in thuộc biểu mẫu nào khi lưu hồ sơ. */
-export const REPORT_FORM_KINDS = ['iqc', 'westgard', 'sigma', 'reagent'] as const satisfies readonly ReportFormKind[];
+export const REPORT_FORM_KINDS = ['iqc', 'westgard', 'sigma', 'reagent', 'review'] as const satisfies readonly ReportFormKind[];
 
 export const REPORT_FORM_LABELS: Record<ReportFormKind, string> = {
   iqc: 'Báo cáo nội kiểm',
   westgard: 'Phân tích Westgard',
   sigma: 'Báo cáo Six Sigma',
   reagent: 'So sánh hoá chất',
+  review: 'Biên bản xem xét QC tháng',
 };
 
 export const DEFAULT_REPORT_TEMPLATES: ReportTemplateSettings = {
@@ -19,6 +20,7 @@ export const DEFAULT_REPORT_TEMPLATES: ReportTemplateSettings = {
   westgard: { formCode: 'BM-WG-01', version: '1.0', effectiveDate: '' },
   sigma: { formCode: 'BM-SS-01', version: '1.0', effectiveDate: '' },
   reagent: { formCode: 'BM-HC-01', version: '1.0', effectiveDate: '' },
+  review: { formCode: 'BM-XX-01', version: '1.0', effectiveDate: '' },
 };
 
 export interface ReportTemplateInput {
@@ -60,6 +62,7 @@ export function parseReportTemplates(raw: unknown): ReportTemplateSettings {
   const result: ReportTemplateSettings = {
     iqc: { ...DEFAULT_REPORT_TEMPLATES.iqc }, westgard: { ...DEFAULT_REPORT_TEMPLATES.westgard },
     sigma: { ...DEFAULT_REPORT_TEMPLATES.sigma }, reagent: { ...DEFAULT_REPORT_TEMPLATES.reagent },
+    review: { ...DEFAULT_REPORT_TEMPLATES.review },
   };
   if (!raw || typeof raw !== 'object') return result;
   const stored = raw as Record<string, unknown>;

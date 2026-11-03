@@ -113,10 +113,14 @@
   gap:var(--field-gap);
   margin-top:var(--space-4);
 }
+/* Khoảng cách trên chỉ để tách khỏi đoạn mô tả đứng trước (khung Khoá kỳ);
+   đứng đầu khung thì sát tiêu đề như mọi khung lọc khác. */
+.report-lock-controls:first-child{margin-top:0;}
 
 .report-lock-action{
   display:flex;
   align-items:flex-end;
+  gap:var(--space-2);
   min-height:var(--control-h);
 }
 
@@ -189,5 +193,14 @@
   .report-template-fields{grid-template-columns:1fr 1fr;}
   .report-template-name,.report-template-action{grid-column:1/-1;}
 }
-
-
+/* Biên bản xem xét QC tháng (GV4 mục 2). */
+.monthly-review-totals{margin:var(--space-3) 0;color:var(--text-secondary);font-size:var(--text-sm);}
+.monthly-review-table-wrap{width:100%;overflow-x:auto;margin:var(--space-3) 0 var(--space-2);}
+.monthly-review-table{width:100%;}
+.monthly-review-table th{white-space:nowrap;}
+.monthly-review-table th:not(:first-child),.monthly-review-table td:not(:first-child){text-align:center;}
+.monthly-review-table td.num{white-space:nowrap;}
+.monthly-review-sign{display:grid;gap:var(--space-3);margin-top:var(--space-4);}
+.monthly-review-sign-form{display:grid;grid-template-columns:minmax(200px,260px) minmax(0,1fr) max-content;align-items:end;gap:var(--field-gap);}
+.monthly-review-sign-form .field{margin:0;}
+@media (max-width:900px){.monthly-review-sign-form{grid-template-columns:1fr;}}

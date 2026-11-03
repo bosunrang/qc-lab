@@ -132,7 +132,7 @@ const DATA_API_NAMES = [
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
   'listReagentComparisons', 'listEqaRounds', 'getEqaRound', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
-  'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'backupStatus', 'getLisSettings',
+  'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
 // mà danh sách trên chưa ghi.
@@ -310,6 +310,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     listPeriodLocks: { channel: 'report:listPeriodLocks', lan: true, run: () => report.listPeriodLocks() },
     getReportTemplateSettings: { channel: 'report:getTemplateSettings', lan: true, run: () => report.getReportTemplateSettings() },
     saveReportTemplateSettings: { channel: 'report:saveTemplateSettings', lan: false, run: (ctx, input) => report.saveReportTemplateSettings(input, ctx.actor()) },
+    getQcMonthlyReview: { channel: 'report:getMonthlyReview', lan: true, run: (_ctx, ym) => report.getQcMonthlyReview(ym) },
+    signQcMonthlyReview: { channel: 'report:signMonthlyReview', lan: false, run: (ctx, input) => report.signQcMonthlyReview(input, ctx.actor()) },
     lockPeriod: { channel: 'report:lockPeriod', lan: false, run: (ctx, input) => report.lockPeriod(input, ctx.actor()) },
     unlockPeriod: { channel: 'report:unlockPeriod', lan: false, run: (ctx, input) => report.unlockPeriod(input, ctx.actor()) },
     queryReport: { channel: 'report:queryReport', lan: true, run: (_ctx, input) => report.queryReport(input) },

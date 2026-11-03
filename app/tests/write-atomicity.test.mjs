@@ -149,8 +149,8 @@ test('so sánh hoá chất, khoá kỳ, hồ sơ đơn vị, LIS đều nguyên 
   assertAtomic(db, ['reagent_tests'], 'reagent.remove', () => reagent.removeComparison({ id: comparison.id }, admin));
   assertAtomic(db, ['app_meta'], 'reagent.addQuickValue', () => reagent.addQuickListValue({ type: 'operator', value: 'KTV A' }, admin));
 
-  assertAtomic(db, ['period_locks'], 'report.lockPeriod', () => report.lockPeriod({ data: { ym: '2026-03', note: 'chốt kỳ' } }, admin));
-  report.lockPeriod({ data: { ym: '2026-04', note: 'chốt kỳ' } }, admin);
+  assertAtomic(db, ['period_locks'], 'report.lockPeriod', () => report.lockPeriod({ data: { ym: '2026-03', note: 'chốt kỳ', acknowledge: true } }, admin));
+  report.lockPeriod({ data: { ym: '2026-04', note: 'chốt kỳ', acknowledge: true } }, admin);
   assertAtomic(db, ['period_locks'], 'report.unlockPeriod', () => report.unlockPeriod({ data: { ym: '2026-04', note: 'mở lại để sửa' } }, admin));
 
   assertAtomic(db, ['lab'], 'settings.saveLabProfile', () => settings.saveLabProfile({ data: { name: 'Khoa Xét nghiệm', dept: '', address: '', brandTitle: 'QC Lab', brandSub: '' } }, admin));

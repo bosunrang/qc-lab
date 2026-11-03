@@ -80,7 +80,7 @@ assert.equal(entry.queryPoints(test.id, 1).every((point) => point.lot === 'L-MOI
 
 // Kỳ đã khoá vẫn được đếm và báo rõ (đổi nhãn lô là thao tác được PHÉP, khác
 // xoá xét nghiệm — nhưng người dùng phải biết nó chạm vào kỳ đã chốt).
-report.lockPeriod({ data: { ym: '2026-03', note: 'chot ky' } }, actor);
+report.lockPeriod({ data: { ym: '2026-03', note: 'chot ky', acknowledge: true } }, actor);
 const previewLocked = config.previewLotRename({ id: lotOld.id, lotNo: 'L-BA' });
 assert.equal(previewLocked.data.rename.affected, 2);
 assert.equal(previewLocked.data.rename.lockedCount, 2, 'phai dem duoc diem thuoc ky da khoa');

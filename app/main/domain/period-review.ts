@@ -11,20 +11,23 @@ export interface PeriodOpenItems {
   unreviewedRuns: { testId: string; date: string; runId: string }[];
   /** Hồ sơ NCE chưa đóng có lần chạy (hoặc ngày phát hiện) trong kỳ. */
   openNceIds: string[];
+  /** Kỳ chưa có biên bản xem xét QC tháng được ký (GV4 mục 2). */
+  reviewMissing: boolean;
 }
 
 const inPeriod = (date: string, ym: string) => date.slice(0, 7) === ym;
 
-export function periodOpenItems(ym: string, queue: readonly NceQueueRow[], openRecords: readonly PeriodOpenRecord[]): PeriodOpenItems {
+export function periodOpenItems(ym: string, queue: readonly NceQueueRow[], openRecords: readonly PeriodOpenRecord[], reviewed = true): PeriodOpenItems {
   return {
     unreviewedRuns: queue.filter((row) => !row.record && inPeriod(row.date, ym)).map((row) => ({ testId: row.testId, date: row.date, runId: row.runId })),
     openNceIds: openRecords
       .filter((record) => (record.runDates.length ? record.runDates.some((date) => inPeriod(date, ym)) : inPeriod(record.detectedAt, ym)))
       .map((record) => record.nceId).sort(),
+    reviewMissing: !reviewed,
   };
 }
 
-export const hasPeriodOpenItems = (items: PeriodOpenItems) => items.unreviewedRuns.length > 0 || items.openNceIds.length > 0;
+export const hasPeriodOpenItems = (items: PeriodOpenItems) => items.unreviewedRuns.length > 0 || items.openNceIds.length > 0 || items.reviewMissing;
 
 const LIST_LIMIT = 5;
 const listText = (items: readonly string[]) => items.slice(0, LIST_LIMIT).join('; ') + (items.length > LIST_LIMIT ? `; … (+${items.length - LIST_LIMIT})` : '');
@@ -36,5 +39,6 @@ export function periodOpenItemsText(items: PeriodOpenItems, testName: (testId: s
     parts.push(`${items.unreviewedRuns.length} lần chạy bị loại chưa có hồ sơ NCE (${listText(items.unreviewedRuns.map((run) => `${testName(run.testId)} ${viDate(run.date)} lần ${run.runId}`))})`);
   }
   if (items.openNceIds.length) parts.push(`${items.openNceIds.length} hồ sơ NCE chưa đóng (${listText(items.openNceIds)})`);
+  if (items.reviewMissing) parts.push('chưa có biên bản xem xét QC tháng');
   return parts.join('; ');
 }

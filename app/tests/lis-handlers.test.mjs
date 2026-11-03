@@ -106,7 +106,7 @@ assert.equal(notPending.error.code, 'not-pending', 'bản ghi không còn trong 
 assert.equal(decideCalls().length, 0);
 assert.equal(db.prepare('SELECT COUNT(*) AS n FROM qc_points').get().n, 1);
 
-report.lockPeriod({ data: { ym: '2026-09', note: 'Chot ky' } }, actor);
+report.lockPeriod({ data: { ym: '2026-09', note: 'Chot ky', acknowledge: true } }, actor);
 fetchCalls.length = 0;
 queue = [fakeRecord('m4', '2026-09-10T02:00:00Z')];
 const blockedImport = await lis.importResult({ data: { record: fakeRecord('m4', '2026-09-10T02:00:00Z') } }, actor);

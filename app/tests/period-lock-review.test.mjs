@@ -44,6 +44,9 @@ test('khoá kỳ còn lần chạy bị loại: phải xác nhận, nhật ký g
   db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided)
     VALUES ('p1',?,1,'2026-10-05','2026-10-05-1',5.8,?,5,0.2,0)`).run(t.id, lot);
 
+  // Kỳ chưa có biên bản xem xét tháng cũng là việc còn tồn (GV4 mục 2).
+  assert.match(report.lockPeriod({ data: { ym: '2026-09' } }, actor).error?.message || '', /chưa có biên bản xem xét QC tháng/);
+  must(report.signQcMonthlyReview({ data: { ym: '2026-09', conclusion: 'ok' } }, actor), 'ký xem xét 09');
   assert.equal(report.lockPeriod({ data: { ym: '2026-09' } }, actor).ok, true, 'kỳ không còn tồn thì khoá ngay');
 
   const blocked = report.lockPeriod({ data: { ym: '2026-10' } }, actor);
@@ -55,5 +58,5 @@ test('khoá kỳ còn lần chạy bị loại: phải xác nhận, nhật ký g
   assert.equal(locked.ok, true, JSON.stringify(locked));
   const audit = db.prepare("SELECT detail FROM activity WHERE type='Khoá kỳ báo cáo' ORDER BY seq DESC LIMIT 1").get().detail;
   assert.match(audit, /Khoá khi còn: 1 lần chạy bị loại chưa có hồ sơ NCE/);
-  assert.equal(report.lockPeriod({ data: { ym: '2026-11', acknowledge: 'true' } }, actor).ok, true, 'chỉ nhận đúng true; kỳ trống thì không cần xác nhận');
+  assert.equal(report.lockPeriod({ data: { ym: '2026-11', acknowledge: 'true' } }, actor).error?.code, 'period-open-items', 'chỉ nhận đúng true');
 });

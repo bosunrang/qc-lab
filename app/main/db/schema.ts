@@ -563,6 +563,22 @@ CREATE TABLE IF NOT EXISTS reagent_tests (
   rows_json TEXT NOT NULL DEFAULT '[]'
 );
 
+-- Biên bản xem xét dữ liệu QC theo tháng (GV4 mục 2, ISO 15189:2022 7.3.7.2).
+-- Mỗi lần ký một dòng; dòng mới nhất của tháng là kết luận hiện hành. summary_json
+-- là ảnh chụp số liệu lúc ký, vì dữ liệu tháng còn đổi được khi kỳ chưa khoá.
+CREATE TABLE IF NOT EXISTS qc_month_reviews (
+  id TEXT PRIMARY KEY,
+  ym TEXT NOT NULL,
+  conclusion TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  reviewer_user_id TEXT NOT NULL DEFAULT '',
+  reviewer_username TEXT NOT NULL DEFAULT '',
+  reviewer_name TEXT NOT NULL DEFAULT '',
+  reviewed_at TEXT NOT NULL DEFAULT '',
+  summary_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_qc_month_reviews_ym ON qc_month_reviews(ym);
+
 CREATE TABLE IF NOT EXISTS period_locks (
   id TEXT PRIMARY KEY,
   ym TEXT NOT NULL UNIQUE,

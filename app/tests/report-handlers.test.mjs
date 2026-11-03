@@ -22,6 +22,7 @@ const DEFAULT_FORMS = {
   westgard: { formCode: 'BM-WG-01', version: '1.0', effectiveDate: '' },
   sigma: { formCode: 'BM-SS-01', version: '1.0', effectiveDate: '' },
   reagent: { formCode: 'BM-HC-01', version: '1.0', effectiveDate: '' },
+  review: { formCode: 'BM-XX-01', version: '1.0', effectiveDate: '' },
 };
 assert.deepEqual(report.getReportTemplateSettings(), DEFAULT_FORMS);
 assert.equal(report.saveReportTemplateSettings({ data: { kind: 'sigma', formCode: 'BM-SS-02', version: '2.0' } }, { ...actor, role: 'staff' }).ok, false);
@@ -41,7 +42,7 @@ const badFormat = report.lockPeriod({ data: { ym: '2026/08' } }, actor);
 assert.equal(badFormat.ok, false);
 assert.equal(badFormat.error.code, 'invalid-period');
 
-const locked = report.lockPeriod({ data: { ym: '2026-08', note: 'Da chot bao cao thang 8' } }, actor);
+const locked = report.lockPeriod({ data: { ym: '2026-08', note: 'Da chot bao cao thang 8', acknowledge: true } }, actor);
 assert.equal(locked.ok, true);
 assert.equal(locked.data.ym, '2026-08');
 assert.equal(report.isPeriodLocked('2026-08'), true);

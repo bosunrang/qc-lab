@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { PeriodLockRow, IpcResult, ReportForm, ReportFormKind, ReportTemplateSettings } from '../../shared/qc-api';
+import type { PeriodLockRow, IpcResult, QcMonthlyReview, QcMonthlyReviewSignature, QcReviewConclusion, ReportForm, ReportFormKind, ReportTemplateSettings } from '../../shared/qc-api';
+
+let reviewRequestSerial = 0;
 
 interface ReportState {
   locks: PeriodLockRow[];
@@ -9,11 +11,18 @@ interface ReportState {
   saveTemplate: (data: ReportForm & { kind: ReportFormKind }) => Promise<IpcResult<ReportTemplateSettings>>;
   lock: (ym: string, note: string, acknowledge?: boolean) => Promise<IpcResult<PeriodLockRow>>;
   unlock: (ym: string, note: string) => Promise<IpcResult<{ ym: string }>>;
+  /** Biên bản xem xét QC tháng đang xem (GV4 mục 2). */
+  review: QcMonthlyReview | null;
+  reviewLoading: boolean;
+  loadReview: (ym: string) => Promise<void>;
+  signReview: (ym: string, conclusion: QcReviewConclusion, note: string) => Promise<IpcResult<QcMonthlyReviewSignature>>;
 }
 
 export const useReportStore = create<ReportState>((set, get) => ({
   locks: [],
   template: null,
+  review: null,
+  reviewLoading: false,
 
   loadLocks: async () => set({ locks: await window.qcApi.listPeriodLocks() }),
   loadTemplate: async () => set({ template: await window.qcApi.getReportTemplateSettings() }),
@@ -33,6 +42,15 @@ export const useReportStore = create<ReportState>((set, get) => ({
     const result = await window.qcApi.unlockPeriod({ data: { ym, note } });
     return result;
   },
+  loadReview: async (ym) => {
+    // Đổi tháng khi lượt trước chưa xong: chỉ lượt mới nhất được hiện.
+    const request = ++reviewRequestSerial;
+    set({ reviewLoading: true, ...(get().review?.ym === ym ? {} : { review: null }) });
+    const review = await window.qcApi.getQcMonthlyReview(ym);
+    if (request === reviewRequestSerial) set({ review, reviewLoading: false });
+  },
+  // Main báo `qc_month_reviews` sau khi ký; trang nạp lại qua `useStoreInvalidation`.
+  signReview: async (ym, conclusion, note) => window.qcApi.signQcMonthlyReview({ data: { ym, conclusion, note } }),
 }));
 
 

@@ -173,7 +173,7 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   độ vận hành, phục hồi backup cũ); `audit-handlers.test.mjs` mục 10 nay kiểm vượt
   ngưỡng không xoá dòng nào; `lan-http-server.test.mjs` kiểm `clientId` của máy trạm.
 
-## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L) — mục 1 đã làm 02/11/2026, mục 3 đã làm 03/11/2026
+## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L) — mục 1 đã làm 02/11/2026, mục 2 và 3 đã làm 03/11/2026
 
 **Đã làm mục 1 (cùng N10 của GV8):**
 
@@ -193,7 +193,18 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   khoá xác nhận (`acknowledge: true`) mới khoá, nhật ký ghi "Khoá khi còn: …". Chọn
   cảnh báo có xác nhận thay vì chặn: CAPA có thể kéo dài quá một tháng mà báo cáo kỳ
   vẫn phải chốt. Test: `period-lock-review.test.mjs`.
-- Chưa làm: mục 2 (biên bản xem xét QC theo tháng).
+- **Mục 2 — đã làm 03/11/2026:** khung "Biên bản xem xét QC tháng" ở trang Báo cáo.
+  Main tổng hợp theo xét nghiệm × mức × lô (`report-handlers.ts`, `domain/monthly-review.ts`):
+  số kết quả, dùng thống kê, bị loại, chưa đánh giá; Mean/SD/CV quan sát trên kết quả
+  được chấp nhận so với Mean/SD/CV đích (ảnh chụp trên điểm mới nhất, đánh dấu khi đích
+  đổi trong tháng), độ dịch Mean theo SD đích, Bias %; điểm huỷ và điểm huỷ thuộc lần
+  chạy bị loại; hồ sơ NCE có lần chạy trong tháng. Kết luận Westgard lấy đúng nguồn của
+  các trang khác (lô đang vận hành, lô cũ, lô song song). Không tự đặt ngưỡng đạt/không
+  đạt — tiêu chí do SOP của PXN. Người có `qc.config` ký: Đạt / Cần theo dõi / Cần hành
+  động (hai mức sau bắt buộc nhận xét ≥ 10 ký tự); bảng `qc_month_reviews` lưu mỗi lần
+  ký kèm ảnh chụp số liệu, ký lại thì giữ lịch sử. In PDF theo biểu mẫu mới
+  "Biên bản xem xét QC tháng" (BM-XX-01). Khoá kỳ chưa có biên bản là việc còn tồn cần
+  xác nhận. Test: `monthly-review.test.mjs`.
   Danh sách điểm đã huỷ ở Nhập QC chưa hiện dấu "lần chạy bị loại".
 - **Test:** `app/tests/void-rejected-run.test.mjs`; `entry-handlers` thêm ca "nhập sai
   dữ liệu" điểm Loại bỏ thiếu lý do bị từ chối.
