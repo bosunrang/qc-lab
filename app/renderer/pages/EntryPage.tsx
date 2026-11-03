@@ -100,7 +100,11 @@ export function EntryPage() {
   // lần render sẽ thành vòng lặp nạp vô hạn.
   const allLevels = levelsByTestId[testId] || EMPTY_LEVELS;
   const levels = useMemo(() => allLevels.filter((l) => l.operational !== 0), [allLevels]);
-  const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
+  // Giữ theo GIÁ TRỊ: sau mỗi lần ghi, `loadLevels` trả mảng mới dù tập mức
+  // không đổi; nếu `levelNums` đổi theo thì effect dưới nạp lại dữ liệu thêm
+  // một lượt ngoài lượt của `useStoreInvalidation` (e2e `reload-count`).
+  const levelKey = levels.map((l) => l.level).join(',');
+  const levelNums = useMemo(() => (levelKey ? levelKey.split(',').map(Number) : []), [levelKey]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   // Đổi xét nghiệm thì dải QC đang xem rơi về mức đầu tiên còn vận hành.
   useEffect(() => {
