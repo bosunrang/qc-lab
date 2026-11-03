@@ -173,7 +173,7 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   độ vận hành, phục hồi backup cũ); `audit-handlers.test.mjs` mục 10 nay kiểm vượt
   ngưỡng không xoá dòng nào; `lan-http-server.test.mjs` kiểm `clientId` của máy trạm.
 
-## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L) — mục 1 đã làm 02/11/2026
+## GV4 — Huỷ điểm của run bị loại và xem xét định kỳ (N4, ISO 7.3.7.2, P0, M–L) — mục 1 đã làm 02/11/2026, mục 3 đã làm 03/11/2026
 
 **Đã làm mục 1 (cùng N10 của GV8):**
 
@@ -186,7 +186,14 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   (luật …), mức vi phạm …". Không dùng bảng sự kiện riêng: điểm đã huỷ không bao giờ
   bị xoá, nên nó là nơi giữ bằng chứng tự nhiên; biên bản xem xét (mục 2) đọc
   `voided=1 AND void_rejection_json<>''`. Điểm huỷ trước migration 9 để rỗng.
-- Chưa làm: mục 2 (biên bản xem xét QC theo tháng) và mục 3 (cảnh báo khi khoá kỳ).
+- **Mục 3 — đã làm 03/11/2026:** `lockPeriod` kiểm việc còn tồn của kỳ (`domain/period-review.ts`):
+  lần chạy bị loại trong kỳ chưa có hồ sơ NCE (hàng chờ NCE dùng chung, `nceQueueRows`)
+  và hồ sơ NCE chưa đóng có lần chạy trong kỳ (hồ sơ không có lần chạy, vd ngoại kiểm,
+  xét theo ngày phát hiện). Còn tồn thì trả `period-open-items` kèm danh sách; người
+  khoá xác nhận (`acknowledge: true`) mới khoá, nhật ký ghi "Khoá khi còn: …". Chọn
+  cảnh báo có xác nhận thay vì chặn: CAPA có thể kéo dài quá một tháng mà báo cáo kỳ
+  vẫn phải chốt. Test: `period-lock-review.test.mjs`.
+- Chưa làm: mục 2 (biên bản xem xét QC theo tháng).
   Danh sách điểm đã huỷ ở Nhập QC chưa hiện dấu "lần chạy bị loại".
 - **Test:** `app/tests/void-rejected-run.test.mjs`; `entry-handlers` thêm ca "nhập sai
   dữ liệu" điểm Loại bỏ thiếu lý do bị từ chối.
@@ -303,7 +310,12 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 
 ## GV8 — Sửa nghiệp vụ Westgard, lô, dải (P1, M)
 
-- **N7:** `allowedRuleScopes('2of3-2s')` tính theo số mức của xét nghiệm.
+- **N7 — đã làm 03/11/2026:** `allowedRuleScopes(ruleId, levelCount)` chỉ trả phạm vi engine
+  chạy được: kênh liên mức cần ≥ `scopeMin` mức đang vận hành; 2of3-2s có cả kênh
+  trong-mức. Giao diện chỉ đưa các phạm vi đó, `saveRuleScope` từ chối phạm vi thiếu mức
+  (`scope-needs-levels`). Cấu hình đã lưu không bị tự sửa ở bước đánh giá (không hồi
+  tố, GV2); ô chọn vẫn giữ phạm vi cũ kèm nhãn "không chạy được" để lưu form không âm
+  thầm đổi luật. Test: `rule-scope-levels.test.mjs`.
 - **N9 — đã làm 03/11/2026:** `addPoint` chặn ngày sau hôm nay (giờ địa phương) và
   kết quả chạy sau hạn dùng của lô (đúng ngày hết hạn vẫn nhận). Điểm nhập lùi về
   trước lần đổi dải gần nhất lấy Mean/SD hiệu lực trong `[effectiveFrom, effectiveTo)`

@@ -221,10 +221,13 @@ assert.equal(h.listTeaRefs().length, 0);
 // ---- Phạm vi luật Westgard theo xét nghiệm ----
 const scopes1 = h.listRuleScopes(test1.id, 1);
 assert.ok(scopes1.some(s => s.id === '1-3s'));
-const saveScope = h.saveRuleScope(test1.id, '2-2s', 'across', actor);
+// N7: xét nghiệm này chưa đủ 2 mức đang vận hành, nên kênh liên mức không
+// chạy được và không lưu được; kênh trong-mức thì được.
+assert.equal(h.saveRuleScope(test1.id, '2-2s', 'across', actor).error?.code, 'scope-needs-levels');
+const saveScope = h.saveRuleScope(test1.id, '2-2s', 'within', actor);
 assert.equal(saveScope.ok, true);
 const scopesAfter = h.listRuleScopes(test1.id, 1);
-assert.equal(scopesAfter.find(s => s.id === '2-2s').scope, 'across');
+assert.equal(scopesAfter.find(s => s.id === '2-2s').scope, 'within');
 const clearScope = h.saveRuleScope(test1.id, '2-2s', '', actor);
 assert.equal(clearScope.ok, true);
 const storedScopes = JSON.parse(db.prepare('SELECT rule_scopes_json FROM tests WHERE id=?').get(test1.id).rule_scopes_json);

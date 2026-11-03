@@ -867,7 +867,8 @@ export interface QcApi {
   syncFirebase(input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>>;
   disconnectFirebase(): Promise<IpcResult<null>>;
   listPeriodLocks(): Promise<PeriodLockRow[]>;
-  lockPeriod(input: { data: { ym: string; note?: string } }): Promise<IpcResult<PeriodLockRow>>;
+  /** `acknowledge`: đã xem việc còn tồn của kỳ (lỗi `period-open-items`) và vẫn khoá. */
+  lockPeriod(input: { data: { ym: string; note?: string; acknowledge?: boolean } }): Promise<IpcResult<PeriodLockRow>>;
   unlockPeriod(input: { data: { ym: string; note: string } }): Promise<IpcResult<{ ym: string }>>;
   queryReport(input: { testId: string; from?: string; to?: string }): Promise<ReportPointRow[]>;
   /** Excel thật qua `exceljs` (main process), trả base64 để

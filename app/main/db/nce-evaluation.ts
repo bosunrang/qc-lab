@@ -10,8 +10,8 @@ import { evaluateQcSets, testRuleActionOf } from './westgard-evaluation';
 import type { QcCut } from '../domain/qc-cuts';
 import { rejectingRules, type CombinedPointFlag } from '../domain/westgard-engine';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
-import type { NceRunKey, NceRunPoint, NceRunSnapshot } from '../domain/nce/types';
-import type { NceQueuePoint } from '../domain/nce/queue';
+import type { NceRunKey, NceRunPoint, NceRunSnapshot, NceStatus } from '../domain/nce/types';
+import { buildNceQueue, type NceQueuePoint, type NceQueueRow } from '../domain/nce/queue';
 import type { NceRunMark, NceRunOutcome, NceSuspectChain } from '../domain/nce/patient-impact';
 
 interface EvalPoint { id: string; date: string; run_id: string; runId: string; level: number; lot: string; val: number; qcMean: number | null; qcSd: number | null }
@@ -163,4 +163,14 @@ export function nceLatestRun(db: Db, testId: string): NceRunKey | null {
 /** Các mức đang vận hành — mức phải có trong lần chạy xác minh của hồ sơ không phải IQC. */
 export function nceOperationalLevels(db: Db, testId: string): number[] {
   return listOperationalLevels(db, testId).map((level) => level.level);
+}
+
+/** Hàng chờ NCE theo lần chạy (D-01, D-14): lần chạy bị loại chưa thuộc hồ sơ
+ * đã đóng. Dùng chung cho trang NCE và cổng khoá kỳ (GV4). */
+export function nceQueueRows(db: Db): NceQueueRow[] {
+  const records = db.prepare('SELECT id, nce_id, status, test_id FROM nce_records WHERE test_id IS NOT NULL').all() as { id: string; nce_id: string; status: NceStatus; test_id: string }[];
+  const runs = db.prepare("SELECT nce_record_id, date, run_id FROM nce_runs WHERE role<>'rerun'").all() as { nce_record_id: string; date: string; run_id: string }[];
+  const runsByRecord = new Map<string, NceRunKey[]>();
+  for (const run of runs) runsByRecord.set(run.nce_record_id, [...(runsByRecord.get(run.nce_record_id) ?? []), { date: run.date, runId: run.run_id }]);
+  return buildNceQueue(nceRejectedPoints(db), records.map((r) => ({ id: r.id, nceId: r.nce_id, status: r.status, testId: r.test_id, runs: runsByRecord.get(r.id) ?? [] })));
 }

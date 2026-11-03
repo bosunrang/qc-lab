@@ -7,7 +7,7 @@ interface ReportState {
   loadLocks: () => Promise<void>;
   loadTemplate: () => Promise<void>;
   saveTemplate: (data: ReportForm & { kind: ReportFormKind }) => Promise<IpcResult<ReportTemplateSettings>>;
-  lock: (ym: string, note: string) => Promise<IpcResult<PeriodLockRow>>;
+  lock: (ym: string, note: string, acknowledge?: boolean) => Promise<IpcResult<PeriodLockRow>>;
   unlock: (ym: string, note: string) => Promise<IpcResult<{ ym: string }>>;
 }
 
@@ -25,8 +25,8 @@ export const useReportStore = create<ReportState>((set, get) => ({
   // Không tự nạp lại sau khi ghi (kế hoạch kiến trúc D.1): main báo `period_locks`
   // sau commit và trang Báo cáo nạp lại qua `useStoreInvalidation` — tự nạp ở đây làm
   // danh sách nạp HAI lần. Không chỗ gọi nào đọc danh sách ngay sau `await`.
-  lock: async (ym, note) => {
-    const result = await window.qcApi.lockPeriod({ data: { ym, note } });
+  lock: async (ym, note, acknowledge) => {
+    const result = await window.qcApi.lockPeriod({ data: { ym, note, ...(acknowledge ? { acknowledge: true } : {}) } });
     return result;
   },
   unlock: async (ym, note) => {

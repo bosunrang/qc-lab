@@ -349,6 +349,13 @@ export function createCatalogConfigHandlers(db: Db) {
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (scope !== '' && !isAllowedRuleScope(ruleId, scope)) return { ok: false, error: { code: 'invalid-scope', message: 'Phạm vi này không được hỗ trợ bởi luật Westgard đã chọn.' } };
+    // N7: kênh liên mức của luật cần đủ số mức đang vận hành; thiếu thì luật
+    // không bao giờ chạy, nên không cho lưu.
+    const levelCount = countOperationalLevels(db, testId);
+    if (scope !== '' && !isAllowedRuleScope(ruleId, scope, levelCount)) {
+      const min = WG_RULE_REGISTRY.find(r => r.id === ruleId)?.scopeMin ?? 2;
+      return { ok: false, error: { code: 'scope-needs-levels', message: `Luật ${ruleId} xét chéo mức cần ít nhất ${min} mức QC đang vận hành; xét nghiệm này có ${levelCount} mức.` } };
+    }
     const overrides: RuleScopesMap = parseRuleScopes(test.rule_scopes_json);
     const before = { ...overrides }, actions = parseRuleActions(test.rule_actions_json);
     if ((overrides[ruleId] ?? '') === scope) return w.noChange({ ruleId, scope });

@@ -126,7 +126,10 @@ export function effectiveRuleConfigList(
     scope: scopeOf(id),
     scopeMin: WG_RULE_BY_ID[id]?.scopeMin ?? 2,
     desc: WG_RULE_BY_ID[id]?.desc ?? '',
-    allowedScopes: allowedRuleScopes(id),
+    // Chỉ phạm vi chạy được với số mức hiện tại (N7). `scope` vẫn là phạm vi
+    // đang áp, kể cả phạm vi cũ không còn chạy được: đổi nó là việc của người
+    // dùng, ghi phiên bản cấu hình mới, không tự sửa ngược (GV2).
+    allowedScopes: allowedRuleScopes(id, levelCount),
     defaultScope: defaultRuleScope(id, levelCount),
     defaultAction: defaultActionOf(id),
     action: actionOf(id),

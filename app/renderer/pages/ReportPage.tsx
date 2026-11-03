@@ -211,7 +211,13 @@ export function ReportPage() {
       { title: `Khoá kỳ ${label}?`, confirmLabel: 'Khoá kỳ', cancelLabel: 'Huỷ', danger: false },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực khoá kỳ', message: `Nhập lại mật khẩu để khoá kỳ ${label}.` }))) return;
-    const result = await lock(lockYm, '');
+    let result = await lock(lockYm, '');
+    // Kỳ còn lần chạy bị loại chưa có NCE hoặc NCE chưa đóng (GV4): main trả
+    // danh sách; người khoá xem rồi mới quyết định, và danh sách vào nhật ký.
+    if (!result.ok && result.error.code === 'period-open-items') {
+      if (!(await confirmDialog(result.error.message, { title: `Kỳ ${label} còn việc chưa xem xét`, confirmLabel: 'Vẫn khoá kỳ', cancelLabel: 'Để xem xét trước', danger: true }))) return;
+      result = await lock(lockYm, '', true);
+    }
     if (!result.ok) { await errorDialog(result.error.message); return; }
     showToast(`Đã khoá kỳ ${label}.`);
   }

@@ -25,7 +25,6 @@ import { validateNceTechnicalAssessment } from '../domain/nce/technical-assessme
 import { nceCapaTriggers, nceErrorClass } from '../domain/nce/tier';
 import { nceEffectivenessBasis, validateNceActionCancel, validateNceActionCompletion, validateNceActionDraft, validateNceEffectivenessReview } from '../domain/nce/actions';
 import { emptyChecklist, nceFieldChanges, prepareNcePatch, prepareNceDetectedAtCorrection } from '../domain/nce/update';
-import { buildNceQueue } from '../domain/nce/queue';
 import { defaultNceDueDate, prepareNceConfig, type NceConfig } from '../domain/nce/config';
 import { compareRun, runLabel, textLength } from '../domain/nce/format';
 import { nextNceId } from '../db/nce-ids';
@@ -34,7 +33,7 @@ import {
   columnsOfPatch, editableOf, insertNceDecision, insertNceRecord, insertNceRevision, insertNceRun, listNceRows, loadNce,
   readNceConfig, recordOfRun, updateNceRecord, type NceLoaded,
 } from '../db/nce-repository';
-import { nceLatestRun, nceOperationalLevels, nceRejectedPoints, nceRunOutcomes, nceRunSnapshot, nceSuspectChain } from '../db/nce-evaluation';
+import { nceLatestRun, nceOperationalLevels, nceQueueRows, nceRunOutcomes, nceRunSnapshot, nceSuspectChain } from '../db/nce-evaluation';
 import { type Actor, type IpcResult, nowIso } from './shared';
 import { writeCommand, type WriteSteps, type WriteTx } from './write-command';
 
@@ -108,12 +107,8 @@ export function createNceHandlers(db: Db) {
   function listNce(): NceRecordRow[] { return listNceRows(db, isoLocalDate()); }
 
   function listNceQueue(): NceQueueRowView[] {
-    const records = db.prepare('SELECT id, nce_id, status, test_id FROM nce_records WHERE test_id IS NOT NULL').all() as { id: string; nce_id: string; status: NceDossier['status']; test_id: string }[];
-    const runs = db.prepare("SELECT nce_record_id, date, run_id FROM nce_runs WHERE role<>'rerun'").all() as { nce_record_id: string; date: string; run_id: string }[];
-    const runsByRecord = new Map<string, NceRunKey[]>();
-    for (const run of runs) runsByRecord.set(run.nce_record_id, [...(runsByRecord.get(run.nce_record_id) ?? []), { date: run.date, runId: run.run_id }]);
     const names = new Map((db.prepare('SELECT id, name FROM tests').all() as { id: string; name: string }[]).map((t) => [t.id, t.name]));
-    return buildNceQueue(nceRejectedPoints(db), records.map((r) => ({ id: r.id, nceId: r.nce_id, status: r.status, testId: r.test_id, runs: runsByRecord.get(r.id) ?? [] })))
+    return nceQueueRows(db)
       .map((row) => ({
         test_id: row.testId, test_name: names.get(row.testId) ?? '', date: row.date, run_id: row.runId,
         rejected_levels: row.rejectedLevels.map((l) => ({ level: l.level, lot: l.lot, rules: [...l.rules], point_id: l.pointId })),

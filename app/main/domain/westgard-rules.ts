@@ -80,17 +80,30 @@ export function defaultRuleScope(ruleId: string, levelCount: number): RuleScope 
   return rule.scope;
 }
 
-/** Một số luật chỉ có một kênh đánh giá thật. Không cho UI/backup ghi một
- * scope không có engine tương ứng, vì nó sẽ biến luật đang bật thành im lặng. */
-export function allowedRuleScopes(ruleId: string): readonly RuleScope[] {
-  const scope = WG_RULE_BY_ID[ruleId]?.scope;
-  return scope === 'both' ? RULE_SCOPES : scope ? [scope] : [];
+/** 2of3-2s khai phạm vi chuẩn `across` nhưng engine có cả kênh trong-mức
+ * (`westgardByPoint`: 2 trong 3 điểm liên tiếp của một mức) — đó là phạm vi
+ * mặc định khi xét nghiệm có dưới 3 mức. */
+const WITHIN_CHANNEL_ALSO: ReadonlySet<string> = new Set(['2of3-2s']);
+
+/** Phạm vi mà engine thực sự đánh giá được. Không cho UI/backup ghi một scope
+ * không có engine tương ứng, vì nó sẽ biến luật đang bật thành im lặng.
+ *
+ * `levelCount` (số mức đang vận hành) loại thêm kênh liên mức khi chưa đủ
+ * `scopeMin` mức (N7): 2of3-2s/3-1s liên mức cần ≥ 3 mức, nên ở xét nghiệm 2
+ * mức chọn "chéo mức" là luật không bao giờ chạy. Không truyền thì chỉ xét
+ * kênh engine (đọc dữ liệu đã lưu, khi chưa biết số mức). */
+export function allowedRuleScopes(ruleId: string, levelCount?: number): readonly RuleScope[] {
+  const rule = WG_RULE_BY_ID[ruleId];
+  if (!rule) return [];
+  const within = rule.scope !== 'across' || WITHIN_CHANNEL_ALSO.has(ruleId);
+  const across = rule.scope !== 'within' && (levelCount === undefined || levelCount >= rule.scopeMin);
+  return RULE_SCOPES.filter((scope) => (scope === 'within' ? within : scope === 'across' ? across : within && across));
 }
 
 /** Kiểm tra cả enum và kênh engine hỗ trợ; dùng chung ở lớp đọc backup và IPC
  * để không có đường ghi nào tạo scope "chết". */
-export function isAllowedRuleScope(ruleId: string, scope: unknown): scope is RuleScope {
-  return typeof scope === 'string' && RULE_SCOPES.includes(scope as RuleScope) && allowedRuleScopes(ruleId).includes(scope as RuleScope);
+export function isAllowedRuleScope(ruleId: string, scope: unknown, levelCount?: number): scope is RuleScope {
+  return typeof scope === 'string' && RULE_SCOPES.includes(scope as RuleScope) && allowedRuleScopes(ruleId, levelCount).includes(scope as RuleScope);
 }
 
 export function primaryErrorRule(ruleIds: readonly string[]): string | null {

@@ -5,6 +5,8 @@ import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
 import { isPeriodLocked as isLocked } from '../db/period-locks';
+import { nceQueueRows } from '../db/nce-evaluation';
+import { hasPeriodOpenItems, periodOpenItems, periodOpenItemsText } from '../domain/period-review';
 import { REPORT_FORM_LABELS, parseReportTemplates, validateReportTemplate, type ReportTemplateInput } from '../domain/report-template-validation';
 import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
@@ -62,12 +64,24 @@ export function createReportHandlers(db: Db) {
     const actor = w.actor;
     const result = validateLockPeriod(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const { ym, note } = result.data;
+    const { ym, note, acknowledge } = result.data;
     if (isPeriodLocked(ym)) return { ok: false, error: { code: 'already-locked', message: `Kỳ ${ym} đã được khoá trước đó.` } };
+    // GV4 mục 3: kỳ còn lần chạy bị loại chưa có hồ sơ NCE hoặc hồ sơ chưa
+    // đóng thì phải xác nhận mới khoá, và danh sách đó vào nhật ký.
+    const openRecords = (db.prepare(`SELECT n.nce_id, n.detected_at, GROUP_CONCAT(r.date) AS run_dates FROM nce_records n
+      LEFT JOIN nce_runs r ON r.nce_record_id=n.id AND r.role<>'rerun'
+      WHERE n.status NOT IN ('closed','cancelled') GROUP BY n.id`).all() as { nce_id: string; detected_at: string; run_dates: string | null }[])
+      .map((row) => ({ nceId: row.nce_id, detectedAt: row.detected_at || '', runDates: row.run_dates ? row.run_dates.split(',') : [] }));
+    const open = periodOpenItems(ym, nceQueueRows(db), openRecords);
+    const names = new Map((db.prepare('SELECT id, name FROM tests').all() as { id: string; name: string }[]).map((t) => [t.id, t.name]));
+    const openText = hasPeriodOpenItems(open) ? periodOpenItemsText(open, (testId) => names.get(testId) || testId) : '';
+    if (openText && !acknowledge) {
+      return { ok: false, error: { code: 'period-open-items', message: `Kỳ ${ym} còn việc chưa xem xét: ${openText}. Vẫn khoá thì danh sách này được ghi vào nhật ký.` } };
+    }
     const id = uid();
     w.commit((tx) => {
       db.prepare('INSERT INTO period_locks(id,ym,locked_at,locked_by,note) VALUES (?,?,?,?,?)').run(id, ym, nowIso(), actor.username, note);
-      tx.audit('Khoá kỳ báo cáo', `Khoá kỳ ${ym}${note ? ': ' + note : ''}`, ym);
+      tx.audit('Khoá kỳ báo cáo', `Khoá kỳ ${ym}${note ? ': ' + note : ''}${openText ? ` · Khoá khi còn: ${openText}` : ''}`, ym);
       tx.changed(['period_locks']);
     });
     return { ok: true, data: db.prepare('SELECT * FROM period_locks WHERE id=?').get(id) as unknown as PeriodLockRow };
