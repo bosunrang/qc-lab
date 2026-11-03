@@ -43,7 +43,7 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
     <Modal title="Huỷ điểm QC" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submitVoid}>Huỷ điểm này</AsyncButton></>}>
       <div className="hint">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
-      {runRejected && <div className="alert warn">Điểm này thuộc lần chạy bị loại{point.rules.length ? ` (luật ${point.rules.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
+      {runRejected && <div className="alert warn void-run-rejected">Điểm này thuộc lần chạy bị loại{point.rules.length ? ` (luật ${point.rules.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
       <div className="field">
         <label htmlFor="voidKindInput">Loại huỷ</label>
         <select id="voidKindInput" aria-label="Loại huỷ điểm QC" value={voidKind}

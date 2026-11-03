@@ -243,6 +243,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-voided-box{margin:var(--space-4) var(--space-4) 0;overflow-x:auto;}
 .qc-voided-box h4{margin:0 0 var(--space-2-5);font-size:var(--title-sub);font-weight:var(--title-sub-weight);color:var(--text-strong);}
 
+/* Cảnh báo lần chạy bị loại đứng ngay dưới dòng ngày/mức/giá trị: chỉ `.field` có khoảng cách sẵn trong modal. */
+.void-run-rejected{margin-top:var(--space-2-5);}
 .void-nce-choice{margin-top:var(--space-2-5);padding:var(--space-2-5) var(--space-3);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
 .void-nce-choice label{display:flex;align-items:center;gap:var(--space-2);margin:0;color:var(--text-primary);}
 .void-nce-choice input{flex:none;}
