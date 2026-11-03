@@ -67,7 +67,12 @@ export function testRuleActionOf(db: Db, testId: string, run?: { date: string; r
  * lần chạy sau quyết định. */
 export function evaluateQcSets<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], levelCount?: number, extraCuts: readonly QcCut[] = []): Map<T, CombinedPointFlag> {
   const configuredLevelCount = Number.isInteger(levelCount) && levelCount! > 0 ? levelCount! : new Set(sets.map(set => set.level)).size;
-  const rules = ruleResolver(db, testId, configuredLevelCount);
+  return evaluateQcSetsWithRules(db, testId, sets, ruleResolver(db, testId, configuredLevelCount), extraCuts);
+}
+
+/** Như `evaluateQcSets()` với bộ phân giải luật nơi gọi đã dựng (và còn
+ * dùng tiếp), để không đọc lại thứ tự nhập của cả xét nghiệm hai lần. */
+export function evaluateQcSetsWithRules<T extends QcPointLike>(db: Db, testId: string, sets: readonly MultiLevelSet<T>[], rules: ReturnType<typeof ruleResolver>, extraCuts: readonly QcCut[] = []): Map<T, CombinedPointFlag> {
   const cuts = [...qcCuts(db, testId), ...extraCuts];
   const evaluate = (input: readonly MultiLevelSet<T>[], fns: RuleFunctions) => combinedWestgardByPoint(input, fns.within, fns.across, fns.actionOf, cuts);
   if (rules.fns.length === 1) return evaluate(sets, rules.latest);

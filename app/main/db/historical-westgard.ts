@@ -110,9 +110,9 @@ export function createHistoricalWestgard(db: Db) {
   }
 
   /** Cùng bộ đánh giá lịch sử cho cả hai cách xem lô cũ. Nhóm snapshot lưu
-   * trữ được ưu tiên vì group_id hiện hành có thể đã đổi sau chuyển tiếp. */
-  function listPreviousLotBlocks(testId: string): ArchivedBlock[] {
-    const previous = listPreviousLotSeriesData(db, testId);
+   * trữ được ưu tiên vì group_id hiện hành có thể đã đổi sau chuyển tiếp.
+   * `previous`: chuỗi lô cũ đã dựng sẵn, để nơi gọi cần cả hai không dựng hai lần. */
+  function listPreviousLotBlocks(testId: string, previous = listPreviousLotSeriesData(db, testId)): ArchivedBlock[] {
     const snapshots = db.prepare("SELECT id,archived_lot_ids_json FROM lot_groups WHERE active=0 ORDER BY rowid DESC").all() as { id: string; archived_lot_ids_json: string }[];
     const cache = new Map<string, ArchivedBlock[]>();
     return previous.flatMap(series => {

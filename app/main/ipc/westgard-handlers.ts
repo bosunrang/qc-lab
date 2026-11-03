@@ -14,6 +14,7 @@ import { observedStats } from '../domain/observed-stats';
 import { type IpcResult, addChangeListener } from './shared';
 import { writeCommand } from './write-command';
 import { TestSummaryCache } from './summary-cache';
+import { previousLotsOf } from './previous-lot-cache';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
 
@@ -35,7 +36,7 @@ function cusumSignalAt(cs: CusumResult, index: number): 'CUSUM +h' | 'CUSUM −h
 }
 
 // Nguồn duy nhất: hợp đồng dùng chung.
-import type { TestSummary, LevelAnalysis } from '../../shared/qc-api';
+import type { TestSummary, LevelAnalysis, ArchivedBlock } from '../../shared/qc-api';
 
 export type { TestSummary };
 
@@ -269,7 +270,8 @@ export function createWestgardHandlers(db: Db) {
     return { points, cusum: { cPos: cs.cPos, cNeg: cs.cNeg, flags: cs.flags, k: cs.k, h: cs.h, ma: cs.ma || [] }, cusumOn };
   }
 
-  const { listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks } = createHistoricalWestgard(db);
+  const { listArchivedBlocks, listArchivedGroupTests } = createHistoricalWestgard(db);
+  const listPreviousLotBlocks = (testId: string): ArchivedBlock[] => previousLotsOf(db, testId).blocks;
 
   /** Ghi đè riêng cho một xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
    * hình chung.

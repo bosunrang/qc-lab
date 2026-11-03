@@ -61,10 +61,15 @@ export function setLanChangeNotifier(notifier: ((payload: StoreChangedPayload) =
 
 export interface StoreChangedPayload { tables: string[]; testIds: string[] }
 
-const changeListeners = new Set<(payload: StoreChangedPayload) => void>();
+/** Lời báo mà bộ nhớ đệm trong main nhận: thêm `lots` — số lô duy nhất bị
+ * đổi trong `qc_points` khi người ghi biết chắc (vd nhập một điểm). Không
+ * gửi ra renderer/LAN; thiếu `lots` nghĩa là "không biết lô nào". */
+export interface MainChangedPayload extends StoreChangedPayload { lots?: string[] }
+
+const changeListeners = new Set<(payload: MainChangedPayload) => void>();
 /** Nghe mọi lời báo `notifyChanged` ngay trong main (vd bộ nhớ đệm tóm tắt
  * Westgard). Trả hàm huỷ đăng ký. */
-export function addChangeListener(listener: (payload: StoreChangedPayload) => void): () => void {
+export function addChangeListener(listener: (payload: MainChangedPayload) => void): () => void {
   changeListeners.add(listener);
   return () => { changeListeners.delete(listener); };
 }
@@ -72,11 +77,12 @@ export function addChangeListener(listener: (payload: StoreChangedPayload) => vo
 /** Báo renderer các bảng nào vừa đổi (+ testId liên quan nếu có) để từng
  * store tự quyết định có refetch không — thay "fetch 1 lần khi mount" cũ.
  * Renderer lọc theo `tables`/`testIds` ở `useStoreInvalidation()`, không lọc
- * ở đây — main không cần biết trang nào đang mở. */
-export function notifyChanged(tables: string[], testIds: string[] = []): void {
+ * ở đây — main không cần biết trang nào đang mở. `lots` chỉ đến bộ nhớ
+ * đệm trong main (xem `MainChangedPayload`). */
+export function notifyChanged(tables: string[], testIds: string[] = [], lots?: string[]): void {
   // Bộ nhớ đệm trong main nghe TRƯỚC, kể cả khi chưa có cửa sổ (test, lúc
   // khởi động): dữ liệu đã đổi thì kết quả giữ lại phải bỏ, dù ai đang xem.
-  for (const listener of changeListeners) listener({ tables, testIds });
+  for (const listener of changeListeners) listener(lots ? { tables, testIds, lots } : { tables, testIds });
   if (!broadcastWindow || broadcastWindow.isDestroyed?.()) return;
   const payload: StoreChangedPayload = { tables, testIds };
   broadcastWindow.webContents.send('store:changed', payload);

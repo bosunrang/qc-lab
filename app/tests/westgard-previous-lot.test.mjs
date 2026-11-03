@@ -7,6 +7,7 @@ const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createWestgardHandlers } = require('../../app-dist/main/ipc/westgard-handlers.js');
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
+const { notifyChanged } = require('../../app-dist/main/ipc/shared.js');
 
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri', role: 'admin', clientId: 'test-client' };
 
@@ -89,6 +90,9 @@ for (const status of ['planned', 'active', 'rejected']) {
   db.prepare("UPDATE test_levels SET mean_sd_history_json='[]' WHERE test_id=?").run(test.id);
   assert.equal(westgard.listPreviousLotBlocks(test.id)[0].mean, 200, 'fallback snapshot tren diem');
   db.prepare("UPDATE qc_points SET qc_mean=NULL, qc_sd=NULL WHERE lot='OLD-1'").run();
+  // Sửa thẳng bằng SQL nên phải tự báo như mọi thao tác ghi thật, để bộ nhớ
+  // đệm lô cũ (`ipc/previous-lot-cache.ts`) bỏ kết quả đã giữ.
+  notifyChanged(['qc_points'], [test.id]);
   assert.deepEqual(westgard.listPreviousLotBlocks(test.id), [], 'het nguon Mean/SD thi bo qua');
 }
 

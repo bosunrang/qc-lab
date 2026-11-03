@@ -236,6 +236,10 @@ CREATE INDEX IF NOT EXISTS idx_qc_points_active ON qc_points(test_id, level, dat
 -- nhiều năm rồi mới lọc: bài đo 60 xét nghiệm × 5 năm (2026-09-26) mở Tổng
 -- quan mất 3,2 s, có chỉ mục này còn 0,6 s.
 CREATE INDEX IF NOT EXISTS idx_qc_points_lot_active ON qc_points(test_id, level, lot, date) WHERE voided = 0;
+-- Danh sách điểm đã huỷ của một xét nghiệm (Nhập QC nạp lại sau mỗi lần ghi):
+-- thiếu chỉ mục này phải đọc mọi điểm của xét nghiệm rồi sắp lại, ~20 ms trên
+-- bộ 5 năm (2026-11-03).
+CREATE INDEX IF NOT EXISTS idx_qc_points_voided ON qc_points(test_id, date, run_id) WHERE voided = 1;
 
 CREATE TABLE IF NOT EXISTS sigma_data (
   id TEXT PRIMARY KEY,
@@ -622,6 +626,13 @@ CREATE INDEX IF NOT EXISTS idx_rule_config_history_scope ON rule_config_history(
  * thiếu cột này); dòng chèn kèm sẵn số (phục hồi backup mới) giữ nguyên. */
 const POST_MIGRATION_SQL = `
 CREATE INDEX IF NOT EXISTS idx_qc_points_entry_seq ON qc_points(entry_seq);
+-- Thứ tự nhập theo lần chạy (\`runEntrySeqs\`, chạy ở mọi lần đánh giá sau khi
+-- đã đổi cấu hình luật): chỉ mục phủ đủ cột nên không phải đọc từng dòng của
+-- bảng. Bộ 5 năm (2026-11-03): một lượt nhập điểm 630 → 280 ms. Cố ý để
+-- entry_seq đứng trước date: chỉ mục bắt đầu bằng (test_id, date) làm SQLite
+-- bỏ \`idx_qc_points_lot_active\` cho câu đọc theo lô có ORDER BY date
+-- (test \`qc-points-index\`).
+CREATE INDEX IF NOT EXISTS idx_qc_points_test_run_seq ON qc_points(test_id, entry_seq, date, run_id);
 CREATE TRIGGER IF NOT EXISTS qc_points_entry_seq AFTER INSERT ON qc_points WHEN NEW.entry_seq = 0
 BEGIN
   UPDATE qc_points SET entry_seq = (SELECT COALESCE(MAX(entry_seq), 0) FROM qc_points) + 1 WHERE rowid = NEW.rowid;

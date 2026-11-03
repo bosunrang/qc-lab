@@ -3,9 +3,7 @@
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
 import { listOperationalLevels, isTestInActivePanel, countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
-import { evaluateQcSets, ruleResolver } from '../db/westgard-evaluation';
-import { createHistoricalWestgard } from '../db/historical-westgard';
-import { listPreviousLotSeriesData } from '../db/lot-lineage';
+import { evaluateQcSets, evaluateQcSetsWithRules, ruleResolver } from '../db/westgard-evaluation';
 // 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
@@ -32,6 +30,7 @@ import { emptyChecklist } from '../domain/nce/update';
 import { defaultNceDueDate } from '../domain/nce/config';
 import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
+import { previousLotsOf } from './previous-lot-cache';
 
 interface QcPointRow {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
@@ -102,7 +101,7 @@ export function createEntryHandlers(db: Db) {
     // dùng. Lộ ra cho cột "Vi phạm loại bỏ" và nhánh dựng lại verdict của điểm
     // lô đã chuyển tiếp trong `voidPoint()`.
     const rules = ruleResolver(db, testId, levels.length);
-    const byPoint = evaluateQcSets(db, testId, levels);
+    const byPoint = evaluateQcSetsWithRules(db, testId, levels, rules);
     return { levels, byPoint, rulesAt: rules.at };
   }
 
@@ -170,8 +169,8 @@ export function createEntryHandlers(db: Db) {
    * dùng cho xét nghiệm này. Mean/SD lấy từ lịch sử cấu hình; snapshot trên
    * điểm là fallback cho dữ liệu đã nhập trước khi lịch sử được hoàn thiện. */
   function listPreviousLotSeries(testId: string): PreviousLotSeries[] {
-    const blocks = createHistoricalWestgard(db).listPreviousLotBlocks(testId);
-    return listPreviousLotSeriesData(db, testId).map((series) => {
+    const { series: previous, blocks } = previousLotsOf(db, testId);
+    return previous.map((series) => {
       const block = blocks.find(item => item.lotId === series.lotId && item.level === series.level);
       const flags = new Map(block?.analysis.points.map(point => [point.id, point]));
       return {
@@ -421,7 +420,8 @@ export function createEntryHandlers(db: Db) {
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(id, testId, level, date, runId, targetLot, val, test.decimal_places ?? 2, targetMean, targetSd, note || dayNoteRow?.note || '', actor.userId, actor.username, operatorName || actor.name, operatorCode);
         tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}`, test.name);
-        tx.changed(['qc_points'], [testId]);
+        // Điểm mới chỉ vào đúng `targetLot`: bộ nhớ đệm lô cũ giữ nguyên.
+        tx.changed(['qc_points'], [testId], [targetLot]);
         const pointView = parallel
           ? listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id)
           : queryPoints(testId, level).find((point) => point.id === id);
