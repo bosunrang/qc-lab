@@ -4,7 +4,8 @@
 // bằng `domain/eqa/*`; renderer chỉ gửi dữ liệu thô đã đọc từ báo cáo PDF.
 import type { Db } from '../db/sqlite-like';
 import type {
-  EqaAttentionRow, EqaDecisionRow, EqaImportInput, EqaImportPreview, EqaResultRow, EqaRoundRow, EqaRoundView, EqaSeriesView,
+  EqaAttentionRow, EqaDecisionRow, EqaImportInput, EqaImportPreview, EqaInstrumentGridRow, EqaInstrumentSummary, EqaResultRow, EqaRoundRow,
+  EqaRoundView, EqaSeriesView,
 } from '../../shared/qc-api';
 import { cleanId, uid } from '../domain/text-utils';
 import {
@@ -12,6 +13,7 @@ import {
   type EqaCatalogTest, type EqaClass, type EqaConfig, type EqaPeer,
 } from '../domain/eqa/evaluation';
 import { checkEqaImport, eqaPairKey, type EqaImportCheck } from '../domain/eqa/import';
+import { eqaMissingInstruments } from '../domain/eqa/overview';
 import { eqaAssignedUncertainty, eqaSeries, EQA_SERIES_DEFAULTS, type EqaSeriesResult } from '../domain/eqa/series';
 import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
@@ -270,12 +272,12 @@ export function createEqaHandlers(db: Db) {
   /** Chuỗi của một xét nghiệm cho biểu đồ z và bảng điểm J (N-07). */
   function getEqaSeries(testId: unknown): EqaSeriesView | null {
     const id = cleanId(testId);
-    const test = db.prepare(`SELECT t.id, COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.unit, i.name AS instrument_name
-      FROM tests t JOIN instruments i ON i.id=t.instrument_id WHERE t.id=?`).get(id) as { id: string; test_name: string; unit: string; instrument_name: string } | undefined;
+    const test = db.prepare(`SELECT t.id, COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.unit, t.instrument_id, i.name AS instrument_name
+      FROM tests t JOIN instruments i ON i.id=t.instrument_id WHERE t.id=?`).get(id) as { id: string; test_name: string; unit: string; instrument_id: string; instrument_name: string } | undefined;
     if (!test) return null;
     const series = seriesOf(id);
     return {
-      test_id: test.id, test_name: test.test_name, instrument_name: test.instrument_name, unit: test.unit, enough: series.enough,
+      test_id: test.id, test_name: test.test_name, instrument_id: test.instrument_id, instrument_name: test.instrument_name, unit: test.unit, enough: series.enough,
       j_limit: EQA_SERIES_DEFAULTS.jLimit, min_points: EQA_SERIES_DEFAULTS.minPoints,
       points: series.points.map((p) => {
         const meta = series.meta.get(p.id)!;
@@ -292,49 +294,99 @@ export function createEqaHandlers(db: Db) {
       const view = getEqaSeries(test_id);
       const last = view?.points.at(-1);
       if (!view || !last || (!last.signals.length && !last.unsuccessful)) return [];
-      return [{ test_id, test_name: view.test_name, instrument_name: view.instrument_name, points: view.points.length,
+      return [{ test_id, test_name: view.test_name, instrument_id: view.instrument_id, instrument_name: view.instrument_name, points: view.points.length,
         latest: { round_id: last.round_id, year: last.year, round: last.round, z: last.z, class: last.class, signals: last.signals, unsuccessful: last.unsuccessful } }];
     }).sort((a, b) => Number(b.latest.unsuccessful) - Number(a.latest.unsuccessful) || a.instrument_name.localeCompare(b.instrument_name, 'vi') || a.test_name.localeCompare(b.test_name, 'vi'));
   }
 
-  interface ResultBrief { class: EqaClass; instrument_name: string }
+  interface ResultBrief { class: EqaClass; instrument_id: string; instrument_name: string }
 
-  function toRoundRow(row: Record<string, unknown>, results: readonly ResultBrief[]): EqaRoundRow {
+  function instrumentSummaries(results: readonly ResultBrief[]): EqaInstrumentSummary[] {
+    const byInstrument = new Map<string, ResultBrief[]>();
+    for (const r of results) byInstrument.set(r.instrument_id, [...(byInstrument.get(r.instrument_id) ?? []), r]);
+    return [...byInstrument.values()].map((list) => {
+      const c = eqaCounts(list.map((r) => r.class));
+      return { instrument_id: list[0].instrument_id, instrument_name: list[0].instrument_name, total: c.total, ok: c.ok, warn: c.warn, rej: c.rej, accept_pct: c.acceptPct };
+    }).sort((a, b) => a.instrument_name.localeCompare(b.instrument_name, 'vi'));
+  }
+
+  /** Kết quả rút gọn (xếp loại, máy) của phiên bản hiện hành, gom theo đợt. */
+  function briefsByRound(where = '', ...params: (string | number)[]): Map<string, ResultBrief[]> {
+    const rows = db.prepare(`SELECT e.round_id, e.class, t.instrument_id, i.name AS instrument_name FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version
+      JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id ${where}`).all(...params) as (ResultBrief & { round_id: string })[];
+    const out = new Map<string, ResultBrief[]>();
+    for (const b of rows) out.set(b.round_id, [...(out.get(b.round_id) ?? []), b]);
+    return out;
+  }
+
+  /** Máy chưa có báo cáo của từng đợt, theo các đợt cùng chương trình–năm. */
+  function missingByRound(rounds: readonly Record<string, unknown>[], briefs: ReadonlyMap<string, readonly ResultBrief[]>): Map<string, EqaRoundRow['missing_instruments']> {
+    const names = new Map<string, string>();
+    for (const list of briefs.values()) for (const b of list) names.set(b.instrument_id, b.instrument_name);
+    const missing = eqaMissingInstruments(rounds.map((r) => ({
+      id: String(r.id), programId: String(r.program_id), year: Number(r.year), status: String(r.status),
+      instrumentIds: [...new Set((briefs.get(String(r.id)) ?? []).map((b) => b.instrument_id))],
+    })));
+    return new Map([...missing].map(([roundId, ids]) => [roundId, ids
+      .map((id) => ({ instrument_id: id, instrument_name: names.get(id) ?? '' }))
+      .sort((a, b) => a.instrument_name.localeCompare(b.instrument_name, 'vi'))]));
+  }
+
+  function toRoundRow(row: Record<string, unknown>, results: readonly ResultBrief[], missing: EqaRoundRow['missing_instruments'] = []): EqaRoundRow {
     const counts = eqaCounts(results.map((r) => r.class));
+    const byInstrument = instrumentSummaries(results);
     return {
       ...(row as unknown as EqaRoundRow),
       total: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej, accept_pct: counts.acceptPct,
-      instruments: [...new Set(results.map((r) => r.instrument_name))].sort((a, b) => a.localeCompare(b, 'vi')),
+      instruments: byInstrument.map((i) => i.instrument_name), by_instrument: byInstrument, missing_instruments: missing,
     };
   }
 
-  /** Danh sách chỉ cần đếm xếp loại và tên máy, không dựng lại từng kết quả. */
+  /** Danh sách chỉ cần đếm xếp loại theo máy, không dựng lại từng kết quả. */
   function listEqaRounds(): EqaRoundRow[] {
     const rounds = db.prepare(`${ROUND_SQL} ORDER BY r.year DESC, r.round_no DESC, p.name`).all() as Record<string, unknown>[];
-    const briefs = db.prepare(`SELECT e.round_id, e.class, i.name AS instrument_name FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version
-      JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id`).all() as (ResultBrief & { round_id: string })[];
-    const byRound = new Map<string, ResultBrief[]>();
-    for (const b of briefs) byRound.set(b.round_id, [...(byRound.get(b.round_id) ?? []), b]);
-    return rounds.map((row) => toRoundRow(row, byRound.get(String(row.id)) ?? []));
+    const briefs = briefsByRound();
+    const missing = missingByRound(rounds, briefs);
+    return rounds.map((row) => toRoundRow(row, briefs.get(String(row.id)) ?? [], missing.get(String(row.id))));
+  }
+
+  /** Lưới z của một máy trong một chương trình–năm: mỗi xét nghiệm một dòng,
+   * mỗi đợt đang dùng một ô (một đợt có thể có nhiều mẫu). */
+  function getEqaInstrumentGrid(raw: unknown): EqaInstrumentGridRow[] {
+    const input = objectInput(raw);
+    const programId = cleanId(input.programId), instrumentId = cleanId(input.instrumentId), year = Number(input.year);
+    if (!programId || !instrumentId || !Number.isInteger(year)) return [];
+    const rows = db.prepare(`SELECT e.id, e.test_id, e.sample, e.z_official, e.class, e.round_id, t.unit,
+      COALESCE(NULLIF(t.display_name,''), t.name) AS test_name
+      FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version JOIN tests t ON t.id=e.test_id
+      WHERE r.status='open' AND r.program_id=? AND r.year=? AND t.instrument_id=?
+      ORDER BY test_name, e.sample`).all(programId, year, instrumentId) as
+      { id: string; test_id: string; sample: string; z_official: number; class: EqaClass; round_id: string; unit: string; test_name: string }[];
+    const byTest = new Map<string, EqaInstrumentGridRow>();
+    for (const r of rows) {
+      const entry = byTest.get(r.test_id) ?? { test_id: r.test_id, test_name: r.test_name, unit: r.unit, cells: [] };
+      entry.cells.push({ round_id: r.round_id, result_id: r.id, sample: r.sample, z: r.z_official, class: r.class });
+      byTest.set(r.test_id, entry);
+    }
+    return [...byTest.values()];
   }
 
   function getEqaRound(id: unknown): EqaRoundView | null {
     const row = db.prepare(`${ROUND_SQL} WHERE r.id=?`).get(cleanId(id)) as Record<string, unknown> | undefined;
     if (!row) return null;
     const results = resultRows(String(row.id), Number(row.version));
-    const byInstrument = new Map<string, EqaResultRow[]>();
-    for (const r of results) byInstrument.set(r.instrument_id, [...(byInstrument.get(r.instrument_id) ?? []), r]);
     const config = readEqaConfig(db);
+    // Máy còn thiếu cần mọi đợt cùng chương trình–năm.
+    const siblings = db.prepare(`${ROUND_SQL} WHERE r.program_id=? AND r.year=?`).all(String(row.program_id), Number(row.year)) as Record<string, unknown>[];
+    const missing = missingByRound(siblings, briefsByRound('WHERE r.program_id=? AND r.year=?', String(row.program_id), Number(row.year)));
+    const round = toRoundRow(row, results, missing.get(String(row.id)));
     return {
-      round: toRoundRow(row, results), results,
+      round, results,
       decisions: db.prepare('SELECT id, type, payload_json, actor_name, decided_at FROM eqa_decisions WHERE round_id=? ORDER BY decided_at, rowid').all(row.id) as unknown as EqaDecisionRow[],
-      instruments: [...byInstrument.values()].map((list) => {
-        const c = eqaCounts(list.map((r) => r.class));
-        return { instrument_id: list[0].instrument_id, instrument_name: list[0].instrument_name, total: c.total, ok: c.ok, warn: c.warn, rej: c.rej, accept_pct: c.acceptPct };
-      }),
+      instruments: round.by_instrument,
       config: { z_warn: config.zWarn, z_reject: config.zReject },
     };
   }
 
-  return { listEqaRounds, getEqaRound, getEqaSeries, listEqaAttention, previewEqaImport, importEqaRound, cancelEqaRound };
+  return { listEqaRounds, getEqaRound, getEqaSeries, getEqaInstrumentGrid, listEqaAttention, previewEqaImport, importEqaRound, cancelEqaRound };
 }

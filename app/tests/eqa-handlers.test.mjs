@@ -146,3 +146,26 @@ test('báo cáo PDF từng máy: nhận chương trình theo mã, bổ sung máy
   assert.deepEqual(replaced.results.filter((r) => r.instrument_name === 'AU5800').map((r) => r.result), [55, 31]);
   assert.equal(replaced.decisions.at(-1).type, 'reimport');
 });
+
+test('tổng quan: đếm theo máy, máy chưa có báo cáo và lưới z của một máy qua các đợt', () => {
+  const { eqa, ids } = fixture();
+  const preview = must(eqa.previewEqaImport(draft()), 'xem trước');
+  const mappings = preview.pairs.map((p) => ({ code: p.code, instrument: p.instrument, testId: p.suggestions[0] }));
+  must(eqa.importEqaRound(draft({ mappings }), admin), 'đợt 01 đủ hai máy');
+  must(eqa.importEqaRound(draft({ round: { ...ROUND, round: 'ĐỢT 02' }, rows: ROWS.slice(0, 2), mappings }), admin), 'đợt 02 chỉ AU5800');
+
+  const [d02, d01] = eqa.listEqaRounds();
+  assert.deepEqual(d01.by_instrument.map((i) => [i.instrument_name, i.total, i.rej]), [['AU5800', 2, 1], ['DxC700', 2, 0]]);
+  assert.deepEqual(d01.missing_instruments, []);
+  assert.deepEqual(d02.missing_instruments.map((m) => m.instrument_name), ['DxC700'], 'đợt 02 thiếu báo cáo DxC700');
+  assert.deepEqual(eqa.getEqaRound(d02.id).round.missing_instruments.map((m) => m.instrument_name), ['DxC700']);
+
+  const au = eqa.getEqaRound(d01.id).instruments.find((i) => i.instrument_name === 'AU5800').instrument_id;
+  const grid = eqa.getEqaInstrumentGrid({ programId: d01.program_id, year: 2026, instrumentId: au });
+  assert.deepEqual(grid.map((t) => [t.test_id, t.cells.map((c) => [c.round_id, c.class])]), [
+    [ids['ALT@AU5800'], [[d01.id, 'ok'], [d02.id, 'ok']]],
+    [ids['AST@AU5800'], [[d01.id, 'rej'], [d02.id, 'rej']]],
+  ]);
+  assert.deepEqual(eqa.getEqaInstrumentGrid({ programId: d01.program_id, year: 'x', instrumentId: au }), [], 'đầu vào sai trả rỗng');
+  assert.ok(eqa.listEqaAttention().every((a) => a.instrument_id === au));
+});

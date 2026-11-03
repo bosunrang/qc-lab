@@ -95,6 +95,7 @@ const api = {
   getEqaRound: (id: string) => ipcRenderer.invoke('eqa:getRound', id),
   getEqaSeries: (testId: string) => ipcRenderer.invoke('eqa:getSeries', testId),
   listEqaAttention: () => ipcRenderer.invoke('eqa:listAttention'),
+  getEqaInstrumentGrid: (input: unknown) => ipcRenderer.invoke('eqa:getInstrumentGrid', input),
   previewEqaImport: (input: unknown) => ipcRenderer.invoke('eqa:previewImport', input),
   importEqaRound: (input: unknown) => ipcRenderer.invoke('eqa:importRound', input),
   cancelEqaRound: (input: unknown) => ipcRenderer.invoke('eqa:cancelRound', input),

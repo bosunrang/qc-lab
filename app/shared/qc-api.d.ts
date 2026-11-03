@@ -629,6 +629,16 @@ export interface EqaRoundRow {
   version: number; row_version: number; created_at: string; updated_at: string;
   /** `accept_pct`: tỷ lệ kết quả chấp nhận — chỉ số tổng hợp, không phải tiêu chí đạt (N-06). */
   total: number; ok: number; warn: number; rej: number; accept_pct: number | null; instruments: string[];
+  /** Đếm xếp loại theo từng máy của phiên bản hiện hành. */
+  by_instrument: EqaInstrumentSummary[];
+  /** Máy đã có kết quả ở đợt khác cùng chương trình–năm nhưng chưa có ở đợt này. */
+  missing_instruments: { instrument_id: string; instrument_name: string }[];
+}
+export interface EqaInstrumentSummary { instrument_id: string; instrument_name: string; total: number; ok: number; warn: number; rej: number; accept_pct: number | null }
+/** Một xét nghiệm của một máy qua các đợt đang dùng trong một chương trình–năm. */
+export interface EqaInstrumentGridRow {
+  test_id: string; test_name: string; unit: string;
+  cells: { round_id: string; result_id: string; sample: string; z: number; class: EqaClassView }[];
 }
 export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; mean: number; sd: number | null; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
 export interface EqaResultRow {
@@ -646,17 +656,17 @@ export interface EqaResultRow {
 }
 export type EqaSignalView = 'reject' | 'two_of_three' | 'six_same_side' | 'j_score';
 export interface EqaSeriesView {
-  test_id: string; test_name: string; instrument_name: string; unit: string; enough: boolean; j_limit: number; min_points: number;
+  test_id: string; test_name: string; instrument_id: string; instrument_name: string; unit: string; enough: boolean; j_limit: number; min_points: number;
   points: { result_id: string; round_id: string; year: number; round: string; sample: string; report_date: string; z: number; class: EqaClassView; pct: number | null; j: number; signals: EqaSignalView[]; unsuccessful: boolean }[];
 }
 export interface EqaAttentionRow {
-  test_id: string; test_name: string; instrument_name: string; points: number;
+  test_id: string; test_name: string; instrument_id: string; instrument_name: string; points: number;
   latest: { round_id: string; year: number; round: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
 }
 export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
 export interface EqaRoundView {
   round: EqaRoundRow; results: EqaResultRow[]; decisions: EqaDecisionRow[];
-  instruments: { instrument_id: string; instrument_name: string; total: number; ok: number; warn: number; rej: number; accept_pct: number | null }[];
+  instruments: EqaInstrumentSummary[];
   config: { z_warn: number; z_reject: number };
 }
 
@@ -809,6 +819,7 @@ export interface QcApi {
   getEqaSeries(testId: string): Promise<EqaSeriesView | null>;
   /** Xét nghiệm đang có tín hiệu hoặc không thành công ở đợt mới nhất. */
   listEqaAttention(): Promise<EqaAttentionRow[]>;
+  getEqaInstrumentGrid(input: { programId: string; year: number; instrumentId: string }): Promise<EqaInstrumentGridRow[]>;
   /** Kiểm và tính thử một lần nhập; không ghi gì. */
   previewEqaImport(input: { data: EqaImportInput }): Promise<IpcResult<EqaImportPreview>>;
   importEqaRound(input: { data: EqaImportInput }): Promise<IpcResult<EqaRoundView>>;

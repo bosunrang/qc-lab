@@ -93,3 +93,16 @@ test('E-03: z tính lại ngược dấu z trên báo cáo là lỗi chặn củ
   assert.match(flipped.rows[0].errors[0], /ngược dấu z trên báo cáo/);
   assert.equal(flipped.rows[0].providerCheck, 'swapped');
 });
+
+test('tổng quan: máy chưa có báo cáo theo chương trình–năm, kể cả khi nhập đợt muộn trước', () => {
+  const { eqaMissingInstruments } = require('../../app-dist/main/domain/eqa/overview.js');
+  const round = (id, year, instrumentIds, status = 'open', programId = 'p1') => ({ id, programId, year, status, instrumentIds });
+  const missing = eqaMissingInstruments([
+    round('d09', 2026, ['au', 'dxc']),
+    round('d08', 2026, ['au']),
+    round('d07', 2026, [], 'cancelled'),
+    round('d12', 2025, ['c501']),
+    round('x01', 2026, ['easy'], 'open', 'p2'),
+  ]);
+  assert.deepEqual([...missing], [['d08', ['dxc']]], 'đợt 08 nhập sau đợt 09 vẫn báo thiếu DxC; đợt huỷ, năm khác, chương trình khác không tính');
+});

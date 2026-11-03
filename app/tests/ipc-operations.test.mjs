@@ -107,7 +107,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 147);
+  assert.equal(handlers.size, 148);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -128,7 +128,7 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
   assert.deepEqual(open, [
     'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
     'attachNceRun', 'backupStatus', 'cancelEqaRound', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
-    'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
+    'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaInstrumentGrid', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
     'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getRangeCandidate',
     // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
     'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
