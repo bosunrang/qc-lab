@@ -245,10 +245,14 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   - mọi nơi nghe dùng chung một `EventSource` (Q2).
 - **Test:** `access-gate.test.mjs`, `lan-session-revoke.test.mjs`, `lan-http-api.test.mjs`.
   E2E `lan.e2e.mjs` kiểm KTV mới phải đổi mật khẩu khi đăng nhập trên máy trạm.
-- **Còn lại của A10, ngoài phạm vi GV5:**
-  - `importLisResult` tin bản ghi client gửi lên;
-  - thời gian phản hồi đăng nhập để lộ tài khoản có tồn tại hay không;
-  - `verifyOwnPassword` không giới hạn số lần thử.
+- **Phần còn lại của A10, đã làm 03/11/2026:**
+  - `importLisResult` chỉ lấy `messageId` từ client rồi đọc lại bản ghi từ hàng chờ
+    `pending` của Gateway; bản ghi đã nhận hoặc bỏ ở máy khác trả `not-pending`;
+  - đăng nhập bằng tên không tồn tại vẫn băm đủ vòng với một hash giả, nên thời gian trả
+    lời như sai mật khẩu;
+  - xác thực lại và tự đổi mật khẩu dùng chung bộ đếm theo tài khoản: 5 lần sai trong 15
+    phút thì khoá 15 phút (`too-many-attempts`), cùng ngưỡng với đăng nhập LAN.
+  - Test: `lis-handlers.test.mjs`, `auth-attempts.test.mjs`.
 
 - **Phương án:**
   1. `LanSession` chỉ giữ `userId` và dấu vân tay `pass_hash`. Hàm

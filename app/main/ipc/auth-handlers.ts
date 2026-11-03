@@ -6,7 +6,7 @@
 // module này chỉ lo xác thực + CRUD tài khoản.
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
-import { hashPasswordAsync, verifyPasswordAsync } from '../domain/password-hash';
+import { PASSWORD_HASH_ITERATIONS, hashPasswordAsync, verifyPasswordAsync } from '../domain/password-hash';
 import {
   validateUserCreate, validateUserUpdate, validateNewPassword, validateLoginInput, validateSetAvatar,
   type UserCreateInput, type UserUpdateInput, type LoginInput,
@@ -15,6 +15,19 @@ import { canWriteRole, roleLabel, roleOf } from '../domain/page-roles';
 import { parseUserCapabilities } from '../domain/capabilities';
 import { type Actor, type IpcResult, type PermissionDenied, writeAudit, withTransaction } from './shared';
 import { writeCommand, writeCommandAsync } from './write-command';
+import { LoginThrottle } from '../lan/login-throttle';
+
+/** Hash giả cùng số vòng với hash thật, dùng khi tên đăng nhập không tồn tại
+ * (A10). Trước đây trường hợp này bỏ qua bước băm nên trả lời nhanh hơn hẳn
+ * vài trăm ms, đo thời gian là biết tài khoản có tồn tại. Không mật khẩu nào
+ * khớp được dãy 0 này. */
+const MISSING_USER_HASH = `pbkdf2$${PASSWORD_HASH_ITERATIONS}$${'0'.repeat(32)}$${'0'.repeat(64)}`;
+
+/** Giới hạn nhập sai khi xác thực lại hoặc tự đổi mật khẩu (A10): 5 lần sai
+ * trong 15 phút thì khoá 15 phút, tính theo tài khoản. Cùng ngưỡng với đăng
+ * nhập qua LAN. Không có ngưỡng này, ai ngồi vào máy đang đăng nhập dở là dò
+ * mật khẩu của chủ phiên được không giới hạn. */
+const REAUTH_THROTTLE = { maxPerPair: 5, maxPerIp: Number.MAX_SAFE_INTEGER, windowMs: 15 * 60 * 1000, lockMs: 15 * 60 * 1000 };
 
 interface UserRow {
   id: string; username: string; name: string; initials: string; external_code: string;
@@ -65,7 +78,20 @@ function forbidden(message = 'Chỉ quản trị viên mới được thực hi�
   return { ok: false, error: { code: 'forbidden', message } };
 }
 
-export function createAuthHandlers(db: Db) {
+export function createAuthHandlers(db: Db, now: () => number = () => Date.now()) {
+  const reauthThrottle = new LoginThrottle(REAUTH_THROTTLE, now);
+  /** Kiểm mật khẩu của chính tài khoản đang đăng nhập, có đếm lần sai. */
+  async function checkOwnPassword(row: UserRow, password: string): Promise<'ok' | 'wrong' | { retryAfterMs: number }> {
+    const gate = reauthThrottle.begin(`reauth:${row.id}`, row.id);
+    if ('retryAfterMs' in gate) return gate;
+    if (!await verifyPasswordAsync(password, row.pass_hash)) return 'wrong';
+    gate.attempt.succeed();
+    return 'ok';
+  }
+  const tooManyAttempts = ({ retryAfterMs }: { retryAfterMs: number }): IpcResult<never> => ({
+    ok: false, error: { code: 'too-many-attempts', message: `Nhập sai mật khẩu quá nhiều lần. Thử lại sau ${Math.ceil(retryAfterMs / 60000)} phút.` },
+  });
+
   function hasAnyUsers(): boolean {
     return (db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c > 0;
   }
@@ -132,7 +158,8 @@ export function createAuthHandlers(db: Db) {
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, password } = result.data;
     const stored = db.prepare('SELECT pass_hash FROM users WHERE username=?').get(username) as { pass_hash: string } | undefined;
-    const passwordOk = !!stored && await verifyPasswordAsync(password, stored.pass_hash);
+    // Tên không tồn tại vẫn băm đủ vòng để thời gian trả lời như sai mật khẩu.
+    const passwordOk = await verifyPasswordAsync(password, stored?.pass_hash ?? MISSING_USER_HASH) && !!stored;
     // Đọc lại SAU khi chờ băm: trong lúc đó admin có thể vừa khoá tài khoản
     // hoặc đổi mật khẩu, nên kết luận phải dựa trên hàng hiện tại.
     const row = db.prepare('SELECT * FROM users WHERE username=?').get(username) as UserRow | undefined;
@@ -265,9 +292,11 @@ export function createAuthHandlers(db: Db) {
 
   async function verifyOwnPassword(input: { data: { password?: unknown } }, actor: Actor): Promise<IpcResult<{ ok: true }>> {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
-    if (!row || !await verifyPasswordAsync(String(input.data?.password || ''), row.pass_hash)) {
-      return { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu không đúng.' } };
-    }
+    const wrong: IpcResult<never> = { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu không đúng.' } };
+    if (!row) return wrong;
+    const checked = await checkOwnPassword(row, String(input.data?.password || ''));
+    if (checked === 'wrong') return wrong;
+    if (checked !== 'ok') return tooManyAttempts(checked);
     return { ok: true, data: { ok: true } };
   }
 
@@ -276,7 +305,9 @@ export function createAuthHandlers(db: Db) {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
     if (!row) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy tài khoản.' } };
     const wrong: IpcResult<never> = { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu hiện tại không đúng.' } };
-    if (!await verifyPasswordAsync(String(input.data?.oldPassword || ''), row.pass_hash)) return wrong;
+    const checked = await checkOwnPassword(row, String(input.data?.oldPassword || ''));
+    if (checked === 'wrong') return wrong;
+    if (checked !== 'ok') return tooManyAttempts(checked);
     const result = validateNewPassword(input.data?.newPassword);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const passHash = await hashPasswordAsync(result.data);

@@ -49,6 +49,12 @@ async function gatewayFetch(settings: LisGatewaySettings, path: string, init: { 
   }
 }
 
+/** Hàng chờ `pending` của Gateway — nguồn duy nhất của bản ghi LIS. */
+async function fetchPending(settings: LisGatewaySettings): Promise<LisQueueRecord[]> {
+  const body = await gatewayFetch(settings, '/api/v1/qc-results?status=pending&limit=500');
+  return Array.isArray(body.items) ? body.items : [];
+}
+
 export function createLisHandlers(db: Db) {
   const entry = createEntryHandlers(db);
 
@@ -80,8 +86,7 @@ export function createLisHandlers(db: Db) {
     if (!settings.enabled) return { ok: false, error: { code: 'disabled', message: 'LIS Gateway chưa được bật.' } };
     try {
       await gatewayFetch(settings, '/health');
-      const body = await gatewayFetch(settings, '/api/v1/qc-results?status=pending&limit=500');
-      const items: LisQueueRecord[] = Array.isArray(body.items) ? body.items : [];
+      const items = await fetchPending(settings);
       const pending = items.filter((it) => it.resolved && it.resolved.ok);
       const unresolved = items.filter((it) => !it.resolved || !it.resolved.ok);
       return { ok: true, data: { pending, unresolved } };
@@ -97,7 +102,21 @@ export function createLisHandlers(db: Db) {
    * rollback) — chỉ báo lỗi để người dùng biết chưa cập nhật gateway, tránh
    * nhận trùng lần sau. */
   async function importResult(input: { data: { record: LisQueueRecord } }, actor: Actor): Promise<IpcResult<{ pointId: string; gatewayWarning?: string }>> {
-    const record = input.data.record;
+    // Không tin bản ghi client gửi lên (A10): máy trạm sửa được giá trị, ngày
+    // hay xét nghiệm trước khi gửi. Chỉ lấy `messageId`, rồi đọc lại bản ghi
+    // từ hàng chờ của Gateway. Bản ghi đã nhận hoặc đã bỏ ở máy khác thì không
+    // còn trong hàng chờ, nên cũng không nhận trùng được.
+    const messageId = String(input?.data?.record?.message?.messageId || '');
+    if (!messageId) return { ok: false, error: { code: 'invalid-record', message: 'Thiếu mã bản ghi LIS.' } };
+    const settings = readSettings(db);
+    if (!settings.enabled) return { ok: false, error: { code: 'disabled', message: 'LIS Gateway chưa được bật.' } };
+    let record: LisQueueRecord | undefined;
+    try {
+      record = (await fetchPending(settings)).find((item) => item?.message?.messageId === messageId);
+    } catch (e) {
+      return { ok: false, error: { code: 'gateway-error', message: e instanceof Error ? e.message : 'Không kết nối được LIS Gateway.' } };
+    }
+    if (!record) return { ok: false, error: { code: 'not-pending', message: 'Kết quả này không còn trong hàng chờ của Gateway (có thể đã được nhận hoặc bỏ ở máy khác). Tải lại hàng chờ.' } };
     const pointInput = resultToPointInput(record);
     if (!pointInput) return { ok: false, error: { code: 'invalid-record', message: 'Bản ghi LIS thiếu dữ liệu hợp lệ (chưa khớp cấu hình hoặc measuredAt sai).' } };
     const saved = entry.addPoint({ data: pointInput }, actor);
@@ -107,7 +126,6 @@ export function createLisHandlers(db: Db) {
     // thất bại chỉ đính kèm cảnh báo để renderer hiện cho người dùng, đồng
     // thời bản ghi vẫn còn 'pending' phía gateway (chưa được báo 'imported')
     // — người dùng cần biết để không vô tình nhận lại gây trùng điểm.
-    const settings = readSettings(db);
     try {
       await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: record.message.messageId, status: 'imported', by: actor.name } });
     } catch (e) {

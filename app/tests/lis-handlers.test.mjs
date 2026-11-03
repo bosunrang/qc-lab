@@ -71,36 +71,54 @@ assert.equal(pulled.data.pending[0].message.messageId, 'm1');
 const healthCall = fetchCalls.find(c => c.url.endsWith('/health'));
 assert.equal(healthCall.opts.headers.authorization, 'Bearer tok1', 'phai gui dung Bearer token');
 
-fetchCalls.length = 0;
+// Gateway giả có hàng chờ thật: `importResult` đọc lại bản ghi từ đây theo
+// `messageId`, không dùng bản ghi client gửi lên (A10).
+let queue = [];
+let decideFails = false;
 globalThis.fetch = async (url, opts) => {
   fetchCalls.push({ url: String(url), opts });
+  if (String(url).includes('/api/v1/qc-results?')) return { ok: true, status: 200, json: async () => ({ items: queue }) };
+  if (String(url).includes('/decide') && decideFails) throw new Error('ECONNREFUSED gia lap');
   return { ok: true, status: 200, json: async () => ({ record: {} }) };
 };
-const imported = await lis.importResult({ data: { record: fakeRecord('m3', '2026-08-06T02:00:00Z') } }, actor);
+const decideCalls = () => fetchCalls.filter(c => c.url.includes('/decide'));
+
+fetchCalls.length = 0;
+queue = [fakeRecord('m3', '2026-08-06T02:00:00Z')];
+const tampered = { ...fakeRecord('m3', '2026-08-20T02:00:00Z'), message: { ...fakeRecord('m3', '2026-08-20T02:00:00Z').message, value: 999 } };
+const imported = await lis.importResult({ data: { record: tampered } }, actor);
 assert.equal(imported.ok, true, JSON.stringify(imported));
 assert.ok(imported.data.pointId);
 const point = db.prepare('SELECT * FROM qc_points WHERE id=?').get(imported.data.pointId);
-assert.equal(point.val, 101);
+assert.equal(point.val, 101, 'giá trị lấy từ Gateway, không lấy giá trị client sửa');
+assert.equal(point.date, '2026-08-06', 'ngày lấy từ Gateway');
 assert.equal(point.test_id, test.id);
-const decideCall = fetchCalls.find(c => c.url.includes('/decide'));
+const decideCall = decideCalls()[0];
 assert.ok(decideCall, 'phai co goi decide sau khi ghi thanh cong');
 const decideBody = JSON.parse(decideCall.opts.body);
 assert.equal(decideBody.messageId, 'm3');
 assert.equal(decideBody.status, 'imported');
 
+fetchCalls.length = 0;
+queue = [];
+const notPending = await lis.importResult({ data: { record: fakeRecord('m3', '2026-08-06T02:00:00Z') } }, actor);
+assert.equal(notPending.error.code, 'not-pending', 'bản ghi không còn trong hàng chờ: không nhận trùng');
+assert.equal(decideCalls().length, 0);
+assert.equal(db.prepare('SELECT COUNT(*) AS n FROM qc_points').get().n, 1);
+
 report.lockPeriod({ data: { ym: '2026-09', note: 'Chot ky' } }, actor);
 fetchCalls.length = 0;
+queue = [fakeRecord('m4', '2026-09-10T02:00:00Z')];
 const blockedImport = await lis.importResult({ data: { record: fakeRecord('m4', '2026-09-10T02:00:00Z') } }, actor);
 assert.equal(blockedImport.ok, false);
 assert.equal(blockedImport.error.code, 'period-locked');
-assert.equal(fetchCalls.length, 0, 'ghi that bai thi TUYET DOI khong duoc goi gateway - ban ghi phai con nguyen pending');
+assert.equal(decideCalls().length, 0, 'ghi that bai thi TUYET DOI khong duoc goi decide - ban ghi phai con nguyen pending');
 
 fetchCalls.length = 0;
-globalThis.fetch = async (url) => {
-  if (String(url).includes('/decide')) throw new Error('ECONNREFUSED gia lap');
-  return { ok: true, status: 200, json: async () => ({}) };
-};
+queue = [fakeRecord('m5', '2026-08-07T02:00:00Z')];
+decideFails = true;
 const importedButDecideFailed = await lis.importResult({ data: { record: fakeRecord('m5', '2026-08-07T02:00:00Z') } }, actor);
+decideFails = false;
 assert.equal(importedButDecideFailed.ok, true, 'diem da ghi thi KHONG duoc bao that bai toan bo');
 assert.ok(importedButDecideFailed.data.pointId);
 assert.ok(/chưa báo được về Gateway/.test(importedButDecideFailed.data.gatewayWarning));
@@ -108,9 +126,15 @@ const point5 = db.prepare('SELECT * FROM qc_points WHERE id=?').get(importedButD
 assert.ok(point5, 'diem QC van duoc ghi that, khong bi xoa/rollback');
 
 const unresolvedRecord = { id: 'qcr_m6', message: { messageId: 'm6', measuredAt: '2026-08-08T00:00:00Z' }, resolved: { ok: false, code: 'UNMAPPED_TEST', reason: 'x' } };
-const rejectedInvalid = await lis.importResult({ data: { record: unresolvedRecord } }, actor);
+queue = [unresolvedRecord];
+// Client gửi bản ghi "đã khớp" nhưng Gateway nói chưa khớp: theo Gateway.
+const rejectedInvalid = await lis.importResult({ data: { record: { ...fakeRecord('m6', '2026-08-08T00:00:00Z') } } }, actor);
 assert.equal(rejectedInvalid.ok, false);
 assert.equal(rejectedInvalid.error.code, 'invalid-record');
+
+globalThis.fetch = async () => { throw new Error('ECONNREFUSED gia lap'); };
+const gatewayDown = await lis.importResult({ data: { record: fakeRecord('m7', '2026-08-09T00:00:00Z') } }, actor);
+assert.equal(gatewayDown.error.code, 'gateway-error', 'không đọc được hàng chờ thì không ghi gì');
 
 fetchCalls.length = 0;
 globalThis.fetch = async (url, opts) => { fetchCalls.push({ url: String(url), opts }); return { ok: true, status: 200, json: async () => ({}) }; };
