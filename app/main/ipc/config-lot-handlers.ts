@@ -15,6 +15,8 @@ import { ymOfDate } from '../domain/period-lock-validation';
 import { isLotGroupInUse } from '../db/lot-groups';
 import { activationCandidates, applyLotGroupActivation, replacedGroupsOf } from '../db/lot-activation';
 import { applyLotTransitionCascade } from '../db/lot-transition';
+import { listParallelColumns } from './parallel-columns';
+import { parallelRunStats, parallelStatsText, PARALLEL_MIN_DAYS, PARALLEL_MIN_RESULTS } from '../domain/parallel-acceptance';
 
 export function createLotConfigHandlers(db: Db) {
   const lotGroupInUse = (lotIds: string[]): boolean => isLotGroupInUse(db, lotIds);
@@ -323,6 +325,7 @@ export function createLotConfigHandlers(db: Db) {
 
     const finalChanged = (status === 'accepted' || status === 'rejected') && (!existing || existing.status !== status);
     const criteria = input.data.criteria || [];
+    let parallelSummary = '';
 
     if (status === 'accepted' && finalChanged) {
       const panelTests = db.prepare(`SELECT t.id, t.name FROM tests t
@@ -341,6 +344,19 @@ export function createLotConfigHandlers(db: Db) {
       if (missing.length) {
         return { ok: false, error: { code: 'missing-target', message: `Chưa thể chấp nhận lô mới: ${missing.map((row) => row.t.name).join(', ')} chưa có Mean/SD hợp lệ cho lô ${toLot.lot_no}. Hãy điền đủ ở bảng Mean/SD phía trên rồi lưu lại.` } };
       }
+      // N12: đếm đúng các kết quả của cột song song ở Nhập QC, đánh giá theo
+      // Mean/SD ứng viên đang lưu cùng lúc này.
+      const parallelStats = rows.map((row) => {
+        const column = existing ? listParallelColumns(db, row.t.id, { transitionId: existing.id, criteria })
+          .find((item) => item.transitionId === existing.id && item.level === row.level!.level) : undefined;
+        const stats = parallelRunStats(column?.points || []);
+        return { stats, text: parallelStatsText(`${row.t.name} M${row.level!.level}`, stats) };
+      });
+      const short = parallelStats.filter((item) => !item.stats.enough);
+      if (short.length) {
+        return { ok: false, error: { code: 'parallel-insufficient', message: `Chưa thể chấp nhận lô mới: cần chạy song song lô ${toLot.lot_no} đủ ${PARALLEL_MIN_RESULTS} kết quả trên ${PARALLEL_MIN_DAYS} ngày cho mỗi xét nghiệm (không tính lần chạy bị loại). Hiện có ${short.map((item) => item.text).join('; ')}.` } };
+      }
+      parallelSummary = parallelStats.map((item) => item.text).join('; ');
     }
 
     const at = nowIso();
@@ -366,7 +382,7 @@ export function createLotConfigHandlers(db: Db) {
       if (cascade) applyLotTransitionCascade(db, { fromLot, toLot, startDate, criteria, at });
       const detail = `${panel.name}: ${fromLot.lot_no} → ${toLot.lot_no} · ${LOT_TRANSITION_STATUS_TEXT[status]}`;
       tx.audit(existing ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', detail, panel.name);
-      if (cascade) tx.audit('Áp dụng chuyển tiếp lô', `${panel.name} · ${fromLot.lot_no} → ${toLot.lot_no} · ${criteria.length} xét nghiệm`, panel.name);
+      if (cascade) tx.audit('Áp dụng chuyển tiếp lô', `${panel.name} · ${fromLot.lot_no} → ${toLot.lot_no} · ${criteria.length} xét nghiệm · Dữ liệu song song: ${parallelSummary}`, panel.name);
       tx.changed(cascade ? ['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests'] : ['lot_transitions']);
       return savedId;
     });

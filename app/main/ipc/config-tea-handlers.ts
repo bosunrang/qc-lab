@@ -5,10 +5,10 @@ import type { Db } from '../db/sqlite-like';
 // Kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung, không khai lại: trước
 // 2026-09-10 các hàm này khai `IpcResult<unknown>` nên renderer tin vào
 // một hình dạng mà không gì bảo đảm.
-import type { TeaRef } from '../../shared/qc-api';
+import type { TeaRef, TeaRefVersion } from '../../shared/qc-api';
 import { cleanId, cleanText, uid } from '../domain/text-utils';
 import { validateTeaRef, TEA_LAB_SOURCE_LABELS, type TeaRefInput } from '../domain/tea-ref-validation';
-import { type IpcResult } from './shared';
+import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
 
@@ -22,11 +22,40 @@ export function createTeaRefHandlers(db: Db) {
   function attachLabLevels(rows: Record<string, unknown>[]): TeaRef[] {
     const defaults = db.prepare('SELECT tea_ref_id,level,tea FROM tea_ref_level_defaults ORDER BY level').all() as
       { tea_ref_id: string; level: number; tea: number }[];
+    const versions = db.prepare('SELECT * FROM tea_ref_versions ORDER BY rowid').all() as unknown as VersionRow[];
     return rows.map((row) => ({
       ...row,
       lab_level_defaults: defaults.filter((item) => item.tea_ref_id === row.id)
         .map(({ level, tea }) => ({ level, tea })),
+      // Nối cả phiên bản của hồ sơ cùng analyte đã bị xoá rồi lập lại.
+      lab_versions: versions
+        .filter((item) => item.tea_ref_id === row.id || (!!item.analyte_id && item.analyte_id === row.analyte_id))
+        .map(({ levels_json, ...item }) => ({ ...item, levels: parseLevels(levels_json) })),
     })) as unknown as TeaRef[];
+  }
+
+  type VersionRow = Omit<TeaRefVersion, 'levels'> & { tea_ref_id: string; analyte_id: string; name: string; levels_json: string };
+  function parseLevels(json: string): { level: number; tea: number }[] {
+    try { const parsed = JSON.parse(json || '[]'); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+  }
+
+  /** Ghi một phiên bản hồ sơ TEa PXN (N8). `state` null là trạng thái sau khi
+   * xoá hồ sơ. Gọi bên trong `w.commit()` để phiên bản và thay đổi là một đơn vị. */
+  function recordVersion(ref: { id: string; analyte_id: string; name: string }, action: TeaRefVersion['action'], actorName: string, state: LabState | null) {
+    db.prepare(`INSERT INTO tea_ref_versions(id,tea_ref_id,analyte_id,name,action,saved_at,saved_by,lab,levels_json,lab_source,lab_prepared_by,lab_next_review_date,sources_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(cleanId(uid()), ref.id, ref.analyte_id || '', ref.name, action,
+      action === 'baseline' ? '' : nowIso(), action === 'baseline' ? '' : actorName,
+      state?.lab ?? null, JSON.stringify(state?.levels || []), state?.lab_source || '', state?.lab_prepared_by || '',
+      state?.lab_next_review_date || '', state?.sources_json || '{}');
+  }
+  type LabState = { lab: number | null; levels: readonly { level: number; tea: number }[]; lab_source: string; lab_prepared_by: string; lab_next_review_date: string; sources_json: string };
+
+  /** Hồ sơ đã có TEa PXN từ trước khi app lưu phiên bản: chụp lại nó làm phiên
+   * bản gốc trước lần đổi đầu tiên, để lịch sử không bắt đầu từ giữa chừng. */
+  function ensureBaseline(ref: { id: string; analyte_id: string; name: string }, state: LabState) {
+    if (state.lab == null && !state.levels.length) return;
+    const has = db.prepare('SELECT 1 FROM tea_ref_versions WHERE tea_ref_id=? OR (analyte_id<>\'\' AND analyte_id=?) LIMIT 1').get(ref.id, ref.analyte_id || '');
+    if (!has) recordVersion(ref, 'baseline', '', state);
   }
 
   /** "M1 3.2%, M2 4.8%" — nhật ký phải ghi đủ giá trị từng mức để truy vết
@@ -72,8 +101,10 @@ export function createTeaRefHandlers(db: Db) {
       const insert = db.prepare('INSERT INTO tea_ref_level_defaults(tea_ref_id,level,tea) VALUES (?,?,?)');
       for (const item of levels) insert.run(teaRefId, item.level, item.tea);
     };
-    type ExistingRow = { id: string; name: string; unit: string; section: string; lab: number | null; lab_source: string; lab_prepared_by: string; lab_next_review_date: string; sources_json: string };
-    const existingSql = 'SELECT id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json FROM tea_refs';
+    type ExistingRow = { id: string; analyte_id: string; name: string; unit: string; section: string; lab: number | null; lab_source: string; lab_prepared_by: string; lab_next_review_date: string; sources_json: string };
+    const existingSql = 'SELECT id,analyte_id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json FROM tea_refs';
+    const savedState: LabState = { lab: labValue, levels, lab_source: labSource, lab_prepared_by: preparedBy, lab_next_review_date: nextReviewDate, sources_json: sourcesJson };
+    const actorName = w.actor.name || w.actor.username;
     // Không có `id` mà analyte đã có dòng (vd chỉ ghi đè CLIA/Ricos) thì gắn hồ
     // sơ vào đúng dòng đó, không tạo dòng thứ hai cho cùng analyte.
     const existing = id
@@ -94,8 +125,11 @@ export function createTeaRefHandlers(db: Db) {
         db.prepare(`UPDATE tea_refs SET name=?,unit=?,section=?,lab=?,lab_source=?,lab_prepared_by=?,lab_next_review_date=?,sources_json=? WHERE id=?`)
           .run(name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson, existing.id);
         writeLevels(existing.id);
+        const ref = { id: existing.id, analyte_id: existing.analyte_id, name };
+        ensureBaseline(ref, { ...existing, levels: beforeLevels });
+        recordVersion(ref, 'save', actorName, savedState);
         tx.audit(isNew ? 'Thiết lập TEa chuẩn hoá' : 'Cập nhật TEa chuẩn hoá', detailOf(existing.lab, beforeLevels), name);
-        tx.changed(['tea_refs', 'tea_ref_level_defaults']);
+        tx.changed(['tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions']);
         return teaRefById(existing.id);
       });
       return { ok: true, data: saved };
@@ -105,8 +139,9 @@ export function createTeaRefHandlers(db: Db) {
       db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,lab,lab_source,lab_prepared_by,lab_next_review_date,sources_json)
         VALUES (?,?,?,?,?,?,?,?,?,?)`).run(newId, analyteId, name, unit, section, labValue, labSource, preparedBy, nextReviewDate, sourcesJson);
       writeLevels(newId);
+      recordVersion({ id: newId, analyte_id: analyteId, name }, 'save', actorName, savedState);
       tx.audit('Thiết lập TEa chuẩn hoá', detailOf(null, []), name);
-      tx.changed(['tea_refs', 'tea_ref_level_defaults']);
+      tx.changed(['tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions']);
       return teaRefById(newId);
     });
     return { ok: true, data: saved };
@@ -201,12 +236,19 @@ export function createTeaRefHandlers(db: Db) {
 
   const removeTeaRef = writeCommand(db, 'removeTeaRef', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string }> => {
     const id = String(input.id || '');
-    const existing = db.prepare('SELECT id, name FROM tea_refs WHERE id=?').get(id) as { id: string; name: string } | undefined;
+    const existing = db.prepare('SELECT id, analyte_id, name, lab, lab_source, lab_prepared_by, lab_next_review_date, sources_json FROM tea_refs WHERE id=?').get(id) as
+      ({ id: string; analyte_id: string; name: string } & Omit<LabState, 'levels'>) | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa.' } };
+    const levelsBefore = levelTeasOf(id);
+    const hadLabProfile = existing.lab != null || levelsBefore.length > 0;
     w.commit((tx) => {
+      if (hadLabProfile) {
+        ensureBaseline(existing, { ...existing, levels: levelsBefore });
+        recordVersion(existing, 'remove', w.actor.name || w.actor.username, null);
+      }
       db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);
       tx.audit('Xoá hồ sơ TEa', `Xoá "${existing.name}"`, existing.name);
-      tx.changed(['tea_refs']);
+      tx.changed(hadLabProfile ? ['tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions'] : ['tea_refs']);
     });
     return { ok: true, data: { id } };
   });
@@ -214,19 +256,21 @@ export function createTeaRefHandlers(db: Db) {
 
   const removeTeaLabProfile = writeCommand(db, 'removeTeaLabProfile', 'admin', (w, input: { id: unknown }): IpcResult<{ id: string; removedRecord: boolean }> => {
     const id = String(input.id || '');
-    const existing = db.prepare('SELECT id, name, clia, ricos, clia_absolute, abbreviation, matrix, lab FROM tea_refs WHERE id=?').get(id) as
-      { id: string; name: string; clia: number | null; ricos: number | null; clia_absolute: number | null; abbreviation: string; matrix: string; lab: number | null } | undefined;
+    const existing = db.prepare('SELECT id, analyte_id, name, clia, ricos, clia_absolute, abbreviation, matrix, lab, lab_source, lab_prepared_by, lab_next_review_date, sources_json FROM tea_refs WHERE id=?').get(id) as
+      ({ id: string; analyte_id: string; name: string; clia: number | null; ricos: number | null; clia_absolute: number | null; abbreviation: string; matrix: string } & Omit<LabState, 'levels'>) | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa.' } };
     const levelsBefore = levelTeasOf(id);
     if (existing.lab == null && levelsBefore.length === 0) return w.noChange({ id, removedRecord: false });
     const isCustomAnalyte = !!(existing.abbreviation || existing.matrix);
     const removedRecord = !isCustomAnalyte && existing.clia == null && existing.ricos == null && existing.clia_absolute == null;
     w.commit((tx) => {
+      ensureBaseline(existing, { ...existing, levels: levelsBefore });
+      recordVersion(existing, 'remove', w.actor.name || w.actor.username, null);
       db.prepare(`UPDATE tea_refs SET lab=NULL, lab_source='', lab_prepared_by='', lab_next_review_date='', sources_json='{}' WHERE id=?`).run(id);
       db.prepare('DELETE FROM tea_ref_level_defaults WHERE tea_ref_id=?').run(id);
       if (removedRecord) db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);
       tx.audit('Xoá TEa chuẩn hoá', `${existing.name} · TEa chung ${existing.lab == null ? '—' : `${Number(existing.lab).toFixed(2)}%`} · Theo mức ${levelText(levelsBefore)}`, existing.name);
-      tx.changed(['tea_refs', 'tea_ref_level_defaults']);
+      tx.changed(['tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions']);
     });
     return { ok: true, data: { id, removedRecord } };
   });

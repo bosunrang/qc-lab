@@ -13,6 +13,12 @@ export function isoLocalDate(at: Date = new Date()): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 }
 
+/** `YYYY-MM-DD` → `dd/mm/yyyy` cho thông báo và nhật ký; chuỗi khác giữ nguyên. */
+export function viDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
 /** Ngày địa phương cách hôm nay `days` ngày (dùng cho hạn xử lý NCE). */
 export function isoLocalDateAfter(days: number, at: Date = new Date()): string {
   const shifted = new Date(at.getFullYear(), at.getMonth(), at.getDate() + days);

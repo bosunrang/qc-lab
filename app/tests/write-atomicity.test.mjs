@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -184,6 +185,7 @@ test('chuyển lô: hồ sơ, cascade và nhật ký là một đơn vị', () =
   const tables = ['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests'];
   assertAtomic(db, tables, 'createLotTransition (dự kiến)', () => config.createLotTransition({ data }, admin));
   const created = config.createLotTransition({ data }, admin).data;
+  seedParallelRun(db, { transitionId: created.id, testId: assay.id, level: 1, lotNo: 'CAND-1', mean: 212, sd: 4.2, start: '2026-04-05' });
   assertAtomic(db, tables, 'createLotTransition (chấp nhận, có cascade)', () => config.createLotTransition({ id: created.id, data: { ...data, status: 'accepted' } }, admin));
   // Không lỗi thì chấp nhận vẫn áp đúng như trước.
   const accepted = config.createLotTransition({ id: created.id, data: { ...data, status: 'accepted' } }, admin);

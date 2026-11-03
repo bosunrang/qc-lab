@@ -299,16 +299,32 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 ## GV8 — Sửa nghiệp vụ Westgard, lô, dải (P1, M)
 
 - **N7:** `allowedRuleScopes('2of3-2s')` tính theo số mức của xét nghiệm.
-- **N9:** chặn ngày tương lai; cảnh báo/chặn lô hết hạn; snapshot Mean/SD của
-  điểm nhập lùi ngày lấy dải hiệu lực theo ngày từ `mean_sd_history_json`.
+- **N9 — đã làm 03/11/2026:** `addPoint` chặn ngày sau hôm nay (giờ địa phương) và
+  kết quả chạy sau hạn dùng của lô (đúng ngày hết hạn vẫn nhận). Điểm nhập lùi về
+  trước lần đổi dải gần nhất lấy Mean/SD hiệu lực trong `[effectiveFrom, effectiveTo)`
+  của `mean_sd_history_json` (`meanSdOnDate()`), nhật ký ghi dải đã dùng. Test:
+  `entry-date-gates.test.mjs`.
 - **N10 — đã làm 02/11/2026:** `evaluateRangeCandidate()` tính Mean/SD trên các
   lần chạy không bị loại, vẫn đòi n ≥ 20 và ≥ 20 ngày độc lập đếm trên chính các điểm
   được tính; lần chạy bị loại không còn chặn. Cảnh báo 1-2s vẫn được tính. Trang
   Nhập QC và hộp thoại lập dải ghi số điểm đã bỏ. Test: `range-workflow.test.mjs`.
 - **N11:** Sigma chỉ cảnh báo khi đích đổi trong nhóm IQC, không đánh `unstable`.
-- **N12:** chấp nhận lô mới cần thống kê cột song song tối thiểu (n, số ngày, run bị loại).
+- **N12 — đã làm 03/11/2026:** chấp nhận lô mới đòi mỗi xét nghiệm/mức có ≥ 10 kết
+  quả chạy song song trên ≥ 10 ngày (giá trị tạm thời theo CLSI C24-Ed4/Westgard;
+  đủ 20/20 thì lập dải PXN), không tính lần chạy bị loại (cùng nguyên tắc N10).
+  Cổng đếm đúng cột song song của Nhập QC (`ipc/parallel-columns.ts`, dùng chung)
+  theo Mean/SD ứng viên đang lưu; nhật ký ghi số liệu. Chuyển thẳng Dự kiến →
+  Chấp nhận bị chặn vì chưa có dữ liệu. Test: `lot-acceptance-parallel.test.mjs`.
 - **N13:** ngưỡng so sánh lô hoá chất lấy từ TEa của xét nghiệm, đánh giá theo từng mức nồng độ.
-- **N14:** ngày hiệu lực của `applyLabRange` theo giờ địa phương.
+- **N14 — phần ngày hiệu lực đã làm 03/11/2026:** `applyLabRange`/`revertManufacturerRange`
+  ghi ngày theo giờ địa phương. Còn lại: tiêu chí đợt EQA không đạt, CLIA Urea/pH.
+
+**N8 — phần còn lại đã làm 03/11/2026:** bảng `tea_ref_versions` lưu ảnh chụp mỗi
+lần lưu/xoá hồ sơ TEa PXN (hồ sơ có từ trước được chụp làm bản gốc ở lần sửa đầu),
+hiện ở hộp sửa hồ sơ; ngày hiệu lực không được sau hôm nay (chỉ có một phiên bản
+hiện hành); Bảng TEa tham chiếu gắn nhãn "Quá hạn xem xét" khi qua ngày xem lại.
+TEa vận hành (cổng lập dải, EQA, danh mục xét nghiệm, Six Sigma) ưu tiên hồ sơ
+PXN — `resolveOperationalTea()`. Test: `tea-ref-versions.test.mjs`, `operational-tea.test.mjs`.
 
 ## GV9 — Modal, focus, màu (U2–U6, P1, M) — phần U2, U3, U7 đã làm 02/11/2026
 

@@ -112,6 +112,8 @@ export interface TeaRef {
   /** TEa riêng theo số mức QC của analyte, áp dụng cho mọi cấu hình xét
    * nghiệm–máy khớp analyte; mức không có ở đây dùng `lab` (TEa chung). */
   lab_level_defaults: TeaRefLevelDefault[];
+  /** Các phiên bản đã lưu của hồ sơ TEa PXN, cũ trước. */
+  lab_versions: TeaRefVersion[];
   /** `config:listTeaRefs` trả nguyên hàng `tea_refs`, nên 3 cột này cũng có
    * sẵn — khai đủ ở đây vì bảng TEa tham chiếu cần chúng: `analyte_id` khoá
    * theo analyte của danh mục tích hợp, `clia`/`ricos` là GHI ĐÈ của phòng
@@ -123,6 +125,14 @@ export interface TeaRef {
 export interface TeaRefLevelDefault {
   level: number;
   tea: number;
+}
+
+/** Một phiên bản hồ sơ TEa của PXN (N8): ảnh chụp lúc lưu hoặc xoá, cũ trước.
+ * `baseline` là hồ sơ đã có trước khi app lưu phiên bản (`saved_at` rỗng). */
+export interface TeaRefVersion {
+  id: string; action: 'baseline' | 'save' | 'remove'; saved_at: string; saved_by: string;
+  lab: number | null; levels: TeaRefLevelDefault[]; lab_source: string; lab_prepared_by: string;
+  lab_next_review_date: string; sources_json: string;
 }
 
 export interface RuleScopeItem {

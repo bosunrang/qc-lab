@@ -1,4 +1,5 @@
 import { cleanId, cleanText, finiteNumber } from './text-utils';
+import { isoLocalDate } from './local-date';
 
 export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 
@@ -69,7 +70,7 @@ export function prepareTeaRef(input: TeaRefInput = {}): PreparedTeaRef {
 /** 6 điều kiện bắt buộc, y hệt thứ tự kiểm tra của `teaLabProfileSave()` bản
  * cũ — giữ đúng thứ tự để thông báo lỗi hiện ra khớp với thói quen người
  * dùng cũ (sửa lỗi đầu tiên trước, không nhảy cóc). */
-export function validateTeaRef(input: TeaRefInput): ValidationResult<PreparedTeaRef> {
+export function validateTeaRef(input: TeaRefInput, today: string = isoLocalDate()): ValidationResult<PreparedTeaRef> {
   const cleaned = prepareTeaRef(input);
   if (!cleaned.name) return { ok: false, code: 'missing-name', message: 'Nhập tên xét nghiệm.' };
   if (cleaned.labValue != null && (!Number.isFinite(cleaned.labValue) || cleaned.labValue <= 0)) {
@@ -106,6 +107,11 @@ export function validateTeaRef(input: TeaRefInput): ValidationResult<PreparedTea
   if (cleaned.reason.length < 10) return { ok: false, code: 'invalid-reason', message: 'Lý do cần ít nhất 10 ký tự.' };
   if (!cleaned.effectiveDate || !cleaned.approvedDate) {
     return { ok: false, code: 'missing-dates', message: 'Nhập đủ ngày hiệu lực và ngày duyệt.' };
+  }
+  // TEa PXN là căn cứ đang dùng của cổng lập dải và ngoại kiểm, và chỉ có
+  // MỘT phiên bản hiện hành: lưu hồ sơ vào đúng ngày bắt đầu áp dụng (N8).
+  if (cleaned.effectiveDate > today) {
+    return { ok: false, code: 'effective-in-future', message: 'Ngày hiệu lực không được sau hôm nay: lưu hồ sơ từ ngày bắt đầu áp dụng.' };
   }
   if (cleaned.approvedDate > cleaned.effectiveDate) {
     return { ok: false, code: 'approved-after-effective', message: 'Ngày duyệt không được sau ngày hiệu lực.' };

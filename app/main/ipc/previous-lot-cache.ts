@@ -20,7 +20,7 @@ import { addChangeListener, type MainChangedPayload } from './shared';
 /** Bảng mà phần lô cũ KHÔNG đọc tới. Khác `SUMMARY_IGNORED_TABLES`: lô cũ
  * đọc `lot_transitions` để dựng chuỗi chuyển tiếp. */
 export const PREVIOUS_LOT_IGNORED_TABLES: ReadonlySet<string> = new Set([
-  'activity', 'users', 'lab', 'tea_refs', 'tea_ref_level_defaults', 'reagent_tests', 'report_templates',
+  'activity', 'users', 'lab', 'tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions', 'reagent_tests', 'report_templates',
   'period_locks', 'sigma_data', 'planned_targets',
   'nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions',
   'eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions',

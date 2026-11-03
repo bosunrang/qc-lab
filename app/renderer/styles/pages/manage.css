@@ -417,6 +417,9 @@ main:has(.config-shell){padding-bottom:var(--space-4);}
 .tea-ref-status .btn { min-height: var(--control-h-sm); padding: var(--space-1) var(--space-2); }
 .tea-form-section { margin-bottom: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .tea-form-section-last { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.tea-version-history { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.tea-version-table { width: 100%; margin-top: var(--space-2); }
+.tea-version-table td:first-child, .tea-version-table th:first-child { width: 3ch; text-align: center; }
 .tea-form-section > b { display: block; margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--text-base); }
 .tea-form-label-note { color: var(--text-tertiary); font-weight: var(--weight-normal); }
 .tea-form-primary { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,.7fr); gap: var(--field-gap); }

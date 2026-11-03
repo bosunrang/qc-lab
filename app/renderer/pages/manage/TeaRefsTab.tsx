@@ -7,7 +7,8 @@ import { TEA_CATALOG, TEA_SOURCE_CARDS } from '../../../main/domain/tea-catalog'
 import { useManageStore } from '../../store/manage-store';
 import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { useAuthStore } from '../../store/auth-store';
-import type { TeaRef } from '../../../shared/qc-api';
+import type { TeaRef, TeaRefVersion } from '../../../shared/qc-api';
+import { isoLocalDate, viDate } from '../../../main/domain/local-date';
 import { EmptyState } from './shared';
 import { useAsyncAction } from '../../components/AsyncButton';
 import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
@@ -39,7 +40,7 @@ const TEA_PROFILE_FIELD_ERRORS: FieldErrorMap = {
   'missing-name': 'name', 'invalid-value': 'labValue', 'missing-source': 'labSource', 'invalid-source': 'labSource',
   'invalid-reference': 'reference', 'invalid-source-url': 'sourceUrl', 'missing-source-url': 'sourceUrl',
   'invalid-reason': 'reason', 'missing-dates': ['effectiveDate', 'approvedDate'],
-  'approved-after-effective': 'approvedDate', 'review-before-effective': 'nextReviewDate',
+  'approved-after-effective': 'approvedDate', 'review-before-effective': 'nextReviewDate', 'effective-in-future': 'effectiveDate',
   'missing-signoff': ['preparedBy', 'approvedBy'],
 };
 
@@ -52,6 +53,46 @@ function parseSources(json: string | undefined) {
 
 function hasLabProfile(ref: Pick<TeaRef, 'lab' | 'lab_level_defaults'> | null | undefined) {
   return ref?.lab != null || !!ref?.lab_level_defaults?.length;
+}
+
+/** Hồ sơ TEa PXN đã qua ngày xem xét lại kế tiếp (ISO 15189:2022 8.3). */
+function reviewOverdue(ref: Pick<TeaRef, 'lab' | 'lab_level_defaults' | 'lab_next_review_date'> | null | undefined, today: string) {
+  return hasLabProfile(ref) && !!ref?.lab_next_review_date && ref.lab_next_review_date < today;
+}
+
+function OverdueTag({ teaRef, today }: { teaRef: TeaRef | null | undefined; today: string }) {
+  if (!teaRef || !reviewOverdue(teaRef, today)) return null;
+  return <span className="tag warn" title={`Ngày xem lại kế tiếp: ${viDate(teaRef.lab_next_review_date)}`}>Quá hạn xem xét</span>;
+}
+
+function versionTeaText(version: TeaRefVersion) {
+  if (version.action === 'remove') return 'Đã xoá hồ sơ';
+  const levels = [...version.levels].sort((left, right) => left.level - right.level).map((item) => `M${item.level} ${item.tea}%`);
+  return [...(version.lab != null ? [`Chung ${version.lab}%`] : []), ...levels].join(' · ') || '—';
+}
+
+/** Các phiên bản đã lưu của hồ sơ TEa PXN (N8), mới nhất trước. */
+function TeaVersionHistory({ versions }: { versions: TeaRefVersion[] }) {
+  if (!versions.length) return null;
+  const rows = versions.map((version, index) => ({ version, no: index + 1 })).reverse();
+  return (
+    <section className="tea-version-history" aria-labelledby="tea-version-title">
+      <b id="tea-version-title">Lịch sử phiên bản</b>
+      <table className="tea-version-table">
+        <thead><tr><th>#</th><th>Lưu</th><th>TEa</th><th>Hiệu lực</th><th>Lý do</th></tr></thead>
+        <tbody>{rows.map(({ version, no }) => {
+          const sources = parseSources(version.sources_json);
+          return <tr key={version.id}>
+            <td>{no}</td>
+            <td>{version.action === 'baseline' ? 'Có từ trước' : `${viDate(isoLocalDate(new Date(version.saved_at)))} · ${version.saved_by || '—'}`}</td>
+            <td>{versionTeaText(version)}</td>
+            <td>{version.action === 'remove' ? '—' : viDate(sources.effectiveDate || '') || '—'}</td>
+            <td>{version.action === 'remove' ? '—' : sources.reason || '—'}</td>
+          </tr>;
+        })}</tbody>
+      </table>
+    </section>
+  );
 }
 
 export function TeaRefsTab() {
@@ -73,6 +114,7 @@ export function TeaRefsTab() {
   const addErrorId = useInvalidField(addFormRef, addErr);
   const errorId = useInvalidField(profileFormRef, err);
   const [query, setQuery] = useState('');
+  const today = isoLocalDate();
   const current = editing && editing !== 'new' ? teaRefs.find((ref) => ref.id === editing) : null;
   const currentSources = useMemo(() => parseSources(current?.sources_json), [current]);
   const normalizedQuery = normalizeTeaKey(query);
@@ -205,12 +247,13 @@ export function TeaRefsTab() {
                 </div></td>
                 <td><div className="tea-ref-status">
                   <span className={`tag ${status.cls}`}>{status.label}</span>
+                  <OverdueTag teaRef={labRef} today={today} />
                   {canManage && hasOverride ? <button type="button" className="btn ghost sm" title="Khôi phục giá trị mặc định" onClick={() => restoreTeaRefDefaults(ref.id)}>Khôi phục</button> : null}
                 </div></td>
               </tr>
             );
           })}
-          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td><b>{ref.lab_level_defaults?.length ? 'Theo mức QC' : formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className={`tag ${hasLabProfile(ref) ? 'ok' : 'none'}`}>{hasLabProfile(ref) ? 'TEa PXN' : 'Tự thêm'}</span><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => openProfile(ref)} /><RowActionButton kind="delete" label={`Xoá TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
+          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td><b>{ref.lab_level_defaults?.length ? 'Theo mức QC' : formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className={`tag ${hasLabProfile(ref) ? 'ok' : 'none'}`}>{hasLabProfile(ref) ? 'TEa PXN' : 'Tự thêm'}</span><OverdueTag teaRef={ref} today={today} /><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => openProfile(ref)} /><RowActionButton kind="delete" label={`Xoá TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
         </tbody>
       </table> : <EmptyState title="Không tìm thấy xét nghiệm">Thử tìm lại theo tên, đơn vị hoặc nhóm xét nghiệm.</EmptyState>}
       </div>
@@ -279,6 +322,7 @@ export function TeaRefsTab() {
           <section className="tea-form-section"><b>Căn cứ áp dụng</b><div className="field"><label htmlFor="tea-profile-reference">Tham chiếu <span className="tea-form-label-note">(tối thiểu 3 ký tự)</span></label><input id="tea-profile-reference" name="reference" defaultValue={currentSources.reference || ''} /></div><div className="field"><label htmlFor="tea-source-url">Link nguồn <span className="tea-form-label-note">(bắt buộc với "Nguồn khác đã thẩm định")</span></label><input id="tea-source-url" name="sourceUrl" inputMode="url" placeholder="https://" defaultValue={currentSources.sourceUrl || ''} /></div><div className="field"><label htmlFor="tea-profile-reason">Lý do áp dụng <span className="tea-form-label-note">(tối thiểu 10 ký tự)</span></label><textarea id="tea-profile-reason" name="reason" defaultValue={currentSources.reason || ''} /></div></section>
           <section className="tea-form-section tea-form-section-last"><b>Hiệu lực và phê duyệt</b><div className="tea-form-dates"><DateField id="tea-effective-date" label="Ngày hiệu lực" name="effectiveDate" defaultValue={currentSources.effectiveDate || ''} /><DateField id="tea-approved-date" label="Ngày duyệt" name="approvedDate" defaultValue={currentSources.approvedDate || ''} /><DateField id="tea-next-review-date" label="Ngày xem lại kế tiếp" name="nextReviewDate" defaultValue={current?.lab_next_review_date || ''} /></div><div className="tea-form-people"><div className="field"><label htmlFor="tea-profile-prepared-by">Người chuẩn bị</label><input id="tea-profile-prepared-by" name="preparedBy" defaultValue={current?.lab_prepared_by || ''} /></div><div className="field"><label htmlFor="tea-profile-approved-by">Người duyệt</label><input id="tea-profile-approved-by" name="approvedBy" defaultValue={currentSources.approvedBy || ''} /></div></div></section>
         </form>
+        <TeaVersionHistory versions={current?.lab_versions || []} />
       </Modal>}
     </>
   );

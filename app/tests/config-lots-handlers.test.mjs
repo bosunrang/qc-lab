@@ -4,6 +4,7 @@
 // config-handlers.test.mjs vì file đó khoá số đếm audit log tuyệt đối.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -150,6 +151,13 @@ assert.match(missingTarget.error.message, /Glucose/);
 
 // Chấp nhận (kèm Mean/SD ứng viên hợp lệ) — chuyển trạng thái, ghi nhận
 // người/ngày duyệt, áp Mean/SD vào test_levels, đánh dấu lô cũ hết dùng.
+// Cổng N12: lô mới phải chạy song song đủ dữ liệu trước khi chấp nhận.
+const shortRun = h.createLotTransition({ id: transition.data.id, data: {
+  panelId: panel.data.id, fromLotId: lot1.data.id, toLotId: lot3.id, startDate: '2026-06-01', status: 'accepted',
+  criteria: [{ testId: test1.id, level: 1, mean: 100, sd: 3 }],
+} }, actor);
+assert.equal(shortRun.error?.code, 'parallel-insufficient', 'chưa chạy song song thì chưa chấp nhận được');
+seedParallelRun(db, { transitionId: transition.data.id, testId: test1.id, level: 1, lotNo: 'L3', mean: 100, sd: 3, start: '2026-06-01' });
 const accept = h.createLotTransition({ id: transition.data.id, data: {
   panelId: panel.data.id, fromLotId: lot1.data.id, toLotId: lot3.id, startDate: '2026-06-01', status: 'accepted',
   criteria: [{ testId: test1.id, level: 1, mean: 100, sd: 3 }],

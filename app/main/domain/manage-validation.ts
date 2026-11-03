@@ -216,6 +216,30 @@ export interface MeanSdHistoryEntry {
 }
 
 
+/** Mean/SD đang hiệu lực của lô `qcLotId` vào ngày `date` (N9). Điểm nhập
+ * lùi về trước lần đổi dải gần nhất phải mang dải của chính ngày chạy, không
+ * phải dải hiện hành: snapshot trên điểm quyết định z và kết luận Westgard.
+ * Mốc lịch sử có hiệu lực trong `[effectiveFrom, effectiveTo)` — `effectiveTo`
+ * là ngày đổi dải, dải mới áp từ chính ngày đó. Mốc cũ thiếu ngày, khác lô
+ * hoặc không có SD dương thì không dùng được; khi đó giữ dải hiện hành. */
+export function meanSdOnDate(
+  historyJson: string | null | undefined, qcLotId: string, date: string,
+  current: { mean: number | null; sd: number | null; effectiveFrom: string },
+): { mean: number | null; sd: number | null; fromHistory: boolean } {
+  const now = { mean: current.mean, sd: current.sd, fromHistory: false };
+  if (!current.effectiveFrom || date >= current.effectiveFrom) return now;
+  let history: MeanSdHistoryEntry[];
+  try { history = JSON.parse(historyJson || '[]'); if (!Array.isArray(history)) return now; } catch { return now; }
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (!entry || entry.qcLotId !== qcLotId || !entry.effectiveTo || date >= entry.effectiveTo) continue;
+    if (entry.effectiveFrom && date < entry.effectiveFrom) continue;
+    if (!Number.isFinite(Number(entry.mean)) || !(Number(entry.sd) > 0)) continue;
+    return { mean: Number(entry.mean), sd: Number(entry.sd), fromHistory: true };
+  }
+  return now;
+}
+
 export function appendMeanSdHistory(
   historyJson: string | null | undefined,
   previous: Omit<MeanSdHistoryEntry, 'at'> | null,

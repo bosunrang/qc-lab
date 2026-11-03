@@ -2,8 +2,7 @@
 // giá đa mức; lô mới trong chuyển tiếp được đánh giá riêng từng mức và không
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
-import { countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
-import { evaluateQcSets } from '../db/westgard-evaluation';
+import { OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
 // 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
@@ -16,11 +15,11 @@ import { uid } from '../domain/text-utils';
 import { validateQcPointInput, validateVoidInput, rejectedRunVoidReasonError, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
 import { evaluateRangeCandidate, manualRangeDeviation, validateRangeReason } from '../domain/range-workflow';
-import { appendMeanSdHistory } from '../domain/manage-validation';
+import { appendMeanSdHistory, meanSdOnDate } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
 import { isDateInLockedPeriod } from '../db/period-locks';
-import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
-import { isoLocalDate } from '../domain/local-date';
+import { qcRunKey } from '../domain/sort-order';
+import { isoLocalDate, viDate } from '../domain/local-date';
 import { initialsFromName } from '../domain/name-initials';
 import { nextNceId } from '../db/nce-ids';
 import { insertNceRecord, insertNceRun, openRecordOfRun, readNceConfig } from '../db/nce-repository';
@@ -31,8 +30,9 @@ import { defaultNceDueDate } from '../domain/nce/config';
 import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 import { previousLotsOf } from './previous-lot-cache';
-import { activeEvaluationOf, type ActivePoint } from './active-evaluation';
+import { activeEvaluationOf } from './active-evaluation';
 import { operationalTeaResolver } from '../db/operational-tea';
+import { listParallelColumns as listParallelColumnsOf, pointsForLot as pointsForLotOf } from './parallel-columns';
 
 export interface RangeCandidateView {
   testId: string; level: number; lot: string; source: 'mfg' | 'lab';
@@ -88,64 +88,10 @@ export function createEntryHandlers(db: Db) {
     return { levels, byPoint, rulesAt: rules.at };
   }
 
-  function pointsForLot(testId: string, level: number, lot: string): ActivePoint[] {
-    const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=? ORDER BY date,run_id')
-      .all(testId, level, lot) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[];
-    return rows.map((point) => ({ ...point, runId: point.run_id, qcMean: point.qc_mean, qcSd: point.qc_sd })).sort(compareQcPointOrder);
-  }
-
-  /** Cột lô song song chỉ nhận hồ sơ active, đúng Panel chứa xét nghiệm, lô
-   * cũ vẫn đang gán và criteria có Mean/SD hợp lệ. Mỗi mức lấy hồ sơ khớp đầu tiên. */
-  function listParallelColumns(testId: string): ParallelEntryColumn[] {
-    const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
-    if (!test) return [];
-    // Phạm vi within/across phải giống MỌI endpoint khác của xét nghiệm này,
-    // nên đếm mức ĐANG VẬN HÀNH chứ không phải mọi dòng `test_levels`.
-    const levelCount = countOperationalLevels(db, testId);
-    const rows = db.prepare(`SELECT tr.id transition_id,tr.start_date,tr.criteria_json,tl.level,
-        ql.id lot_id,ql.lot_no,ql.exp
-      FROM lot_transitions tr
-      JOIN qc_panel_tests pt ON pt.panel_id=tr.panel_id AND pt.test_id=?
-      JOIN test_levels tl ON tl.test_id=pt.test_id AND tl.qc_lot_id=tr.from_lot_id
-      JOIN qc_lots ql ON ql.id=tr.to_lot_id AND ql.level=tl.level
-      WHERE tr.status='active' ORDER BY tr.rowid`)
-      .all(testId) as { transition_id: string; start_date: string; criteria_json: string; level: number; lot_id: string; lot_no: string; exp: string }[];
-    const seen = new Set<number>();
-    const columns: { row: typeof rows[number]; target: { mean: number; sd: number; low?: number | null; high?: number | null }; pts: ActivePoint[] }[] = [];
-    for (const row of rows) {
-      if (seen.has(row.level)) continue;
-      let criteria: { testId: string; level: number; mean: number; sd: number; low?: number | null; high?: number | null }[] = [];
-      try { const parsed = JSON.parse(row.criteria_json || '[]'); if (Array.isArray(parsed)) criteria = parsed; } catch { /* hồ sơ hỏng không tạo cột nhập */ }
-      const target = criteria.find((item) => item.testId === testId && Number(item.level) === row.level && Number.isFinite(Number(item.mean)) && Number(item.sd) > 0);
-      if (!target) continue;
-      columns.push({ row, target: { ...target, mean: Number(target.mean), sd: Number(target.sd) }, pts: pointsForLot(testId, row.level, row.lot_no) });
-      seen.add(row.level);
-    }
-    if (!columns.length) return [];
-    // Đánh giá CẢ BỘ cột song song qua cùng một đường với chuỗi đang vận hành
-    // và tab lô lịch sử. Bản trước gọi `westgardByPoint()` cho TỪNG cột, tức
-    // chỉ kênh trong-mức: hai mức của lô mới đo cùng một lần chạy mà một mức
-    // +2,5SD còn mức kia −2,5SD thì R4s/2-2s liên mức không bao giờ nổ, và
-    // mốc "đã khắc phục xong" cũng không được áp. Lô đang chạy thẩm định là
-    // lúc CẦN bắt sai số ngẫu nhiên lớn nhất, không phải lúc nới cổng.
-    //
-    // Chỉ gộp các cột song song với NHAU: chúng là các mức của cùng một lô
-    // mới trong cùng lần chạy. Không trộn với lô đang vận hành — đó là hai
-    // dòng dữ liệu khác nhau, kết luận thẩm định lô mới không được lẫn với
-    // kết luận thường quy.
-    const parallelSets = columns.map((column) => ({ level: column.row.level, key: `${column.row.level}:${column.row.lot_no}`, pts: column.pts, mean: column.target.mean, sd: column.target.sd }));
-    const byPoint = evaluateQcSets(db, testId, parallelSets, levelCount);
-    const accepted = acceptedRunPoints(byPoint);
-    const rejectedBy = rejectedLevelsByRun(parallelSets, byPoint);
-    return columns.map(({ row, target, pts }) => ({
-      transitionId: row.transition_id, level: row.level, lotId: row.lot_id, lot: row.lot_no, startDate: row.start_date,
-      mean: target.mean, sd: target.sd, low: target.low ?? null, high: target.high ?? null, exp: row.exp || '',
-      points: pts.map((point) => {
-        const flag = byPoint.get(point);
-        return { ...point, verdict: flag?.level || 'ok', rules: flag?.rules || [], accepted: accepted.has(point), runRejectedBy: rejectedBy.get(qcRunKey(point)) || [] };
-      }),
-    }));
-  }
+  // Phần đọc và đánh giá cột lô song song nằm ở `ipc/parallel-columns.ts`,
+  // dùng chung với cổng chấp nhận lô mới.
+  const pointsForLot = (testId: string, level: number, lot: string) => pointsForLotOf(db, testId, level, lot);
+  const listParallelColumns = (testId: string): ParallelEntryColumn[] => listParallelColumnsOf(db, testId);
 
   /** Các lô cũ nằm trên đúng chuỗi chuyển tiếp đã CHẤP NHẬN dẫn tới lô đang
    * vận hành. Không liệt kê mọi lô cùng nhóm vì chúng có thể chưa từng được
@@ -367,20 +313,31 @@ export function createEntryHandlers(db: Db) {
     // (qc_mean/qc_sd/lot) — westgard-engine.ts's pointTarget() đã sẵn đọc lại
     // 2 cột này làm ưu tiên trước fallbackMean/fallbackSd, nên điểm cũ không
     // bị đổi verdict âm thầm nếu sau này ai sửa lại Mean/SD của mức.
-    const levelRow = db.prepare('SELECT mean, sd, qc_lot_id FROM test_levels WHERE test_id=? AND level=?').get(testId, level) as
-      { mean: number | null; sd: number | null; qc_lot_id: string | null } | undefined;
+    // Kết quả QC là bản ghi của một lần chạy đã xảy ra (N9).
+    const today = isoLocalDate();
+    if (date > today) return { ok: false, error: { code: 'future-date', message: `Ngày ${viDate(date)} ở tương lai: chỉ nhập kết quả QC đã chạy (hôm nay ${viDate(today)}).` } };
+    const levelRow = db.prepare('SELECT mean, sd, qc_lot_id, mean_sd_effective_from, mean_sd_history_json FROM test_levels WHERE test_id=? AND level=?').get(testId, level) as
+      { mean: number | null; sd: number | null; qc_lot_id: string | null; mean_sd_effective_from: string; mean_sd_history_json: string } | undefined;
     if (!canEnterQcForLevel(testId, levelRow?.qc_lot_id ?? null)) {
       return { ok: false, error: { code: 'level-not-operational', message: 'Mức QC chưa thuộc Panel và nhóm lô đang vận hành, không thể nhập QC.' } };
     }
-    const lotRow = levelRow?.qc_lot_id ? db.prepare('SELECT lot_no FROM qc_lots WHERE id=?').get(levelRow.qc_lot_id) as { lot_no: string } | undefined : undefined;
+    const lotRow = levelRow?.qc_lot_id ? db.prepare('SELECT lot_no, exp FROM qc_lots WHERE id=?').get(levelRow.qc_lot_id) as { lot_no: string; exp: string } | undefined : undefined;
     const currentLot = lotRow?.lot_no || '';
     const parallel = lotNo && lotNo !== currentLot ? listParallelColumns(testId).find((column) => column.level === level && column.lot === lotNo) : undefined;
     if (lotNo && lotNo !== currentLot && !parallel) {
       return { ok: false, error: { code: 'invalid-parallel-lot', message: 'Lô song song không còn ở trạng thái đang chạy hoặc chưa có Mean/SD ứng viên hợp lệ.' } };
     }
     const targetLot = parallel?.lot || currentLot;
-    const targetMean = parallel?.mean ?? levelRow?.mean ?? null;
-    const targetSd = parallel?.sd ?? levelRow?.sd ?? null;
+    // Vật liệu QC quá hạn dùng không còn bảo đảm giá trị đích (N9).
+    const lotExp = parallel ? parallel.exp : lotRow?.exp || '';
+    if (lotExp && date > lotExp) {
+      return { ok: false, error: { code: 'lot-expired', message: `Lô ${targetLot} hết hạn ngày ${viDate(lotExp)}: không nhập kết quả QC chạy sau hạn dùng.` } };
+    }
+    // Điểm nhập lùi ngày mang dải hiệu lực của chính ngày chạy (N9).
+    const datedTarget = parallel ? null : meanSdOnDate(levelRow?.mean_sd_history_json, levelRow?.qc_lot_id || '', date,
+      { mean: levelRow?.mean ?? null, sd: levelRow?.sd ?? null, effectiveFrom: levelRow?.mean_sd_effective_from || '' });
+    const targetMean = parallel?.mean ?? datedTarget?.mean ?? null;
+    const targetSd = parallel?.sd ?? datedTarget?.sd ?? null;
     // Một mức/lô chỉ có MỘT kết quả trong một lần chạy. UI luôn sinh run ID
     // chung đúng quy tắc này, nhưng LIS và mọi lời gọi IPC cũng phải bị chặn
     // tại cổng ghi; nếu không engine liên mức chỉ giữ điểm cuối cùng của mức
@@ -405,7 +362,7 @@ export function createEntryHandlers(db: Db) {
         db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,lot,val,value_decimals,qc_mean,qc_sd,note,operator_id,operator_username,operator_name,operator_code)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(id, testId, level, date, runId, targetLot, val, test.decimal_places ?? 2, targetMean, targetSd, note || dayNoteRow?.note || '', actor.userId, actor.username, operatorName || actor.name, operatorCode);
-        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}`, test.name);
+        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}${datedTarget?.fromHistory ? ` · Mean/SD hiệu lực ngày chạy ${targetMean}/${targetSd}` : ''}`, test.name);
         // Điểm mới chỉ vào đúng `targetLot`: bộ nhớ đệm lô cũ giữ nguyên.
         tx.changed(['qc_points'], [testId], [targetLot]);
         const pointView = parallel

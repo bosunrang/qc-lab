@@ -2,6 +2,7 @@
 // phải kiểm Mean hữu hạn + SD dương, không được áp điều kiện Mean > 0.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -22,6 +23,8 @@ const planned = config.createLotTransition({ data: {
   criteria: [{ testId: test.id, level: 1, mean: -1.5, sd: 0.5 }],
 } }, actor);
 assert.equal(planned.ok, true);
+// Cổng N12: lô mới phải chạy song song đủ dữ liệu trước khi chấp nhận.
+seedParallelRun(db, { transitionId: planned.data.id, testId: test.id, level: 1, lotNo: 'BE-NEW', mean: -1.5, sd: 0.5 });
 const accepted = config.createLotTransition({ id: planned.data.id, data: {
   panelId: panel.id, fromLotId: oldLot.id, toLotId: newLot.id, status: 'accepted',
   criteria: [{ testId: test.id, level: 1, mean: -1.5, sd: 0.5 }],

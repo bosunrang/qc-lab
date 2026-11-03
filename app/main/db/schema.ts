@@ -601,6 +601,28 @@ CREATE TABLE IF NOT EXISTS tea_ref_level_defaults (
   PRIMARY KEY (tea_ref_id, level)
 );
 
+-- Phiên bản hồ sơ TEa của PXN (N8, ISO 15189:2022 8.3): mỗi lần lưu hoặc xoá
+-- giữ nguyên ảnh chụp, vì TEa PXN là căn cứ của cổng lập dải và ngoại kiểm.
+-- action: 'baseline' (hồ sơ có từ trước khi lưu phiên bản), 'save', 'remove'.
+-- Không khoá ngoại tới tea_refs: xoá hồ sơ không được xoá lịch sử của nó;
+-- analyte_id/name giữ để nối lại khi hồ sơ được lập lại.
+CREATE TABLE IF NOT EXISTS tea_ref_versions (
+  id TEXT PRIMARY KEY,
+  tea_ref_id TEXT NOT NULL,
+  analyte_id TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL DEFAULT 'save',
+  saved_at TEXT NOT NULL DEFAULT '',
+  saved_by TEXT NOT NULL DEFAULT '',
+  lab REAL,
+  levels_json TEXT NOT NULL DEFAULT '[]',
+  lab_source TEXT NOT NULL DEFAULT '',
+  lab_prepared_by TEXT NOT NULL DEFAULT '',
+  lab_next_review_date TEXT NOT NULL DEFAULT '',
+  sources_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_tea_ref_versions_ref ON tea_ref_versions(tea_ref_id);
+
 -- Lịch sử cấu hình luật Westgard (GV2): mỗi lần đổi ghi một phiên bản, để
 -- kết luận của các lần chạy đã có không đổi theo cấu hình mới. scope =
 -- 'global' (cấu hình chung) hoặc id xét nghiệm. boundary_entry_seq: số thứ tự
