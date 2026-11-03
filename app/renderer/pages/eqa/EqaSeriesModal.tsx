@@ -36,7 +36,7 @@ export function EqaSeriesModal({ testId, onClose }: { testId: string; onClose: (
         : !view || !view.points.length ? <EmptyState size="compact" title="Chưa có kết quả ngoại kiểm cho xét nghiệm này" />
         : (
           <div className="eqa-series">
-            {!view.enough && <div className="alert info">Mới có {view.points.length} kết quả; cần ít nhất {view.min_points} đợt để kết luận về xu hướng. Tín hiệu |z| ≥ 3 và "không thành công" vẫn có hiệu lực.</div>}
+            {!view.enough && <div className="alert info">Mới có {view.rounds} đợt; cần ít nhất {view.min_points} đợt để kết luận về xu hướng. Tín hiệu |z| ≥ 3 và "không thành công" vẫn có hiệu lực.</div>}
             <div className="chart-scroll"><QcChart mode="lj" points={points} height={260} /></div>
             <p className="eqa-note">Trục dọc là z của nhà cung cấp; dải ±2 cảnh báo, ±3 không chấp nhận. Điểm J: 0/2/4/8 theo |z| &lt; 1 / &lt; 2 / &lt; 3 / ≥ 3, cộng dồn cùng dấu, đổi dấu thì đặt lại, báo khi |J| ≥ {view.j_limit}.</p>
             <div className="eqa-table-wrap">

@@ -169,3 +169,19 @@ test('tổng quan: đếm theo máy, máy chưa có báo cáo và lưới z củ
   assert.deepEqual(eqa.getEqaInstrumentGrid({ programId: d01.program_id, year: 'x', instrumentId: au }), [], 'đầu vào sai trả rỗng');
   assert.ok(eqa.listEqaAttention().every((a) => a.instrument_id === au));
 });
+
+test('N5: "Cần chú ý" xét mọi mẫu của đợt mới nhất, không chỉ mẫu cuối', () => {
+  const { eqa, ids } = fixture();
+  const mappings = [{ code: 'AST(GOT)', instrument: 'AU5800', testId: ids['AST@AU5800'] }];
+  // Mẫu M1 không chấp nhận (z = 3,33), mẫu M2 — đứng sau — đạt.
+  const rows = [
+    row('AST(GOT)', 'AU5800', 40, 30, 3, 3.33),
+    row('AST(GOT)', 'AU5800', 31, 30, 3, 0.33, { ref: 'AST(GOT)@AU5800#M2', sample: 'M2' }),
+  ];
+  must(eqa.importEqaRound(draft({ rows, mappings }), admin), 'nhập đợt hai mẫu');
+  assert.equal(eqa.getEqaSeries(ids['AST@AU5800']).points.at(-1).class, 'ok', 'mẫu cuối của đợt đạt');
+  const [ast] = eqa.listEqaAttention();
+  assert.ok(ast, 'mẫu không đạt đứng trước vẫn phải lên danh sách');
+  // |z| = 3,33 cho điểm J = 8, đạt ngưỡng J ngay ở kết quả này.
+  assert.deepEqual([ast.flagged, ast.latest.sample, ast.latest.class, ast.latest.signals], [1, 'M1', 'rej', ['reject', 'j_score']]);
+});

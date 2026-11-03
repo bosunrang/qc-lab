@@ -14,7 +14,7 @@ import {
 } from '../domain/eqa/evaluation';
 import { checkEqaImport, eqaPairKey, type EqaImportCheck } from '../domain/eqa/import';
 import { eqaMissingInstruments } from '../domain/eqa/overview';
-import { eqaAssignedUncertainty, eqaSeries, EQA_SERIES_DEFAULTS, type EqaSeriesResult } from '../domain/eqa/series';
+import { eqaAssignedUncertainty, eqaSeries, EQA_SERIES_DEFAULTS, EQA_SIGNAL_ORDER, type EqaSeriesResult } from '../domain/eqa/series';
 import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
 import { operationalTeaResolver } from '../db/operational-tea';
@@ -234,10 +234,10 @@ export function createEqaHandlers(db: Db) {
 
   /** Chuỗi z của một xét nghiệm qua các đợt đang dùng (phiên bản hiện hành). */
   function seriesOf(testId: string): EqaSeriesResult & { meta: Map<string, { round_id: string; report_date: string; pct: number | null }> } {
-    const rows = db.prepare(`SELECT e.id, e.z_official, e.sample, e.pct, r.id AS round_id, r.year, r.round, r.round_no, r.report_date
+    const rows = db.prepare(`SELECT e.id, e.z_official, e.sample, e.pct, r.id AS round_id, r.program_id, r.year, r.round, r.round_no, r.report_date
       FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version
-      WHERE r.status='open' AND e.test_id=?`).all(testId) as { id: string; z_official: number; sample: string; pct: number | null; round_id: string; year: number; round: string; round_no: number; report_date: string }[];
-    const result = eqaSeries(rows.map((r) => ({ id: r.id, year: r.year, roundNo: r.round_no, round: r.round, sample: r.sample, z: r.z_official })), readEqaConfig(db));
+      WHERE r.status='open' AND e.test_id=?`).all(testId) as { id: string; z_official: number; sample: string; pct: number | null; round_id: string; program_id: string; year: number; round: string; round_no: number; report_date: string }[];
+    const result = eqaSeries(rows.map((r) => ({ id: r.id, year: r.year, roundNo: r.round_no, round: r.round, sample: r.sample, z: r.z_official, roundId: r.round_id, programId: r.program_id, reportDate: r.report_date })), readEqaConfig(db));
     return { ...result, meta: new Map(rows.map((r) => [r.id, { round_id: r.round_id, report_date: r.report_date, pct: r.pct }])) };
   }
 
@@ -277,7 +277,7 @@ export function createEqaHandlers(db: Db) {
     if (!test) return null;
     const series = seriesOf(id);
     return {
-      test_id: test.id, test_name: test.test_name, instrument_id: test.instrument_id, instrument_name: test.instrument_name, unit: test.unit, enough: series.enough,
+      test_id: test.id, test_name: test.test_name, instrument_id: test.instrument_id, instrument_name: test.instrument_name, unit: test.unit, enough: series.enough, rounds: series.rounds,
       j_limit: EQA_SERIES_DEFAULTS.jLimit, min_points: EQA_SERIES_DEFAULTS.minPoints,
       points: series.points.map((p) => {
         const meta = series.meta.get(p.id)!;
@@ -287,15 +287,28 @@ export function createEqaHandlers(db: Db) {
     };
   }
 
-  /** Xét nghiệm có tín hiệu hoặc không thành công ở điểm mới nhất. */
+  /** Xét nghiệm có tín hiệu hoặc không thành công ở đợt mới nhất (N5): xét
+   * MỌI mẫu của đợt mới nhất của từng chương trình, không chỉ mẫu cuối —
+   * mẫu không đạt đứng trước trong cùng đợt từng bị bỏ sót. Dòng hiện kết
+   * quả nặng nhất và hợp mọi tín hiệu của các mẫu đó. */
   function listEqaAttention(): EqaAttentionRow[] {
     const tests = db.prepare(`SELECT DISTINCT e.test_id FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version WHERE r.status='open'`).all() as { test_id: string }[];
+    const severity = (p: EqaSeriesResult['points'][number]) => (p.unsuccessful ? 4 : 0) + (p.cls === 'rej' ? 2 : 0) + Math.abs(p.z) / 100;
     return tests.flatMap(({ test_id }) => {
-      const view = getEqaSeries(test_id);
-      const last = view?.points.at(-1);
-      if (!view || !last || (!last.signals.length && !last.unsuccessful)) return [];
-      return [{ test_id, test_name: view.test_name, instrument_id: view.instrument_id, instrument_name: view.instrument_name, points: view.points.length,
-        latest: { round_id: last.round_id, year: last.year, round: last.round, z: last.z, class: last.class, signals: last.signals, unsuccessful: last.unsuccessful } }];
+      const test = db.prepare(`SELECT COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.instrument_id, i.name AS instrument_name
+        FROM tests t JOIN instruments i ON i.id=t.instrument_id WHERE t.id=?`).get(test_id) as { test_name: string; instrument_id: string; instrument_name: string } | undefined;
+      if (!test) return [];
+      const series = seriesOf(test_id);
+      // Điểm đã xếp theo thời gian: đợt cuối cùng gặp của mỗi chương trình là đợt mới nhất.
+      const latestRound = new Map<string, string>();
+      for (const p of series.points) latestRound.set(p.programId ?? '', p.roundId ?? '');
+      const latestIds = new Set(latestRound.values());
+      const flagged = series.points.filter((p) => latestIds.has(p.roundId ?? '') && (p.signals.length || p.unsuccessful));
+      if (!flagged.length) return [];
+      const worst = flagged.reduce((a, b) => (severity(b) > severity(a) ? b : a));
+      const signals = EQA_SIGNAL_ORDER.filter((s) => flagged.some((p) => p.signals.includes(s)));
+      return [{ test_id, test_name: test.test_name, instrument_id: test.instrument_id, instrument_name: test.instrument_name, points: series.points.length, flagged: flagged.length,
+        latest: { round_id: worst.roundId ?? '', year: worst.year, round: worst.round, sample: worst.sample, z: worst.z, class: worst.cls, signals, unsuccessful: flagged.some((p) => p.unsuccessful) } }];
     }).sort((a, b) => Number(b.latest.unsuccessful) - Number(a.latest.unsuccessful) || a.instrument_name.localeCompare(b.instrument_name, 'vi') || a.test_name.localeCompare(b.test_name, 'vi'));
   }
 

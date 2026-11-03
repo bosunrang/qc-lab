@@ -289,11 +289,16 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 - **Test:** gói không chứa token; kéo về không đổi `users` ở máy đã có tài khoản;
   gói sai chữ ký bị từ chối; token được làm mới.
 
-## GV7 — Sửa nghiệp vụ EQA (N5, N6, P1, S–M)
+## GV7 — Sửa nghiệp vụ EQA (N5, N6, P1, S–M) — N5, N6 đã làm 03/11/2026
 
-- Danh sách "Cần chú ý" xét **mọi mẫu** của đợt mới nhất (hoặc mọi mẫu chưa xem xét).
-- Tín hiệu 2/3 và 6 gom theo đợt; `enough` đếm số đợt; chuỗi sắp theo
-  `report_date` và tách theo chương trình.
+- **N5:** "Cần chú ý" xét **mọi mẫu** của đợt mới nhất của từng chương trình;
+  dòng hiện kết quả nặng nhất, hợp mọi tín hiệu và số mẫu có tín hiệu.
+- **N6:** "2/3 đợt" và "6 đợt liên tiếp" đếm đợt, không đếm mẫu: đợt vượt ±2
+  khi có mẫu vượt; phía của đợt là dấu chung của mọi mẫu (mẫu trái dấu cắt
+  chuỗi). Điểm J và |z| ≥ 3 vẫn theo từng kết quả. `enough` đếm số đợt của
+  chương trình có đợt mới nhất. Chuỗi tách theo chương trình khi tính, sắp
+  theo năm–số đợt, ngày báo cáo chỉ phân định khi số đợt trùng (số đợt luôn
+  có, ngày có thể trống). Test: `eqa-series`, `eqa-handlers`.
 - Chốt mâu thuẫn N-15 (Bias có dấu) với SG21 (RMS) trước khi nối Bias EQA vào Sigma.
 
 ## GV8 — Sửa nghiệp vụ Westgard, lô, dải (P1, M)

@@ -48,7 +48,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
         <section className="panel" aria-label="Xét nghiệm cần chú ý">
           <div className="panel-head"><h2>Xét nghiệm cần chú ý <span className="count">{attention.length}</span></h2></div>
           <div className="eqa-section-body">
-            <p className="eqa-note">Tín hiệu ở đợt mới nhất của từng xét nghiệm: không chấp nhận, không thành công (2 đợt liên tiếp hoặc 2 trong 3 đợt không chấp nhận) hoặc xu hướng. Đây là việc cần xem xét, chưa phải kết luận nguyên nhân.</p>
+            <p className="eqa-note">Tín hiệu ở mọi mẫu của đợt mới nhất: không chấp nhận, không thành công (2 đợt liên tiếp hoặc 2 trong 3 đợt không chấp nhận) hoặc xu hướng. Đây là việc cần xem xét, chưa phải kết luận nguyên nhân.</p>
             <div className="eqa-table-wrap">
               <table className="eqa-table">
                 <thead><tr><th>Xét nghiệm</th><th>Máy</th><th>Đợt mới nhất</th><th className="num">z</th><th>Đánh giá</th><th>Tín hiệu</th><th aria-label="Thao tác" /></tr></thead>
@@ -57,7 +57,7 @@ export function EqaOverview({ onOpen }: { onOpen: (id: string) => void }) {
                     <tr key={a.test_id} className={a.latest.unsuccessful || a.latest.class === 'rej' ? 'is-rej' : 'is-warn'}>
                       <td><b className="eqa-strong">{a.test_name}</b></td>
                       <td>{a.instrument_name}</td>
-                      <td>{roundLabel(a.latest)}</td>
+                      <td>{roundLabel(a.latest)}<div className="hint">{a.flagged > 1 ? `${a.flagged} mẫu có tín hiệu` : a.latest.sample ? `Mẫu ${a.latest.sample}` : ''}</div></td>
                       <td className="num">{numText(a.latest.z)}</td>
                       <td><ClassTag cls={a.latest.class} /></td>
                       <td><TrendTags signals={a.latest.signals} unsuccessful={a.latest.unsuccessful} /></td>

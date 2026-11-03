@@ -656,12 +656,17 @@ export interface EqaResultRow {
 }
 export type EqaSignalView = 'reject' | 'two_of_three' | 'six_same_side' | 'j_score';
 export interface EqaSeriesView {
-  test_id: string; test_name: string; instrument_id: string; instrument_name: string; unit: string; enough: boolean; j_limit: number; min_points: number;
+  test_id: string; test_name: string; instrument_id: string; instrument_name: string; unit: string; enough: boolean;
+  /** Số đợt của chương trình có đợt mới nhất — `enough` khi ≥ `min_points`. */
+  rounds: number; j_limit: number; min_points: number;
   points: { result_id: string; round_id: string; year: number; round: string; sample: string; report_date: string; z: number; class: EqaClassView; pct: number | null; j: number; signals: EqaSignalView[]; unsuccessful: boolean }[];
 }
 export interface EqaAttentionRow {
   test_id: string; test_name: string; instrument_id: string; instrument_name: string; points: number;
-  latest: { round_id: string; year: number; round: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
+  /** Số kết quả có tín hiệu trong đợt mới nhất (mọi mẫu, N5). */
+  flagged: number;
+  /** Kết quả nặng nhất trong đợt mới nhất, kèm hợp mọi tín hiệu của đợt. */
+  latest: { round_id: string; year: number; round: string; sample: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
 }
 export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
 export interface EqaRoundView {
