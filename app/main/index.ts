@@ -25,6 +25,7 @@ import { createBackupHandlers } from './ipc/backup-handlers';
 import { createLisHandlers } from './ipc/lis-handlers';
 import { createFirebaseHandlers } from './ipc/firebase-handlers';
 import { createUtilityPushRunner } from './sync/firebase-push-runner';
+import { fileSecretStore } from './sync/firebase-secret-store';
 import { lanIpv4 } from './lan/addresses';
 import { LanHttpServer } from './lan/http-server';
 import { caCoversIp, caThumbprint, type LanCa } from './lan/tls-certs';
@@ -194,9 +195,12 @@ async function createWindow(): Promise<void> {
   const lis = createLisHandlers(db);
   // Gói sao lưu Firebase dựng và gửi ở tiến trình phụ (đọc tệp CSDL bằng kết
   // nối chỉ đọc riêng), không chặn cửa sổ và máy trạm LAN.
+  // Refresh token của phiên Firebase lưu mã hoá ngoài CSDL, để sao lưu tự
+  // động chạy tiếp sau khi mở lại app (GV6).
   const firebase = createFirebaseHandlers(db, userDataDir, undefined, {
     dbPath,
     pushRunner: createUtilityPushRunner(path.join(__dirname, 'sync', 'firebase-push-worker.js')),
+    secretStore: fileSecretStore(path.join(userDataDir, 'firebase-session.bin'), sealedKeyProtector(safeStorage)),
   });
   // Đóng app mà còn thay đổi chưa đẩy lên Firebase: đẩy nốt rồi mới thoát,
   // chờ tối đa 30 giây để một mạng chậm không giữ app mãi.

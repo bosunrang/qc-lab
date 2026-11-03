@@ -279,7 +279,34 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
 - **Test:** khoá tài khoản thì phiên LAN đang mở bị từ chối ngay ở yêu cầu kế
   tiếp; đọc khi chưa đăng nhập bị từ chối; test cho `createLanHttpApi`.
 
-## GV6 — Đồng bộ Firebase an toàn (A4, A5, P0, M)
+## GV6 — Đồng bộ Firebase an toàn (A4, A5, P0, M) — mục 1, 2, 4 đã làm 03/11/2026
+
+**Đã làm 03/11/2026:**
+
+- **Mục 1:** gói đẩy lên bỏ các khoá riêng của máy (`domain/cloud-backup.ts`,
+  `MACHINE_LOCAL_META_KEYS`): cấu hình LIS Gateway kèm token, cấu hình/trạng thái
+  Firebase. Bỏ trạng thái đồng bộ cũng làm hai máy cùng dữ liệu ra cùng checksum.
+- **Mục 2 (khác phương án gốc):** máy cài mới cũng đã có admin vừa tạo, nên
+  "máy đã có người dùng thì giữ `users`" sẽ làm mất danh sách nhân viên khi khôi
+  phục. Thay bằng `mergeUsersForPull`: máy chưa có tài khoản nhận nguyên danh sách;
+  máy đã có thì giữ nguyên tài khoản của máy (mật khẩu, vai trò, trạng thái), tài
+  khoản chỉ có trên đám mây được thêm ở trạng thái **khoá** để admin xem rồi mở.
+  Khoá riêng của máy không bị bản đám mây ghi đè. Nhật ký ghi số tài khoản giữ/thêm.
+- **Mục 4:** `signIn` lấy cả refresh token; `client.refresh()` đổi token qua
+  `securetoken.googleapis.com` khi idToken còn dưới 5 phút. Refresh token lưu mã hoá
+  bằng `safeStorage` ở tệp `firebase-session.bin` (`sync/firebase-secret-store.ts`),
+  ngoài CSDL, nên sao lưu tự động chạy tiếp sau khi mở lại app. Lỗi 400/401/403 khi
+  đổi token: quên phiên, xoá tệp, trạng thái "Phiên đám mây đã hết hạn — cần kết nối
+  lại"; lỗi mạng/5xx thì thử lại ở chu kỳ sau.
+- **Mục 3 (ký HMAC) — tạm bỏ, người dùng chốt 03/11/2026:** cần thêm một mật khẩu ký
+  của phòng trên mọi máy, và mất mật khẩu đó thì bản đám mây không tải về được.
+  Rủi ro còn lại đã được giảm bằng: kéo về là thao tác admin có xác thực lại và luôn
+  chụp bản an toàn trước; tài khoản không cài được qua đám mây (mục 2); quyền ghi
+  Firebase giới hạn bằng Firebase Rules theo tài khoản của phòng. Xem lại khi có
+  nhiều máy cùng ghi lên một mã phòng.
+- **Test:** `firebase-security.test.mjs`.
+
+**Phương án gốc (31/10/2026):**
 
 - **Phương án:**
   1. Gói đẩy lên không chứa token LIS và các khoá bí mật trong `app_meta`.

@@ -25,7 +25,7 @@ function fakeClient() {
   return {
     writes,
     remote: null,
-    async signIn() { return { idToken: 'token', uid: 'uid' }; },
+    async signIn() { return { idToken: 'token', uid: 'uid', refreshToken: 'refresh', expiresAt: Date.now() + 3600_000 }; },
     async read() { return this.remote; },
     async writeJson(_c, _l, _t, json) { writes.push(Date.now()); this.remote = JSON.parse(json); },
     uploadUrl: () => 'https://t-default-rtdb.firebaseio.com/qclab-shared/x.json',

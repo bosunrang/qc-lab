@@ -262,7 +262,7 @@ export function SettingsPage() {
           if (!(await reauthDialog({ title: 'Xác thực trước khi tải Firebase', message: 'Tải dữ liệu đám mây sẽ thay thế dữ liệu cục bộ — xác thực lại mật khẩu.' }))) return;
           const synced = await syncFirebase('pull');
           if (!synced.ok) { await showError(synced.error.message); return; }
-          await infoDialog('Đã tải dữ liệu từ Firebase. Nếu tài khoản hiện tại không còn trong dữ liệu đám mây, hãy đăng nhập lại.', { type: 'success' });
+          await infoDialog('Đã tải dữ liệu từ Firebase. Tài khoản trên máy được giữ nguyên; tài khoản chỉ có trên đám mây được thêm ở trạng thái khoá — mở ở trang Người dùng nếu cần.', { type: 'success' });
         }
       } else {
         showToast(result.data.state === 'pushed' ? 'Đã kết nối và đưa dữ liệu hiện tại lên Firebase.' : 'Đã kết nối Firebase; dữ liệu đã đồng bộ.');

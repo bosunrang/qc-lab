@@ -1,7 +1,19 @@
 import type { FirebaseConfig } from './firebase-validation';
 
-export interface FirebaseSession { idToken: string; uid: string; }
+/** `idToken` sống khoảng 1 giờ (`expiresAt`, ms); `refreshToken` dùng để xin
+ * token mới mà không cần mật khẩu (GV6). */
+export interface FirebaseSession { idToken: string; refreshToken: string; uid: string; expiresAt: number; }
+
+/** Lỗi đổi token cho thấy phiên không dùng lại được nữa (refresh token hết hạn,
+ * bị thu hồi, tài khoản bị khoá/xoá): phải kết nối lại bằng mật khẩu. */
+export class FirebaseSessionExpiredError extends Error {}
 export type FetchLike = (input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+
+/** `expiresIn` (giây, dạng chuỗi) → mốc hết hạn; thiếu thì coi như 1 giờ. */
+function expiresAtOf(expiresIn: string | undefined, now = Date.now()): number {
+  const seconds = Number(expiresIn);
+  return now + (Number.isFinite(seconds) && seconds > 0 ? seconds : 3600) * 1000;
+}
 
 function errorMessage(prefix: string, body: string, status: number): Error {
   let message = body;
@@ -21,10 +33,28 @@ export function createFirebaseClient(fetchImpl: FetchLike = fetch as unknown as 
     });
     const text = await response.text();
     if (!response.ok) throw errorMessage('Không thể đăng nhập Firebase', text, response.status);
-    let result: { idToken?: string; localId?: string };
+    let result: { idToken?: string; localId?: string; refreshToken?: string; expiresIn?: string };
     try { result = JSON.parse(text); } catch { throw new Error('Firebase trả về dữ liệu xác thực không hợp lệ.'); }
     if (!result.idToken || !result.localId) throw new Error('Firebase không trả về token xác thực.');
-    return { idToken: result.idToken, uid: result.localId };
+    return { idToken: result.idToken, uid: result.localId, refreshToken: result.refreshToken || '', expiresAt: expiresAtOf(result.expiresIn) };
+  }
+
+  /** Đổi refresh token lấy idToken mới (Secure Token API). Lỗi 400/401/403 là
+   * phiên hỏng hẳn; lỗi khác (mạng, 5xx) để lần sau thử lại. */
+  async function refresh(config: FirebaseConfig, refreshToken: string): Promise<FirebaseSession> {
+    const response = await fetchImpl(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(config.apiKey)}`, {
+      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`,
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      const error = errorMessage('Không thể làm mới phiên Firebase', text, response.status);
+      throw [400, 401, 403].includes(response.status) ? new FirebaseSessionExpiredError(error.message) : error;
+    }
+    let result: { id_token?: string; refresh_token?: string; user_id?: string; expires_in?: string };
+    try { result = JSON.parse(text); } catch { throw new Error('Firebase trả về dữ liệu làm mới phiên không hợp lệ.'); }
+    if (!result.id_token || !result.user_id) throw new Error('Firebase không trả về token mới.');
+    return { idToken: result.id_token, uid: result.user_id, refreshToken: result.refresh_token || refreshToken, expiresAt: expiresAtOf(result.expires_in) };
   }
 
   const urlOf = (config: FirebaseConfig, labCode: string, token: string) =>
@@ -47,7 +77,7 @@ export function createFirebaseClient(fetchImpl: FetchLike = fetch as unknown as 
     if (!response.ok) throw errorMessage('Không thể ghi Firebase Realtime Database', text, response.status);
   }
 
-  return { signIn, read, writeJson, uploadUrl: urlOf };
+  return { signIn, refresh, read, writeJson, uploadUrl: urlOf };
 }
 
 
