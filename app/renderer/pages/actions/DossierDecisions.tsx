@@ -66,7 +66,7 @@ export function TechnicalAssessmentSection(props: SectionProps) {
   return (
     <Section title="Xác minh kỹ thuật IQC" actions={can.edit && !form ? <button type="button" className="btn ghost sm" onClick={() => { setDraftVersion(record.row_version); setForm({ ...EMPTY_TECHNICAL, meanResetDecision: requiresMeanReview ? 'not_allowed' : 'not_applicable' }); }}>{latest ? 'Ghi đánh giá mới' : 'Ghi đánh giá'}</button> : null}>
       <div className="nce-technical-intro">
-        <div><p className="nce-eyebrow">Sau kiểm tra nhanh</p><h3>Xác nhận bản chất sai số và hiệu quả xử lý</h3><p>Đối chiếu nhật ký, hiệu chuẩn, vật liệu và dữ liệu QC. Các ngưỡng tính toán là tín hiệu kỹ thuật hỗ trợ rà soát bệnh nhân, không tự đưa ra quyết định lâm sàng.</p></div>
+        <div><p className="nce-eyebrow">Sau kiểm tra nhanh</p><h3>Xác nhận bản chất sai số và hiệu quả xử lý</h3><p>Đối chiếu nhật ký, hiệu chuẩn, vật liệu và dữ liệu QC. Các ngưỡng chỉ hỗ trợ rà soát, không thay quyết định lâm sàng.</p></div>
         <div className="nce-technical-rule"><b>Trình tự</b><span>Xác minh nguyên nhân → xử lý → đánh giá số liệu → kết luận kỹ thuật</span></div>
       </div>
 
@@ -451,7 +451,7 @@ export function EffectivenessSection(props: SectionProps) {
   }
   return (
     <Section title="Đánh giá hiệu lực và nguy cơ còn lại" actions={editor.actions(can.edit)}>
-      {props.dossier.missing.some((item) => item.code === 'effectiveness-basis-changed') && <div className="alert warn">Đánh giá cũ vẫn được giữ trong lịch sử nhưng không còn đủ căn cứ cho nội dung hiện tại. Rà soát tiêu chí, nguy cơ và hành động rồi ghi đánh giá mới.</div>}
+      {props.dossier.missing.some((item) => item.code === 'effectiveness-basis-changed') && <div className="alert warn">Đánh giá cũ vẫn lưu trong lịch sử nhưng không còn khớp nội dung hiện tại. Rà soát tiêu chí, nguy cơ, hành động rồi ghi đánh giá mới.</div>}
       {d ? (
         <div className="nce-form-grid">
           <Field label="Tiêu chí đánh giá hiệu lực (đặt trước khi đánh giá)" htmlFor="effCrit" wide><textarea id="effCrit" rows={2} value={d.effectivenessCriteria} onChange={(e) => editor.set('effectivenessCriteria', e.target.value)} /></Field>

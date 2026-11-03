@@ -250,7 +250,7 @@ export function WestgardPage() {
                 <details className="wg-guide">
                   <summary>Hướng dẫn nhanh luật Westgard</summary>
                   <div className="alert info" style={{ margin: '10px 12px 18px' }}>
-                    <span>Ký hiệu ↩ trong bảng là điểm lịch sử cấu thành quy tắc. Điểm này chỉ là bằng chứng; trạng thái cảnh báo/loại được gắn cho lần chạy phát hiện hiện tại, không đổi hồi tố kết luận cũ.</span>
+                    <span>↩ đánh dấu điểm cũ góp phần làm luật vi phạm. Cảnh báo/loại chỉ gắn cho lần chạy phát hiện, không đổi kết luận của điểm cũ.</span>
                   </div>
                   <div className="chart-scroll">
                     <table>
@@ -305,7 +305,7 @@ export function WestgardPage() {
               <button onClick={() => setCusumView('levels')}>Từng mức</button>
             </div>
           </div>
-          <div className="hint wg-panel-intro">Mỗi mức được tính CUSUM riêng theo Mean/SD của chính mức đó; biểu đồ chỉ dùng chung trục để so sánh. Màu có dấu +/− trong chú giải cho biết nhánh CUSUM của từng mức.</div>
+          <div className="hint wg-panel-intro">Mỗi mức tính CUSUM riêng theo Mean/SD của mức đó, chỉ dùng chung trục để so sánh. Dấu +/− trong chú giải chỉ nhánh CUSUM.</div>
           <div className="chart-scroll"><QcMultiCusumChart className="wgCusumMulti" series={multiCusumSeries} height={300} responsiveHeight /></div>
         </div>
       )}
@@ -330,7 +330,7 @@ export function WestgardPage() {
               <EmptyState title="Chưa có dữ liệu">LOT đang dùng chưa có điểm QC.</EmptyState>
             ) : (
               <>
-                <div className="hint wg-panel-intro">Đường CUSUM+ (teal)/CUSUM− (xanh tím) cộng dồn độ lệch z-score; đường xám nét đứt là trung bình động 5 điểm để tham khảo xu hướng. Vượt vạch đỏ đứt ±h là dấu hiệu trôi/shift kéo dài.</div>
+                <div className="hint wg-panel-intro">CUSUM+ và CUSUM− cộng dồn độ lệch z-score; vượt vạch đỏ ±h là dấu hiệu trôi hoặc dịch chuyển kéo dài. Đường xám nét đứt là trung bình động 5 điểm.</div>
                 <div className="chart-scroll"><QcChart className="cusumChart" mode="cusum" points={analysis?.points || []} cusum={analysis?.cusum} height={300} responsiveHeight /></div>
               </>
             )}
@@ -343,7 +343,7 @@ export function WestgardPage() {
       {view === 'current' && testId && chartMode === 'lj' && showMultiChart && (
         <div className="panel wg-multi-panel">
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
-          <div className="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
+          <div className="hint wg-panel-intro">Các mức QC quy về Z-score để so trên cùng trục; kết luận theo bộ luật Westgard đang bật. Bật "Xem lô cũ" ở từng mức để thêm đường của lô đã chuyển tiếp.</div>
           <div className="chart-scroll"><QcMultiChart className="wgLJMulti" series={multiSeries} height={300} responsiveHeight decimals={currentSummary?.decimalPlaces ?? 2} /></div>
           <QcChartLegend />
         </div>

@@ -236,7 +236,7 @@ export function TeaRefsTab() {
           </div>
           <div className="field"><label htmlFor="tea-add-clia-absolute-unit">Đơn vị giới hạn tuyệt đối</label><input id="tea-add-clia-absolute-unit" name="cliaAbsoluteUnit" placeholder="Mặc định dùng đơn vị xét nghiệm" /></div>
           <div className="hint flow-note">Chỉ khai giới hạn tuyệt đối khi nguồn CLIA của analyte quy định đơn vị đo; hệ thống sẽ chỉ dùng khi đơn vị tương thích.</div>
-          <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hoá được lập thành hồ sơ riêng sau khi thêm dòng.</div>
+          <div className="hint flow-item">Mỗi xét nghiệm một tên quốc tế, viết tắt trong ngoặc. TEa chuẩn hoá lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
       </Modal>}
       {editing && <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm hồ sơ TEa chuẩn hoá' : 'Sửa hồ sơ TEa chuẩn hoá'} onClose={() => { setEditing(null); setPrefill(null); }} size="lg" className="tea-lab-profile-modal" footer={<>

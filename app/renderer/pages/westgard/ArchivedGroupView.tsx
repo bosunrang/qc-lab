@@ -31,7 +31,7 @@ export function ArchivedGroupPicker({ state }: { state: ArchivedWestgardState })
           </select>
         </div>
       </div>
-      <p className="hint wg-archive-note">Ưu tiên Mean/SD lưu tại từng điểm QC, dùng dải lịch sử của lô khi điểm cũ chưa có snapshot; kết luận được đánh giá lại theo bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô còn hoạt động.</p>
+      <p className="hint wg-archive-note">Dùng Mean/SD lưu tại từng điểm QC; điểm cũ chưa lưu thì dùng dải lịch sử của lô. Kết luận tính lại theo bộ luật Westgard đang bật, không theo cấu hình lúc nhóm lô còn hoạt động.</p>
     </>
   );
 }
@@ -59,7 +59,7 @@ export function ArchivedGroupResults({ state }: { state: ArchivedWestgardState }
       {archivedTestId && archivedBlocks.length >= 2 && (
         <div className="panel wg-multi-panel">
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
-          <div className="hint wg-panel-intro">Biểu đồ quy đổi từng mức về Z-score theo Mean/SD đã chốt của chính lô để so sánh trên cùng trục; kết luận được đánh giá lại theo bộ luật Westgard đang bật.</div>
+          <div className="hint wg-panel-intro">Các mức quy về Z-score theo Mean/SD đã chốt của lô; kết luận tính lại theo bộ luật Westgard đang bật.</div>
           <div className="chart-scroll"><QcMultiChart className="wgLJMultiArchived" height={300} responsiveHeight decimals={archivedDecimals}
             series={archivedBlocks.map((b) => ({ level: b.level, lot: b.lotNo, points: b.analysis.points }))} /></div>
           <QcChartLegend />

@@ -229,7 +229,7 @@ export function InvestigationSection(props: SectionProps) {
   const d = editor.draft;
   return (
     <Section title="Điều tra và nguyên nhân" actions={editor.actions(can.edit)}>
-      <div className="nce-capa-guidance"><p className="nce-eyebrow">Nguyên tắc điều tra</p><p>Luật QC chỉ gợi ý kiểu sai số, không tự chứng minh nguyên nhân. Đối chiếu nhật ký máy, hiệu chuẩn, vật liệu đối chứng hoặc phương pháp khi phù hợp; không tự hiệu chuẩn lại hay đổi Mean chỉ để làm mất cảnh báo.</p></div>
+      <div className="nce-capa-guidance"><p className="nce-eyebrow">Nguyên tắc điều tra</p><p>Luật QC chỉ gợi ý kiểu sai số, không chứng minh nguyên nhân. Đối chiếu nhật ký máy, hiệu chuẩn, vật liệu QC và phương pháp; không hiệu chuẩn lại hay đổi Mean chỉ để hết cảnh báo.</p></div>
       {d ? (
         <div className="nce-form-grid">
           <Field label="Kết luận nguyên nhân" htmlFor="causeStatus"><OptionSelect id="causeStatus" value={d.causeStatus} options={NCE_CAUSE_STATUS_LABEL} placeholder="— Chưa kết luận —" onChange={(v) => editor.set('causeStatus', v as typeof d.causeStatus)} /></Field>

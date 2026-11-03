@@ -209,7 +209,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     <Modal title="Lưu trữ nhật ký cũ" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
       {err && <p className="field-error" role="alert">{err}</p>}
-      <p className="audit-archive-copy">Xuất CSV của đúng phần sẽ lưu trữ, gồm PrevHash/Hash để đối chiếu chuỗi. Sau khi xác thực lại, hệ thống chỉ xoá khi bạn xác nhận đã kiểm tra file tải về.</p>
+      <p className="audit-archive-copy">Xuất CSV phần sẽ lưu trữ, kèm PrevHash/Hash để đối chiếu chuỗi. Chỉ xoá sau khi bạn xác thực lại và xác nhận đã kiểm tra tệp.</p>
       <div className="field">
         <label htmlFor="audit-archive-months">Giữ lại dữ liệu trong</label>
         <select id="audit-archive-months" value={months} onChange={(e) => setMonths(e.target.value as never)}>

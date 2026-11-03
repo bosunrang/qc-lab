@@ -273,7 +273,7 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
               </div>
             )}
       </div>
-      <div className="hint">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào. Người duyệt hồ sơ NCE phải độc lập với người đã tham gia hồ sơ đó.</div>
+      <div className="hint">Vai trò quyết định quyền sửa và quản trị; các thẻ quyết định màn hình được mở. Người duyệt hồ sơ NCE phải độc lập với người đã tham gia hồ sơ.</div>
     </Modal>
   );
 }

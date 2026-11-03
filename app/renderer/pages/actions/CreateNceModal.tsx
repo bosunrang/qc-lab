@@ -80,9 +80,9 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
           </div>
         </div>
         <div className="nce-field-wide">
-          <p className="nce-note">Ngày lập hồ sơ được hệ thống ghi tại lúc lưu, tách biệt với ngày phát hiện thực tế. QC xác minh không được trước ngày phát hiện.</p>
+          <p className="nce-note">Ngày lập hồ sơ do hệ thống ghi lúc lưu, khác ngày phát hiện. QC xác minh không được trước ngày phát hiện.</p>
           <label className="nce-check"><input type="checkbox" checked={retrospective} onChange={(e) => { setRetrospective(e.target.checked); setDetectedAt(e.target.checked ? '' : todayIso()); }} /> Nhập hồi cứu: sự cố đã được phát hiện trước đây, nay mới lập hồ sơ</label>
-          {retrospective && <p className="nce-note">Chọn ngày phát hiện thực tế theo nhật ký. Không tự lấy ngày QC làm ngày phát hiện; quyết định cho hoạt động trở lại vẫn ghi ở thời điểm hiện tại.</p>}
+          {retrospective && <p className="nce-note">Ghi ngày phát hiện thực tế theo nhật ký, không mặc định lấy ngày QC. Quyết định cho hoạt động trở lại vẫn ghi theo giờ hiện tại.</p>}
           {prefill && prefill.date < detectedAt && <div className="alert warn">Lần QC gây sự cố là {nceRunLabel(prefill)}, trước ngày phát hiện đang chọn. Các lần QC trước {detectedAt.split('-').reverse().join('/')} sẽ không dùng làm bằng chứng xác minh. Nếu chỉ mới phát hiện hôm nay, giữ đúng ngày này.</div>}
         </div>
         <DateField label="Ngày phát hiện thực tế" id="nceDetected" value={detectedAt} onChange={setDetectedAt} />

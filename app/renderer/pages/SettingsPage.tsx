@@ -409,7 +409,7 @@ export function SettingsPage() {
           </div>
           <div className="admin-tool">
             <b>Nhật ký lỗi của ứng dụng</b>
-            <span>Lỗi và tệp crash chỉ lưu trên máy này, không gửi đi đâu. Xuất gói log (một tệp .zip) để gửi kèm khi báo lỗi; tệp log không chứa mật khẩu, token hay dữ liệu QC.</span>
+            <span>Nhật ký lỗi chỉ lưu trên máy này. Khi báo lỗi, xuất gói log (.zip) để gửi kèm; gói không chứa mật khẩu, token hay dữ liệu QC.</span>
             <div className="admin-tool-actions">
               <button className="btn ghost" onClick={exportLogs}>Xuất gói log…</button>
               <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
@@ -471,7 +471,7 @@ export function SettingsPage() {
             <div id="lisGatewayStatus" className={`alert lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
               {LIS_STATUS_LABEL[lisStatus.kind]}{lisErr ? ` · ${lisErr}` : lisStatus.detail ? ` · ${lisStatus.detail}` : ''}
             </div>
-            <div className="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div>
+            <div className="hint">Nhận kết quả nội kiểm từ LIS Gateway. Mỗi kết quả chỉ thành điểm QC sau khi bạn xác nhận trong hàng chờ. Không nhận dữ liệu bệnh nhân; chỉ kết nối localhost:8787.</div>
           </div>
           <div className="settings-panel-actions">
             <button className="btn teal" onClick={saveLisSettings}>Lưu &amp; kiểm tra</button>

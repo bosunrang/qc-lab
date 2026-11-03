@@ -25,6 +25,6 @@ export function DetectedAtCorrection(props: SectionProps) {
       <Field label="Lý do và căn cứ đính chính" htmlFor="nceCorrectReason" wide><textarea id="nceCorrectReason" rows={2} value={draft.reason} placeholder="Ví dụ: nhập nhầm ngày lập hồ sơ thay cho ngày phát hiện; đối chiếu nhật ký số…" onChange={(e) => setDraft({ ...draft, reason: e.target.value })} /></Field>
       {draft.version !== record.row_version && <p className="nce-editor-warning">Hồ sơ đã được cập nhật ở nơi khác</p>}
       <div className="nce-form-actions nce-field-wide"><button type="button" className="btn ghost sm" onClick={() => setDraft(null)}>Bỏ qua</button><button type="button" className="btn sm" disabled={props.busy || draft.reason.trim().length < 10 || !draft.detectedAt || draft.detectedAt === record.detected_at} onClick={() => void save()}>Lưu đính chính</button></div>
-    </div></> : !can.release && <p className="nce-note">Đính chính ngày chỉ mở khi hồ sơ đang xử lý và tài khoản có quyền cho hoạt động trở lại. Mọi đính chính đều lưu lý do và lịch sử trước–sau.</p>}
+    </div></> : !can.release && <p className="nce-note">Chỉ đính chính được khi hồ sơ đang xử lý và tài khoản có quyền cho hoạt động trở lại. Mỗi lần đính chính lưu lý do và giá trị trước–sau.</p>}
   </div>;
 }
