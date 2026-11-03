@@ -32,6 +32,7 @@ import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 import { previousLotsOf } from './previous-lot-cache';
 import { activeEvaluationOf, type ActivePoint } from './active-evaluation';
+import { operationalTeaResolver } from '../db/operational-tea';
 
 export interface RangeCandidateView {
   testId: string; level: number; lot: string; source: 'mfg' | 'lab';
@@ -226,7 +227,7 @@ export function createEntryHandlers(db: Db) {
   }
 
   function rangeCandidate(testId: string, level: number): IpcResult<RangeCandidateView> {
-    const test = db.prepare('SELECT id,tea FROM tests WHERE id=?').get(testId) as { id: string; tea: number | null } | undefined;
+    const test = db.prepare('SELECT id FROM tests WHERE id=?').get(testId) as { id: string } | undefined;
     const config = db.prepare(`SELECT mean,sd,mfg_mean,mfg_sd,applied,qc_lot_id FROM test_levels WHERE test_id=? AND level=?`).get(testId, level) as
       { mean: number | null; sd: number | null; mfg_mean: number | null; mfg_sd: number | null; applied: 'mfg' | 'lab'; qc_lot_id: string | null } | undefined;
     if (!test || !config) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy mức QC.' } };
@@ -254,7 +255,9 @@ export function createEntryHandlers(db: Db) {
           SELECT 1 FROM nce_runs r JOIN qc_points p ON p.test_id=r.test_id AND p.date=r.date AND p.run_id=r.run_id
           WHERE r.nce_record_id=n.id AND r.role<>'rerun' AND p.level=? AND p.lot=?))
       ORDER BY n.detected_at DESC, n.created_at DESC LIMIT 1`).get(testId, level, lot) as { nce_id: string } | undefined;
-    const tea = test.tea != null && test.tea > 0 ? test.tea : null;
+    // TEa vận hành của đúng mức (hồ sơ TEa PXN trước), quy đổi giới hạn tuyệt
+    // đối tại Mean hiện hành — không đọc `tests.tea`, xem `resolveOperationalTea()`.
+    const tea = operationalTeaResolver(db)(testId, config.mean, level)?.value ?? null;
     return { ok: true, data: {
       testId, level, lot, source: config.applied,
       current: { mean: config.mean, sd: config.sd, cv: config.mean && config.sd != null ? config.sd / Math.abs(config.mean) * 100 : null },
@@ -288,7 +291,7 @@ export function createEntryHandlers(db: Db) {
     if (fresh.data.safety.needed) {
       const bias = Number(input.data.bias), threshold = fresh.data.safety.biasThreshold;
       if (!input.data.causeConfirmed) return { ok: false, error: { code: 'cause-not-confirmed', message: 'Cần xác nhận đã xử lý nguyên nhân sai số hệ thống trước khi đổi dải.' } };
-      if (threshold == null) return { ok: false, error: { code: 'missing-tea', message: 'Xét nghiệm chưa có TEa để kiểm tra Bias trước khi đổi dải.' } };
+      if (threshold == null) return { ok: false, error: { code: 'missing-tea', message: 'Xét nghiệm chưa có TEa của PXN để kiểm tra Bias trước khi đổi dải (Cấu hình chung → Bảng TEa tham chiếu).' } };
       if (!Number.isFinite(bias) || Math.abs(bias) > threshold) return { ok: false, error: { code: 'bias-out-of-range', message: `Bias phải nằm trong ±${threshold.toFixed(2)}% (TEa/4).` } };
     }
     const row = db.prepare('SELECT id,mean,sd,low,high,mfg_mean,mfg_sd,applied,qc_lot_id,mean_sd_history_json,mean_sd_effective_from FROM test_levels WHERE test_id=? AND level=?').get(fresh.data.testId, fresh.data.level) as
@@ -297,7 +300,7 @@ export function createEntryHandlers(db: Db) {
     const changedAt = nowIso();
     const p = { mean: chosenMean, sd: chosenSd }, history = appendMeanSdHistory(row.mean_sd_history_json, {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
-      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
+      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: isoLocalDate(), source: row.applied,
     }, changedAt);
     const mfgMean = row.mfg_mean ?? row.mean, mfgSd = row.mfg_sd ?? row.sd;
     // Nhật ký phải đủ để người xem xét dựng lại quyết định: dải đề xuất từ dữ
@@ -311,15 +314,16 @@ export function createEntryHandlers(db: Db) {
     const selection = manual
       ? `chỉnh thủ công (đề xuất Mean ${r4(proposed.mean)}, SD ${r4(proposed.sd)}, n=${proposed.n}${deviation ? `; SD tay gấp ${deviation.sdRatio.toFixed(2)} lần, Mean lệch ${deviation.meanShiftSd.toFixed(2)} SD${deviation.exceeds ? ' — VƯỢT NGƯỠNG CẢNH BÁO' : ''}` : ''})`
       : `dải đề xuất (n=${proposed.n}, ${proposed.days} ngày)`;
+    const teaUsed = fresh.data.safety.needed ? operationalTeaResolver(db)(fresh.data.testId, fresh.data.current.mean, fresh.data.level) : null;
     const safety = fresh.data.safety.needed
-      ? ` Cổng sai số hệ thống: hồ sơ ${fresh.data.safety.nceId}, Bias nhập ${Number(input.data.bias)}% (ngưỡng ±${fresh.data.safety.biasThreshold?.toFixed(2)}%), đã xác nhận xử lý nguyên nhân.`
+      ? ` Cổng sai số hệ thống: hồ sơ ${fresh.data.safety.nceId}, Bias nhập ${Number(input.data.bias)}% (ngưỡng ±${fresh.data.safety.biasThreshold?.toFixed(2)}% = TEa ${fresh.data.safety.tea?.toFixed(2)}% / 4, theo ${teaUsed?.criterion || '—'}), đã xác nhận xử lý nguyên nhân.`
       : '';
     const referenceBias = row.mfg_mean != null && row.mfg_mean !== 0
       ? ` Bias đối chiếu so với Mean NSX ${row.mfg_mean}: ${((p.mean - row.mfg_mean) / Math.abs(row.mfg_mean) * 100).toFixed(2)}%.`
       : '';
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
-        .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
+        .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, isoLocalDate(), row.id);
       tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}.${safety}${referenceBias} Lý do: ${reason}`, fresh.data.testId);
       tx.changed(['test_levels'], [fresh.data.testId]);
     });
@@ -339,11 +343,11 @@ export function createEntryHandlers(db: Db) {
     const changedAt = nowIso();
     const history = appendMeanSdHistory(row.mean_sd_history_json, {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
-      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
+      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: isoLocalDate(), source: row.applied,
     }, changedAt);
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
-        .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
+        .run(m, sd, m - 2 * sd, m + 2 * sd, history, isoLocalDate(), row.id);
       tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về dải nhà sản xuất, Mean ${row.mean ?? '—'} → ${m}; SD ${row.sd ?? '—'} → ${sd}. Lý do: ${reason}`, fresh.data.testId);
       tx.changed(['test_levels'], [fresh.data.testId]);
     });

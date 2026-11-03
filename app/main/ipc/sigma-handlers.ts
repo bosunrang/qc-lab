@@ -4,7 +4,8 @@ import { sigmaMetric, uncertaintyBudget, eqaRoundBias, eqaRoundsStats, sigmaQual
 import { buildSigmaCohorts, type SigmaCohort, type SigmaCohortPoint } from '../domain/sigma-cohort';
 import { countOperationalLevels } from '../db/operational-levels';
 import { nceResolvedPointIds } from '../db/nce-repository';
-import { resolveTea, type SigmaTeaSourceCore, type TeaRefCore } from '../domain/sigma-tea-core';
+import { hasLabTea, resolveTea, type SigmaTeaSourceCore } from '../domain/sigma-tea-core';
+import { loadTeaRefs, loadTeaTest } from '../db/operational-tea';
 import { TEA_CATALOG_WITH_CLIA_ABSOLUTE } from '../domain/tea-catalog';
 import { isoLocalDate } from '../domain/local-date';
 import { sha256Hex } from '../domain/sha256';
@@ -186,27 +187,13 @@ export function createSigmaHandlers(db: Db) {
    * (`stored.targetMean`, truyền vào từ ngoài) rồi mới tới Mean hiện hành —
    * để giữ báo cáo đã chốt ổn định khi cấu hình thay đổi. */
   function makeLevelTeaResolver(testId: string) {
-    // Phải đọc cả 4 cột truy vết EFLM: cổng `hasTrace` của `resolveTea()`
-    // đọc chúng, thiếu thì mọi xét nghiệm có `tea` đều được coi là "TEa EFLM
-    // đã truy vết".
-    const test = db.prepare('SELECT name,tea_ref_key,unit,tea,tea_source,eflm_tea,eflm_analyte,eflm_ref,eflm_lookup_date FROM tests WHERE id=?').get(testId) as
-      { name: string; tea_ref_key: string; unit: string; tea: number | null; tea_source: string; eflm_tea: number | null; eflm_analyte: string; eflm_ref: string; eflm_lookup_date: string } | undefined;
-    if (!test) return { bySource: () => null, basis: (): TeaBasis | undefined => undefined, currentSource: '' };
-    const refs = db.prepare('SELECT id,name,analyte_id,aliases_json,lab,lab_source,clia,ricos,clia_rule,clia_absolute,clia_absolute_unit FROM tea_refs').all() as (TeaRefCore & { id: string })[];
-    const levelDefaults = db.prepare('SELECT tea_ref_id,level,tea FROM tea_ref_level_defaults').all() as
-      { tea_ref_id: string; level: number; tea: number }[];
-    for (const ref of refs) {
-      ref.lab_level_defaults = levelDefaults.filter((item) => item.tea_ref_id === ref.id);
-    }
+    const shape = loadTeaTest(db, testId);
+    if (!shape) return { bySource: () => null, basis: (): TeaBasis | undefined => undefined, currentSource: '' };
+    const refs = loadTeaRefs(db);
     const means = new Map<number, number | null>(
       (db.prepare('SELECT level,mean FROM test_levels WHERE test_id=?').all(testId) as { level: number; mean: number | null }[])
         .map((row) => [row.level, row.mean]),
     );
-    const shape = {
-      name: test.name || '', tea_ref_key: test.tea_ref_key || '', unit: test.unit || '', tea: Number(test.tea) || 0,
-      eflm_tea: test.eflm_tea,
-      tea_source: test.tea_source || '', eflm_analyte: test.eflm_analyte || '', eflm_ref: test.eflm_ref || '', eflm_lookup_date: test.eflm_lookup_date || '',
-    };
     const basis = (rawSource: string, level: number, targetMean: number | null): TeaBasis | undefined => {
       const source = rawSource.toLowerCase();
       if (!TEA_SOURCES.has(source)) return undefined;
@@ -219,7 +206,10 @@ export function createSigmaHandlers(db: Db) {
       const value = basis(source, level, targetMean)?.value;
       return value != null && value > 0 ? value : null;
     };
-    return { bySource, basis, currentSource: shape.tea_source };
+    // Nguồn đang khai = nguồn của TEa vận hành: hồ sơ PXN nếu có, không thì
+    // nguồn đã chọn ở trang này (`resolveOperationalTea()`).
+    const currentSource = hasLabTea(shape, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE) ? 'lab' : shape.tea_source || '';
+    return { bySource, basis, currentSource };
   }
 
   /** Hai bậc giải TEa cho một kỳ: theo nguồn ĐÃ CHỐT của kỳ, và — chỉ khi kỳ

@@ -15,6 +15,7 @@ import { checkEqaImport, eqaPairKey, type EqaImportCheck } from '../domain/eqa/i
 import { eqaAssignedUncertainty, eqaSeries, EQA_SERIES_DEFAULTS, type EqaSeriesResult } from '../domain/eqa/series';
 import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
+import { operationalTeaResolver } from '../db/operational-tea';
 
 const fail = <T>(code: string, message: string): IpcResult<T> => ({ ok: false, error: { code, message } });
 const objectInput = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {};
@@ -243,16 +244,20 @@ export function createEqaHandlers(db: Db) {
   function resultRows(roundId: string, version: number): EqaResultRow[] {
     const rows = db.prepare(`SELECT e.id, e.test_id, e.code, e.instrument_label, e.sample, e.unit, e.result, e.assigned, e.sigma_p, e.z, e.z_provider,
       e.z_official, e.pct, e.class, e.provider_check, e.method, e.peer_group, e.peer_json, e.warnings_json,
-      COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.instrument_id, t.tea AS test_tea, i.name AS instrument_name
+      COALESCE(NULLIF(t.display_name,''), t.name) AS test_name, t.instrument_id, i.name AS instrument_name
       FROM eqa_results e JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id
-      WHERE e.round_id=? AND e.version=? ORDER BY i.name, test_name, e.sample`).all(roundId, version) as unknown as (Omit<EqaResultRow, 'peer' | 'warnings' | 'assigned_check' | 'tea_pct' | 'within_tea' | 'trend'> & { peer_json: string; warnings_json: string; test_tea: number | null })[];
+      WHERE e.round_id=? AND e.version=? ORDER BY i.name, test_name, e.sample`).all(roundId, version) as unknown as (Omit<EqaResultRow, 'peer' | 'warnings' | 'assigned_check' | 'tea_pct' | 'within_tea' | 'trend'> & { peer_json: string; warnings_json: string })[];
     const series = new Map<string, EqaSeriesResult>();
-    return rows.map(({ peer_json, warnings_json, test_tea, ...row }) => {
+    const teaOf = operationalTeaResolver(db);
+    return rows.map(({ peer_json, warnings_json, ...row }) => {
       const peer = parseJson<EqaPeer>(peer_json, {});
       const check = eqaAssignedUncertainty(row.result, row.assigned, row.sigma_p, peer);
       if (!series.has(row.test_id)) series.set(row.test_id, seriesOf(row.test_id));
       const point = series.get(row.test_id)?.points.find((p) => p.id === row.id);
-      const tea = test_tea !== null && Number(test_tea) > 0 ? Number(test_tea) : null;
+      // TEa vận hành (hồ sơ TEa PXN trước, TEa chung vì mẫu ngoại kiểm không
+      // ứng với mức QC nào), quy đổi giới hạn tuyệt đối tại giá trị ấn định
+      // của mẫu. Thiếu TEa thì để trống, không báo "Vượt TEa".
+      const tea = teaOf(row.test_id, row.assigned)?.value ?? null;
       return {
         ...row, peer: eqaPeerComparison(row.result, peer), warnings: parseJson<string[]>(warnings_json, []),
         assigned_check: check ? { level: check.level, n: check.n, u: check.u, ratio: check.ratio, uncertain: check.uncertain, z_prime: check.zPrime } : null,

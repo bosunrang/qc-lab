@@ -6,10 +6,6 @@ export interface TeaSuggestion {
   displayName: string;
   unit: string;
   section: string;
-  /** TEa% gợi ý: CLIA% nếu có, không thì Ricos%. */
-  tea: number | null;
-  /** Nguồn của TEa% ở trên: 'clia' | 'ricos' | '' (không có giá trị nào). */
-  teaSource: 'clia' | 'ricos' | '';
   /** Khoá analyte để đối chiếu lại về sau (`tests.tea_ref_key`). */
   teaRefKey: string;
   /** Chuỗi phụ trong danh sách gợi ý: viết tắt · nhóm xét nghiệm. */
@@ -31,12 +27,10 @@ export function analyteDisplayName(item: { name: string; abbr: string }): string
 }
 
 
-/** Danh mục TEa sau khi áp hồ sơ ghi đè của phòng xét nghiệm. Ô ghi đè để
- * trống nghĩa là "dùng giá trị mặc định của danh mục", đúng quy tắc main giải
- * TEa (`resolveTea()`: `ref?.clia ?? catalog?.clia`) và đúng ý nghĩa của nút
- * "Khôi phục mặc định" (ghi NULL vào ô ghi đè). Trước 2026-09-26 hàm này thay
- * ô trống bằng `null`: chỉ ghi đè Ricos là gợi ý mất CLIA của danh mục, lệch
- * với TEa mà Six Sigma dùng cho cùng xét nghiệm. */
+/** Danh mục xét nghiệm sau khi áp tên, đơn vị, nhóm do phòng xét nghiệm sửa.
+ * Gợi ý KHÔNG mang TEa (từ 2026-11-03): TEa vận hành đọc thẳng từ Bảng TEa
+ * tham chiếu (`resolveOperationalTea()`), không chép CLIA/Ricos sang xét
+ * nghiệm như trước. */
 export function effectiveTeaCatalog(teaRefs: readonly TeaRef[]): TeaCatalogItem[] {
   const overrides = new Map<string, TeaRef>();
   for (const ref of teaRefs) if (ref.analyte_id) overrides.set(ref.analyte_id, ref);
@@ -48,23 +42,17 @@ export function effectiveTeaCatalog(teaRefs: readonly TeaRef[]): TeaCatalogItem[
       name: over.name || item.name,
       unit: over.unit || item.unit,
       section: over.section || item.section,
-      clia: over.clia ?? item.clia,
-      ricos: over.ricos ?? item.ricos,
     };
   });
 }
 
 function toSuggestion(item: TeaCatalogItem): TeaSuggestion {
-  const tea = item.clia != null ? item.clia : item.ricos;
-  const teaSource: 'clia' | 'ricos' | '' = item.clia != null ? 'clia' : item.ricos != null ? 'ricos' : '';
   const displayName = analyteDisplayName(item);
   const abbrHint = item.abbr && normalizeName(item.abbr) !== normalizeName(item.name) ? item.abbr : '';
   return {
     displayName,
     unit: item.unit,
     section: item.section,
-    tea: tea ?? null,
-    teaSource,
     teaRefKey: item.id,
     hint: [abbrHint, item.section].filter(Boolean).join(' · '),
   };

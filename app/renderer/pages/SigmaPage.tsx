@@ -24,7 +24,7 @@ import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib
 import { loadPrintIdentity } from '../lib/print-document';
 import { confirmDialog, errorDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
-import { resolveSigmaTea, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
+import { resolveSigmaTea, sigmaHasLabTea, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
 import { governingSigmaLevel } from '../lib/sigma-workflow';
 import { AddSigmaPeriodModal } from './sigma/AddSigmaPeriodModal';
 import { BiasModal } from './sigma/BiasModal';
@@ -104,10 +104,17 @@ export function SigmaPage() {
   useEffect(() => {
     if (normalizedTestSearch && visibleSigmaTests.length && !selectedVisible) setTestId(visibleSigmaTests[0].id);
   }, [normalizedTestSearch, visibleSigmaTests, selectedVisible]);
+  // Có hồ sơ TEa của PXN thì mở trang ở nguồn PXN — cùng TEa vận hành mà cổng
+  // lập dải và ngoại kiểm dùng (`resolveOperationalTea()`). Đổi sang nguồn
+  // khác vẫn được để so sánh; `tea_source` đã lưu chỉ là nguồn dự phòng khi
+  // chưa có hồ sơ PXN, nên không kéo trang về nguồn cũ (vd Ricos do gợi ý
+  // danh mục tự điền trước 2026-11-03).
+  const hasLabTea = useMemo(() => !!test && sigmaHasLabTea(test, teaRefs), [test, teaRefs]);
+  const savedTeaSource = hasLabTea ? '' : test?.tea_source || '';
   useEffect(() => {
-    if (test?.tea_source && TEA_SOURCES.some((source) => source.value === test.tea_source)) setTeaSource(test.tea_source);
+    if (!hasLabTea && savedTeaSource && TEA_SOURCES.some((source) => source.value === savedTeaSource)) setTeaSource(savedTeaSource);
     else setTeaSource('lab');
-  }, [test?.id, test?.tea_source]);
+  }, [test?.id, hasLabTea, savedTeaSource]);
   // Chỉ xét hồ sơ TEa PXN khớp ĐÚNG xét nghiệm đang xem, không phải cả bảng.
   const labTeaByLevel = useMemo(() => test ? sigmaLabLevelTeas(test, teaRefs) : [], [test, teaRefs]);
   const teaSourceValueText = (source: string): string => {
@@ -127,9 +134,10 @@ export function SigmaPage() {
   const teaMissingHint = teaResolution?.value == null && !(teaSource === 'lab' && labTeaByLevel.length)
     ? ' Chưa có TEa thì KHÔNG tính được Sigma dù đã nhập đủ CV và Bias. Cách xử lý: đổi “Nguồn TEa” sang CLIA/Ricos/EFLM (xét nghiệm phải được gán analyte trong Bảng TEa tham chiếu), hoặc tạo hồ sơ TEa chuẩn hoá của phòng xét nghiệm ở Cấu hình chung → Bảng TEa tham chiếu.'
     : '';
+  const teaCompareHint = hasLabTea && teaSource !== 'lab' ? ' Đang so sánh: TEa vận hành của xét nghiệm là TEa PXN.' : '';
   const teaHint = teaSource === 'clia'
-    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`
-    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`;
+    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}${teaCompareHint}`
+    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}${teaCompareHint}`;
   const configuredTea = teaResolution?.value ?? null;
   const configuredTeaSource = teaSource;
   const targetMeanForLevel = (levelNumber: number) => (levelsByTestId[testId] || []).find((level) => level.level === levelNumber)?.mean ?? null;

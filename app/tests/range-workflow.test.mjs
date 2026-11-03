@@ -79,7 +79,11 @@ db.prepare("INSERT INTO nce_records(id,nce_id,source,test_id,detected_at,status,
 assert.equal(entry.rangeCandidate(test.id, 1).data.safety.nceId, 'NCE-SE-01');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống' } }, actor).error.code, 'cause-not-confirmed');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 0 } }, actor).error.code, 'missing-tea');
-db.prepare('UPDATE tests SET tea=8 WHERE id=?').run(test.id);
+// `tests.tea` không còn là căn cứ (chỉ là số chép từ gợi ý cũ): cổng đọc TEa
+// vận hành, tức hồ sơ TEa của PXN khớp tên xét nghiệm.
+db.prepare('UPDATE tests SET tea=50 WHERE id=?').run(test.id);
+assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 0 } }, actor).error.code, 'missing-tea');
+db.prepare("INSERT INTO tea_refs(id,name,lab,lab_source) VALUES ('ref-range','Range test',8,'Hồ sơ PXN')").run();
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 2.1 } }, actor).error.code, 'bias-out-of-range');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 2 } }, actor).ok, true);
 

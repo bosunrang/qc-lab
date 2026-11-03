@@ -8,6 +8,7 @@ import { RowActionButton } from '../../components/RowActionButton';
 import { confirmDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
 import { teaSuggestions, findTeaSuggestion, normalizeName, type TeaSuggestion } from '../../lib/tea-suggest';
+import { operationalTeaText } from '../../lib/sigma-tea';
 import { EmptyState, WESTGARD_RULES, parseRuleConfig } from './shared';
 import { defaultRuleAction } from '../../../main/domain/westgard-rules';
 import { NOT_RETROACTIVE_NOTE } from '../../../main/domain/rule-config';
@@ -41,7 +42,19 @@ const TEST_FIELD_ERRORS: FieldErrorMap = {
   'missing-name': 'name', 'duplicate-name': 'name', 'missing-instrument': 'instrumentIds', 'invalid-tea': 'tea',
 };
 
-export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string; onNeedInstrument?: () => void } = {}) {
+/** Ô TEa của bảng danh mục: TEa vận hành kèm nguồn; thiếu TEa PXN thì nói rõ
+ * và mở thẳng Bảng TEa tham chiếu. Nút nằm ở bảng chứ không trong hộp sửa,
+ * vì rời hộp sửa sẽ bỏ mất phần đang nhập dở. */
+function OperationalTeaCell({ tea, testName, onGoTeaRefs }: { tea: ReturnType<typeof operationalTeaText>; testName: string; onGoTeaRefs?: () => void }) {
+  if (!tea.source) {
+    return onGoTeaRefs
+      ? <button type="button" className="btn ghost sm" aria-label={`Chưa có TEa PXN cho ${testName}: mở Bảng TEa tham chiếu`} onClick={onGoTeaRefs}>Chưa có TEa PXN</button>
+      : <span className="hint">Chưa có TEa PXN</span>;
+  }
+  return <>{tea.text} <span className="hint">({tea.sourceLabel})</span></>;
+}
+
+export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTestId?: string; onNeedInstrument?: () => void; onGoTeaRefs?: () => void } = {}) {
   const { tests, instruments, teaRefs, saveTest, removeTest, saveRuleAction, saveRuleScope, ruleScopesByTestId, loadRuleScopes } = useManageStore(useShallow((s) => ({ tests: s.tests, instruments: s.instruments, teaRefs: s.teaRefs, saveTest: s.saveTest, removeTest: s.removeTest, saveRuleAction: s.saveRuleAction, saveRuleScope: s.saveRuleScope, ruleScopesByTestId: s.ruleScopesByTestId, loadRuleScopes: s.loadRuleScopes })));
   // Gợi ý TEa: danh mục tích hợp đã phủ ghi đè của phòng xét nghiệm.
   const suggestions = useMemo(() => teaSuggestions(teaRefs), [teaRefs]);
@@ -71,6 +84,9 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   const errorId = useInvalidField(formRef, err);
   const [query, setQuery] = useState('');
   const [nameQuery, setNameQuery] = useState('');
+  // Khoá analyte đang chọn trong form, để ô TEa vận hành đổi theo tên ngay
+  // khi chọn gợi ý, trước khi lưu.
+  const [formTeaRefKey, setFormTeaRefKey] = useState('');
   const [namePickerOpen, setNamePickerOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const namePickerCloseTimer = useRef<number | null>(null);
@@ -82,6 +98,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
   }, [openTestId, tests]);
   useEffect(() => {
     setNameQuery(editing && editing !== 'new' ? editing.name : '');
+    setFormTeaRefKey(editing && editing !== 'new' ? editing.tea_ref_key : '');
     if (!editing) { setNamePickerOpen(false); setAssigningMachines(false); }
   }, [editing]);
   useEffect(() => () => {
@@ -130,18 +147,18 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     setErr(null); setEditingSingleAssignment(false); setEditing('new');
   }
 
+  // Chỉ gắn khoá analyte và đơn vị. TEa không còn chép từ gợi ý danh mục:
+  // TEa vận hành đọc thẳng từ Bảng TEa tham chiếu (`resolveOperationalTea()`),
+  // còn `tea`/`tea_source` của xét nghiệm giữ nguyên lựa chọn ở trang Six Sigma.
   function fillTeaSuggestion(form: HTMLFormElement, match: TeaSuggestion | null) {
     if (!form) return;
     const field = <T extends HTMLElement>(name: string) => form.elements.namedItem(name) as T | null;
     const keyEl = field<HTMLInputElement>('teaRefKey');
-    const sourceEl = field<HTMLInputElement>('teaSource');
-    if (!match) { if (keyEl) keyEl.value = ''; if (sourceEl) sourceEl.value = ''; return; }
-    if (keyEl) keyEl.value = match.teaRefKey;
-    if (sourceEl) sourceEl.value = match.teaSource;
+    if (keyEl) keyEl.value = match?.teaRefKey || '';
+    setFormTeaRefKey(match?.teaRefKey || '');
+    if (!match) return;
     const unitEl = field<HTMLInputElement>('unit');
-    const teaEl = field<HTMLInputElement>('tea');
     if (unitEl) unitEl.value = match.unit || '';
-    if (teaEl) teaEl.value = match.tea == null ? '' : String(match.tea);
   }
 
   function changeTestName(input: HTMLInputElement) {
@@ -250,9 +267,15 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     return [...groups.entries()].map(([key, assignments]) => ({ key, assignments, test: assignments[0] }));
   }, [tests]);
   const normalizedQuery = normalizeName(query);
+  const editingTest = editing && editing !== 'new' ? editing : null;
+  const formTea = operationalTeaText({
+    name: nameQuery, tea_ref_key: formTeaRefKey, unit: editingTest?.unit || '', tea: editingTest?.tea || 0,
+    tea_source: editingTest?.tea_source || '', eflm_tea: editingTest?.eflm_tea ?? null,
+    eflm_analyte: editingTest?.eflm_analyte || '', eflm_ref: editingTest?.eflm_ref || '', eflm_lookup_date: editingTest?.eflm_lookup_date || '',
+  }, teaRefs);
   const visible = catalogGroups.filter(group => !normalizedQuery || group.assignments.some(test => {
     const instrument = instruments.find(item => item.id === test.instrument_id);
-    return normalizeName(`${test.name} ${test.unit} ${test.method} ${test.reagent} ${test.tea} ${instrument?.name || ''} ${instrument?.section || test.section}`).includes(normalizedQuery);
+    return normalizeName(`${test.name} ${test.unit} ${test.method} ${test.reagent} ${operationalTeaText(test, teaRefs).text} ${instrument?.name || ''} ${instrument?.section || test.section}`).includes(normalizedQuery);
   }));
 
   return (
@@ -290,7 +313,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                 </select>
                 </td>
                 <td>{selected.reagent || '—'}</td>
-                <td className="num">{selected.tea ? `${selected.tea}%` : '—'}</td>
+                <td className="num"><OperationalTeaCell tea={operationalTeaText(selected, teaRefs)} testName={selected.name} onGoTeaRefs={onGoTeaRefs} /></td>
                 <td><span className={`tag ${selected.active ? 'ok' : 'none'}`}>{selected.active ? 'Đang dùng' : 'Ngừng dùng'}</span></td>
                 <td><div className="manage-actions">
                   <RowActionButton kind="edit" label={`Sửa ${selected.name} trên ${selectedInstrument?.name || 'máy đã chọn'}`} onClick={() => { setErr(null); setAssigningMachines(false); setEditingSingleAssignment(true); setEditing(selected); }} />
@@ -354,9 +377,17 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                     </div>
                     <div className="assay-detail-grid">
                       <div className="field"><label htmlFor="test-method">Phương pháp</label><input id="test-method" name="method" defaultValue={editing !== 'new' ? editing.method : ''} /></div>
-                      <div className="field"><label htmlFor="test-tea">TEa %</label><input id="test-tea" name="tea" type="number" step="0.01" defaultValue={editing !== 'new' ? editing.tea : ''} /></div>
-                      <div className="field"><label htmlFor="test-reagent">Hoá chất</label><input id="test-reagent" name="reagent" defaultValue={editing !== 'new' ? editing.reagent : ''} /></div>
                       <div className="field"><label htmlFor="test-decimal-places">Số thập phân</label><select id="test-decimal-places" name="decimalPlaces" defaultValue={editing !== 'new' ? editing.decimal_places : 2}>{[0, 1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
+                      <div className="field assay-span-all"><label htmlFor="test-reagent">Hoá chất</label><input id="test-reagent" name="reagent" defaultValue={editing !== 'new' ? editing.reagent : ''} /></div>
+                      <div className="field assay-span-all">
+                        <label htmlFor="test-tea">TEa vận hành</label>
+                        <input id="test-tea" readOnly aria-describedby="test-tea-hint" value={formTea.source ? `${formTea.text} (${formTea.sourceLabel})` : 'Chưa có TEa của PXN'} />
+                        <p id="test-tea-hint" className="hint">
+                          {formTea.source === 'lab' ? 'Theo Bảng TEa tham chiếu.' : formTea.source ? 'Chưa có TEa của PXN; đang dùng nguồn đã chọn ở Six Sigma. Khai ở Cấu hình chung → Bảng TEa tham chiếu.' : 'Khai TEa chung hoặc theo mức ở Cấu hình chung → Bảng TEa tham chiếu.'}
+                        </p>
+                        {/* Giữ nguyên `tea` cũ khi lưu: trang Six Sigma dùng nó cho nguồn EFLM. */}
+                        <input type="hidden" name="tea" defaultValue={editing !== 'new' ? editing.tea : 0} />
+                      </div>
                     </div>
                   </div>
                 </section>
