@@ -42,8 +42,11 @@ test('câu đọc điểm theo lô dùng chỉ mục có cột lot', () => {
   // Câu đọc chuỗi điểm của một lô: FROM qc_points, có `lot=?`, lọc điểm chưa
   // huỷ. Câu fallback lấy Mean/SD chụp trên điểm (`lotMeanSd`, không lọc
   // `voided`) chỉ chạy khi thiếu lịch sử cấu hình, không thuộc đường nóng.
+  // Từ 2026-11-03 Nhập QC và Phân tích Westgard đọc mức đang vận hành bằng
+  // cùng một câu (`ipc/active-evaluation.ts`), nên còn hai câu: lô đang vận
+  // hành và lô cũ.
   const lotQueries = [...seen].filter((sql) => /FROM qc_points\b/.test(sql) && /\blot=\?/.test(sql) && /voided=0/.test(sql));
-  assert.ok(lotQueries.length >= 3, `bắt được các câu đọc theo lô: ${lotQueries.length}`);
+  assert.ok(lotQueries.length >= 2, `bắt được các câu đọc theo lô: ${lotQueries.length}`);
   for (const sql of lotQueries) {
     const params = (sql.match(/\?/g) || []).map(() => 'x');
     const plan = db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params).map((row) => row.detail).join(' | ');

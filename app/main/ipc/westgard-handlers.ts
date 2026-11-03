@@ -1,20 +1,20 @@
 import type { Db } from '../db/sqlite-like';
-import { listOperationalLevels, isTestInActivePanel } from '../db/operational-levels';
 import { readGlobalRules, writeGlobalRules } from '../db/rule-settings';
 import { createHistoricalWestgard } from '../db/historical-westgard';
-import { evaluateQcSets, qcCuts } from '../db/westgard-evaluation';
+import { qcCuts } from '../db/westgard-evaluation';
 import { qcEpochOf } from '../domain/qc-cuts';
 import { cusumScan, acceptedRunPoints, rejectedLevelsByRun, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, parseRuleScopes, serializeRuleActions, isRuleAction, globalRuleList, makeRuleActionLayered, NOT_RETROACTIVE_NOTE, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
 import { GLOBAL_RULE_SCOPE, recordRuleConfigChange } from '../db/rule-config-history';
 import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
-import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
+import { qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { observedStats } from '../domain/observed-stats';
 import { type IpcResult, addChangeListener } from './shared';
 import { writeCommand } from './write-command';
 import { TestSummaryCache } from './summary-cache';
 import { previousLotsOf } from './previous-lot-cache';
+import { activeEvaluationOf } from './active-evaluation';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
 
@@ -43,27 +43,10 @@ export type { TestSummary };
 export type { LevelAnalysis } from '../../shared/qc-api';
 
 export function createWestgardHandlers(db: Db) {
-  type ActivePoint = QcPointLike & { id: string; date: string; run_id: string; val: number; qcMean: number | null; qcSd: number | null };
-  type ActiveLevel = { level: number; mean: number | null; sd: number | null; qc_lot_id: string | null; lot_no: string; exp: string; pts: ActivePoint[] };
-  const pointOrder = compareQcPointOrder;
-
-  /** Mức QC ĐANG VẬN HÀNH của một xét nghiệm — hai cổng nằm ở
-   * `db/operational-levels.ts` (nguồn DUY NHẤT, dùng chung với Nhập QC; lý do
-   * và ca lệch đã đo được ghi ở đầu file đó). Ở đây chỉ còn phần riêng của
-   * trang này: nạp điểm chưa huỷ của đúng lô đang gán từng mức.
-   * Nhóm lô đã dừng/lưu trữ có tab riêng (`listArchivedGroupTests`), đây
-   * không phải chỗ hiển thị chúng. */
-  function activeLevels(testId: string): ActiveLevel[] {
-    const levels = listOperationalLevels(db, testId);
-    const inActivePanel = isTestInActivePanel(db, testId);
-    return levels.map((level) => {
-      const rows = inActivePanel ? db.prepare(`SELECT id,date,run_id,val,qc_mean,qc_sd FROM qc_points
-        WHERE test_id=? AND level=? AND voided=0 AND lot=?`).all(testId, level.level, level.lot_no) as
-        { id: string; date: string; run_id: string; val: number; qc_mean: number | null; qc_sd: number | null }[] : [];
-      const pts = rows.map((row) => ({ ...row, runId: row.run_id, qcMean: row.qc_mean, qcSd: row.qc_sd })).sort(pointOrder);
-      return { ...level, pts };
-    });
-  }
+  // Mức QC ĐANG VẬN HÀNH của một xét nghiệm cùng kết luận Westgard của chúng
+  // lấy từ `activeEvaluationOf()` — chung với Nhập QC, nên hai trang luôn
+  // đánh giá trên cùng một tập dữ liệu. Nhóm lô đã dừng/lưu trữ có tab riêng
+  // (`listArchivedGroupTests`), đây không phải chỗ hiển thị chúng.
 
   const globalRules = (): RuleActionsMap => readGlobalRules(db);
   /** Hai cấu hình chung cho cùng hành động ở mọi luật — so theo kết quả phân
@@ -151,9 +134,8 @@ export function createWestgardHandlers(db: Db) {
   }
 
   function summarizeLevels(t: { test_id: string; cusum_on: number; cusum_k: number; cusum_h: number }, today: string): TestSummary['levels'] {
-    const active = { levels: activeLevels(t.test_id) };
-    const byPoint = evaluateQcSets(db, t.test_id, active.levels);
-    const levels = active.levels.map(lv => {
+    const { levels: activeLevels, byPoint } = activeEvaluationOf(db, t.test_id);
+    const levels = activeLevels.map(lv => {
       const points = lv.pts;
       let worstVerdict: RuleVerdict = 'ok';
       // `latestVerdict`/`latestRules` là kết luận của ĐIỂM CUỐI CÙNG, KHÁC
@@ -234,8 +216,8 @@ export function createWestgardHandlers(db: Db) {
 
   function analyzeLevel(testId: string, level: number): LevelAnalysis {
     const test = db.prepare('SELECT cusum_on, cusum_k, cusum_h FROM tests WHERE id=?').get(testId) as { cusum_on: number; cusum_k: number; cusum_h: number } | undefined;
-    const active = { levels: activeLevels(testId) }, levelRow = active.levels.find((item) => item.level === level), rows = levelRow?.pts || [];
-    const byPoint = evaluateQcSets(db, testId, active.levels);
+    const { levels: activeLevels, byPoint } = activeEvaluationOf(db, testId);
+    const levelRow = activeLevels.find((item) => item.level === level), rows = levelRow?.pts || [];
     const hasTarget = !!(levelRow && levelRow.mean != null && levelRow.sd != null);
     // CUSUM chỉ tính khi xét nghiệm đã bật và mức có Mean/SD hợp lệ; dùng đúng
     // ngưỡng cấu hình của xét nghiệm.
@@ -256,7 +238,7 @@ export function createWestgardHandlers(db: Db) {
     // Lý do loại theo LẦN CHẠY — cùng trường mà `entry:queryPoints` và tab
     // lô lịch sử trả, để ba đường đọc không mô tả cùng một điểm bằng ba hình
     // dạng khác nhau.
-    const rejectedBy = rejectedLevelsByRun(active.levels, byPoint);
+    const rejectedBy = rejectedLevelsByRun(activeLevels, byPoint);
     const points = rows.map((r, i) => {
       // Mức chưa có Mean/SD hợp lệ: điểm chưa được đánh giá ('none'), không
       // phải 'ok'; Z không có nghĩa (giữ

@@ -2,8 +2,8 @@
 // giá đa mức; lô mới trong chuyển tiếp được đánh giá riêng từng mức và không
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
-import { listOperationalLevels, isTestInActivePanel, countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
-import { evaluateQcSets, evaluateQcSetsWithRules, ruleResolver } from '../db/westgard-evaluation';
+import { countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
+import { evaluateQcSets } from '../db/westgard-evaluation';
 // 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
@@ -31,17 +31,7 @@ import { defaultNceDueDate } from '../domain/nce/config';
 import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 import { previousLotsOf } from './previous-lot-cache';
-
-interface QcPointRow {
-  id: string; test_id: string; level: number; date: string; run_id: string; val: number;
-  note: string; operator_name: string; operator_code: string;
-  /** Cột INTEGER trong SQLite nhưng chỉ nhận 0/1 — khai hẹp cho khớp hợp
-   * đồng `shared/qc-api.d.ts`, nơi renderer đọc nó như cờ nhị phân. */
-  voided: 0 | 1;
-  void_reason: string;
-}
-type ActivePoint = QcPointRow & { lot: string; qc_mean: number | null; qc_sd: number | null; runId: string; qcMean: number | null; qcSd: number | null };
-type ActiveLevel = { level: number; mean: number | null; sd: number | null; lot: string; pts: ActivePoint[] };
+import { activeEvaluationOf, type ActivePoint } from './active-evaluation';
 
 export interface RangeCandidateView {
   testId: string; level: number; lot: string; source: 'mfg' | 'lab';
@@ -86,22 +76,14 @@ export function createEntryHandlers(db: Db) {
    * đang gán của từng mức, sắp lần chạy theo số tự nhiên, rồi ghép luật
    *
    * Tập mức lấy từ `db/operational-levels.ts` — cùng tập mà trang Phân tích
-   * Westgard dùng, để hai màn hình luôn đánh giá trên cùng một tập dữ liệu. */
+   * Westgard dùng, để hai màn hình luôn đánh giá trên cùng một tập dữ liệu.
+   * Phần tính nằm ở `ipc/active-evaluation.ts`, dùng chung trong một lượt nạp. */
   function activeEvaluation(testId: string) {
-    const inActivePanel = isTestInActivePanel(db, testId);
-    const levels: ActiveLevel[] = listOperationalLevels(db, testId).map((config) => {
-      const rows = inActivePanel
-        ? db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=?').all(testId, config.level, config.lot_no) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[]
-        : [];
-      const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd })).sort(compareQcPointOrder);
-      return { level: config.level, mean: config.mean, sd: config.sd, lot: config.lot_no, pts };
-    });
+    const { levels, byPoint, rules } = activeEvaluationOf(db, testId);
     // Hàm luật theo LẦN CHẠY (GV2, không hồi tố): `rulesAt(point)` là cấu hình
     // có hiệu lực tại lần chạy của điểm, cùng phép phân giải `evaluateQcSets()`
     // dùng. Lộ ra cho cột "Vi phạm loại bỏ" và nhánh dựng lại verdict của điểm
     // lô đã chuyển tiếp trong `voidPoint()`.
-    const rules = ruleResolver(db, testId, levels.length);
-    const byPoint = evaluateQcSetsWithRules(db, testId, levels, rules);
     return { levels, byPoint, rulesAt: rules.at };
   }
 
