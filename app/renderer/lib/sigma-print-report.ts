@@ -1,16 +1,9 @@
 import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 import { mdcRatios, sigmaDesignEligible } from './sigma-workflow';
+import { DOCUMENT_CSS, documentHeader, escapeHtml, signatureBlock, type PrintIdentity } from './print-document';
 
-interface SigmaReportHeader {
+interface SigmaReportHeader extends PrintIdentity {
   title: string;
-  /** Hồ sơ đơn vị được lấy tức thời trước khi in, nên luôn theo dữ liệu đã
-   * đồng bộ từ phần Cài đặt thay vì một bản sao cũ trong thẻ Sigma. */
-  labName: string;
-  labDept: string;
-  labAddress: string;
-  logoData: string;
-  formCode: string;
-  formVersion: string;
 }
 
 export interface SigmaPeriodPrintInput extends SigmaReportHeader {
@@ -32,10 +25,6 @@ export interface SigmaComparisonPrintInput extends SigmaReportHeader {
 const LEVEL_COLORS = ['#0e4d4a', '#7a4f9a', '#c47d12', '#247c57'];
 const SIGMA_LINES: Array<[number, string]> = [[2, '#c0362c'], [3, '#dd8b1f'], [4, '#b59a00'], [5, '#3f9a55'], [6, '#0e8f8f']];
 
-function escapeHtml(value: unknown): string {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] || character));
-}
-
 function number(value: number | null | undefined, digits = 2): string {
   return Number.isFinite(value) ? Number(value).toFixed(digits) : '—';
 }
@@ -44,29 +33,13 @@ function periodLabel(period: string): string {
   return /^\d{4}-\d{2}$/.test(period) ? `Kỳ ${period.slice(5)}/${period.slice(0, 4)}` : period;
 }
 
-function reportPrintedDate(): string {
-  return new Intl.DateTimeFormat('vi-VN').format(new Date());
-}
-
-/** Phần đầu biểu mẫu dùng chung cho báo cáo từng kỳ lẫn tổng hợp. Hồ sơ đơn
- * vị không bắt buộc, vì vậy khi chưa khai báo vẫn in được mà không để trống
- * một vùng nhận diện khó hiểu. */
+/** Phần đầu biểu mẫu dùng chung cho báo cáo từng kỳ lẫn tổng hợp. */
 function reportHeader(input: SigmaReportHeader, subtitle: string): string {
-  const name = input.labName.trim() || 'Đơn vị xét nghiệm';
-  const dept = input.labDept.trim();
-  const address = input.labAddress.trim();
-  const logo = input.logoData.startsWith('data:image/') ? `<div class="lab-logo"><img src="${escapeHtml(input.logoData)}" alt="Logo đơn vị"></div>` : '';
-  return `<header class="report-header">${logo ? `<div class="lab-identity">${logo}<div class="lab-copy">` : '<div class="lab-identity"><div class="lab-copy">'}<div class="lab-name">${escapeHtml(name)}</div>${dept ? `<div class="lab-detail">${escapeHtml(dept)}</div>` : ''}${address ? `<div class="lab-detail lab-address">${escapeHtml(address)}</div>` : ''}</div></div><div class="document-control"><span>Mã biểu mẫu: ${escapeHtml(input.formCode)}</span><span>Phiên bản: ${escapeHtml(input.formVersion)}</span></div><div class="report-title">${escapeHtml(input.title)}</div><div class="report-subtitle">${escapeHtml(subtitle)}</div><div class="report-meta"><span>Dữ liệu Six Sigma tại thời điểm in</span><span>Ngày in: ${reportPrintedDate()}</span></div></header>`;
-}
-
-/** Chừa đủ khoảng trắng để ký tay sau khi in PDF; không gán người ký hoặc
- * xác nhận điện tử vì app hiện chưa có nghiệp vụ phê duyệt hồ sơ. */
-function signatureBlock(): string {
-  return `<section class="signatures" aria-label="Khu vực ký duyệt"><div><b>NGƯỜI LẬP BÁO CÁO</b><span>(Ký, ghi rõ họ tên)</span><i></i></div><div><b>NGƯỜI PHỤ TRÁCH</b><span>(Ký, ghi rõ họ tên)</span><i></i></div><div><b>PHÊ DUYỆT</b><span>(Ký, ghi rõ họ tên)</span><i></i></div></section>`;
+  return documentHeader(input, input.title, subtitle, ['Dữ liệu Six Sigma tại thời điểm in']);
 }
 
 const REPORT_CSS = `
-  @page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#183843;margin:0}.report-header{position:relative;border-bottom:2px solid #31869b;padding:0 0 8px;margin-bottom:10px;text-align:center}.lab-identity{display:flex;width:fit-content;align-items:center;gap:8px;text-align:center}.lab-logo{width:42px;height:42px;flex:0 0 42px}.lab-logo img{display:block;width:100%;height:100%;object-fit:contain}.lab-name{font-size:15px;font-weight:700;color:#215968;text-transform:uppercase}.lab-detail{margin-top:2px;color:#526975}.document-control{position:absolute;top:0;right:0;display:grid;gap:2px;text-align:right;color:#526975;font-size:8px}.report-title{font-size:18px;font-weight:700;color:#215968;margin-top:10px}.report-subtitle{margin-top:3px;color:#40515c}.report-meta{display:flex;justify-content:center;gap:12px;margin-top:7px;color:#526975;font-size:9px}h2{font-size:12px;color:#fff;background:#31869b;padding:6px 8px;margin:14px 0 0;break-after:avoid;text-align:left}h3{font-size:11px;margin:9px 0 5px;color:#215968}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #c9d9d6;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere;text-align:center}th{background:#e9f1f2;font-weight:700}.setup th{width:21%;background:#f2f7f4;text-align:left}.setup td{width:29%;text-align:left}.wide{font-size:8px}.wide th{font-size:8px}tr{break-inside:avoid}.note{margin:6px 0;color:#455f69}.charts{break-before:page}.chart{break-inside:avoid;margin-top:8px}.chart svg{width:100%;height:auto;display:block}.chart svg text{font:10px Arial,sans-serif;fill:#526975}.chart svg .legend{font-weight:700;fill:#40515c}.chart svg .axis{font-weight:700;fill:#40515c}.empty-chart{padding:18px;border:1px solid #dce3e9;color:#526975}.footer{margin-top:10px;font-size:8px;color:#526975}.signatures{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:22px;break-inside:avoid;text-align:center}.signatures b{display:block;font-size:9px}.signatures span{display:block;margin-top:3px;color:#526975;font-size:8px;font-style:italic}.signatures i{display:block;height:52px}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  @page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#183843;margin:0}h2{font-size:12px;color:#fff;background:#31869b;padding:6px 8px;margin:14px 0 0;break-after:avoid;text-align:left}h3{font-size:11px;margin:9px 0 5px;color:#215968}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #c9d9d6;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere;text-align:center}th{background:#e9f1f2;font-weight:700}.setup th{width:21%;background:#f2f7f4;text-align:left}.setup td{width:29%;text-align:left}.wide{font-size:8px}.wide th{font-size:8px}tr{break-inside:avoid}.note{margin:6px 0;color:#455f69}.charts{break-before:page}.chart{break-inside:avoid;margin-top:8px}.chart svg{width:100%;height:auto;display:block}.chart svg text{font:10px Arial,sans-serif;fill:#526975}.chart svg .legend{font-weight:700;fill:#40515c}.chart svg .axis{font-weight:700;fill:#40515c}.empty-chart{padding:18px;border:1px solid #dce3e9;color:#526975}.footer{margin-top:10px;font-size:8px;color:#526975}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}${DOCUMENT_CSS}
 `;
 
 function sigmaZone(value: number | null | undefined): { label: string; color: string } {

@@ -21,6 +21,7 @@ import { DateField } from '../components/DateField';
 import { printHtmlToPdf } from '../lib/export';
 import { exportSigmaReportXlsx } from '../lib/sigma-summary-export';
 import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib/sigma-print-report';
+import { loadPrintIdentity } from '../lib/print-document';
 import { confirmDialog, errorDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 import { resolveSigmaTea, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
@@ -232,15 +233,10 @@ export function SigmaPage() {
     if (!test) return;
     // Đọc ngay trước lúc mở hộp in để tên bệnh viện/khoa luôn là hồ sơ đã
     // đồng bộ hiện hành, kể cả khi Cài đặt vừa được chỉnh ở cửa sổ khác.
-    const [lab, template] = await Promise.all([window.qcApi.getLabProfile(), window.qcApi.getReportTemplateSettings()]);
+    const identity = await loadPrintIdentity('sigma');
     const error = await printHtmlToPdf(buildSigmaPeriodPrintHtml({
+      ...identity,
       title: `Báo cáo Six Sigma — ${vnPeriod(period.period)}`,
-      labName: lab.name,
-      labDept: lab.dept,
-      labAddress: lab.address,
-      logoData: lab.logo_data,
-      formCode: template.formCode,
-      formVersion: template.version,
       testName: test.name,
       unit: test.unit,
       instrumentName,
@@ -254,15 +250,10 @@ export function SigmaPage() {
   }
   async function printAllPeriods() {
     if (!test) return;
-    const [lab, template] = await Promise.all([window.qcApi.getLabProfile(), window.qcApi.getReportTemplateSettings()]);
+    const identity = await loadPrintIdentity('sigma');
     const error = await printHtmlToPdf(buildSigmaComparisonPrintHtml({
+      ...identity,
       title: 'Báo cáo tổng hợp theo dõi Six Sigma — so sánh các kỳ',
-      labName: lab.name,
-      labDept: lab.dept,
-      labAddress: lab.address,
-      logoData: lab.logo_data,
-      formCode: template.formCode,
-      formVersion: template.version,
       testName: test.name,
       unit: test.unit,
       instrumentName,

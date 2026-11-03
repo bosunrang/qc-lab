@@ -550,7 +550,11 @@ export interface StorageInfo {
   schemaVersion: number;
   storageMode: 'file' | 'memory' | 'browser-preview';
 }
-export interface ReportTemplateSettings { formCode: string; version: string }
+/** Loại PDF có biểu mẫu kiểm soát riêng: nội kiểm, Westgard, Six Sigma, so sánh hoá chất. */
+export type ReportFormKind = 'iqc' | 'westgard' | 'sigma' | 'reagent';
+/** Thông tin kiểm soát tài liệu in ở đầu PDF. `effectiveDate` là `YYYY-MM-DD` hoặc rỗng. */
+export interface ReportForm { formCode: string; version: string; effectiveDate: string }
+export type ReportTemplateSettings = Record<ReportFormKind, ReportForm>;
 export interface FirebaseSettings {
   labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
 }
@@ -831,7 +835,7 @@ export interface QcApi {
   saveLabProfile(input: { data: { name?: string; dept?: string; address?: string; brandTitle?: string; brandSub?: string; logoText?: string; logoData?: string; clearLogo?: boolean } }): Promise<IpcResult<LabProfile>>;
   getStorageInfo(): Promise<StorageInfo>;
   getReportTemplateSettings(): Promise<ReportTemplateSettings>;
-  saveReportTemplateSettings(input: { data: { formCode?: string; version?: string } }): Promise<IpcResult<ReportTemplateSettings>>;
+  saveReportTemplateSettings(input: { data: { kind: ReportFormKind; formCode?: string; version?: string; effectiveDate?: string } }): Promise<IpcResult<ReportTemplateSettings>>;
   getFirebaseSettings(): Promise<FirebaseSettings>;
   connectFirebase(input: { data: { labCode?: string; email?: string; password?: string; config?: string } }): Promise<IpcResult<FirebaseConnectResult>>;
   syncFirebase(input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>>;

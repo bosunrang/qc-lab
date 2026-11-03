@@ -19,10 +19,12 @@ import { ERROR_CLASS_LABEL } from '../../main/domain/westgard-rules';
 import { confirmDialog, errorDialog, reauthDialog } from '../state/dialog-store';
 import { showToast } from '../state/toast-store';
 import { downloadCsv, exportTableXlsx, printHtmlToPdf } from '../lib/export';
+import { DOCUMENT_CSS, documentHeader, loadPrintIdentity, signatureBlock, type PrintIdentity } from '../lib/print-document';
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import type { NceRecordRow, ReportPointRow, TestSummary } from '../../shared/qc-api';
+import type { NceRecordRow, ReportForm, ReportFormKind, ReportPointRow, ReportTemplateSettings, TestSummary } from '../../shared/qc-api';
+import { REPORT_FORM_KINDS, REPORT_FORM_LABELS } from '../../main/domain/report-template-validation';
 import { NCE_SOURCE_LABEL, NCE_STATUS_LABEL, NCE_TIER_LABEL } from '../../main/domain/nce/labels';
 import { AsyncButton } from '../components/AsyncButton';
 
@@ -84,25 +86,28 @@ function nceRow(r: NceRecordRow): string[] {
 /** Trang in — tĩnh, tự đứng một mình (cửa sổ in ở main process nạp qua
  * `data:` URL, không dùng CSS/JS của renderer). Phụ lục NCE chỉ in khi
  * người dùng tick — đúng nhãn "(Áp dụng cho PDF và Excel)". */
-function buildPrintHtml(label: string, from: string, to: string, points: ReportPointRow[], nce: NceRecordRow[] | null): string {
+function buildPrintHtml(identity: PrintIdentity, label: string, from: string, to: string, points: ReportPointRow[], nce: NceRecordRow[] | null): string {
   const rows = points.map((p) => `<tr${p.voided ? ' class="voided"' : ''}>${pointRow(p).map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
   const appendix = nce
     ? `<h2>Phụ lục NCE</h2>${nce.length
       ? `<table><thead><tr>${NCE_HEADERS.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${nce.map((r) => `<tr>${nceRow(r).map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '<p class="meta">Không có hồ sơ khắc phục nào trong khoảng ngày này.</p>'}`
     : '';
+  const range = `Khoảng thời gian: ${from ? vnDate(from) : '(không giới hạn)'} — ${to ? vnDate(to) : '(không giới hạn)'}`;
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo nội kiểm</title>
   <style>
-    body{font-family:Arial,sans-serif;color:#14242e;padding:24px;}
-    h1{font-size:20px;} h2{font-size:15px;margin-top:22px;}
+    @page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}
+    body{font:10px Arial,sans-serif;color:#183843;margin:0;}
+    h2{font-size:12px;color:#215968;margin:16px 0 6px;break-after:avoid;}
     p.meta{color:#506674;margin-bottom:16px;}
-    table{width:100%;border-collapse:collapse;} th,td{border:1px solid #dde4e8;padding:6px 8px;text-align:left;font-size:12px;}
-    th{background:#eef2f4;} tr.voided td{color:#888;text-decoration:line-through;}
+    table{width:100%;border-collapse:collapse;} th,td{border:1px solid #c9d9d6;padding:4px 6px;text-align:left;overflow-wrap:anywhere;}
+    th{background:#e9f1f2;print-color-adjust:exact;-webkit-print-color-adjust:exact;} thead{display:table-header-group} tr{break-inside:avoid}
+    tr.voided td{color:#888;text-decoration:line-through;}
+    ${DOCUMENT_CSS}
   </style></head><body>
-  <h1>Báo cáo nội kiểm — ${esc(label)}</h1>
-  <p class="meta">Khoảng thời gian: ${esc(from ? vnDate(from) : '') || '(không giới hạn)'} — ${esc(to ? vnDate(to) : '') || '(không giới hạn)'} · In lúc ${new Date().toLocaleString('vi-VN')}</p>
+  ${documentHeader(identity, 'Báo cáo nội kiểm', label, [range])}
   <table><thead><tr>${POINT_HEADERS.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
-  ${appendix}</body></html>`;
+  ${appendix}${signatureBlock()}</body></html>`;
 }
 
 export function ReportPage() {
@@ -116,12 +121,11 @@ export function ReportPage() {
   const [lockYm, setLockYm] = useState(isoMonth());
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [formCode, setFormCode] = useState('');
-  const [formVersion, setFormVersion] = useState('');
+  const [forms, setForms] = useState<ReportTemplateSettings | null>(null);
 
   useEffect(() => { loadLocks(); loadTemplate(); }, [loadLocks, loadTemplate]);
   useCatalog(['summaries']);
-  useEffect(() => { if (template) { setFormCode(template.formCode); setFormVersion(template.version); } }, [template]);
+  useEffect(() => { if (template) setForms(template); }, [template]);
   useStoreInvalidation(['period_locks', 'report_templates'], undefined, () => { loadLocks(); loadTemplate(); });
 
   // Tìm không dấu trên nhãn hiển thị; lựa chọn mất khỏi danh sách khớp thì
@@ -168,8 +172,8 @@ export function ReportPage() {
 
   function printReport() {
     return run(async () => {
-      const { points, nce } = await collect();
-      const error = await printHtmlToPdf(buildPrintHtml(selected ? testSelectLabel(selected, summaries) : selectedId, start, end, points, nce), `bao-cao-${stamp()}.pdf`);
+      const [{ points, nce }, identity] = await Promise.all([collect(), loadPrintIdentity('iqc')]);
+      const error = await printHtmlToPdf(buildPrintHtml(identity, selected ? testSelectLabel(selected, summaries) : selectedId, start, end, points, nce), `bao-cao-${stamp()}.pdf`, { pageNumbers: true });
       if (error) await errorDialog(error);
     });
   }
@@ -212,10 +216,13 @@ export function ReportPage() {
     showToast(`Đã khoá kỳ ${label}.`);
   }
 
-  async function saveTemplateSettings() {
-    const result = await saveTemplate({ formCode, version: formVersion });
+  const editForm = (kind: ReportFormKind, patch: Partial<ReportForm>) =>
+    setForms((current) => (current ? { ...current, [kind]: { ...current[kind], ...patch } } : current));
+  async function saveTemplateSettings(kind: ReportFormKind) {
+    if (!forms) return;
+    const result = await saveTemplate({ kind, ...forms[kind] });
     if (!result.ok) { await errorDialog(result.error.message); return; }
-    showToast('Đã lưu biểu mẫu báo cáo Six Sigma.');
+    showToast(`Đã lưu biểu mẫu ${REPORT_FORM_LABELS[kind]}.`);
   }
 
   return (
@@ -223,14 +230,23 @@ export function ReportPage() {
       <PageHeader title="Báo cáo & Biểu mẫu" subtitle={summaries.length ? 'Tổng hợp hồ sơ nội kiểm theo khoảng ngày lựa chọn' : ''} />
 
       {admin && <section className="panel report-template-panel">
-        <h2 className="panel-title">Biểu mẫu báo cáo Six Sigma</h2>
+        <h2 className="panel-title">Biểu mẫu báo cáo PDF</h2>
         <div className="report-template-body">
-          <p className="hint">Dùng cho PDF Six Sigma theo kỳ và PDF tổng hợp. Tên đơn vị, logo và địa chỉ vẫn lấy từ Cài đặt &amp; Đồng bộ.</p>
-          <div className="report-template-fields">
-            <div className="field"><label htmlFor="reportFormCode">Mã biểu mẫu</label><input id="reportFormCode" value={formCode} maxLength={40} onChange={(event) => setFormCode(event.target.value)} placeholder="BM-SS-01" /></div>
-            <div className="field"><label htmlFor="reportFormVersion">Phiên bản</label><input id="reportFormVersion" value={formVersion} maxLength={20} onChange={(event) => setFormVersion(event.target.value)} placeholder="1.0" /></div>
-            <div className="report-template-action"><button className="btn teal" onClick={saveTemplateSettings} disabled={busy || !template}>Lưu biểu mẫu</button></div>
-          </div>
+          <p className="hint">In ở góc trên mỗi PDF, kèm số trang và khu vực ký. Tên đơn vị, logo và địa chỉ lấy từ Cài đặt &amp; Đồng bộ.</p>
+          {REPORT_FORM_KINDS.map((kind) => {
+            const form = forms?.[kind];
+            const saved = template?.[kind];
+            const dirty = !!form && !!saved && (form.formCode !== saved.formCode || form.version !== saved.version || form.effectiveDate !== saved.effectiveDate);
+            return (
+              <div className="report-template-fields" key={kind}>
+                <div className="report-template-name">{REPORT_FORM_LABELS[kind]}</div>
+                <div className="field"><label htmlFor={`reportFormCode-${kind}`}>Mã biểu mẫu</label><input id={`reportFormCode-${kind}`} value={form?.formCode ?? ''} maxLength={40} onChange={(event) => editForm(kind, { formCode: event.target.value })} /></div>
+                <div className="field"><label htmlFor={`reportFormVersion-${kind}`}>Phiên bản</label><input id={`reportFormVersion-${kind}`} value={form?.version ?? ''} maxLength={20} onChange={(event) => editForm(kind, { version: event.target.value })} /></div>
+                <div className="field"><label htmlFor={`reportFormDate-${kind}`}>Ngày hiệu lực</label><DateField id={`reportFormDate-${kind}`} value={form?.effectiveDate ?? ''} onChange={(value) => editForm(kind, { effectiveDate: value })} /></div>
+                <div className="report-template-action"><button className="btn teal" onClick={() => saveTemplateSettings(kind)} disabled={busy || !dirty}>Lưu</button></div>
+              </div>
+            );
+          })}
         </div>
       </section>}
 

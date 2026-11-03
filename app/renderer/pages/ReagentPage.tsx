@@ -25,6 +25,7 @@ import { ReagentChart } from '../components/ReagentChart';
 import { ReagentToolIcon } from '../components/ReagentToolIcon';
 import { confirmDialog, errorDialog } from '../state/dialog-store';
 import { printHtmlToPdf } from '../lib/export';
+import { DOCUMENT_CSS, documentHeader, escapeHtml, loadPrintIdentity, signatureBlock } from '../lib/print-document';
 import { vnDate } from '../lib/format';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { TEA_CATALOG } from '../../main/domain/tea-catalog';
@@ -381,18 +382,20 @@ export function ReagentPage() {
     const rows = summary ? store.comparisons : [current];
     const body = rows.map((c) => {
       const r = c.result;
-      return `<tr><td>${c.reagent}</td><td>${[c.lot_old, c.lot_new].filter(Boolean).join(' → ')}</td><td>${c.date ? vnDate(c.date) : ''}</td>`
+      // Tên hoá chất và số lô là chữ người dùng gõ: phải escape trước khi ghép HTML.
+      return `<tr><td>${escapeHtml(c.reagent)}</td><td>${escapeHtml([c.lot_old, c.lot_new].filter(Boolean).join(' → '))}</td><td>${c.date ? vnDate(c.date) : ''}</td>`
         + `<td>${r ? r.N : '—'}</td><td>${r ? fmt(r.bias, 3) + '%' : '—'}</td><td>${r ? fmt(r.r, 4) : '—'}</td>`
-        + `<td>${r ? verdictOf(r).title.replace('Kết luận: ', '') : 'Chưa đủ dữ liệu'}</td></tr>`;
+        + `<td>${escapeHtml(r ? verdictOf(r).title.replace('Kết luận: ', '') : 'Chưa đủ dữ liệu')}</td></tr>`;
     }).join('');
     const title = summary ? 'So sánh hoá chất — báo cáo tổng hợp' : `So sánh hoá chất — ${current.reagent}`;
-    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${title}</title>
-      <style>body{font:13px system-ui,sans-serif;color:#163541;padding:18px}h1{font-size:17px}
-      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9e0;padding:5px 7px;text-align:left}
-      th{background:#eef4f7;print-color-adjust:exact;-webkit-print-color-adjust:exact}</style></head>
-      <body><h1>${title}</h1><table><thead><tr><th>Hoá chất</th><th>Lô cũ → mới</th><th>Ngày</th><th>n</th><th>%Bias</th><th>r</th><th>Kết luận</th></tr></thead>
-      <tbody>${body}</tbody></table></body></html>`;
-    const error = await printHtmlToPdf(html, summary ? 'so-sanh-hoa-chat-tong-hop.pdf' : `so-sanh-${current.reagent}.pdf`);
+    const identity = await loadPrintIdentity('reagent');
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+      <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#183843;margin:0}
+      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9d6;padding:4px 6px;text-align:left}
+      thead{display:table-header-group}tr{break-inside:avoid}th{background:#e9f1f2;print-color-adjust:exact;-webkit-print-color-adjust:exact}${DOCUMENT_CSS}</style></head>
+      <body>${documentHeader(identity, 'So sánh hoá chất', summary ? 'Báo cáo tổng hợp' : current.reagent, [])}<table><thead><tr><th>Hoá chất</th><th>Lô cũ → mới</th><th>Ngày</th><th>n</th><th>%Bias</th><th>r</th><th>Kết luận</th></tr></thead>
+      <tbody>${body}</tbody></table>${signatureBlock()}</body></html>`;
+    const error = await printHtmlToPdf(html, summary ? 'so-sanh-hoa-chat-tong-hop.pdf' : `so-sanh-${current.reagent}.pdf`, { pageNumbers: true });
     if (error) await errorDialog(error);
   }
 

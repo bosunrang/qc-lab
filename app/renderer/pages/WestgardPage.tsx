@@ -14,6 +14,7 @@ import { QcChart, QcChartLegend, QcMultiChart, QcMultiCusumChart, type QcMultiLe
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
+import { DOCUMENT_CSS, documentHeader, loadPrintIdentity, signatureBlock } from '../lib/print-document';
 import { errorDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
 import { observedStats } from '../../main/domain/observed-stats';
@@ -171,13 +172,15 @@ export function WestgardPage() {
     const rows = westgardExportRows(displayBlocks);
     const body = rows.map(row => '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>').join('');
     const title = `Phân tích Westgard — ${currentSummary?.testName || ''}`;
+    const identity = await loadPrintIdentity('westgard');
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
-      <style>@page{size:A4 landscape}body{font:11px system-ui,sans-serif;color:#163541;padding:12px}h1{font-size:17px}
-      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9e0;padding:5px;text-align:left;overflow-wrap:anywhere}
-      tr{break-inside:avoid}th{background:#eef4f7;print-color-adjust:exact;-webkit-print-color-adjust:exact}</style></head>
-      <body><h1>${escapeHtml(title)}</h1><p>Kết luận được đánh giá theo cấu hình luật hiện tại. Thống kê chỉ dùng các lần chạy được chấp nhận.</p>
-      <table><thead><tr>${WESTGARD_EXPORT_HEADERS.map(header => '<th>' + escapeHtml(header) + '</th>').join('')}</tr></thead><tbody>${body}</tbody></table></body></html>`;
-    const error = await printHtmlToPdf(html, `westgard-${currentSummary?.testName || 'xet-nghiem'}.pdf`);
+      <style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#183843;margin:0}
+      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9d6;padding:4px 5px;text-align:left;overflow-wrap:anywhere}
+      thead{display:table-header-group}tr{break-inside:avoid}th{background:#e9f1f2;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+      p.note{margin:0 0 8px;color:#455f69}${DOCUMENT_CSS}</style></head>
+      <body>${documentHeader(identity, 'Phân tích Westgard', currentSummary?.testName || '', [])}<p class="note">Kết luận được đánh giá theo cấu hình luật hiện tại. Thống kê chỉ dùng các lần chạy được chấp nhận.</p>
+      <table><thead><tr>${WESTGARD_EXPORT_HEADERS.map(header => '<th>' + escapeHtml(header) + '</th>').join('')}</tr></thead><tbody>${body}</tbody></table>${signatureBlock()}</body></html>`;
+    const error = await printHtmlToPdf(html, `westgard-${currentSummary?.testName || 'xet-nghiem'}.pdf`, { pageNumbers: true });
     if (error) await errorDialog(error);
   }
 

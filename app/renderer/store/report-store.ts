@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import type { PeriodLockRow, IpcResult, ReportTemplateSettings } from '../../shared/qc-api';
+import type { PeriodLockRow, IpcResult, ReportForm, ReportFormKind, ReportTemplateSettings } from '../../shared/qc-api';
 
 interface ReportState {
   locks: PeriodLockRow[];
   template: ReportTemplateSettings | null;
   loadLocks: () => Promise<void>;
   loadTemplate: () => Promise<void>;
-  saveTemplate: (data: { formCode: string; version: string }) => Promise<IpcResult<ReportTemplateSettings>>;
+  saveTemplate: (data: ReportForm & { kind: ReportFormKind }) => Promise<IpcResult<ReportTemplateSettings>>;
   lock: (ym: string, note: string) => Promise<IpcResult<PeriodLockRow>>;
   unlock: (ym: string, note: string) => Promise<IpcResult<{ ym: string }>>;
 }
