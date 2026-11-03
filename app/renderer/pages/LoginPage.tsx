@@ -7,7 +7,7 @@ import type { LoginBrand } from '../../shared/qc-api';
 // brand-mark "QC" teal, tiêu đề/phụ đề. Trước đây trang này chưa từng được
 // style (chỉ `sans-serif`/input trần) vì nằm ngoài luồng AppRouter/AppShell
 // bình thường (render TRƯỚC khi đăng nhập).
-function AuthBrand({ brand }: { brand: LoginBrand | null }) {
+export function AuthBrand({ brand }: { brand: LoginBrand | null }) {
   const title = brand?.brand_title || 'QC Lab';
   const sub = brand?.brand_sub || 'Nội kiểm xét nghiệm';
   const mark = (brand?.logo_text || 'QC').slice(0, 4);

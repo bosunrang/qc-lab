@@ -537,6 +537,10 @@ td .hint{margin-top:var(--space-0-5);color:var(--text-tertiary);}
 .auth-actions{margin-top:var(--space-1);}
 .auth-actions .btn{width:100%;min-height:var(--control-h);justify-content:center;}
 .auth-hint{margin-top:var(--space-5);font-size:var(--text-xs);color:var(--text-tertiary);text-align:center;line-height:var(--leading-body);}
+/* Tự đổi mật khẩu (ChangePasswordForm): màn bắt buộc đổi và hộp ở trang Người dùng. */
+.change-password-form{display:grid;gap:var(--field-gap);}
+.change-password-actions{display:flex;justify-content:flex-end;}
+.auth-form .change-password-actions .btn{width:100%;min-height:var(--control-h);justify-content:center;}
 
 
 .space-after-item{margin-bottom:var(--space-2);}

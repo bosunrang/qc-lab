@@ -55,11 +55,25 @@ export async function bootstrapAndLogin(page, user = ADMIN) {
   await login(page, user);
 }
 
+/** Đăng nhập. Tài khoản do admin tạo phải đổi mật khẩu ở lần đầu (GV5): gặp
+ * màn đổi mật khẩu thì đổi sang mật khẩu mới và ghi lại vào `user.password`
+ * cho các lần đăng nhập sau. Trả `true` khi đã phải đổi mật khẩu. */
 export async function login(page, user) {
   await page.fill('#login-username', user.username);
   await page.fill('#login-password', user.password);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
-  await page.getByRole('navigation', { name: 'Điều hướng chính' }).waitFor();
+  const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+  const forced = page.locator('#cpw-old');
+  await nav.or(forced).first().waitFor();
+  if (!(await forced.isVisible())) return false;
+  const next = `${user.password}-doi`;
+  await forced.fill(user.password);
+  await page.fill('#cpw-new', next);
+  await page.fill('#cpw-confirm', next);
+  await page.getByRole('button', { name: 'Đổi mật khẩu và tiếp tục' }).click();
+  await nav.waitFor();
+  user.password = next;
+  return true;
 }
 
 /** Ngày hôm nay theo giờ địa phương của cửa sổ, dạng YYYY-MM-DD. */

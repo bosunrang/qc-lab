@@ -25,7 +25,7 @@ Nguyên tắc chung cho mọi gói:
 | GV2 | Kết luận QC không hồi tố | N2 | P0 | L | sau GV1 |
 | GV3 | Toàn vẹn nhật ký | A2, A7, A8 | P0 | M | — |
 | GV4 | Huỷ điểm của run bị loại + xem xét định kỳ dữ liệu QC | N4, ISO 7.3.7.2 | P0 | M–L | sau GV1 |
-| GV5 | Phiên và quyền truy cập | A1, A3, A10, Q1 | P0 | M | sau commit EQA |
+| GV5 | Phiên và quyền truy cập — đã làm 02/11/2026 | A1, A3, A10, Q1 | P0 | M | — |
 | GV6 | Đồng bộ Firebase an toàn | A4, A5 | P0 | M | — |
 | GV7 | Sửa nghiệp vụ EQA | N5, N6 | P1 | S–M | sau commit EQA |
 | GV8 | Sửa nghiệp vụ Westgard, lô, dải | N7, N9–N12, N14 | P1 | M | sau GV2 |
@@ -212,6 +212,43 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   khi nhập lại; khoá kỳ cảnh báo khi còn mục chưa xem xét.
 
 ## GV5 — Phiên và quyền truy cập (A1, A3, A10, Q1, P0, M)
+
+**Đã làm 02/11/2026.**
+
+- **Cổng quyền `ipc/access-gate.ts`, chạy trước mọi thao tác** (IPC máy chính, RPC LAN, bản
+  xem trước):
+  - đọc lại tài khoản từ CSDL ở mỗi lời gọi; tài khoản không còn hoặc đã khoá thì coi như
+    chưa đăng nhập;
+  - handler nhận vai trò mới nhất, không phải vai trò lúc đăng nhập;
+  - chỉ 7 kênh công khai: `hasAnyUsers`, `currentUser`, `bootstrapAdmin`, `login`,
+    `logout`, `getLoginBrand`, `log:clientError`;
+  - chặn theo trang dựa trên `page-roles.ts`. Áp cho Nhật ký, Người dùng, các thao tác ghi
+    của Cấu hình chung, Six Sigma, So sánh hoá chất, Ngoại kiểm, hồ sơ NCE chi tiết, Báo
+    cáo, các thao tác ghi của Nhập QC và Cài đặt. Dữ liệu dùng chung nhiều trang (danh mục,
+    điểm QC, tóm tắt Westgard, tóm tắt NCE, hồ sơ đơn vị) chỉ cần đăng nhập;
+  - tài khoản đang phải đổi mật khẩu chỉ được đổi mật khẩu và đăng xuất.
+- **Phiên LAN:** giữ dấu vân tay mật khẩu (`lan/session-check.ts`) và kiểm lại ở mỗi yêu cầu,
+  kể cả luồng sự kiện.
+  - Khoá, xoá tài khoản, đặt lại mật khẩu hay phục hồi bản sao lưu đều thu hồi phiên ngay;
+    hạ quyền có hiệu lực ở yêu cầu kế tiếp.
+  - Tự đổi mật khẩu giữ phiên đang dùng; các phiên khác của tài khoản đó bị thu hồi.
+- **Bản đóng gói:** `devTools: false`, `Menu.setApplicationMenu(null)`, không nhận
+  `QCLAB_DEV_SERVER_URL`.
+- **Đổi mật khẩu:** thêm màn bắt buộc đổi mật khẩu (`ChangePasswordPage`). Trước đây cờ
+  `must_change_password` có trong CSDL nhưng giao diện chưa hề có chỗ tự đổi mật khẩu. Nút
+  "Đổi mật khẩu" của chính mình ở trang Người dùng dùng form tự đổi, không còn mở hộp "Đặt
+  lại mật khẩu" của admin.
+- **Client LAN (`lan/http-api.ts`):**
+  - 401 thì về màn đăng nhập kèm lý do;
+  - thao tác đọc lỗi (`readFailed`) thì ném lỗi;
+  - màn đăng nhập không gọi RPC khi chưa có phiên;
+  - mọi nơi nghe dùng chung một `EventSource` (Q2).
+- **Test:** `access-gate.test.mjs`, `lan-session-revoke.test.mjs`, `lan-http-api.test.mjs`.
+  E2E `lan.e2e.mjs` kiểm KTV mới phải đổi mật khẩu khi đăng nhập trên máy trạm.
+- **Còn lại của A10, ngoài phạm vi GV5:**
+  - `importLisResult` tin bản ghi client gửi lên;
+  - thời gian phản hồi đăng nhập để lộ tài khoản có tồn tại hay không;
+  - `verifyOwnPassword` không giới hạn số lần thử.
 
 - **Phương án:**
   1. `LanSession` chỉ giữ `userId` và dấu vân tay `pass_hash`. Hàm

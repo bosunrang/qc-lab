@@ -93,7 +93,12 @@ test('NCE: đọc tóm tắt cần đăng nhập; người chỉ xem không đ�
   assert.deepEqual(business.listNce.run(sessionContext(() => viewer)), [], 'giữ quyền xem tóm tắt của Tổng quan và Báo cáo');
   for (const name of ['getNce', 'listNceQueue', 'listNceUsers', 'getNceConfig', 'previewNceRelease']) {
     assert.throws(() => business[name].run(sessionContext(() => viewer), 'không-tồn-tại'), /không có quyền xem hồ sơ chi tiết/, name);
-    if (name !== 'previewNceRelease') await assert.rejects(lan(name, ['không-tồn-tại'], viewer), /không có quyền xem hồ sơ chi tiết/, name);
+    // Qua LAN, lỗi của thao tác đọc gói kèm `readFailed` để client ném lại (GV5).
+    if (name !== 'previewNceRelease') {
+      const result = await lan(name, ['không-tồn-tại'], viewer);
+      assert.equal(result.readFailed, true, name);
+      assert.match(result.error.message, /không có quyền xem hồ sơ chi tiết/, name);
+    }
   }
 });
 
@@ -278,7 +283,9 @@ test('exception của thao tác trả IpcResult thành { ok: false }; thao tác 
     assert.deepEqual(await lan('createNce', [NCE_INPUT], tech), expected, 'LAN');
     assert.deepEqual(await api.createNce(NCE_INPUT), expected, 'bản xem trước');
     await assert.rejects(handlers.get('config:listTests')({}), /SQLITE_BUSY/);
-    await assert.rejects(lan('listTests', [], tech), /SQLITE_BUSY/);
+    const lanRead = await lan('listTests', [], tech);
+    assert.equal(lanRead.readFailed, true, 'LAN gói lỗi đọc kèm readFailed để client ném lại');
+    assert.match(lanRead.error.message, /SQLITE_BUSY/);
     await assert.rejects(api.listTests(), /SQLITE_BUSY/);
   } finally {
     console.error = quiet;

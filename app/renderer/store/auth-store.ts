@@ -4,6 +4,7 @@
 // quyết định quyền (mọi gate thật nằm ở main/ipc/auth-handlers.ts).
 import { create } from 'zustand';
 import type { PublicUser, IpcResult } from '../../shared/qc-api';
+import { onSessionEnded, SESSION_ENDED_MESSAGE } from '../lib/session-events';
 
 type Status = 'checking' | 'needs-bootstrap' | 'logged-out' | 'logged-in';
 
@@ -74,5 +75,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (user) set({ user });
   },
 }));
+
+// Máy chủ LAN báo phiên kết thúc (401): về màn đăng nhập kèm lý do (GV5).
+onSessionEnded(() => {
+  if (useAuthStore.getState().status !== 'logged-in') return;
+  useAuthStore.setState({ status: 'logged-out', user: null, error: SESSION_ENDED_MESSAGE });
+});
 
 

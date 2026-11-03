@@ -15,7 +15,7 @@ export const ROLES = ['admin', 'technician', 'viewer'] as const;
 export type Role = typeof ROLES[number];
 
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,40}$/;
-const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 8;
 
 function cleanRole(value: unknown): Role {
   return (ROLES as readonly string[]).includes(value as string) ? (value as Role) : 'technician';

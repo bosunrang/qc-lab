@@ -43,7 +43,8 @@ test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao t
 
     const station = await openStation(app, secureUrl, { partition: 'station', trustedCaPem: caPem });
     await station.locator('#login-username').waitFor();
-    await login(station, TECH);
+    // Tài khoản vừa tạo phải đổi mật khẩu ngay ở lần đăng nhập đầu, kể cả trên máy trạm (GV5).
+    assert.equal(await login(station, TECH), true, 'KTV mới phải đổi mật khẩu trước khi vào app');
     // Chỉ đếm lỗi từ sau khi đăng nhập: trước đó `/api/session` và
     // `/api/events` trả 401 là đúng thiết kế, trình duyệt vẫn in ra console.
     const stationErrors = watchErrors(station);

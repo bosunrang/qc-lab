@@ -22,6 +22,8 @@ import type { PublicUser } from '../../shared/qc-api';
 import { AsyncButton } from '../components/AsyncButton';
 import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../lib/field-error';
 import { useInvalidField } from '../lib/useInvalidField';
+import { ChangePasswordForm } from '../components/ChangePasswordForm';
+import { showToast } from '../state/toast-store';
 
 /** Mã lỗi `createUser` / `resetPassword` (`auth-validation.ts`) → ô cần sửa.
  * Các ô dùng state, không nằm trong `<form>`, nên tìm qua `data-field`. */
@@ -211,7 +213,9 @@ export function UsersPage() {
       </div>
 
       {permsFor && <PermsModal user={permsFor} onClose={() => setPermsFor(null)} />}
-      {resetFor && <ResetPasswordModal user={resetFor} onClose={() => setResetFor(null)} />}
+      {resetFor && (resetFor.id === me?.id
+        ? <OwnPasswordModal onClose={() => setResetFor(null)} />
+        : <ResetPasswordModal user={resetFor} onClose={() => setResetFor(null)} />)}
     </>
   );
 }
@@ -270,6 +274,16 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
             )}
       </div>
       <div className="hint">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào. Người duyệt hồ sơ NCE phải độc lập với người đã tham gia hồ sơ đó.</div>
+    </Modal>
+  );
+}
+
+/** Tự đổi mật khẩu của chính mình: cần mật khẩu hiện tại, không bật cờ phải
+ * đổi mật khẩu như khi admin đặt lại cho người khác. */
+function OwnPasswordModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Đổi mật khẩu của bạn" size="sm" onClose={onClose}>
+      <ChangePasswordForm onDone={() => { showToast('Đã đổi mật khẩu.'); onClose(); }} />
     </Modal>
   );
 }

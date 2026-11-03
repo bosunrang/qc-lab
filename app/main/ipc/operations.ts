@@ -91,6 +91,20 @@ export class NotSignedInError extends Error {
   constructor() { super('Chưa đăng nhập.'); }
 }
 
+/** Lời gọi bị cổng quyền (`access-gate.ts`) chặn: không có quyền vào trang của
+ * thao tác, hoặc tài khoản phải đổi mật khẩu trước. Lỗi dự kiến nên không ghi
+ * log lỗi như lỗi lập trình. */
+export class AccessError extends Error {
+  constructor(readonly code: 'forbidden' | 'password-change-required', message: string) { super(message); }
+}
+
+/** Cổng quyền chạy trước MỌI thao tác (GV5): đọc lại tài khoản từ CSDL, chặn
+ * theo trang và theo cờ phải đổi mật khẩu, trả ngữ cảnh mang vai trò mới
+ * nhất. Ném `NotSignedInError`/`AccessError` khi không cho chạy. */
+export interface AccessGate {
+  guard(channel: string, ctx: CallContext): CallContext;
+}
+
 /** Ngữ cảnh đọc danh tính từ một phiên đang giữ trong bộ nhớ (máy chính,
  * bản xem trước). Đọc lại mỗi lần gọi `actor()`, không chụp lúc tạo. */
 export function sessionContext(current: () => Actor | null): CallContext {
@@ -130,7 +144,7 @@ const DATA_APIS: ReadonlySet<string> = new Set(DATA_API_NAMES);
 /** Chuyển exception thành `IpcResult` lỗi. Lỗi ngoài dự kiến ghi ra console
  * và tệp log của main để lần được, vì renderer chỉ thấy câu thông báo. */
 export function errorResult(error: unknown, operation?: string): { ok: false; error: { code: string; message: string } } {
-  if (error instanceof NotSignedInError) return { ok: false, error: { code: error.code, message: error.message } };
+  if (error instanceof NotSignedInError || error instanceof AccessError) return { ok: false, error: { code: error.code, message: error.message } };
   console.error(error);
   const described = describeError(error);
   logEvent({ level: 'error', source: 'ipc', message: operation ? `${operation}: ${described.message}` : described.message, detail: described.stack });
@@ -138,10 +152,12 @@ export function errorResult(error: unknown, operation?: string): { ok: false; er
   return { ok: false, error: { code: 'internal-error', message } };
 }
 
-async function invokeOperation(name: string, operation: AnyOperation, ctx: CallContext, args: unknown[]): Promise<unknown> {
-  if (DATA_APIS.has(name)) return operation.run(ctx, ...args);
+async function invokeOperation(name: string, operation: AnyOperation, ctx: CallContext, args: unknown[], gate?: AccessGate): Promise<unknown> {
+  // Cổng quyền nằm TRONG phần bọc lỗi: thao tác trả `IpcResult` nhận
+  // `{ ok:false, code }`, thao tác đọc ném lỗi như mọi lỗi đọc khác.
+  if (DATA_APIS.has(name)) return operation.run(gate ? gate.guard(operation.channel, ctx) : ctx, ...args);
   try {
-    return await operation.run(ctx, ...args);
+    return await operation.run(gate ? gate.guard(operation.channel, ctx) : ctx, ...args);
   } catch (error) {
     return errorResult(error, name);
   }
@@ -316,12 +332,13 @@ export function registerIpcOperations(
   ipc: { handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void },
   tables: object[],
   ctx: CallContext,
+  gate?: AccessGate,
 ): void {
   const seen = new Set<string>();
   for (const [name, operation] of entriesOf(tables)) {
     if (seen.has(operation.channel)) throw new Error(`Kênh IPC bị khai hai lần: ${operation.channel} (${name}).`);
     seen.add(operation.channel);
-    ipc.handle(operation.channel, (_event, ...args) => invokeOperation(name, operation, ctx, args));
+    ipc.handle(operation.channel, (_event, ...args) => invokeOperation(name, operation, ctx, args, gate));
   }
 }
 
@@ -333,21 +350,27 @@ export const LAN_UNKNOWN_OPERATION = {
 /** Bộ điều phối RPC của máy trạm LAN: tra ĐÚNG tên hàm `QcApi` trong danh
  * sách `lan: true`, chạy với actor của phiên HTTP. Không xếp hàng: mỗi lời
  * gọi mang danh tính riêng nên chạy song song như IPC của máy chính. */
-export function createLanInvoker(tables: object[]): (method: string, args: unknown[], actor: Actor) => Promise<unknown> {
+export function createLanInvoker(tables: object[], gate?: AccessGate): (method: string, args: unknown[], actor: Actor) => Promise<unknown> {
   // `Map` thay vì tra thuộc tính object: tên như `constructor`, `__proto__`
   // không được khớp vào prototype.
   const allowed = new Map(entriesOf(tables).filter(([, operation]) => operation.lan));
   return async (method, args, actor) => {
     const operation = allowed.get(method);
     if (!operation) return LAN_UNKNOWN_OPERATION;
-    return invokeOperation(method, operation, { actor: () => actor }, args);
+    try {
+      return await invokeOperation(method, operation, { actor: () => actor }, args, gate);
+    } catch (error) {
+      // Thao tác đọc ném lỗi; qua HTTP thì gói lại kèm `readFailed` để client
+      // LAN ném lại đúng lỗi, thay vì nhận một object lỗi ở chỗ chờ mảng.
+      return { ...errorResult(error, method), readFailed: true };
+    }
   };
 }
 
 /** Biến bảng thành các hàm `QcApi` gắn sẵn một ngữ cảnh — dùng cho bản xem
  * trước, nơi renderer gọi thẳng hàm thay vì qua IPC. */
 export type BoundOperations<N extends ApiName> = { [K in N]: (...args: Args<K>) => Promise<Result<K>> };
-export function bindOperations<N extends ApiName>(table: OperationTable<N>, ctx: CallContext): BoundOperations<N> {
+export function bindOperations<N extends ApiName>(table: OperationTable<N>, ctx: CallContext, gate?: AccessGate): BoundOperations<N> {
   return Object.fromEntries(entriesOf([table]).map(([name, operation]) =>
-    [name, (...args: unknown[]) => invokeOperation(name, operation, ctx, args)])) as unknown as BoundOperations<N>;
+    [name, (...args: unknown[]) => invokeOperation(name, operation, ctx, args, gate)])) as unknown as BoundOperations<N>;
 }

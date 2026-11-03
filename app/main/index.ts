@@ -7,6 +7,8 @@ import { openDatabase } from './db/open-database';
 import { type Actor, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier } from './ipc/shared';
 import { createBusinessOperations, createLanInvoker, registerIpcOperations, sessionContext } from './ipc/operations';
 import { createDesktopOperations, desktopActor } from './ipc/desktop-operations';
+import { createAccessGate } from './ipc/access-gate';
+import { createSessionCheck } from './lan/session-check';
 import { createConfigHandlers } from './ipc/config-handlers';
 import { createEntryHandlers } from './ipc/entry-handlers';
 import { createWestgardHandlers } from './ipc/westgard-handlers';
@@ -64,11 +66,16 @@ app.on('child-process-gone', (_event, details) => {
 let tray: Tray | null = null;
 let quitting = false;
 let mainWindow: BrowserWindow | null = null;
-const DEV_SERVER_URL = process.env.QCLAB_DEV_SERVER_URL;
+// Bản đóng gói không nhận địa chỉ dev server từ biến môi trường: nếu không,
+// ai đặt được biến môi trường là thay được toàn bộ giao diện (GV5).
+const DEV_SERVER_URL = app.isPackaged ? undefined : process.env.QCLAB_DEV_SERVER_URL;
+/** DevTools chỉ có khi chạy từ mã nguồn. Bản đóng gói mở được DevTools thì
+ * người chưa đăng nhập gọi thẳng được IPC của máy chính (GV5). */
+const DEV_TOOLS = !app.isPackaged;
 const INDEX_HTML = path.join(__dirname, '..', 'renderer', 'index.html');
 /** URL trang chính — mốc để quyết định điều hướng, xem `window-guard.ts`. */
 const APP_ENTRY_URL = DEV_SERVER_URL || pathToFileURL(INDEX_HTML).href;
-const CHILD_WINDOW_PREFERENCES = { sandbox: true, contextIsolation: true, nodeIntegration: false };
+const CHILD_WINDOW_PREFERENCES = { sandbox: true, contextIsolation: true, nodeIntegration: false, devTools: DEV_TOOLS };
 
 /** Áp cho MỌI webContents (cửa sổ chính, cửa sổ hướng dẫn, cửa sổ in PDF):
  * chỉ hiển thị trang của app; liên kết `https:` ra ngoài mở bằng trình duyệt
@@ -222,6 +229,7 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      devTools: DEV_TOOLS,
     },
   });
 
@@ -267,7 +275,9 @@ async function createWindow(): Promise<void> {
       electronVersion: process.versions.electron,
     }),
   ];
-  registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor));
+  // Cổng quyền đọc lại tài khoản ở MỖI lời gọi, cho cả máy chính lẫn máy trạm.
+  const accessGate = createAccessGate(db);
+  registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor), accessGate);
 
   const lanTls = startLanTls(userDataDir);
   const lan = new LanHttpServer<PublicUser>({
@@ -275,7 +285,8 @@ async function createWindow(): Promise<void> {
     getLoginBrand: () => settings.getLoginBrand(),
     actorOf: desktopActor,
     currentUser: (actor) => auth.getUser(actor.userId),
-    invoke: createLanInvoker(operationTables),
+    sessionCheck: createSessionCheck(db),
+    invoke: createLanInvoker(operationTables, accessGate),
     staticDir: path.join(__dirname, '..', 'renderer'),
     tls: { credentials: () => lanTls.credentials, caCertificate: () => lanTls.ca.certDer },
   });
@@ -317,6 +328,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', showMainWindow);
   app.on('web-contents-created', (_event, contents) => guardNavigation(contents));
   app.whenReady().then(() => {
+    // Bản đóng gói bỏ menu mặc định của Electron (có mục mở DevTools, tải lại).
+    if (app.isPackaged) Menu.setApplicationMenu(null);
     logEvent({ level: 'info', source: 'app', message: `Khởi động QC Lab ${app.getVersion()} · Electron ${process.versions.electron}` });
     return createWindow();
   }).catch((error) => {

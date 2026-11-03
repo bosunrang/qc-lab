@@ -32,6 +32,7 @@ import { createSettingsHandlers } from '../../main/ipc/settings-handlers';
 import { createReportHandlers } from '../../main/ipc/report-handlers';
 import { createLisHandlers } from '../../main/ipc/lis-handlers';
 import { bindOperations, createBusinessOperations, sessionContext } from '../../main/ipc/operations';
+import { createAccessGate } from '../../main/ipc/access-gate';
 import { readOperationMode } from '../../main/db/operation-mode';
 import type { QcApi, IpcResult } from '../../shared/qc-api';
 import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from '../lib/browser-export';
@@ -120,6 +121,9 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   const business = bindOperations(
     createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis }),
     sessionContext(() => sessionActor),
+    // Cùng cổng quyền với Electron (GV5): khoá tài khoản, quyền theo trang và
+    // cờ phải đổi mật khẩu có hiệu lực cả ở bản xem trước.
+    createAccessGate(db),
   );
 
   // Khôi phục phiên sau F5 — đọc lại từ DB (không tin dữ liệu trong

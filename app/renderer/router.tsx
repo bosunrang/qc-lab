@@ -14,6 +14,7 @@ import { AuditPage } from './pages/AuditPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ReportPage } from './pages/ReportPage';
 import { LoginPage } from './pages/LoginPage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { AppShell } from './components/AppShell';
 import { useAuthStore } from './store/auth-store';
 import { PAGE_DEFS, canUserAccessPage, firstAccessPath } from './lib/permissions';
@@ -55,6 +56,8 @@ export function AppRouter() {
   // màn hình trước khi form đăng nhập hoàn chỉnh xuất hiện.
   if (status === 'checking') return <LoginPage />;
   if (status !== 'logged-in') return <LoginPage />;
+  // Main chặn mọi thao tác khác tới khi đổi mật khẩu xong (GV5).
+  if (user?.mustChangePassword) return <ChangePasswordPage />;
 
   return (
     <HashRouter>
