@@ -1,7 +1,9 @@
-// Đọc "Bản phân tích kết quả ngoại kiểm tra" dạng PDF của Trung tâm Kiểm chuẩn
-// Xét nghiệm TP.HCM (VEQAS). Hàm thuần: renderer trích chữ kèm toạ độ bằng
-// pdf.js rồi gọi `parseVeqasReport`; main vẫn kiểm lại toàn bộ khi xem trước
-// và khi ghi (`checkEqaImport`).
+// Đọc báo cáo ngoại kiểm dạng PDF. Hiện hỗ trợ:
+//   - VEQAS của Trung tâm Kiểm chuẩn Xét nghiệm TP.HCM;
+//   - RIQAS Monthly Clinical Chemistry của Randox.
+// Hàm thuần: renderer trích chữ kèm toạ độ bằng pdf.js rồi gọi
+// `parseEqaPdfReport`; main vẫn kiểm lại toàn bộ khi xem trước và khi ghi qua
+// cổng nghiệp vụ `checkEqaImport`.
 //
 // Bố cục một báo cáo (một đơn vị × một nhóm thiết bị × một đợt):
 //   - trang bìa: mã đơn vị, tên nhóm thiết bị, chương trình, mã chương trình,
@@ -121,6 +123,18 @@ export function splitVeqasTitle(title: string): { name: string; code: string; un
 const ASSIGNED_LEVEL_TEXT: Readonly<Record<EqaPeerLevel, string>> = { all: 'Tất cả phương pháp', method: 'Nhóm phương pháp', instrument: 'Nhóm thiết bị' };
 
 interface DetailRow { page: number; name: string; code: string; unit: string; result: number | null; assigned: number | null; sigmaP: number | null; z: number | null; peer: EqaPeer; methodGroup: string; level: EqaPeerLevel | null }
+
+/** Ghép phần chữ nằm trong một vùng ngang. Báo cáo RIQAS đặt nhãn trục biểu
+ * đồ cùng hàng với bảng, nên cần giới hạn vùng thay vì đọc cả dòng. */
+function textInRange(line: Line, minX: number, maxX: number): string {
+  return line.items.filter((item) => item.x >= minX && item.x <= maxX).map((item) => item.str.trim()).filter(Boolean).join(' ');
+}
+
+/** Ngày RIQAS `dd/mm/yyyy` → `yyyy-mm-dd`. */
+function dateFromDmy(value: string): string {
+  const match = value.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : '';
+}
 
 /** Đọc một trang thông số; `null` nếu trang không phải trang thông số. */
 function parseDetailPage(lines: readonly Line[], page: number, instrumentGroup: string): DetailRow | { page: number; error: string } | null {
@@ -242,4 +256,162 @@ export function parseVeqasReport(doc: EqaPdfDocument): EqaPdfReport {
     },
     rows, errors, warnings,
   };
+}
+
+interface RiqasDetailRow extends DetailRow { peerGroup: string }
+
+/** Đọc một trang kết quả RIQAS. Bảng thống kê nằm trong vùng x < 330; phần
+ * ngoài vùng này là nhãn trục biểu đồ và không phải dữ liệu bảng. */
+function parseRiqasDetailPage(lines: readonly Line[], page: number): RiqasDetailRow | { page: number; error: string } | null {
+  const head = lines.findIndex((line) => {
+    const text = fold(textInRange(line, 0, 330));
+    return text.startsWith('n mean cv%') && text.includes('sdpa');
+  });
+  if (head < 0) return null;
+
+  const titleLine = lines.slice(0, head).reverse().find((line) => textInRange(line, 0, 160).includes(','));
+  const title = titleLine ? textInRange(titleLine, 0, 160).replace(/\0/g, '').trim() : '';
+  const comma = title.lastIndexOf(',');
+  const name = comma >= 0 ? title.slice(0, comma).trim() : title;
+  const unit = comma >= 0 ? title.slice(comma + 1).trim() : '';
+  const code = name;
+  if (!code) return { page, error: `trang ${page}: không đọc được tên thông số` };
+
+  const resultLine = lines.find((line) => startsWithLabel(line, 'Your Result'));
+  const assignedLine = lines.find((line) => startsWithLabel(line, 'Mean for Comparison')
+    && /Mean for Comparison\s+-?[\d.,]+/i.test(textInRange(line, 0, 330)));
+  const resultText = resultLine ? textInRange(resultLine, 0, 330) : '';
+  const assignedText = assignedLine ? textInRange(assignedLine, 0, 330) : '';
+  const resultMatch = resultText.match(/Your Result\s+(-?[\d.,]+)\s+SDI\s+(-?[\d.,]+)/i);
+  const assignedMatch = assignedText.match(/Mean for Comparison\s+(-?[\d.,]+)/i);
+  const result = reportNumber(resultMatch?.[1]);
+  const z = reportNumber(resultMatch?.[2]);
+  const assigned = reportNumber(assignedMatch?.[1]);
+  if (result === null || assigned === null || z === null) {
+    return { page, error: `trang ${page} (${code}): không đọc được Your Result, Mean for Comparison hoặc SDI` };
+  }
+
+  const end = lines.findIndex((line, index) => index > head && startsWithLabel(line, 'Your Result'));
+  const stats = (end > head ? lines.slice(head + 1, end) : []).map((line) => {
+    const parsed = splitTrailingNumbers(textInRange(line, 0, 330), 6);
+    return { ...parsed, y: line.y };
+  }).filter((row) => row.label && row.nums.length === 6);
+  const toPeer = (row: typeof stats[number] | undefined): EqaPeerStats | undefined => {
+    if (!row) return undefined;
+    const [n, mean, cv, _uncertainty, sd] = row.nums;
+    return { n, mean, sd, cv };
+  };
+  const allRow = stats.find((row) => fold(row.label).startsWith('all method'));
+  const methodRow = stats.find((row) => fold(row.label).startsWith('ion selective electrode'))
+    ?? stats.find((row) => row !== allRow);
+  const instrumentRows = stats.filter((row) => row !== allRow && row !== methodRow);
+  const instrumentRow = [...instrumentRows].reverse().find((row) => eqaSameValue(row.nums[1], assigned)) ?? instrumentRows.at(-1);
+  const peer: EqaPeer = { all: toPeer(allRow), method: toPeer(methodRow), instrument: toPeer(instrumentRow) };
+  const sigmaP = peer.instrument?.sd ?? null;
+  if (sigmaP === null) return { page, error: `trang ${page} (${code}): không xác định được SDPA của nhóm so sánh` };
+
+  return {
+    page, name, code, unit, result, assigned, sigmaP, z, peer,
+    methodGroup: methodRow?.label ?? '',
+    // Randox cắt mất ký tự cuối của nhãn dài ngay trong lớp chữ của PDF.
+    peerGroup: (instrumentRow?.label ?? '').replace(/\binstrumen$/i, 'instrument'), level: 'instrument',
+  };
+}
+
+/** Trang tổng hợp RIQAS: tên thông số → [Mean for Comparison, Your Result, SDI]. */
+function parseRiqasSummary(lines: readonly Line[]): Map<string, number[]> | null {
+  const head = lines.findIndex((line) => {
+    const text = fold(line.text);
+    return text.startsWith('analyte') && text.includes('sdi') && text.includes('rmts');
+  });
+  if (head < 0) return null;
+  const out = new Map<string, number[]>();
+  for (const line of lines.slice(head + 1)) {
+    const { label, nums } = splitTrailingNumbers(line.text, 8);
+    if (!label || nums.length !== 8) continue;
+    out.set(fold(label).replace(/[^a-z0-9]/g, ''), nums.slice(0, 3));
+  }
+  return out;
+}
+
+/** Đọc báo cáo RIQAS Monthly Clinical Chemistry. SDI là z-score; SDPA của
+ * đúng nhóm dùng để so sánh là σp để ứng dụng tự tính lại và đối chiếu. */
+export function parseRiqasReport(doc: EqaPdfDocument): EqaPdfReport {
+  const pages = doc.pages.map(linesOf);
+  const all = pages.flat();
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const cover = pages[0] ?? [];
+  const allText = all.map((line) => line.text).join(' ');
+
+  const labRef = allText.match(/LABORATORY REF\.?\s*NO\.?\s*([A-Z0-9.-]+)/i)?.[1] ?? '';
+  const cycle = allText.match(/\bCYCLE\s+([A-Z0-9.-]+)/i)?.[1] ?? '';
+  const sample = allText.match(/\bSAMPLE\s+([A-Z0-9.-]+)/i)?.[1] ?? '';
+  const program = all.find((line) => /^monthly clinical chemistry$/i.test(line.text.trim()))?.text.trim()
+    ?? (allText.match(/MONTHLY CLINICAL CHEMISTRY/i)?.[0] ?? '');
+  const configuration = cover.find((line) => /^\s*[A-Z]{2,8}\s+-\s+/.test(line.text))?.text.trim() ?? '';
+  const parts = configuration.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean);
+  const programCode = parts[0] ?? '';
+  const instrumentGroup = parts.at(-1) ?? '';
+  const issueDate = dateFromDmy(allText.match(/Issue Date:\s*\d{2}\/\d{2}\/\d{4}/i)?.[0] ?? '');
+  const reportDate = issueDate || doc.creationDate;
+  if (!issueDate && doc.creationDate) warnings.push(`${doc.fileName}: không đọc được Issue Date; dùng ngày tạo file PDF ${doc.creationDate}.`);
+
+  const details: RiqasDetailRow[] = [];
+  pages.forEach((lines, index) => {
+    const parsed = parseRiqasDetailPage(lines, index + 1);
+    if (!parsed) return;
+    if ('error' in parsed) errors.push(`${doc.fileName}: ${parsed.error}.`);
+    else details.push(parsed);
+  });
+  if (!details.length) errors.push(`${doc.fileName}: không tìm thấy trang kết quả — file không phải báo cáo RIQAS Monthly Clinical Chemistry.`);
+
+  const summary = pages.map(parseRiqasSummary).find((value) => value && value.size) ?? null;
+  if (!summary) warnings.push(`${doc.fileName}: không có trang tổng hợp để đối chiếu.`);
+  else {
+    const seen = new Set<string>();
+    for (const row of details) {
+      const key = fold(row.code).replace(/[^a-z0-9]/g, '');
+      seen.add(key);
+      const values = summary.get(key);
+      if (!values) {
+        errors.push(`${doc.fileName}: thông số ${row.code} (trang ${row.page}) không có trong trang tổng hợp.`);
+        continue;
+      }
+      const [assigned, result, z] = values;
+      if (!eqaSameValue(row.assigned, assigned) || !eqaSameValue(row.result, result) || !eqaSameValue(row.z, z)) {
+        errors.push(`${doc.fileName}: thông số ${row.code} — số liệu trang ${row.page} khác trang tổng hợp.`);
+      }
+    }
+    for (const key of summary.keys()) if (!seen.has(key)) errors.push(`${doc.fileName}: trang tổng hợp có thông số "${key}" nhưng không có trang chi tiết.`);
+  }
+
+  if (!reportDate) errors.push(`${doc.fileName}: không xác định được ngày báo cáo.`);
+  if (!labRef) errors.push(`${doc.fileName}: không đọc được mã đơn vị (Laboratory Ref. No.).`);
+  if (!cycle || !sample) errors.push(`${doc.fileName}: không đọc được Cycle hoặc Sample.`);
+
+  // Mỗi sample RIQAS là một lần đánh giá riêng (một đợt, N-16): kỳ mang cả
+  // cycle lẫn sample, và báo cáo chỉ có một mẫu nên không ghi lại tên mẫu.
+  const rows: EqaRowInput[] = details.map((row) => ({
+    ref: `${doc.fileName} · trang ${row.page}`, code: row.code, instrument: instrumentGroup, sample: '', unit: row.unit,
+    result: row.result, assigned: row.assigned, sigmaP: row.sigmaP, zProvider: row.z,
+    method: row.methodGroup, peerGroup: row.peerGroup, peer: row.peer,
+  }));
+  return {
+    fileName: doc.fileName, instrumentGroup,
+    round: {
+      program, provider: 'RIQAS - Randox Laboratories', programCode, unitCode: labRef,
+      year: reportDate ? Number(reportDate.slice(0, 4)) : null, round: cycle && sample ? `CYCLE ${cycle} SAMPLE ${sample}` : '',
+      reportCode: labRef && cycle && sample ? `${labRef}-${cycle}-${sample}` : '', reportDate, assignedLevel: 'Nhóm thiết bị',
+    },
+    rows, errors, warnings,
+  };
+}
+
+/** Tự nhận dạng nhà cung cấp theo nội dung, không dựa vào tên tệp. */
+export function parseEqaPdfReport(doc: EqaPdfDocument): EqaPdfReport {
+  const signature = fold(doc.pages.flat().map((item) => item.str).join(' '));
+  return signature.includes('monthly clinical chemistry') && (signature.includes('riqas') || signature.includes('sdi'))
+    ? parseRiqasReport(doc)
+    : parseVeqasReport(doc);
 }

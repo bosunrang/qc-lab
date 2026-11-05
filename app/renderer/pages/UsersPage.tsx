@@ -51,7 +51,7 @@ function PermGrid({ groupId, labelledBy, role, selected, onToggle, availableOnly
       {PAGE_DEFS.filter((page) => !availableOnly || allowed.has(page.id)).map((page) => {
         const enabled = allowed.has(page.id);
         return (
-          <label key={page.id} className={enabled ? (selected.has(page.id) ? 'selected' : '') : 'disabled'} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
+          <label key={page.id} className={`choice-card${enabled ? (selected.has(page.id) ? ' is-selected' : '') : ' is-disabled'}`} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
             <input type="checkbox" data-field="pagePerms" value={page.id} checked={enabled && selected.has(page.id)} disabled={!enabled}
               onChange={(e) => onToggle(page.id, e.target.checked)} />
             <span>{page.label}</span>
@@ -265,7 +265,7 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
             : (
               <div className="user-perm-grid" role="group" aria-labelledby="editUserCapLabel">
                 {CAPABILITY_OPTIONS.map(([id, label]) => (
-                  <label key={id} className={grantedCaps.has(id) ? 'selected' : ''}>
+                  <label key={id} className={`choice-card${grantedCaps.has(id) ? ' is-selected' : ''}`}>
                     <input type="checkbox" checked={grantedCaps.has(id)} onChange={(e) => setGrantedCaps((prev) => { const next = new Set(prev); if (e.target.checked) next.add(id); else next.delete(id); return next; })} />
                     <span>{label}</span>
                   </label>

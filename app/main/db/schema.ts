@@ -9,9 +9,10 @@ import { cleanId, uid } from '../domain/text-utils';
 import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
+import { eqaRoundNumber } from '../domain/eqa/evaluation';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -824,7 +825,56 @@ const MIGRATIONS: Migration[] = [
     name: 'Loại mẫu của chương trình ngoại kiểm',
     up(db) { addColumnIfMissing(db, 'eqa_programs', 'sample_type', "TEXT NOT NULL DEFAULT ''"); },
   },
+  {
+    version: 11,
+    // Bản trước lấy "CYCLE 23" làm kỳ của RIQAS, nên sample sau ghi đè sample
+    // trước của cùng máy. Từ bước này mỗi sample là một đợt (N-16). Kỳ cũ chỉ
+    // từng có MỘT sample (mọi phiên bản) thì đổi tên đúng như bộ đọc mới đặt;
+    // kỳ đã lẫn nhiều sample giữ nguyên để không đoán lại lịch sử phiên bản.
+    name: 'Ngoại kiểm RIQAS: mỗi sample là một đợt',
+    up(db) { splitRiqasCycleRounds(db); },
+  },
 ];
+
+function splitRiqasCycleRounds(db: SqliteLike): void {
+  const rounds = db.prepare(`SELECT r.id, r.program_id, r.year, r.round FROM eqa_rounds r JOIN eqa_programs p ON p.id=r.program_id
+    WHERE p.provider LIKE 'RIQAS%'`).all() as { id: string; program_id: string; year: number; round: string }[];
+  for (const round of rounds) {
+    const cycle = round.round.trim().match(/^CYCLE\s+(\d+)$/i)?.[1];
+    if (!cycle) continue;
+    const samples = db.prepare('SELECT DISTINCT sample FROM eqa_results WHERE round_id=?').all(round.id) as { sample: string }[];
+    const sample = samples.length === 1 ? samples[0].sample.trim() : '';
+    if (!/^\d+$/.test(sample)) continue;
+    const name = `CYCLE ${cycle} SAMPLE ${sample}`;
+    if (db.prepare('SELECT 1 FROM eqa_rounds WHERE program_id=? AND year=? AND round=?').get(round.program_id, round.year, name)) continue;
+    const roundNo = Number(cycle) * 100 + Number(sample);
+    db.prepare('UPDATE eqa_rounds SET round=?, round_no=? WHERE id=?').run(name, roundNo, round.id);
+    db.prepare("UPDATE eqa_results SET sample='' WHERE round_id=?").run(round.id);
+    // Lịch nối với đợt theo (chương trình, năm, số đợt): dòng lịch đang trỏ vào
+    // kỳ cũ ("CYCLE 23" → 23) đi theo đợt vừa đổi số. Dòng lịch ghi sẵn
+    // "CYCLE x SAMPLE y" thì để vòng dưới tính theo chính tên của nó.
+    const schedule = db.prepare('SELECT id, round FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=?')
+      .get(round.program_id, round.year, Number(cycle)) as { id: string; round: string } | undefined;
+    if (schedule && !RIQAS_SAMPLE_ROUND.test(schedule.round)
+      && !db.prepare('SELECT 1 FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=?').get(round.program_id, round.year, roundNo)) {
+      db.prepare('UPDATE eqa_schedule SET round=?, round_no=? WHERE id=?').run(name, roundNo, schedule.id);
+    }
+  }
+  // Số đợt của lịch được tính khi lưu bằng `eqaRoundNumber` bản cũ, nên
+  // "CYCLE 23 SAMPLE 7" từng thành 23; tính lại theo cách đánh số mới. Trùng
+  // với một dòng lịch khác thì giữ nguyên để không vỡ ràng buộc duy nhất.
+  const scheduleRows = db.prepare('SELECT id, program_id, year, round, round_no FROM eqa_schedule').all() as
+    { id: string; program_id: string; year: number; round: string; round_no: number }[];
+  for (const row of scheduleRows) {
+    if (!RIQAS_SAMPLE_ROUND.test(row.round)) continue;
+    const roundNo = eqaRoundNumber(row.round);
+    if (roundNo === row.round_no) continue;
+    if (db.prepare('SELECT 1 FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=?').get(row.program_id, row.year, roundNo)) continue;
+    db.prepare('UPDATE eqa_schedule SET round_no=? WHERE id=?').run(roundNo, row.id);
+  }
+}
+
+const RIQAS_SAMPLE_ROUND = /CYCLE\s*\d+\D+?SAMPLE\s*\d+/i;
 
 /** Chuyển các dòng `actions` sang mô hình NCE mới (kế hoạch mục 6.1). Chạy lại
  * được: dòng đã chuyển (theo `legacy_action_id`) bị bỏ qua, và lần chạy/mốc

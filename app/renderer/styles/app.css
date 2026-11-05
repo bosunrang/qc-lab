@@ -68,7 +68,7 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 /* Header trang chuẩn 84px ở desktop: đủ cho tên trang, mô tả và cụm tài
    khoản nhưng không chiếm chiều cao của bảng. `min-height` (thay vì height)
    vẫn cho phép nó nới an toàn nếu một tiêu đề/khối tài khoản phải xuống dòng. */
-.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(var(--space-3),1.4vw,var(--space-5));position:sticky;top:0;z-index:var(--z-page-head);box-sizing:border-box;min-height:88px;margin:0 calc(-1 * clamp(var(--space-5),2.4vw,36px)) var(--page-header-gap);padding:var(--space-3) clamp(var(--space-5),2.4vw,36px);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:var(--shadow-page-head);}
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(var(--space-3),1.4vw,var(--space-5));position:sticky;top:0;z-index:var(--z-page-head);box-sizing:border-box;min-height:var(--page-header-h);margin:0 calc(-1 * clamp(var(--space-5),2.4vw,36px)) var(--page-header-gap);padding:var(--space-3) clamp(var(--space-5),2.4vw,36px);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:var(--shadow-page-head);}
 /* Khoảng hở dưới header nằm trên chính margin dưới của `.head`
    (`margin:0 calc(...) var(--page-header-gap)`). Bản trước dùng
    `main > .head + *{margin-top:...}` — KHÔNG khớp được, vì mọi trang app
@@ -139,6 +139,15 @@ input[type="search"]:not([type="checkbox"]):not([type="radio"]){height:var(--con
 input[type="date"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
 select{height:var(--control-h);min-height:var(--control-h);}
 textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:var(--control-h);border:1px solid var(--border);border-radius:var(--control-radius);background:var(--surface);box-shadow:var(--shadow-control);color:var(--text-primary);font-weight:var(--weight-normal);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,background var(--motion-fast) ease;}
+
+/* Thẻ chọn nhiều dùng chung trong toàn hệ thống. Checkbox luôn vuông; nút
+   tròn chỉ dành cho lựa chọn một (radio). CSS trang chỉ quyết định bố cục
+   phần nội dung bên trong thẻ, không tự vẽ lại trạng thái chọn. */
+.choice-card{box-sizing:border-box;min-height:var(--control-h);margin:0;padding:var(--space-2) var(--space-3);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);cursor:pointer;box-shadow:none;transition:border-color var(--motion-fast) ease,background var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
+.choice-card:hover:not(:has(input:disabled)){border-color:var(--accent-border-strong);box-shadow:var(--shadow-control-hover);}
+.choice-card:has(input[type="checkbox"]:checked),.choice-card.is-selected{border-color:var(--accent-border);background:var(--accent-surface-tint);box-shadow:none;}
+.choice-card:has(input:disabled),.choice-card.is-disabled{cursor:not-allowed;}
+.choice-card input[type="checkbox"]{appearance:auto;-webkit-appearance:checkbox;box-sizing:border-box;width:var(--choice-control-size);min-width:var(--choice-control-size);max-width:var(--choice-control-size);height:var(--choice-control-size);min-height:0;flex:0 0 var(--choice-control-size);margin:0;padding:0;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--surface);box-shadow:none;accent-color:var(--accent);cursor:inherit;}
 /* Vòng chỉ dẫn khi lấy nét dùng chung toàn hệ thống. Nơi cần điều chỉnh chỉ
    đổi `outline-offset`; không tắt vòng chỉ dẫn hoặc vẽ lại bằng `box-shadow`. */
 :focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:var(--focus-ring-offset);}
@@ -152,6 +161,17 @@ aside :focus-visible,.dayseg button.on:focus-visible{outline-color:var(--focus-r
 input:not([type="checkbox"]):not([type="radio"]):focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){border-color:var(--accent-border);box-shadow:none;}
 input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:var(--surface-subtle);color:var(--text-readonly);border-color:var(--border-subtle);}
 input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--surface-page);color:var(--text-disabled);border-color:var(--border-subtle);cursor:not-allowed;}
+
+/* Ô chọn có tìm kiếm dùng cho danh sách dài. Popup nằm trong cùng lớp với ô
+   nhập để focus trap của modal và thao tác bàn phím vẫn hoạt động thống nhất. */
+.search-select{position:relative;min-width:0;}
+.search-select-menu{position:absolute;top:calc(100% + var(--space-1));right:0;left:0;z-index:var(--z-picker);max-height:calc(var(--table-row-h-compact) * 7);overflow:auto;padding:var(--space-1);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-popover);}
+.search-select-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-2);width:100%;min-height:var(--control-h-compact);padding:0 var(--space-2);border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-base);text-align:left;cursor:pointer;}
+.search-select-option span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.search-select-option small{color:var(--accent-text);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
+.search-select-option.is-active{background:var(--surface-subtle);color:var(--accent);}
+.search-select-option.is-selected{font-weight:var(--weight-semibold);}
+.search-select-empty{margin:0;padding:var(--space-2);color:var(--text-tertiary);font-size:var(--text-sm);text-align:center;}
 
 /* Danh sách xổ xuống của `select`. Mặc định Chromium vẽ danh sách này bằng
    cửa sổ của hệ điều hành — CSS không với tới được, nên nó luôn vuông góc dù

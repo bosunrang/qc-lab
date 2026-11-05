@@ -133,6 +133,28 @@ assert.equal(target().importBackupFrom(file('cu-sua.json'), actor).error.code, '
 writeFileSync(file('cu-hong.json'), '{khong-phai-json');
 assert.equal(target().importBackupFrom(file('cu-hong.json'), actor).error.code, 'invalid-json');
 
+// ── 6b) Giữ tài khoản hiện tại: chỉ thay dữ liệu, bảng users giữ nguyên ──
+// Bản sao lưu cũ mang tài khoản và mật khẩu cũ; mặc định trên giao diện là
+// giữ tài khoản của máy này để phục hồi xong vẫn đăng nhập được.
+const accountSource = openDatabase(':memory:');
+accountSource.prepare("INSERT INTO users(id,username,name,role,active,pass_hash) VALUES ('u-old','admin','Tài khoản cũ','admin',1,'pbkdf2$1$aa$bb')").run();
+createConfigHandlers(accountSource).saveInstrument({ data: { name: 'Máy của bản sao lưu' } }, actor);
+const accountSqlite = file('tai-khoan.sqlite');
+assert.equal(createBackupHandlers(accountSource, dir).exportBackupTo(accountSqlite, actor).ok, true);
+const accountJson = file('tai-khoan.json');
+writeFileSync(accountJson, JSON.stringify(buildBackupEnvelope(dumpAllTables(accountSource), SCHEMA_VERSION, 'app', new Date().toISOString())));
+for (const source of [accountSqlite, accountJson]) {
+  for (const keepAccounts of [true, false]) {
+    const machine = openDatabase(':memory:');
+    machine.prepare("INSERT INTO users(id,username,name,role,active,pass_hash) VALUES ('u-now','admin','Đang dùng','admin',1,'pbkdf2$1$cc$dd')").run();
+    const result = createBackupHandlers(machine, dir).importBackupFrom(source, { keepAccounts }, actor);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const ids = machine.prepare('SELECT id FROM users ORDER BY id').all().map((u) => u.id);
+    assert.deepEqual(ids, keepAccounts ? ['u-now'] : ['u-old'], `${path.basename(source)} keepAccounts=${keepAccounts}`);
+    assert.deepEqual(createConfigHandlers(machine).listInstruments().map((i) => i.name), ['Máy của bản sao lưu'], 'dữ liệu luôn lấy theo bản sao lưu');
+  }
+}
+
 // ── 7) Xoá sạch dữ liệu thử ─────────────────────────────────────────────
 const resetDb = openDatabase(':memory:');
 const resetConfig = createConfigHandlers(resetDb);

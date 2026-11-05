@@ -231,6 +231,30 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   );
 });
 
+test('bản đồ z dùng đúng chữ tiêu đề cột của bảng hệ thống', () => {
+  const eqa = readFileSync(join(STYLE_DIR, 'pages', 'eqa.css'), 'utf8');
+  assert.match(
+    eqa,
+    /\.eqa-zmap thead th\{[^}]*background:var\(--table-head-bg\);[^}]*color:var\(--table-head-ink\);[^}]*font-size:var\(--table-head-size\);[^}]*font-weight:var\(--table-head-weight\);[^}]*letter-spacing:var\(--table-head-tracking\);/,
+    'tiêu đề “Xét nghiệm” và các cột đợt phải cùng cỡ, màu, độ đậm và tracking với bảng chuẩn',
+  );
+  assert.match(
+    eqa,
+    /\.eqa-zmap thead \.eqa-zmap-test\{[^}]*vertical-align:middle;/,
+    'cột “Xét nghiệm” chỉ có một dòng nên phải căn giữa dọc, không đi theo đáy của tiêu đề đợt hai dòng',
+  );
+});
+
+test('bộ chuyển lịch năm cao bằng select cùng hàng', () => {
+  const eqa = readFileSync(join(STYLE_DIR, 'pages', 'eqa.css'), 'utf8');
+  const schedule = readFileSync(join(ROOT, 'renderer', 'pages', 'eqa', 'EqaSchedule.tsx'), 'utf8');
+  assert.match(schedule, /className="dayseg eqa-year-view"/);
+  assert.match(eqa, /\.eqa-year-view\{height:var\(--control-h\);\}/,
+    'bộ chuyển Dòng thời gian/Bảng phải cao 36px như hai select dữ liệu');
+  assert.match(eqa, /\.eqa-year-view button\{[^}]*align-self:stretch;[^}]*height:auto;[^}]*min-height:0;/,
+    'hai nút phải lấp đầy khung 36px mà không cộng thêm chiều cao riêng');
+});
+
 test('nhãn đứng trên control dùng thang form chung', () => {
   const appCss = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
   const reagent = readFileSync(join(STYLE_DIR, 'pages', 'reagent.css'), 'utf8');

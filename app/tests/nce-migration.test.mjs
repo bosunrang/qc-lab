@@ -43,7 +43,7 @@ const count = (db, table) => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).ge
 test('ca 18: chuyển hồ sơ cũ, không bịa dữ liệu, chạy lại không tạo trùng', () => {
   const db = legacyDb();
   applySchema(db);
-  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '10');
+  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '11');
   const rows = Object.fromEntries(db.prepare('SELECT * FROM nce_records').all().map((r) => [r.id, r]));
   assert.deepEqual(Object.keys(rows).sort(), ['a1', 'a2', 'a3', 'a5'], 'hồ sơ đổi dải không chuyển (D-12)');
 
@@ -94,3 +94,34 @@ test('ca 18: chuyển hồ sơ cũ, không bịa dữ liệu, chạy lại khôn
   assert.equal(count(db, 'actions'), 5, 'bảng cũ giữ nguyên');
   db.close();
 });
+
+// N-16 (schema 11): kỳ RIQAS cũ lấy "CYCLE 23" làm kỳ; chỉ một sample thì đổi
+// thành "CYCLE 23 SAMPLE 7", lẫn nhiều sample thì giữ nguyên.
+test('schema 11: kỳ RIQAS một sample đổi sang tên đợt theo sample', () => {
+  const db = openDatabase(':memory:');
+  db.prepare("INSERT INTO instruments(id,name) VALUES ('m','EasyLyte')").run();
+  db.prepare("INSERT INTO tests(id,name,instrument_id) VALUES ('t','Sodium','m')").run();
+  db.prepare("INSERT INTO eqa_programs(id,name,provider) VALUES ('p','MONTHLY CLINICAL CHEMISTRY','RIQAS - Randox Laboratories'), ('v','SINH HÓA','TTKCXN')").run();
+  const round = db.prepare("INSERT INTO eqa_rounds(id,program_id,year,round,round_no) VALUES (?,?,2026,?,?)");
+  round.run('one', 'p', 'CYCLE 23', 23); round.run('mixed', 'p', 'CYCLE 22', 22); round.run('veqas', 'v', 'ĐỢT 01', 1);
+  const result = db.prepare("INSERT INTO eqa_results(id,round_id,version,test_id,code,instrument_label,sample,result,assigned,sigma_p,z,z_official,class) VALUES (?,?,?,'t','Sodium','EasyLyte',?,1,1,1,0,0,'ok')");
+  result.run('r1', 'one', 1, '7'); result.run('r2', 'mixed', 1, '5'); result.run('r3', 'mixed', 2, '6'); result.run('r4', 'veqas', 1, 'M1');
+  // Lịch lưu trước migration: số đợt tính bằng cách đánh số cũ ("CYCLE x …" → x).
+  const schedule = db.prepare("INSERT INTO eqa_schedule(id,program_id,year,round,round_no,due_date) VALUES (?,?,2026,?,?,'2026-11-30')");
+  schedule.run('s-cycle', 'p', 'CYCLE 23', 23); schedule.run('s-sample', 'p', 'CYCLE 22 SAMPLE 3', 22); schedule.run('s-veqas', 'v', 'ĐỢT 01', 1);
+  db.prepare("UPDATE app_meta SET value='10' WHERE key='schemaVersion'").run();
+  applySchema(db);
+  const rounds = Object.fromEntries(db.prepare('SELECT id, round, round_no FROM eqa_rounds').all().map((r) => [r.id, [r.round, r.round_no]]));
+  assert.deepEqual(rounds, { one: ['CYCLE 23 SAMPLE 7', 2307], mixed: ['CYCLE 22', 22], veqas: ['ĐỢT 01', 1] });
+  assert.equal(db.prepare("SELECT sample FROM eqa_results WHERE id='r1'").get().sample, '');
+  assert.equal(db.prepare("SELECT sample FROM eqa_results WHERE id='r4'").get().sample, 'M1', 'không đụng chương trình khác');
+  const plans = Object.fromEntries(db.prepare('SELECT id, round, round_no FROM eqa_schedule').all().map((r) => [r.id, [r.round, r.round_no]]));
+  assert.deepEqual(plans, {
+    's-cycle': ['CYCLE 23 SAMPLE 7', 2307], // đi theo đợt vừa đổi số, nên vẫn nối được với báo cáo
+    's-sample': ['CYCLE 22 SAMPLE 3', 2203], // tính lại theo chính tên của dòng lịch
+    's-veqas': ['ĐỢT 01', 1],
+  });
+  const linked = db.prepare(`SELECT s.id FROM eqa_schedule s JOIN eqa_rounds r ON r.program_id=s.program_id AND r.year=s.year AND r.round_no=s.round_no`).all().map((r) => r.id).sort();
+  assert.deepEqual(linked, ['s-cycle', 's-veqas']);
+});
+

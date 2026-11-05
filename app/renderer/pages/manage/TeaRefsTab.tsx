@@ -211,7 +211,7 @@ export function TeaRefsTab() {
       <div className="tea-source-registry">{TEA_SOURCE_CARDS.map((source) => <div className={`tea-source-card ${source.tone}`} key={source.label}><div><b>{source.label}</b><span className={`tag ${source.tone === 'dynamic' ? 'ok' : source.tone === 'retired' ? 'warn' : 'none'}`}>{source.tag}</span></div><p>{source.detail}</p><a href={source.url} target="_blank" rel="noreferrer">Mở nguồn chính thức</a></div>)}</div>
       <div className="panel rcfg-list tea-ref-panel">
       {visibleCatalog.length || visibleCustomRefs.length ? <table className="tea-ref-table">
-        <thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hoá %</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hoá %</th><th>Hồ sơ</th><th>Trạng thái</th></tr></thead>
         <tbody>
           {visibleCatalog.map((ref) => {
             const override = overrideByAnalyte.get(ref.id);
@@ -237,13 +237,15 @@ export function TeaRefsTab() {
                   aria-label={`TEa Ricos % cho ${displayName}`}
                   defaultValue={override?.ricos ?? ref.ricos ?? ''}
                   onBlur={(event) => commitTeaValue(ref, 'ricos', event.currentTarget)} /></td>
-                <td><div className="tea-lab-cell">
-                  {labRef?.lab_level_defaults?.length ? <b>Theo mức QC</b> : labRef?.lab != null ? <b>{Number(labRef.lab).toFixed(2)}%</b> : null}
+                <td className="tea-lab-value">
+                  {labRef?.lab_level_defaults?.length ? <b>Theo mức QC</b> : labRef?.lab != null ? <b>{Number(labRef.lab).toFixed(2)}%</b> : '—'}
+                </td>
+                <td><div className="tea-profile-cell">
                   {canManage ? (
                     labRef && hasLabProfile(labRef)
                       ? <button type="button" className="btn ghost sm" onClick={() => openProfile(labRef)}>Xem hồ sơ</button>
                       : <button type="button" className="btn ghost sm" onClick={() => openProfile(null, { analyteId: ref.id, name: ref.name, unit: ref.unit, section: ref.section })}>Thêm hồ sơ</button>
-                  ) : null}
+                  ) : '—'}
                 </div></td>
                 <td><div className="tea-ref-status">
                   <span className={`tag ${status.cls}`}>{status.label}</span>
@@ -253,7 +255,7 @@ export function TeaRefsTab() {
               </tr>
             );
           })}
-          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td><b>{ref.lab_level_defaults?.length ? 'Theo mức QC' : formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className={`tag ${hasLabProfile(ref) ? 'ok' : 'none'}`}>{hasLabProfile(ref) ? 'TEa PXN' : 'Tự thêm'}</span><OverdueTag teaRef={ref} today={today} /><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => openProfile(ref)} /><RowActionButton kind="delete" label={`Xoá TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
+          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td className="tea-lab-value"><b>{ref.lab_level_defaults?.length ? 'Theo mức QC' : formatTeaValue(ref.lab)}</b></td><td><div className="tea-profile-cell"><button type="button" className="btn ghost sm" onClick={() => openProfile(ref)}>{hasLabProfile(ref) ? 'Xem hồ sơ' : 'Thêm hồ sơ'}</button></div></td><td><div className="tea-ref-status"><span className={`tag ${hasLabProfile(ref) ? 'ok' : 'none'}`}>{hasLabProfile(ref) ? 'TEa PXN' : 'Tự thêm'}</span><OverdueTag teaRef={ref} today={today} /><RowActionButton kind="delete" label={`Xoá TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
         </tbody>
       </table> : <EmptyState title="Không tìm thấy xét nghiệm">Thử tìm lại theo tên, đơn vị hoặc nhóm xét nghiệm.</EmptyState>}
       </div>

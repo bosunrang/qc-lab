@@ -78,7 +78,7 @@ test('xuất backup, xoá sạch dữ liệu rồi phục hồi lại từ tệp
     await page.getByRole('button', { name: 'Chọn tệp sao lưu' }).click();
     const confirm = dialogTitled(page, 'Phục hồi từ bản sao lưu');
     assert.match(await confirm.innerText(), /e2e-backup\.sqlite hợp lệ/);
-    await confirmIn(page, 'Phục hồi từ bản sao lưu', 'Phục hồi');
+    await confirmIn(page, 'Phục hồi từ bản sao lưu', 'Giữ tài khoản hiện tại');
     await reauth(page);
     const restored = await closeInfo(page, 'Đã phục hồi thành công');
     const restoreSnapshot = restored.match(/được lưu tại:\s*(.+)$/m)?.[1].trim();

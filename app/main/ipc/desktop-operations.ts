@@ -130,15 +130,24 @@ export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): 
         return { ok: true as const, data: { ...verified.data, fileName: host.basename(filePath) } };
       },
     },
-    // Không nhận tham số: chỉ phục hồi đúng tệp main vừa kiểm tra.
+    // Chỉ phục hồi đúng tệp main vừa kiểm tra; renderer chỉ chọn có giữ tài khoản hay không.
     importBackup: {
       channel: 'backup:import', lan: false,
-      run: (ctx) => {
+      run: (ctx, input) => {
         const actor = ctx.actor();
         if (!pendingRestorePath) return { ok: false as const, error: { code: 'no-file', message: 'Chưa chọn tệp sao lưu để phục hồi.' } };
         const filePath = pendingRestorePath;
         pendingRestorePath = null;
-        return backup.importBackupFrom(filePath, actor);
+        const keepAccounts = !!(input && typeof input === 'object' && (input as { keepAccounts?: unknown }).keepAccounts === true);
+        const result = backup.importBackupFrom(filePath, { keepAccounts }, actor);
+        // Phục hồi thay cả bảng users: tài khoản đang đăng nhập có thể không còn
+        // trong dữ liệu mới. Kết thúc phiên ngay để renderer về màn đăng nhập
+        // (hoặc khởi tạo quản trị) thay vì mọi lời gọi sau đó báo "Chưa đăng nhập".
+        if (!result.ok) return result;
+        const still = auth.getUser(actor.userId);
+        if (still && still.active) return result;
+        session.set(null);
+        return { ok: true as const, data: { ...result.data, signedOut: true } };
       },
     },
     backupStatus: { channel: 'backup:status', lan: true, run: () => backup.backupStatus() },

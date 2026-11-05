@@ -12,8 +12,8 @@ import { Modal } from '../../components/Modal';
 import type { EqaResultRow, EqaRoundView } from '../../../shared/qc-api';
 import { EQA_PEER_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EqaImportModal } from './EqaImportModal';
-import { EqaSeriesModal } from './EqaSeriesModal';
 import { ClassTag, Facts, numText, pctText, rawNum, roundLabel, RoundStatusTag, rowTone, StatCard, TrendTags } from './shared';
+import type { EqaNavigationContext } from './useEqaScope';
 
 const DECISION_LABEL: Readonly<Record<string, string>> = {
   import: 'Nhập đợt', append: 'Bổ sung máy vào đợt', reimport: 'Nhập lại (phiên bản mới)', cancel: 'Huỷ đợt',
@@ -54,7 +54,7 @@ function needsReview(row: EqaResultRow): boolean {
   return row.class !== 'ok' || !!row.trend?.signals.length || !!row.trend?.unsuccessful || notes(row).length > 0;
 }
 
-export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void }) {
+export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id: string; focusedResultId?: string; onBack: () => void; onOpenTest: (testId: string, context?: EqaNavigationContext) => void }) {
   const get = useEqaStore((s) => s.get);
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const [view, setView] = useState<EqaRoundView | null | undefined>(undefined);
@@ -63,15 +63,14 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
   const [filter, setFilter] = useState<ClassFilter>('all');
   const [reimport, setReimport] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [seriesTest, setSeriesTest] = useState('');
   // Nhóm đồng đẳng và lưu ý ít khi cần đọc nên mở theo từng dòng, giữ bảng gọn.
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(focusedResultId ? [focusedResultId] : []));
 
   const reload = useCallback(() => {
     get(id).then((data) => { setView(data); setError(''); }).catch((e) => setError(e instanceof Error ? e.message : 'Không tải được kỳ ngoại kiểm.'));
   }, [get, id]);
   useEffect(reload, [reload]);
-  useStoreInvalidation(['eqa_rounds', 'tests', 'instruments'], undefined, reload);
+  useStoreInvalidation(['eqa_rounds', 'tests', 'instruments', 'tea_refs'], undefined, reload);
 
   const results = useMemo(() => (view?.results ?? []).filter((r) => (!instrument || r.instrument_id === instrument)
     && (filter === 'all' || (filter === 'attention' ? needsReview(r) : r.class === filter))), [view, instrument, filter]);
@@ -188,7 +187,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
                     const isOpen = expanded.has(r.id);
                     return (
                       <Fragment key={r.id}>
-                        <tr className={rowTone(r.class)}>
+                        <tr className={`${rowTone(r.class) ?? ''}${r.id === focusedResultId ? ' is-selected' : ''}`} data-eqa-result={r.id}>
                           {showInstrument && <td>{r.instrument_name}</td>}
                           <td className="eqa-test-cell"><b className="eqa-strong">{r.test_name}</b><span className="eqa-sub">{[r.code, r.unit].filter(Boolean).join(' · ')}</span></td>
                           {showSample && <td>{r.sample || '—'}</td>}
@@ -203,7 +202,7 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
                           <td>{r.within_tea === null ? '—' : <span className={`tag ${r.within_tea ? 'ok' : 'warn'}`}>{r.within_tea ? 'Trong' : 'Vượt'} TEa {numText(r.tea_pct, 1)}%</span>}</td>
                           <td>
                             <div className="eqa-row-actions">
-                              <button type="button" className="btn ghost sm" onClick={() => setSeriesTest(r.test_id)}>Biểu đồ</button>
+                              <button type="button" className="btn ghost sm" onClick={() => onOpenTest(r.test_id, { year: round.year, programId: round.program_id, instrumentId: r.instrument_id, resultId: r.id, roundId: round.id })}>Xem chuỗi</button>
                               <button type="button" className="btn ghost sm" aria-expanded={isOpen} onClick={() => toggle(r.id)}>{isOpen ? 'Thu gọn' : 'Chi tiết'}</button>
                             </div>
                           </td>
@@ -241,7 +240,6 @@ export function EqaRoundDetail({ id, onBack }: { id: string; onBack: () => void 
       </section>
 
       {reimport && <EqaImportModal onClose={() => setReimport(false)} onImported={() => setReimport(false)} />}
-      {seriesTest && <EqaSeriesModal testId={seriesTest} onClose={() => setSeriesTest('')} />}
       {cancelOpen && <CancelRoundModal view={view} onClose={() => setCancelOpen(false)} />}
     </div>
   );
@@ -296,13 +294,18 @@ function CancelRoundModal({ view, onClose }: { view: EqaRoundView; onClose: () =
   const [error, setError] = useState('');
   async function submit() {
     setBusy(true); setError('');
-    const result = await cancel(view.round.id, view.round.row_version, reason);
-    setBusy(false);
-    if (result.ok) onClose(); else setError(result.error.message);
+    try {
+      const result = await cancel(view.round.id, view.round.row_version, reason);
+      setBusy(false);
+      if (result.ok) onClose(); else setError(result.error.message);
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof Error ? e.message : 'Không huỷ được kỳ ngoại kiểm.');
+    }
   }
   return (
-    <Modal title="Huỷ kỳ ngoại kiểm" size="sm" onClose={onClose}
-      footer={<><button type="button" className="btn ghost" onClick={onClose}>Quay lại</button><button type="button" className="btn danger" disabled={busy || reason.trim().length < 10} onClick={() => void submit()}>Huỷ kỳ</button></>}>
+    <Modal title="Huỷ kỳ ngoại kiểm" size="sm" busy={busy} onClose={onClose}
+      footer={<><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>Quay lại</button><button type="button" className="btn danger" disabled={busy || reason.trim().length < 10} onClick={() => void submit()}>Huỷ kỳ</button></>}>
       <p className="eqa-note">Kỳ đã huỷ vẫn được lưu để truy xuất nhưng không tính vào thống kê. Dùng khi nhập nhầm kỳ hoặc trùng dữ liệu.</p>
       <div className="field">
         <label htmlFor="eqaCancelReason">Lý do huỷ (ít nhất 10 ký tự)</label>

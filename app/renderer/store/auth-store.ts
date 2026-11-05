@@ -22,6 +22,9 @@ interface AuthState {
   /** Đọc lại tài khoản đang đăng nhập từ DB — dùng sau khi đổi/xoá ảnh đại
    * diện (main không trả lại toàn bộ `PublicUser`, chỉ trả avatar mới). */
   refreshUser: () => Promise<void>;
+  /** Phiên kết thúc từ phía main: về màn đăng nhập kèm lý do; không còn tài
+   * khoản nào (vd vừa phục hồi bản sao lưu không kèm tài khoản) thì sang khởi tạo quản trị. */
+  endSession: (message: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -74,12 +77,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const user = await window.qcApi.currentUser();
     if (user) set({ user });
   },
+
+  endSession: async (message) => {
+    set({ status: 'logged-out', user: null, error: message });
+    if (!(await window.qcApi.hasAnyUsers())) set({ status: 'needs-bootstrap' });
+  },
 }));
 
 // Máy chủ LAN báo phiên kết thúc (401): về màn đăng nhập kèm lý do (GV5).
 onSessionEnded(() => {
   if (useAuthStore.getState().status !== 'logged-in') return;
-  useAuthStore.setState({ status: 'logged-out', user: null, error: SESSION_ENDED_MESSAGE });
+  void useAuthStore.getState().endSession(SESSION_ENDED_MESSAGE);
 });
 
 

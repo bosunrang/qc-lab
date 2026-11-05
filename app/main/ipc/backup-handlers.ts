@@ -202,8 +202,11 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
   /** Phục hồi TOÀN BỘ dữ liệu từ tệp sao lưu. Kiểm tra lại tệp ngay trước khi
    * ghi (tệp có thể đã đổi từ lúc người dùng xác nhận) và luôn chốt một bản
    * an toàn của dữ liệu hiện tại trước. */
-  const importBackupFrom = writeCommand(db, 'importBackupFrom', (actor) => (actor.role === 'admin' ? null : { ok: false as const, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được phục hồi từ bản sao lưu.' } }), (w, filePath: string): IpcResult<{ preRestoreSnapshotPath: string }> => {
+  const importBackupFrom = writeCommand(db, 'importBackupFrom', (actor) => (actor.role === 'admin' ? null : { ok: false as const, error: { code: 'forbidden', message: 'Chỉ quản trị viên mới được phục hồi từ bản sao lưu.' } }), (w, filePath: string, options: { keepAccounts?: boolean } | undefined): IpcResult<{ preRestoreSnapshotPath: string }> => {
     const inspected = inspectBackupFile(filePath);
+    // Giữ tài khoản: chỉ thay dữ liệu, bảng `users` của máy này giữ nguyên để
+    // người đang dùng vẫn đăng nhập bằng mật khẩu hiện tại (như đồng bộ Firebase).
+    const keep = options?.keepAccounts ? ['users'] : [];
     if (!inspected.ok) return fail(inspected.code, inspected.message);
 
     let snapshotPath: string;
@@ -215,8 +218,8 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
 
     try {
       keepOperationMode(db, () => {
-        if (inspected.kind === 'sqlite') restoreAllTablesFromFile(db, filePath);
-        else restoreAllTables(db, inspected.envelope.data);
+        if (inspected.kind === 'sqlite') restoreAllTablesFromFile(db, filePath, keep);
+        else restoreAllTables(db, inspected.envelope.data, keep);
       });
     } catch (e) {
       return fail('restore-failed', e instanceof Error ? e.message : 'Phục hồi thất bại.');
@@ -227,7 +230,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     // rộng hơn thường lệ để mọi trang đang mở refetch lại đúng, không cần khởi
     // động lại app mới thấy dữ liệu đã phục hồi.
     w.commit((tx) => {
-      tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
+      tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC${keep.length ? ', giữ tài khoản hiện tại' : ', thay cả tài khoản'}, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
       tx.changed(listTableNames(db));
     });
     return { ok: true, data: { preRestoreSnapshotPath: snapshotPath } };

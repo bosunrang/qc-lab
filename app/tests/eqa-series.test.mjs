@@ -58,21 +58,21 @@ test('N-05: u(x_pt) ≈ 1,25·SD/√N của nhóm làm giá trị ấn định; 
   assert.equal(eqaAssignedUncertainty(12, 11, 2, { instrument: { mean: 10, sd: 4, cv: 40, n: 6 } }), null, 'không nhóm nào trùng giá trị ấn định');
 });
 
-// N6 (2026-11-03): tín hiệu xu hướng đếm ĐỢT, không đếm mẫu; `enough` đếm
+// N-06/N-07 (2026-11-03): tín hiệu xu hướng đếm ĐỢT, không đếm mẫu; `enough` đếm
 // số đợt; chuỗi tách theo chương trình.
 const rounds = (zsByRound, programId = 'p1', start = 1) => zsByRound.flatMap((zs, i) => zs.map((z, k) => ({
   id: `${programId}-${start + i}-${k}`, year: 2026, roundNo: start + i, round: `ĐỢT ${start + i}`, sample: `M${k + 1}`, z, roundId: `${programId}-${start + i}`, programId,
 })));
 const has = (result, signal) => result.points.filter((p) => p.signals.includes(signal)).map((p) => p.id);
 
-test('N6: 2/3 đếm theo đợt — hai mẫu vượt +2 trong CÙNG một đợt chưa phải tín hiệu', () => {
+test('N-07: 2/3 đếm theo đợt — hai mẫu vượt +2 trong CÙNG một đợt chưa phải tín hiệu', () => {
   assert.deepEqual(has(eqaSeries(rounds([[2.3, 2.4]])), 'two_of_three'), []);
   // Đợt 1 có mẫu vượt +2, đợt 3 cũng vậy: chỉ mẫu vượt của đợt 3 mang tín hiệu.
   const r = eqaSeries(rounds([[2.3, 0.4], [0.1, 0.2], [2.2, -0.5]]));
   assert.deepEqual(has(r, 'two_of_three'), ['p1-3-0']);
 });
 
-test('N6: 6 đợt liên tiếp cùng phía — đợt có mẫu trái dấu cắt chuỗi', () => {
+test('N-07: 6 đợt liên tiếp cùng phía — đợt có mẫu trái dấu cắt chuỗi', () => {
   const same = eqaSeries(rounds([[0.3, 0.5], [0.2, 0.1], [0.4, 0.6], [0.1, 0.3], [0.2, 0.2], [0.5, 0.1]]));
   assert.deepEqual(has(same, 'six_same_side'), ['p1-6-0', 'p1-6-1']);
   const broken = eqaSeries(rounds([[0.3, 0.5], [0.2, -0.1], [0.4, 0.6], [0.1, 0.3], [0.2, 0.2], [0.5, 0.1]]));
@@ -82,11 +82,20 @@ test('N6: 6 đợt liên tiếp cùng phía — đợt có mẫu trái dấu c�
   assert.deepEqual([three.points.length, three.rounds, three.enough], [6, 3, false]);
 });
 
-test('N6: hai chương trình không trộn chuỗi', () => {
+test('N-07: hai chương trình không trộn chuỗi', () => {
   // Cùng đợt 1–2 ở hai nhà cung cấp: mỗi bên chỉ một lần vượt +2.
   const mixed = eqaSeries([...rounds([[2.3]], 'A'), ...rounds([[2.4]], 'B'), ...rounds([[0.1]], 'A', 2)]);
   assert.deepEqual(has(mixed, 'two_of_three'), []);
   assert.deepEqual(mixed.points.map((p) => p.id), ['A-1-0', 'B-1-0', 'A-2-0'], 'gộp lại theo thời gian để vẽ');
   const unsuccessful = eqaSeries([...rounds([[3.3]], 'A'), ...rounds([[3.4]], 'B', 2)]);
   assert.deepEqual(unsuccessful.points.map((p) => p.unsuccessful), [false, false], 'không chấp nhận ở hai chương trình khác nhau không phải "2 đợt liên tiếp"');
+});
+
+test('N-07: số đợt và "đủ đợt" tính riêng cho từng chương trình', () => {
+  // A đủ 6 đợt nhưng đợt mới nhất thuộc B (mới 1 đợt): màn xem A không được
+  // mượn `enough` của B.
+  const result = eqaSeries([...rounds([[0.1], [0.2], [0.3], [0.1], [0.2], [0.3]], 'A'), ...rounds([[0.4]], 'B', 7)]);
+  assert.deepEqual([result.rounds, result.enough], [1, false], 'mức chung theo chương trình có đợt mới nhất');
+  assert.deepEqual(result.programs, [{ programId: 'A', rounds: 6, enough: true }, { programId: 'B', rounds: 1, enough: false }]);
+  assert.deepEqual(eqaSeries([]).programs, []);
 });

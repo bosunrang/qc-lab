@@ -39,8 +39,12 @@
   align-self:flex-end;
 }
 .audit-table-wrap{
-  margin:0 var(--space-4);overflow-x:auto;
+  margin:0 var(--space-4) var(--space-4);overflow-x:auto;
 }
+/* Một trang không dựng thanh phân trang, nên cần khoảng đáy để viền bảng
+   không đè lên viền panel. Khi có nhiều trang, chính thanh phân trang tạo
+   nhịp đáy và khoảng này được bỏ để không cộng dồn. */
+.audit-table-wrap:has(+ .table-pagination){margin-bottom:0;}
 .audit-table-wrap .audit-table{
   width:100%; max-width:100%; min-width:0;
 }

@@ -65,14 +65,10 @@
 .user-create-perms .user-perm-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));}
 
 .user-perm-grid label{
-  display:flex; align-items:center; gap:var(--space-2); min-height:var(--control-h); margin:0; padding:var(--space-2) var(--space-3); border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-medium); cursor:pointer; box-shadow:none;
+  display:flex; align-items:center; gap:var(--space-2); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-medium);
 }
-.user-perm-grid label.selected{border-color:var(--accent-border);background:var(--accent-surface-tint);color:var(--accent-text);font-weight:var(--weight-semibold);}
+.user-perm-grid label.is-selected{color:var(--accent-text);font-weight:var(--weight-semibold);}
 
-.user-perm-grid label.disabled{
+.user-perm-grid label.is-disabled{
   opacity:.46; background:var(--surface-subtle); cursor:not-allowed;
-}
-
-.user-perm-grid input[type="checkbox"]{
-  appearance:auto; -webkit-appearance:checkbox; box-sizing:border-box; width:17px; min-width:17px; max-width:17px; height:17px; min-height:0; flex:0 0 17px; margin:0; padding:0; border:1px solid var(--border); border-radius:var(--radius-xs); background:var(--surface); box-shadow:none; accent-color:var(--accent);
 }

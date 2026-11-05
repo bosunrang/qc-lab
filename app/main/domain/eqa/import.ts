@@ -5,7 +5,7 @@
 // Main KHÔNG tin dữ liệu renderer đã đọc: `checkEqaImport` ép kiểu, kiểm và
 // tính lại toàn bộ trước khi xem trước lẫn khi ghi.
 import {
-  EQA_DEFAULT_CONFIG, EQA_PEER_LEVELS, eqaClass, eqaNormalize, eqaPct, eqaProviderCheck, eqaSuggestTests, eqaZ,
+  EQA_DEFAULT_CONFIG, EQA_PEER_LEVELS, eqaClass, eqaNormalize, eqaPct, eqaProviderCheck, eqaRoundNumber, eqaSuggestTests, eqaZ,
   type EqaCatalogTest, type EqaClass, type EqaConfig, type EqaPeer, type EqaProviderCheck,
 } from './evaluation';
 
@@ -51,16 +51,36 @@ function year(value: unknown): number | null {
 }
 
 /** Gộp các báo cáo của CÙNG một đợt (mỗi máy một file). File khác đợt bị từ chối. */
+/** Khoá nhận diện một đợt: chương trình, đơn vị, tên đợt, năm. Cùng khoá thì
+ * là các máy của cùng một đợt (mỗi máy một PDF). */
+export function eqaRoundSignature(r: EqaRoundInput): string {
+  return [eqaNormalize(r.programCode || r.program), eqaNormalize(r.unitCode), eqaNormalize(r.round), r.year ?? ''].join('|');
+}
+
+/** Chia các file đã đọc thành từng đợt để nhập nhiều đợt một lần (ví dụ 12
+ * sample RIQAS của một năm). Nhóm xếp theo năm rồi số thứ tự đợt; mỗi nhóm
+ * giữ chỉ số file gốc. File không có dòng nào vẫn thành nhóm riêng để lỗi
+ * đọc của nó không bị bỏ qua. */
+export function groupEqaSources(sources: readonly EqaParsedSource[]): { key: string; round: EqaRoundInput; indices: number[] }[] {
+  const groups = new Map<string, { key: string; round: EqaRoundInput; indices: number[] }>();
+  sources.forEach((source, index) => {
+    const key = source.rows.length ? eqaRoundSignature(source.round) : `file:${index}`;
+    const group = groups.get(key);
+    if (group) group.indices.push(index); else groups.set(key, { key, round: source.round, indices: [index] });
+  });
+  return [...groups.values()].sort((a, b) => (a.round.year ?? 0) - (b.round.year ?? 0)
+    || eqaRoundNumber(a.round.round) - eqaRoundNumber(b.round.round) || a.round.round.localeCompare(b.round.round, 'vi'));
+}
+
 export function mergeEqaSources(sources: readonly EqaParsedSource[], names: readonly string[] = []): EqaParsedSource {
   const errors = sources.flatMap((source) => source.errors);
   const warnings = sources.flatMap((source) => source.warnings ?? []);
   const base = sources.find((source) => source.rows.length) ?? sources[0];
   if (!base) return { round: cleanRound(null), rows: [], errors: ['Chưa chọn file nào.'], warnings };
-  const sig = (r: EqaRoundInput) => [eqaNormalize(r.programCode || r.program), eqaNormalize(r.unitCode), eqaNormalize(r.round), r.year ?? ''].join('|');
   const rows: EqaRowInput[] = [];
   sources.forEach((source, i) => {
     if (!source.rows.length) return;
-    if (source !== base && sig(source.round) !== sig(base.round)) {
+    if (source !== base && eqaRoundSignature(source.round) !== eqaRoundSignature(base.round)) {
       errors.push(`${names[i] || `File ${i + 1}`}: thuộc đợt khác (${source.round.programCode || source.round.program} / ${source.round.round} / ${source.round.year ?? '?'}); không nhập file này.`);
       return;
     }

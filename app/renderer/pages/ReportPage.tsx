@@ -239,7 +239,6 @@ export function ReportPage() {
       {admin && <section className="panel report-template-panel">
         <h2 className="panel-title">Biểu mẫu báo cáo PDF</h2>
         <div className="report-template-body">
-          <p className="hint">In ở góc trên mỗi PDF, kèm số trang và khu vực ký. Tên đơn vị, logo và địa chỉ lấy từ Cài đặt &amp; Đồng bộ.</p>
           {REPORT_FORM_KINDS.map((kind) => {
             const form = forms?.[kind];
             const saved = template?.[kind];

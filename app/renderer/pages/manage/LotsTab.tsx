@@ -282,7 +282,7 @@ export function LotsTab() {
                   <div className="lot-level-title">Mức {level}</div>
                   {levelLots.map((lot) => {
                     const locked = !!lot.depleted && !groupChecked.has(lot.id);
-                    return <label className={lot.depleted ? 'lot-opt-depleted' : ''} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
+                    return <label className={`choice-card${lot.depleted ? ' lot-opt-depleted' : ''}`} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
                       <input type="checkbox" data-field="lotIds" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
                         const next = new Set(groupChecked);
                         if (e.target.checked) next.add(lot.id); else next.delete(lot.id);

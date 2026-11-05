@@ -7,10 +7,11 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { parseVeqasReport, splitVeqasTitle } = require('../../app-dist/main/domain/eqa/pdf-report.js');
+const { parseEqaPdfReport, parseRiqasReport, parseVeqasReport, splitVeqasTitle } = require('../../app-dist/main/domain/eqa/pdf-report.js');
 const { checkEqaImport, eqaPairKey } = require('../../app-dist/main/domain/eqa/import.js');
 
 const FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/veqas-bc20c-dot09.json', import.meta.url), 'utf8'));
+const RIQAS_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/riqas-mc-cycle23-sample7.json', import.meta.url), 'utf8'));
 const clone = () => JSON.parse(JSON.stringify(FIXTURE));
 
 test('tách tiêu đề thông số: mã là cụm ngoặc cuối, đơn vị sau nó', () => {
@@ -63,4 +64,41 @@ test('dòng đọc từ PDF đi qua đúng cổng kiểm của main: z app khớ
   assert.equal(check.blocking, 0, JSON.stringify(check.rows.filter((r) => r.errors.length).map((r) => r.errors)));
   assert.ok(check.rows.every((r) => r.providerCheck === 'match' || r.providerCheck === 'none'), 'z tính lại khớp z trên báo cáo');
   assert.ok(check.rows.every((r) => r.cls === 'ok'));
+});
+
+test('đọc báo cáo RIQAS thật: nhận dạng mẫu, Cycle/Sample, SDPA và đối chiếu trang tổng hợp', () => {
+  const report = parseRiqasReport(RIQAS_FIXTURE);
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.warnings, []);
+  assert.equal(report.instrumentGroup, 'Medica Easylyte Plus');
+  assert.deepEqual(report.round, {
+    program: 'MONTHLY CLINICAL CHEMISTRY', provider: 'RIQAS - Randox Laboratories', programCode: 'MC', unitCode: '231210.11',
+    year: 2026, round: 'CYCLE 23 SAMPLE 7', reportCode: '231210.11-23-7', reportDate: '2026-07-29', assignedLevel: 'Nhóm thiết bị',
+  });
+  assert.deepEqual(report.rows.map((row) => row.code), ['Chloride', 'Potassium', 'Sodium']);
+  assert.deepEqual(report.rows.map((row) => [row.result, row.assigned, row.sigmaP, row.zProvider]), [
+    [111.2, 112.325, 2.94, -0.38], [5.89, 5.89, 0.18, 0], [152.9, 153.906, 3.27, -0.31],
+  ]);
+  assert.equal(report.rows[0].peerGroup, 'Medica Corporation Medica Easylyte instrument');
+  assert.deepEqual(report.rows[0].peer, {
+    all: { n: 5361, mean: 110.262, sd: 2.88, cv: 2.8 },
+    method: { n: 4949, mean: 110.125, sd: 2.88, cv: 2.7 },
+    instrument: { n: 66, mean: 112.325, sd: 2.94, cv: 3 },
+  });
+  assert.equal(parseEqaPdfReport(RIQAS_FIXTURE).round.provider, 'RIQAS - Randox Laboratories');
+  assert.equal(parseEqaPdfReport(FIXTURE).round.provider, 'TRUNG TÂM KIỂM CHUẨN XÉT NGHIỆM TP.HCM');
+});
+
+test('dòng RIQAS đi qua cổng kiểm của main và SDI khớp z tính lại', () => {
+  const report = parseEqaPdfReport(RIQAS_FIXTURE);
+  const rows = report.rows.map((row) => ({ ...row, instrument: 'EasyLyte Plus' }));
+  const tests = rows.map((row, index) => ({
+    id: `riqas-${index}`, name: row.code, display_name: '', standard_name: '', abbreviation: '', aliases: [],
+    instrument_id: 'easylyte', instrument_name: 'EasyLyte Plus', instrument_model: '', active: true,
+  }));
+  const mapping = new Map(rows.map((row, index) => [eqaPairKey(row.code, 'EasyLyte Plus'), `riqas-${index}`]));
+  const check = checkEqaImport({ round: report.round, rows }, { tests, mapping });
+  assert.equal(check.blocking, 0, JSON.stringify(check.rows.filter((row) => row.errors.length).map((row) => row.errors)));
+  assert.ok(check.rows.every((row) => row.providerCheck === 'match'));
+  assert.ok(check.rows.every((row) => row.cls === 'ok'));
 });

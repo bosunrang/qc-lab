@@ -88,6 +88,14 @@ test('lỗi không được bắt: báo người dùng, không mở đè hộp t
   reportUnhandled(new Error('ResizeObserver loop limit exceeded'), { ...deps, report: (reason) => reported.push(reason.message) });
   assert.deepEqual(reported, ['lỗi cần ghi log'], 'lỗi thật được gửi về tệp log của máy chính, lỗi vô hại thì không');
 
+  // Mất phiên (tài khoản bị xoá, khoá hoặc vừa phục hồi dữ liệu không có tài
+  // khoản này): về màn đăng nhập, không hiện hộp "Thao tác không hoàn tất".
+  let ended = 0;
+  const before = shown.length;
+  reportUnhandled(new Error("Error invoking remote method 'nce:getConfig': Error: Chưa đăng nhập."), { ...deps, sessionEnded: () => { ended += 1; } });
+  assert.equal(ended, 1);
+  assert.equal(shown.length, before);
+
   assert.equal(unhandledMessage('chuỗi'), 'chuỗi');
   assert.equal(unhandledMessage({ code: 1 }), 'không có mô tả');
 });

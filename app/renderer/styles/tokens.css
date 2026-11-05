@@ -306,6 +306,7 @@
   --icon-nav:18px;
   --icon-md:20px;
   --icon-lg:24px;
+  --choice-control-size:17px;
   --control-padding-x:var(--space-3);
   --control-radius:var(--radius-sm);
   --button-padding-x:var(--space-3-5);
@@ -320,6 +321,9 @@
   --panel-header-px:var(--panel-padding);
   --subpanel-header-h:44px;
   --panel-shadow:var(--shadow-panel);
+  /* Header trang dính ở đỉnh vùng cuộn; các panel sticky lấy mốc này để
+     không chui xuống dưới header khi người dùng cuộn. */
+  --page-header-h:88px;
 
 
   /* Thang tiêu đề — MỖI CẤP CẤU TRÚC MỘT CỠ, không tuỳ trang.

@@ -37,12 +37,14 @@ export function writeSafetySnapshot(db: Db, userDataDir: string, filePrefix: str
 }
 
 /** Thay thế toàn bộ bảng bằng dữ liệu đã kiểm tra trong một transaction. */
-export function restoreAllTables(db: Db, dataByTable: Record<string, Record<string, unknown>[] | undefined>): void {
+/** `keep`: bảng giữ nguyên dữ liệu hiện có (không xoá, không chép từ bản sao
+ * lưu) — vd `users` khi người dùng chọn giữ tài khoản của máy này. */
+export function restoreAllTables(db: Db, dataByTable: Record<string, Record<string, unknown>[] | undefined>, keep: readonly string[] = []): void {
   // PRAGMA foreign_keys chỉ có tác dụng NGOÀI transaction, nên đặt trước.
   db.exec('PRAGMA foreign_keys = OFF');
   try {
     withTransaction(db, () => {
-      const tables = listTableNames(db);
+      const tables = listTableNames(db).filter((table) => !keep.includes(table));
       // Xoá theo thứ tự NGƯỢC LIỆT KÊ để giảm khả năng đụng ràng buộc dù đã
       // tắt foreign_keys (phòng thủ 2 lớp, không phụ thuộc mỗi PRAGMA).
       for (const table of [...tables].reverse()) db.exec(`DELETE FROM ${quoteIdent(table)}`);
@@ -79,12 +81,12 @@ export function restoreAllTables(db: Db, dataByTable: Record<string, Record<stri
  * JavaScript. Chỉ chép các bảng và cột có ở CẢ HAI phía: bảng lạ trong tệp
  * (như `backup_info`) bị bỏ qua; cột mới hơn bản backup nhận giá trị mặc định
  * của schema hiện tại. */
-export function restoreAllTablesFromFile(db: Db, filePath: string): void {
+export function restoreAllTablesFromFile(db: Db, filePath: string, keep: readonly string[] = []): void {
   db.exec('PRAGMA foreign_keys = OFF');
   db.prepare('ATTACH DATABASE ? AS backup_src').run(filePath);
   try {
     withTransaction(db, () => {
-      const tables = listTableNames(db);
+      const tables = listTableNames(db).filter((table) => !keep.includes(table));
       const sourceTables = new Set((db.prepare("SELECT name FROM backup_src.sqlite_master WHERE type='table'").all() as { name: string }[]).map((r) => r.name));
       for (const table of [...tables].reverse()) db.exec(`DELETE FROM main.${quoteIdent(table)}`);
       for (const table of tables) {

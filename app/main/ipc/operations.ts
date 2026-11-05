@@ -270,7 +270,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     listEqaRounds: { channel: 'eqa:listRounds', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaRounds(); } },
     getEqaRound: { channel: 'eqa:getRound', lan: true, run: (ctx, id) => { ctx.actor(); return eqa.getEqaRound(id); } },
     getEqaSeries: { channel: 'eqa:getSeries', lan: true, run: (ctx, testId) => { ctx.actor(); return eqa.getEqaSeries(testId); } },
-    listEqaAttention: { channel: 'eqa:listAttention', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaAttention(); } },
+    listEqaAttention: { channel: 'eqa:listAttention', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.listEqaAttention(input); } },
     getEqaInstrumentGrid: { channel: 'eqa:getInstrumentGrid', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.getEqaInstrumentGrid(input); } },
     previewEqaImport: { channel: 'eqa:previewImport', lan: true, run: (ctx, input) => { nceReader(ctx); return eqa.previewEqaImport(input); } },
     importEqaRound: { channel: 'eqa:importRound', lan: true, run: (ctx, input) => eqa.importEqaRound(input, ctx.actor()) },

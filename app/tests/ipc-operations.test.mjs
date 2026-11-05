@@ -234,9 +234,11 @@ test('phục hồi backup chỉ dùng tệp main vừa kiểm tra, không nhận
   const imported = [];
   const backup = {
     verifyBackupFile: (filePath) => ({ ok: true, data: { points: 3, checked: filePath } }),
-    importBackupFrom: (filePath, actor) => { imported.push([filePath, actor.username]); return { ok: true, data: { preRestoreSnapshotPath: 'snap' } }; },
+    importBackupFrom: (filePath, options, actor) => { imported.push([filePath, actor.username, options.keepAccounts]); return { ok: true, data: { preRestoreSnapshotPath: 'snap' } }; },
   };
-  const { desktop, session } = setup({ backup, pickOpen: async () => 'C:\\backup\\qclab.sqlite' });
+  const { desktop, session, db } = setup({ backup, pickOpen: async () => 'C:\\backup\\qclab.sqlite' });
+  // Tài khoản admin có trong CSDL: phục hồi giả không xoá nó nên phiên được giữ.
+  db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-admin','admin','Quan tri','admin',1)").run();
   const ctx = sessionContext(() => session.get());
 
   session.set(tech);
@@ -250,8 +252,11 @@ test('phục hồi backup chỉ dùng tệp main vừa kiểm tra, không nhận
   const chosen = await desktop.chooseBackupFile.run(ctx);
   assert.equal(chosen.data.fileName, 'qclab.sqlite');
   desktop.importBackup.run(ctx, 'C:\\evil.sqlite');
-  assert.deepEqual(imported, [['C:\\backup\\qclab.sqlite', 'admin']]);
+  assert.deepEqual(imported, [['C:\\backup\\qclab.sqlite', 'admin', false]], 'tham số lạ từ renderer không thành đường dẫn hay tuỳ chọn');
   assert.equal(desktop.importBackup.run(ctx).error.code, 'no-file', 'mỗi lần chọn chỉ phục hồi được một lần');
+  await desktop.chooseBackupFile.run(ctx);
+  desktop.importBackup.run(ctx, { keepAccounts: true });
+  assert.deepEqual(imported.at(-1), ['C:\\backup\\qclab.sqlite', 'admin', true], 'chỉ nhận cờ giữ tài khoản');
 });
 
 test('bản xem trước gắn cùng bảng nghiệp vụ, đọc phiên tại thời điểm gọi', async () => {
@@ -289,5 +294,31 @@ test('exception của thao tác trả IpcResult thành { ok: false }; thao tác 
     await assert.rejects(api.listTests(), /SQLITE_BUSY/);
   } finally {
     console.error = quiet;
+  }
+});
+
+// Phục hồi thay cả bảng users: tài khoản đang đăng nhập không còn thì main kết
+// thúc phiên và báo `signedOut` để renderer về màn đăng nhập/khởi tạo quản trị.
+test('phục hồi làm mất tài khoản đang đăng nhập: kết thúc phiên, báo signedOut', async () => {
+  for (const keepUser of [false, true]) {
+    let ref;
+    const backup = {
+      backupStatus: () => ({ lastBackupAt: null, lastBackupBytes: 0 }),
+      verifyBackupFile: () => ({ ok: true, data: { tables: 1, rows: 1, points: 0, schemaVersion: 1, createdAt: '', bytes: 1, legacy: true } }),
+      importBackupFrom: () => {
+        if (!keepUser) ref.db.prepare("DELETE FROM users WHERE id='u-admin'").run();
+        return { ok: true, data: { preRestoreSnapshotPath: 'C:/qclab/pre-restore.sqlite' } };
+      },
+    };
+    ref = setup({ backup, pickOpen: async () => 'C:/backup.json' });
+    const { db, desktop, session } = ref;
+    db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-admin','admin','Quan tri','admin',1)").run();
+    session.set(admin);
+    const ctx = sessionContext(() => session.get());
+    assert.equal((await desktop.chooseBackupFile.run(ctx)).ok, true);
+    const result = await desktop.importBackup.run(ctx);
+    assert.equal(result.ok, true);
+    assert.equal(result.data.signedOut ?? false, !keepUser);
+    assert.equal(session.get() === null, !keepUser, keepUser ? 'tài khoản còn thì giữ phiên' : 'tài khoản mất thì kết thúc phiên');
   }
 });

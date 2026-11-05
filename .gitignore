@@ -24,3 +24,6 @@ Thumbs.db
 
 # Biên bản thẩm định do `npm run validate` sinh ra
 validation-output/
+
+# Bộ PDF mẫu ngoại kiểm sinh để thử tay, không phải nguồn
+/mau-ngoai-kiem/

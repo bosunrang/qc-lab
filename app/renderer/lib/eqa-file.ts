@@ -1,7 +1,7 @@
 // Đọc báo cáo PDF của trung tâm ngoại kiểm ở renderer: pdf.js chỉ trích chữ
 // kèm toạ độ, phần hiểu nội dung nằm ở `main/domain/eqa/pdf-report.ts`; main
 // kiểm lại toàn bộ trước khi ghi.
-import { parseVeqasReport, type EqaPdfReport, type EqaPdfTextItem } from '../../main/domain/eqa/pdf-report';
+import { parseEqaPdfReport, type EqaPdfReport, type EqaPdfTextItem } from '../../main/domain/eqa/pdf-report';
 
 type PdfJs = typeof import('pdfjs-dist');
 let pdfjsReady: Promise<PdfJs> | null = null;
@@ -36,10 +36,10 @@ async function readPdf(file: File): Promise<EqaPdfReport> {
         pages.push(content.items.flatMap((item) => ('str' in item && item.str.trim()) ? [{ str: item.str, x: item.transform[4], y: item.transform[5] }] : []));
       }
       const meta = await doc.getMetadata().catch(() => null);
-      return parseVeqasReport({ fileName: file.name, pages, creationDate: pdfDate((meta?.info as { CreationDate?: unknown } | undefined)?.CreationDate) });
+      return parseEqaPdfReport({ fileName: file.name, pages, creationDate: pdfDate((meta?.info as { CreationDate?: unknown } | undefined)?.CreationDate) });
     } finally { void task.destroy(); }
   } catch (error) {
-    const empty = parseVeqasReport({ fileName: file.name, pages: [], creationDate: '' });
+    const empty = parseEqaPdfReport({ fileName: file.name, pages: [], creationDate: '' });
     return { ...empty, warnings: [], errors: [`${file.name}: không đọc được file PDF (${error instanceof Error ? error.message : 'lỗi không rõ'}).`] };
   }
 }

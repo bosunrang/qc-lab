@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useEqaStore } from '../../store/eqa-store';
+import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { EmptyState } from '../../components/EmptyState';
@@ -23,7 +24,8 @@ const FIELD_ERRORS: FieldErrorMap = {
 };
 
 export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null; onClose: () => void }) {
-  const { programs, instruments, saveSchedule } = useEqaStore(useShallow((s) => ({ programs: s.programs, instruments: s.instruments, saveSchedule: s.saveSchedule })));
+  const { programs, saveSchedule } = useEqaStore(useShallow((s) => ({ programs: s.programs, saveSchedule: s.saveSchedule })));
+  const instruments = useManageStore((s) => s.instruments);
   const initialProgram = programs.find((p) => p.id === row?.program_id) ?? (row ? undefined : programs[0]);
   const [programId, setProgramId] = useState(row?.program_id ?? (programs[0]?.id || NEW_PROGRAM));
   const [sampleType, setSampleType] = useState(row?.sample_type ?? initialProgram?.sample_type ?? '');
@@ -110,7 +112,7 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
           <div className="eqa-machine-picker" role="group" aria-labelledby="eqa-s-machines-label">
             {!machines.length && <EmptyState size="compact">Chưa có máy xét nghiệm. Thêm máy ở Cấu hình chung.</EmptyState>}
             {machines.map((m) => (
-              <label key={m.id}>
+              <label key={m.id} className="choice-card">
                 <input type="checkbox" data-field="instrumentIds" checked={machineIds.has(m.id)} disabled={submittedIds.has(m.id)} onChange={(e) => {
                   setMachineIds((prev) => { const next = new Set(prev); if (e.target.checked) next.add(m.id); else next.delete(m.id); return next; });
                 }} />

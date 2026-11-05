@@ -1,7 +1,7 @@
 import { qcRunKey, compareQcRunKey } from '../../main/domain/sort-order';
 // Biểu đồ Levey-Jennings và CUSUM dùng chung. Levey-Jennings có dải màu
 // ±1/±2/±3SD, nhãn bậc SD bên trái, giá trị thật bên phải và nhãn ngày trục X.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { vnDate, vnDayMonth } from '../lib/format';
 import { CHART_TEAL } from '../lib/chart-colors';
 import { levelDash, markerShape, markerSize, pickRejectLabels, rejectRuleLabel, traceMarker } from '../lib/qc-marker';
@@ -14,6 +14,30 @@ export interface QcChartPoint {
   /** Mức nào trong cùng lần chạy đã bị loại — lý do một điểm "Đạt" vẫn không
    * vào thống kê. Rỗng/không có nghĩa là không biết lý do nào. */
   runRejectedBy?: number[];
+}
+
+/** Cách trình bày chuỗi đối chiếu trên cùng khung vẽ Levey-Jennings.
+ * Giá trị, xếp loại và giới hạn do nơi gọi cung cấp; biểu đồ không đánh giá
+ * lại nghiệp vụ. Không truyền thì giữ nguyên biểu đồ nội kiểm hiện có. */
+export interface QcChartComparison {
+  title: string;
+  xTitle: string;
+  unit: 'z' | '%';
+  warning: number | null;
+  rejection: number | null;
+  labels: readonly string[];
+  /** Nhóm (đợt ngoại kiểm) của từng điểm, đánh số 0, 1, 2… tăng dần. Có thì
+   * trục X đặt mỗi nhóm một vị trí, điểm cùng nhóm nằm sát nhau và đường chỉ
+   * nối điểm cùng thứ tự giữa các nhóm — mẫu khác nồng độ không nối với nhau. */
+  groups?: readonly number[];
+  /** Nhãn trục X của từng nhóm. */
+  groupLabels?: readonly string[];
+  /** Nhóm mở đầu một năm mới: vẽ vạch phân cách trước nhóm đó. */
+  groupBreaks?: readonly number[];
+  limits?: readonly (number | null)[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+  tooltip: (index: number) => ReactNode;
 }
 
 /** Điểm KHÔNG vào thống kê nhưng TỰ NÓ không vi phạm: cả lần chạy bị loại vì
@@ -53,7 +77,7 @@ export interface QcChartCusum {
   k?: number; h?: number; ma?: number[];
 }
 
-type LjHover = { left: number; top: number; level?: number; lot?: string; point: QcChartPoint };
+type LjHover = { left: number; top: number; level?: number; lot?: string; point: QcChartPoint; index?: number };
 const VERDICT_TEXT: Record<QcChartPoint['verdict'], string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
 
 /** Tooltip điểm QC. Canvas không có phần tử điểm riêng để browser
@@ -177,20 +201,21 @@ function useCanvasDraw(
   return { canvasRef, wrapRef };
 }
 
-export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, height = 220, responsiveHeight = false, className }: {
+export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, height = 220, responsiveHeight = false, className, comparison }: {
   mode: 'lj' | 'cusum'; points: QcChartPoint[]; cusum?: QcChartCusum;
   /** Mean/SD đích của mức, dùng để in giá trị thật ở trục Y bên phải. */
   mean?: number | null; sd?: number | null; lot?: string; decimals?: number;
   height?: number; responsiveHeight?: boolean; className?: string;
+  comparison?: QcChartComparison;
 }) {
   const [ljHover, setLjHover] = useState<LjHover | null>(null);
   const { canvasRef, wrapRef } = useCanvasDraw(height, responsiveHeight, (ctx, width, renderHeight) => {
-    if (mode === 'lj') drawLJ(ctx, width, renderHeight, points, mean, sd, decimals);
+    if (mode === 'lj') drawLJ(ctx, width, renderHeight, points, mean, sd, decimals, comparison);
     else drawCusum(ctx, width, renderHeight, cusum || { cPos: [], cNeg: [], flags: [] });
-  }, [mode, points, cusum, mean, sd, decimals]);
+  }, [mode, points, cusum, mean, sd, decimals, comparison]);
   // Tooltip đọc props mới nhất qua ref để hàm xử lý giữ một tham chiếu.
-  const argsRef = useRef({ mode, points, cusum, mean, sd, lot });
-  argsRef.current = { mode, points, cusum, mean, sd, lot };
+  const argsRef = useRef({ mode, points, cusum, mean, sd, lot, comparison });
+  argsRef.current = { mode, points, cusum, mean, sd, lot, comparison };
 
   /** CUSUM là canvas nên không có từng điểm DOM để browser tự hiện title.
    * Tìm điểm gần con trỏ theo cùng hình học x của hàm vẽ, sau đó đặt native
@@ -210,39 +235,60 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
 
   const updateLjTooltip = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    const { mode, points, mean, sd, lot } = argsRef.current;
+    const { mode, points, mean, sd, lot, comparison } = argsRef.current;
     if (!canvas || mode !== 'lj' || !points.length) { setLjHover(null); return; }
     const rect = canvas.getBoundingClientRect();
     const hasTarget = mean != null && sd != null && sd > 0;
     const targetMean = hasTarget ? (mean as number) : 0, targetSd = hasTarget ? (sd as number) : 1;
-    const { x, clampY } = geometry(rect.width, rect.height, points.length, targetMean, targetSd);
+    const { x: plainX, clampY, padL, padT, cw, ch, markPad } = geometry(rect.width, rect.height, points.length, targetMean, targetSd,
+      comparison ? comparisonScale(points, comparison).limit : undefined, comparison ? COMPARISON_PAD_R : undefined);
+    const x = groupLayout(points.length, comparison, padL, cw, markPad)?.x ?? plainX;
     const px = event.clientX - rect.left, py = event.clientY - rect.top;
     let hit: QcChartPoint | null = null;
+    let hitIndex = -1;
     let closest = 14;
     points.forEach((point, index) => {
       // Cùng `plotValue()` mà `drawLJ()` dùng — hai công thức riêng thì vùng
       // bắt hover trôi khỏi chấm đang vẽ.
       const value = plotValue(point, hasTarget, targetMean, targetSd);
       if (!Number.isFinite(value)) return;
-      const distance = Math.hypot(px - x(index), py - clampY(value));
-      if (distance <= closest) { closest = distance; hit = point; }
+      const radius = markerSize(point.verdict);
+      const pointY = Math.max(padT + radius, Math.min(padT + ch - radius, clampY(value)));
+      const distance = Math.hypot(px - x(index), py - pointY);
+      if (distance <= closest) { closest = distance; hit = point; hitIndex = index; }
     });
     if (!hit) { setLjHover(null); return; }
     const left = Math.min(window.innerWidth - 248, event.clientX + 14);
     const top = Math.min(window.innerHeight - 142, event.clientY + 14);
-    setLjHover({ left: Math.max(12, left), top: Math.max(12, top), lot, point: hit });
+    setLjHover({ left: Math.max(12, left), top: Math.max(12, top), lot, point: hit, index: hitIndex });
   }, [canvasRef]);
 
-  const chartAriaLabel = mode === 'lj'
+  const chartAriaLabel = comparison ? `${comparison.title}, ${points.filter((p) => Number.isFinite(p.z)).length} kết quả. Dùng phím mũi tên để chọn mẫu.` : mode === 'lj'
     ? `Biểu đồ Levey-Jennings${lot ? ` lô ${lot}` : ''}, ${points.length} điểm QC trong khoảng xem.`
     : `Biểu đồ CUSUM, ${points.length} điểm QC trong khoảng xem.`;
 
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>
-      <canvas ref={canvasRef} className={className} role="img" aria-label={chartAriaLabel} onPointerMove={(event) => { updateCusumTooltip(event); updateLjTooltip(event); }}
+      <canvas ref={canvasRef} className={className} role="img" aria-label={chartAriaLabel} tabIndex={comparison ? 0 : undefined}
+        onClick={() => { if (comparison && ljHover?.index !== undefined && points[ljHover.index] === ljHover.point) comparison.onSelect(ljHover.index); }}
+        onKeyDown={(event) => {
+          if (!comparison) return;
+          const available = points.flatMap((p, i) => Number.isFinite(p.z) ? [i] : []);
+          if (!available.length) return;
+          const current = Math.max(0, available.indexOf(comparison.selectedIndex));
+          const next = event.key === 'Home' ? available[0] : event.key === 'End' ? available.at(-1)!
+            : event.key === 'ArrowLeft' ? available[Math.max(0, current - 1)] : event.key === 'ArrowRight' ? available[Math.min(available.length - 1, current + 1)]
+            : event.key === 'Enter' || event.key === ' ' ? available[current] : undefined;
+          if (next !== undefined) { event.preventDefault(); comparison.onSelect(next); }
+        }}
+        onPointerMove={(event) => { updateCusumTooltip(event); updateLjTooltip(event); }}
+        onPointerDown={comparison ? updateLjTooltip : undefined}
         onPointerLeave={() => { if (canvasRef.current) canvasRef.current.title = ''; setLjHover(null); }}
         style={{ width: '100%', height: responsiveHeight ? 'auto' : height, display: 'block' }} />
-      <LjTooltip hit={ljHover} decimals={decimals} />
+      {comparison ? <>
+        <span className="sr-only" aria-live="polite">{comparison.labels[comparison.selectedIndex] ?? ''}</span>
+        {ljHover?.index !== undefined && points[ljHover.index] === ljHover.point && <div className="qc-chart-tooltip" style={{ left: ljHover.left, top: ljHover.top }}>{comparison.tooltip(ljHover.index)}</div>}
+      </> : <LjTooltip hit={ljHover} decimals={decimals} />}
     </div>
   );
 }
@@ -250,14 +296,37 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
 /** Hình học biểu đồ: chừa 56px bên trái cho bậc SD,
  * 78px bên phải cho giá trị thật, 34px trên cho tiêu đề, 48px dưới cho ngày;
  * trục Y phủ ±3.25SD (rộng hơn ±3 để dải "ngoài 3SD" có chỗ hiện). */
-function geometry(width: number, height: number, count: number, mean: number, sd: number) {
-  const padL = 56, padR = 78, padT = 34, padB = 48;
+function geometry(width: number, height: number, count: number, mean: number, sd: number, extent = 3.25, padR = 78) {
+  const padL = 56, padT = 34, padB = 48;
   const cw = width - padL - padR, ch = height - padT - padB, markPad = 10;
-  const top = mean + 3.25 * sd, bottom = mean - 3.25 * sd;
+  const top = mean + extent * sd, bottom = mean - extent * sd;
   const y = (value: number) => padT + ((top - value) / (top - bottom)) * ch;
   const clampY = (value: number) => Math.max(padT, Math.min(padT + ch, y(value)));
   const x = (index: number) => (count <= 1 ? padL + cw / 2 : padL + markPad + (index / (count - 1)) * (cw - markPad * 2));
   return { padL, padT, cw, ch, markPad, y, clampY, x };
+}
+
+/** Biểu đồ đối chiếu không in giá trị thật bên phải (trùng nhãn bên trái),
+ * nên chỉ chừa lề phải đủ cho nhãn điểm. */
+const COMPARISON_PAD_R = 24;
+
+/** Trục X gom theo nhóm: mỗi nhóm một khoảng bằng nhau, điểm cùng nhóm đặt
+ * sát nhau quanh tâm khoảng. `null` khi không gom. */
+function groupLayout(n: number, comparison: QcChartComparison | undefined, padL: number, cw: number, markPad: number) {
+  const groups = comparison?.groups;
+  if (!groups || groups.length !== n || !n) return null;
+  const count = Math.max(...groups) + 1;
+  const sizes = new Array<number>(count).fill(0);
+  const order = groups.map((g) => sizes[g]++);
+  const widest = Math.max(...sizes);
+  const inner = cw - markPad * 2, pitch = inner / count;
+  const step = widest > 1 ? Math.min(14, (pitch * 0.5) / (widest - 1)) : 0;
+  const center = (g: number) => padL + markPad + (g + 0.5) * pitch;
+  return {
+    count, order, widest, center,
+    boundary: (g: number) => padL + markPad + g * pitch,
+    x: (i: number) => center(groups[i]) + (order[i] - (sizes[groups[i]] - 1) / 2) * step,
+  };
 }
 
 /** Toạ độ theo trục giá trị của MỘT điểm trên biểu đồ Levey-Jennings.
@@ -294,48 +363,107 @@ function ticksOf(points: QcChartPoint[], maxTicks = 5) {
   });
 }
 
+/** Chỉ chọn thang vẽ đối xứng quanh 0; không tính lại kết luận của điểm.
+ * Thang phần trăm giữ đơn vị thật và TEa riêng của mỗi mẫu. */
+function comparisonScale(points: QcChartPoint[], comparison: QcChartComparison) {
+  const peak = Math.max(0, ...points.map((p) => Number.isFinite(p.z) ? Math.abs(p.z) : 0), ...(comparison.limits ?? []).map((v) => v ?? 0));
+  if (comparison.unit === 'z') {
+    const rejection = comparison.rejection ?? 3, warning = comparison.warning ?? 2;
+    // Chừa ít nhất 0,5 đơn vị z trên điểm cao nhất: viền chọn và nhãn của điểm
+    // không chấp nhận không dính mép vùng vẽ.
+    const limit = Math.max(rejection + 0.25, peak * 1.12, peak + 0.5);
+    const ticks = [...new Set([-rejection, -warning, -1, 0, 1, warning, rejection])].filter((v) => Math.abs(v) <= limit).sort((a, b) => b - a);
+    return { limit, ticks };
+  }
+  const rough = Math.max(peak, 1) / 3;
+  const power = 10 ** Math.floor(Math.log10(rough));
+  const step = [1, 2, 2.5, 5, 10].map((n) => n * power).find((n) => n >= rough) ?? power * 10;
+  const limit = Math.ceil(Math.max(peak, 1) * 1.12 / step) * step;
+  const ticks = Array.from({ length: Math.round(2 * limit / step) + 1 }, (_, i) => Number((limit - i * step).toPrecision(8)));
+  return { limit, ticks };
+}
+
 function drawLJ(
   ctx: CanvasRenderingContext2D, width: number, height: number,
   points: QcChartPoint[], meanIn?: number | null, sdIn?: number | null, decimals = 2,
+  comparison?: QcChartComparison,
 ) {
   // Không có Mean/SD đích thì vẽ theo thang z (mean 0, sd 1).
   const hasTarget = meanIn != null && sdIn != null && sdIn > 0;
   const mean = hasTarget ? (meanIn as number) : 0;
   const sd = hasTarget ? (sdIn as number) : 1;
   const n = points.length;
-  const { padL, padT, cw, ch, markPad, y, clampY, x } = geometry(width, height, n, mean, sd);
+  const scale = comparison ? comparisonScale(points, comparison) : null;
+  const { padL, padT, cw, ch, markPad, y, clampY, x: plainX } = geometry(width, height, n, mean, sd, scale?.limit, comparison ? COMPARISON_PAD_R : undefined);
+  const layout = groupLayout(n, comparison, padL, cw, markPad);
+  const x = layout?.x ?? plainX;
+  const gridLevels = scale?.ticks ?? [3, 2, 1, 0, -1, -2, -3];
+  const bands = comparison ? comparison.unit === 'z' ? [
+    { low: comparison.rejection ?? 3, high: scale!.limit, color: 'rejectBand' as const },
+    { low: -scale!.limit, high: -(comparison.rejection ?? 3), color: 'rejectBand' as const },
+    { low: comparison.warning ?? 2, high: comparison.rejection ?? 3, color: 'warnBand' as const },
+    { low: -(comparison.rejection ?? 3), high: -(comparison.warning ?? 2), color: 'warnBand' as const },
+    { low: -(comparison.warning ?? 2), high: comparison.warning ?? 2, color: 'okBand' as const },
+    { low: -Math.min(1, comparison.warning ?? 2), high: Math.min(1, comparison.warning ?? 2), color: 'okMid' as const },
+  ] : [] : BANDS;
 
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = LJ.okBand; ctx.fillRect(padL, padT, cw, ch);
+  ctx.fillStyle = comparison?.unit === '%' ? LJ.okMid : LJ.okBand; ctx.fillRect(padL, padT, cw, ch);
   ctx.save();
   ctx.beginPath(); ctx.rect(padL - markPad, padT, cw + markPad * 2, ch); ctx.clip();
-  for (const band of BANDS) {
+  for (const band of bands) {
     const bandTop = y(mean + band.high * sd);
     ctx.fillStyle = LJ[band.color];
     ctx.fillRect(padL, bandTop, cw, y(mean + band.low * sd) - bandTop);
   }
+  // Dải TEa thay đổi theo mẫu: mỗi đoạn nằm trên đúng khoảng của mẫu đó,
+  // không nối qua mẫu thiếu TEa và không đổi phần trăm thành z hay SD.
+  comparison?.limits?.forEach((limit, i) => {
+    if (limit === null || !Number.isFinite(limit)) return;
+    const left = i === 0 ? padL : (x(i - 1) + x(i)) / 2;
+    const right = i === n - 1 ? padL + cw : (x(i) + x(i + 1)) / 2;
+    ctx.fillStyle = LJ.okBand; ctx.fillRect(left, y(limit), right - left, y(-limit) - y(limit));
+  });
   // Đường kẻ theo bậc SD; bậc 0 (Mean) đậm hơn — `leveyJenningsGridLines`.
-  for (const z of [3, 2, 1, 0, -1, -2, -3]) {
+  for (const z of gridLevels) {
     const gy = y(mean + z * sd);
     ctx.strokeStyle = z === 0 ? LJ.mean : LJ.grid;
     ctx.lineWidth = z === 0 ? 1.8 : 1.15;
     ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + cw, gy); ctx.stroke();
   }
+  // Vạch đứt phân cách năm, nằm dưới điểm và đường TEa.
+  if (layout) for (const g of comparison?.groupBreaks ?? []) {
+    if (g <= 0 || g >= layout.count) continue;
+    const bx = layout.boundary(g);
+    ctx.strokeStyle = LJ.mean; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(bx, padT); ctx.lineTo(bx, padT + ch); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  comparison?.limits?.forEach((limit, i) => {
+    if (limit === null || !Number.isFinite(limit)) return;
+    const left = i === 0 ? padL : (x(i - 1) + x(i)) / 2;
+    const right = i === n - 1 ? padL + cw : (x(i) + x(i + 1)) / 2;
+    ctx.strokeStyle = LJ.rejectPoint; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    for (const sign of [-1, 1]) { ctx.beginPath(); ctx.moveTo(left, y(sign * limit)); ctx.lineTo(right, y(sign * limit)); ctx.stroke(); }
+    ctx.setLineDash([]);
+  });
   ctx.restore();
 
   ctx.font = '800 11.5px Manrope,system-ui,sans-serif';
   ctx.fillStyle = '#17212b'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('Levey-Jennings', padL + cw / 2, padT - 8);
+  ctx.fillText(comparison?.title ?? 'Levey-Jennings', padL + cw / 2, padT - 8);
 
   // Trục Y: bậc SD bên trái ('> +3'/'< -3' ở hai đầu), giá trị thật bên phải.
+  // Biểu đồ đối chiếu chỉ có nhãn bên trái: bên phải sẽ lặp đúng giá trị đó.
   ctx.font = '800 12.5px Manrope,system-ui,sans-serif';
   ctx.textBaseline = 'middle';
-  for (const z of [3, 2, 1, 0, -1, -2, -3]) {
+  for (const z of gridLevels) {
     const yy = y(mean + z * sd);
-    const left = z === 3 ? '> +3' : z === -3 ? '< -3' : String(z);
+    const left = comparison ? `${z > 0 ? '+' : ''}${z}${comparison.unit === '%' ? '%' : ''}` : z === 3 ? '> +3' : z === -3 ? '< -3' : String(z);
     ctx.fillStyle = '#17212b';
     ctx.textAlign = 'right'; ctx.fillText(left, padL - 9, yy);
+    if (comparison) continue;
     ctx.textAlign = 'left';
     ctx.fillText(hasTarget ? (mean + z * sd).toFixed(decimals) : `${z > 0 ? '+' : ''}${z}SD`, padL + cw + 10, yy);
   }
@@ -356,18 +484,31 @@ function drawLJ(
     ctx.strokeStyle = LJ.line; ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.setLineDash([]);
     ctx.beginPath();
-    points.forEach((point, i) => {
-      const px = x(i), py = clampY(valueOf(point));
-      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
-    });
+    // Gom theo nhóm: mỗi thứ tự trong nhóm (mẫu 1, mẫu 2…) là một đường riêng.
+    for (let lane = 0; lane < (layout?.widest ?? 1); lane++) {
+      let connected = false;
+      points.forEach((point, i) => {
+        if (layout && layout.order[i] !== lane) return;
+        const value = valueOf(point);
+        if (!Number.isFinite(value)) { connected = false; return; }
+        const px = x(i), py = clampY(value);
+        if (connected) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+        connected = true;
+      });
+    }
     ctx.stroke();
   }
-  const marks = points.map((p, i) => {
+  const marks = points.flatMap((p, i) => {
+    if (!Number.isFinite(valueOf(p))) return [];
     const radius = markerSize(p.verdict);
     // Giữ trọn marker trong vùng vẽ khi giá trị nằm ngoài ±3.25SD.
     const px = x(i), py = Math.max(padT + radius, Math.min(padT + ch - radius, clampY(valueOf(p))));
-    drawPoint(ctx, p, px, py, verdictColor(p.verdict, LJ.okPoint));
-    return { p, px, py, radius };
+    if (comparison?.selectedIndex === i) {
+      traceMarker(ctx, markerShape(p.verdict), px, py, radius + 4);
+      ctx.strokeStyle = LJ.line; ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke();
+    }
+    drawPoint(ctx, p, px, py, comparison && p.verdict === 'none' ? '#7b838e' : verdictColor(p.verdict, LJ.okPoint));
+    return [{ p, px, py, radius }];
   });
   ctx.restore();
 
@@ -375,19 +516,34 @@ function drawLJ(
   ctx.font = '700 10.5px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center';
   const rejects = marks.filter((m) => m.p.verdict === 'rej' && m.p.rules.length);
-  const labels = rejects.map((m) => ({ text: rejectRuleLabel(m.p.rules), above: m.py > padT + ch / 2 }));
-  const picked = pickRejectLabels(rejects.map((m, i) => ({ x: m.px, above: labels[i].above, width: ctx.measureText(labels[i].text).width })));
+  // Tâm nhãn kẹp trong vùng vẽ: điểm sát hai đầu trục không đẩy nhãn đè lên
+  // nhãn trục Y ở hai bên.
+  const labels = rejects.map((m) => {
+    const text = comparison ? m.p.rules[0] : rejectRuleLabel(m.p.rules);
+    const width = ctx.measureText(text).width;
+    return { text, width, x: Math.min(padL + cw - width / 2, Math.max(padL + width / 2, m.px)), above: m.py > padT + ch / 2 };
+  });
+  const picked = pickRejectLabels(labels.map(({ x, above, width }) => ({ x, above, width })));
   for (const i of picked) {
-    const m = rejects[i], { text, above } = labels[i];
+    const m = rejects[i], { text, above, x: tx } = labels[i];
     ctx.textBaseline = above ? 'bottom' : 'top';
     const ty = above ? m.py - m.radius - 3 : m.py + m.radius + 3;
-    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round'; ctx.strokeText(text, m.px, ty);
-    ctx.fillStyle = LJ.rejectPoint; ctx.fillText(text, m.px, ty);
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round'; ctx.strokeText(text, tx, ty);
+    ctx.fillStyle = LJ.rejectPoint; ctx.fillText(text, tx, ty);
   }
 
   ctx.fillStyle = '#536772'; ctx.font = '700 11.5px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  for (const tick of ticksOf(points)) ctx.fillText(tick.label, x(tick.index), padT + ch + 10);
+  if (layout) {
+    // Nhãn theo nhóm, giãn đều; khoảng 120px một nhãn để không chồng chữ.
+    const total = Math.min(layout.count, Math.max(1, Math.floor(cw / 120)));
+    const picks = total === 1 ? [layout.count - 1] : [...new Set(Array.from({ length: total }, (_, i) => Math.round((i * (layout.count - 1)) / (total - 1))))];
+    for (const g of picks) ctx.fillText(comparison?.groupLabels?.[g] ?? '', layout.center(g), padT + ch + 10);
+  } else for (const tick of ticksOf(points, comparison ? Math.max(1, Math.floor(cw / 140)) : 5)) {
+    const label = comparison ? comparison.labels[tick.index] ?? '' : tick.label;
+    ctx.fillText(label, x(tick.index), padT + ch + 10);
+  }
+  if (comparison) { ctx.textBaseline = 'bottom'; ctx.fillText(comparison.xTitle, padL + cw / 2, height - 2); }
 }
 
 /** Màu theo mức cho biểu đồ tổng hợp nhiều mức. */

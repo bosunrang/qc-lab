@@ -84,6 +84,7 @@ Xem xét đợt (N-08) ◀── Theo dõi xu hướng theo xét nghiệm (N-06,
 | N-13 | **Hiệu lực**: tiêu chí đặt trước khi đánh giá; tối thiểu kết quả đạt ở đợt ngoại kiểm kế tiếp của xét nghiệm đó và không có tín hiệu nội kiểm tương ứng; duyệt độc lập theo NCE | Eurachem 2022 bước 4; ISO 15189 8.7 |
 | N-14 | **Bao phủ ngoại kiểm**: báo cáo xét nghiệm đang hoạt động không có kết quả ngoại kiểm trong 12 tháng; với từng xét nghiệm đó ghi phương pháp thay thế (so sánh liên phòng, mẫu chia đôi, mẫu đã biết giá trị), lý do và kết quả | ISO 15189 7.3.7.3; SADCAS TR 08 (kế hoạch phủ mọi xét nghiệm); R-09 |
 | N-15 | **Bias cho Six Sigma**: lấy từ kết quả ngoại kiểm cùng xét nghiệm trong kỳ Sigma, loại kết quả mà điều tra kết luận lỗi hành chính hoặc vấn đề chương trình. Cách gộp (trung bình có dấu cho Sigma; RMS chỉ cho ngân sách MU theo Nordtest) và chọn mẫu theo nồng độ phải chốt trong một đợt `SIGMA-REVIEW` trước khi làm | E-09; R-11 |
+| N-16 | **Một đợt = một lần phân phối mẫu được chấm điểm riêng.** VEQAS: một đợt (ĐỢT nn) có thể gồm nhiều mẫu. RIQAS: mỗi SAMPLE của một CYCLE là một đợt ("CYCLE 23 SAMPLE 7", số thứ tự = cycle×100 + sample để sample cuối cycle vắt sang năm sau vẫn xếp trước cycle kế tiếp). Bản trước lấy CYCLE làm kỳ nên sample sau ghi đè sample trước của cùng máy và luật xu hướng N-07 đếm cả cycle là một đợt. Schema 11 đổi tên kỳ RIQAS cũ chỉ có một sample; kỳ đã lẫn nhiều sample giữ nguyên (2026-11-05) | ISO 13528 (mỗi vòng PT đánh giá riêng); RIQAS cấp báo cáo theo từng sample |
 
 ## 5. Ảnh hưởng tới kế hoạch EQA
 

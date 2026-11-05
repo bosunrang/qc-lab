@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store/settings-store';
+import { useAuthStore } from '../store/auth-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
-import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/dialog-store';
+import { choiceDialog, confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/dialog-store';
 import { showToast } from '../state/toast-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
@@ -221,13 +222,24 @@ export function SettingsPage() {
     if (!verified.ok) { await errorDialog(`Tệp sao lưu KHÔNG hợp lệ: ${verified.error.message}`); return; }
     if (!verified.data) return;
     const created = verified.data.createdAt ? ` tạo lúc ${new Date(verified.data.createdAt).toLocaleString('vi-VN')}` : '';
-    if (!(await confirmDialog(
-      `File ${verified.data.fileName} hợp lệ (${verified.data.points} điểm QC${created}). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè. Tiếp tục?`,
-      { title: 'Phục hồi từ bản sao lưu', danger: true, confirmLabel: 'Phục hồi' },
-    ))) return;
+    // Bản sao lưu cũ thường mang tài khoản và mật khẩu cũ: mặc định giữ tài
+    // khoản của máy này để phục hồi xong vẫn đăng nhập được.
+    const mode = await choiceDialog({
+      title: 'Phục hồi từ bản sao lưu',
+      message: `File ${verified.data.fileName} hợp lệ (${verified.data.points} điểm QC${created}). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè.`,
+      options: [
+        { key: 'all', label: 'Thay cả tài khoản', variant: 'danger', hint: 'danh sách tài khoản lấy theo bản sao lưu; phải đăng nhập bằng mật khẩu của bản sao lưu.' },
+        { key: 'keep', label: 'Giữ tài khoản hiện tại', variant: 'teal', hint: 'chỉ thay dữ liệu; tài khoản và mật khẩu đang dùng trên máy này giữ nguyên.' },
+      ],
+    });
+    if (!mode) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ bản sao lưu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
-    const result = await importBackup();
+    const result = await importBackup(mode === 'keep');
     if (!result.ok) { await showError(result.error.message); return; }
+    if (result.data.signedOut) {
+      await useAuthStore.getState().endSession(`Đã phục hồi thành công. Tài khoản vừa dùng không có trong bản sao lưu: đăng nhập bằng tài khoản của bản sao lưu, hoặc tạo quản trị mới nếu bản sao lưu không kèm tài khoản. Bản an toàn trước khi phục hồi: ${result.data.preRestoreSnapshotPath}`);
+      return;
+    }
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
 

@@ -28,7 +28,7 @@ export interface EqaSeriesInput {
   /** Khoá đợt; thiếu thì gom theo năm–số đợt–tên đợt. */
   roundId?: string;
   /** Chương trình ngoại kiểm: tín hiệu chỉ tính trong cùng một chương trình,
-   * vì hai nhà cung cấp có cách đánh số đợt và mẫu riêng (N6). */
+   * vì hai nhà cung cấp có cách đánh số đợt và mẫu riêng (N-06). */
   programId?: string;
   reportDate?: string;
 }
@@ -49,6 +49,9 @@ export interface EqaSeriesResult {
   enough: boolean;
   /** Số đợt của chương trình đó. */
   rounds: number;
+  /** Số đợt và `enough` của từng chương trình — màn xem một chương trình phải
+   * dùng số của chính chương trình đó, không phải của chương trình mới nhất. */
+  programs: { programId: string; rounds: number; enough: boolean }[];
 }
 
 /** z làm tròn 2 chữ số như báo cáo, để so ngưỡng không lệch vì phần ẩn. */
@@ -72,7 +75,7 @@ const roundKey = (point: EqaSeriesInput) => point.roundId || `${point.year}|${po
 export const EQA_SIGNAL_ORDER: readonly EqaSignal[] = ['reject', 'two_of_three', 'six_same_side', 'j_score'];
 
 /** Tín hiệu của một chương trình. Theo N-07 các luật xu hướng đếm ĐỢT, không
- * đếm mẫu (N6): một đợt thường có 2–5 mẫu ở nồng độ khác nhau, đếm mẫu thì
+ * đếm mẫu (N-06): một đợt thường có 2–5 mẫu ở nồng độ khác nhau, đếm mẫu thì
  * "2/3" và "6 liên tiếp" nổ ngay trong một đợt. Điểm J và |z| ≥ 3 vẫn theo
  * từng kết quả. */
 function programSeries(input: readonly EqaSeriesInput[], config: EqaConfig, series: EqaSeriesConfig): { points: EqaSeriesPoint[]; rounds: number } {
@@ -131,13 +134,14 @@ function programSeries(input: readonly EqaSeriesInput[], config: EqaConfig, seri
 export function eqaSeries(input: readonly EqaSeriesInput[], config: EqaConfig = EQA_DEFAULT_CONFIG, series: EqaSeriesConfig = EQA_SERIES_DEFAULTS): EqaSeriesResult {
   const byProgram = new Map<string, EqaSeriesInput[]>();
   for (const item of input) byProgram.set(item.programId ?? '', [...(byProgram.get(item.programId ?? '') ?? []), item]);
-  const results = [...byProgram.values()].map((items) => programSeries(items, config, series));
+  const results = [...byProgram].map(([programId, items]) => ({ programId, ...programSeries(items, config, series) }));
   // Gộp lại theo thời gian để vẽ một biểu đồ; chương trình chỉ tách khi tính.
   const points = results.flatMap((r) => r.points)
     .sort((a, b) => seriesOrder(a, b) || (a.programId ?? '').localeCompare(b.programId ?? ''));
   const latest = points.at(-1);
   const rounds = latest ? results.find((r) => r.points.includes(latest))!.rounds : 0;
-  return { points, enough: rounds >= series.minPoints, rounds };
+  return { points, enough: rounds >= series.minPoints, rounds,
+    programs: results.map((r) => ({ programId: r.programId, rounds: r.rounds, enough: r.rounds >= series.minPoints })) };
 }
 
 export interface EqaAssignedUncertainty {

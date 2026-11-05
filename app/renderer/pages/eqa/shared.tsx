@@ -28,6 +28,14 @@ export function rowTone(cls: EqaClassView | null): string | undefined {
   return cls === 'rej' ? 'is-rej' : cls === 'warn' ? 'is-warn' : undefined;
 }
 
+/** Chọn kết quả mặc định theo mức đánh giá trước, rồi theo |z|. Không dùng
+ * thứ tự dòng vì một đợt có thể có nhiều mẫu của cùng xét nghiệm. */
+export function worstEqaResult<T extends { class: EqaClassView; z: number }>(rows: readonly T[]): T | undefined {
+  const rank = (row: T) => (row.class === 'rej' ? 2 : row.class === 'warn' ? 1 : 0);
+  return rows.reduce<T | undefined>((worst, row) => !worst || rank(row) > rank(worst)
+    || (rank(row) === rank(worst) && Math.abs(row.z) > Math.abs(worst.z)) ? row : worst, undefined);
+}
+
 export function RoundStatusTag({ status }: { status: string }) {
   return status === 'open' ? <span className="tag ok">Đang dùng</span> : <span className="tag none">Đã huỷ</span>;
 }

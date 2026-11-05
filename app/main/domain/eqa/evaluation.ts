@@ -129,8 +129,12 @@ export function eqaSuggestTests(code: string, instrument: string, tests: readonl
   return tests.filter((test) => test.active && nameMatch(test) && deviceMatch(test)).map((test) => test.id);
 }
 
-/** "ĐỢT 02" → 2; dùng để xếp thứ tự các đợt trong năm. */
+/** "ĐỢT 02" → 2; dùng để xếp thứ tự các đợt trong năm. RIQAS đánh số theo
+ * cycle rồi sample ("CYCLE 23 SAMPLE 7" → 2307), để sample cuối của một cycle
+ * vắt sang năm sau vẫn đứng trước sample đầu của cycle kế tiếp (N-16). */
 export function eqaRoundNumber(round: string): number {
+  const riqas = String(round ?? '').match(/CYCLE\s*(\d+)\D+?SAMPLE\s*(\d+)/i);
+  if (riqas) return Number(riqas[1]) * 100 + Number(riqas[2]);
   const match = String(round ?? '').match(/\d+/);
   return match ? Number(match[0]) : 0;
 }

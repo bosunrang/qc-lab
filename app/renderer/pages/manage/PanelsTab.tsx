@@ -138,11 +138,11 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
               <div className="panel-test-picker group-lot-picker" role="group" aria-labelledby="panel-test-label">
                 {instrumentId && !visibleTests.length && <EmptyState size="compact">Máy này chưa có xét nghiệm.</EmptyState>}
                 {visibleTests.map((t) => (
-                  <label key={t.id}>
+                  <label key={t.id} className="choice-card">
                     <input type="checkbox" data-field="testIds" checked={checked.has(t.id)} onChange={(e) => {
                       setChecked((prev) => { const next = new Set(prev); if (e.target.checked) next.add(t.id); else next.delete(t.id); return next; });
                     }} />
-                    <span><b>{t.name}</b><small>{instruments.find((i) => i.id === t.instrument_id)?.name || '—'} · {t.unit || 'Chưa có đơn vị'}</small></span>
+                    <span><b>{t.name}</b><small>{t.unit || 'Chưa có đơn vị'}</small></span>
                   </label>
                 ))}
               </div>

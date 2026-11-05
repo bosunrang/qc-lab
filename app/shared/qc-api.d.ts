@@ -681,16 +681,27 @@ export interface EqaResultRow {
 export type EqaSignalView = 'reject' | 'two_of_three' | 'six_same_side' | 'j_score';
 export interface EqaSeriesView {
   test_id: string; test_name: string; instrument_id: string; instrument_name: string; unit: string; enough: boolean;
+  /** Ngưỡng đang dùng để biểu đồ và xếp loại cùng một cấu hình. */
+  config: { z_warn: number; z_reject: number };
   /** Số đợt của chương trình có đợt mới nhất — `enough` khi ≥ `min_points`. */
   rounds: number; j_limit: number; min_points: number;
-  points: { result_id: string; round_id: string; year: number; round: string; sample: string; report_date: string; z: number; class: EqaClassView; pct: number | null; j: number; signals: EqaSignalView[]; unsuccessful: boolean }[];
+  /** Số đợt của từng chương trình; màn xem một chương trình dùng dòng của nó. */
+  programs: { program_id: string; program_name: string; rounds: number; enough: boolean }[];
+  points: {
+    result_id: string; round_id: string; program_id: string; program_name: string; year: number; round: string; sample: string; report_date: string;
+    result: number; assigned: number; z: number; class: EqaClassView; pct: number | null;
+    /** TEa vận hành (%) tại giá trị ấn định của mẫu; null khi xét nghiệm chưa có TEa. */
+    tea_pct: number | null; within_tea: boolean | null;
+    j: number; signals: EqaSignalView[]; unsuccessful: boolean;
+  }[];
 }
 export interface EqaAttentionRow {
   test_id: string; test_name: string; instrument_id: string; instrument_name: string; points: number;
-  /** Số kết quả có tín hiệu trong đợt mới nhất (mọi mẫu, N5). */
+  /** Số kết quả có tín hiệu trong đợt mới nhất (mọi mẫu, N-06/N-07). */
   flagged: number;
-  /** Kết quả nặng nhất trong đợt mới nhất, kèm hợp mọi tín hiệu của đợt. */
-  latest: { round_id: string; year: number; round: string; sample: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
+  /** Kết quả nặng nhất trong đợt mới nhất của MỘT chương trình, kèm hợp mọi
+   * tín hiệu của đợt. Một xét nghiệm ở hai chương trình là hai dòng. */
+  latest: { round_id: string; program_id: string; program_name: string; year: number; round: string; sample: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
 }
 /** Một đợt trong lịch ngoại kiểm. `status` do main suy ra: đã có báo cáo của
  * trung tâm > đã nộp > quá hạn > chưa nộp. `days_left`: số ngày tới hạn nộp (âm = đã quá). */
@@ -879,7 +890,7 @@ export interface QcApi {
   /** Chuỗi z/J của một xét nghiệm qua các đợt. */
   getEqaSeries(testId: string): Promise<EqaSeriesView | null>;
   /** Xét nghiệm đang có tín hiệu hoặc không thành công ở đợt mới nhất. */
-  listEqaAttention(): Promise<EqaAttentionRow[]>;
+  listEqaAttention(input?: { programId?: string; year?: number; instrumentId?: string }): Promise<EqaAttentionRow[]>;
   getEqaInstrumentGrid(input: { programId: string; year: number; instrumentId: string }): Promise<EqaInstrumentGridRow[]>;
   listEqaSchedule(): Promise<EqaScheduleRow[]>;
   listEqaPrograms(): Promise<EqaProgramOption[]>;
@@ -950,7 +961,8 @@ export interface QcApi {
   chooseBackupFile(): Promise<IpcResult<BackupFileSummary | null>>;
   /** Phục hồi từ tệp vừa kiểm tra ở `chooseBackupFile()`; luôn tạo bản an
    * toàn của dữ liệu hiện tại trước khi thay thế. */
-  importBackup(): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
+  /** `signedOut`: tài khoản đang đăng nhập không có trong dữ liệu vừa phục hồi, main đã kết thúc phiên. */
+  importBackup(input?: { keepAccounts?: boolean }): Promise<IpcResult<{ preRestoreSnapshotPath: string; signedOut?: boolean }>>;
   backupStatus(): Promise<BackupStatus>;
   /** Ghi lỗi không được bắt của renderer vào tệp log của máy chính. Chỉ cửa
    * sổ Electron của máy chính gọi được; máy trạm LAN không mở kênh này. */

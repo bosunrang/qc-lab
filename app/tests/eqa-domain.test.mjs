@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const {
   eqaClass, eqaZ, eqaPct, eqaProviderCheck, eqaPeerComparison, eqaCounts, eqaSuggestTests, eqaRoundNumber,
 } = require('../../app-dist/main/domain/eqa/evaluation.js');
-const { mergeEqaSources, checkEqaImport, eqaPairKey, eqaDate } = require('../../app-dist/main/domain/eqa/import.js');
+const { mergeEqaSources, groupEqaSources, checkEqaImport, eqaPairKey, eqaDate } = require('../../app-dist/main/domain/eqa/import.js');
 
 test('E-01: |z| ≤ 2,0 chấp nhận, 2,0 < |z| < 3,0 cảnh báo, |z| ≥ 3,0 không chấp nhận', () => {
   assert.equal(eqaClass(2), 'ok', '|z| = 2,00 là chấp nhận (công cụ cũ xếp nhầm cảnh báo)');
@@ -31,7 +31,7 @@ test('E-03: đối chiếu z với z trên báo cáo', () => {
   assert.equal(eqaProviderCheck(0.3, null), 'none');
 });
 
-test('so nhóm đồng đẳng, PT score, gợi ý xét nghiệm, số đợt', () => {
+test('so nhóm đồng đẳng, tỷ lệ chấp nhận, gợi ý xét nghiệm, số đợt', () => {
   const [peer] = eqaPeerComparison(105, { instrument: { mean: 100, sd: 2.5, cv: 2.5, n: 30 } });
   assert.deepEqual([peer.level, peer.sdi, peer.pct], ['instrument', 2, 5]);
   assert.deepEqual(eqaCounts(['ok', 'ok', 'warn', 'rej']), { total: 4, ok: 2, warn: 1, rej: 1, acceptPct: 50 });
@@ -55,6 +55,19 @@ test('gộp báo cáo từng máy của cùng đợt; báo cáo khác đợt b�
   assert.deepEqual(merged.rows.map((r) => r.instrument), ['AU5800', 'DxC700']);
   assert.match(merged.errors[0], /cobas\.pdf: thuộc đợt khác/);
   assert.equal(merged.warnings.length, 3);
+});
+
+test('nhập nhiều đợt: chia file theo đợt, xếp theo năm rồi số đợt, file lỗi thành nhóm riêng', () => {
+  const src = (round, year, instrument, rows = 1) => ({ round: { program: 'MC', provider: 'RIQAS', programCode: 'MC', unitCode: '231210.11', year, round },
+    rows: Array.from({ length: rows }, () => ({ ref: instrument, code: 'Na', instrument })), errors: [], warnings: [] });
+  const groups = groupEqaSources([
+    src('CYCLE 23 SAMPLE 2', 2026, 'EasyLyte'), src('CYCLE 22 SAMPLE 12', 2025, 'EasyLyte'),
+    src('CYCLE 23 SAMPLE 1', 2026, 'EasyLyte'), src('CYCLE 23 SAMPLE 1', 2026, 'Máy 2'), src('', null, '', 0),
+  ]);
+  assert.deepEqual(groups.map((g) => [g.round.round, g.indices]), [
+    ['', [4]], ['CYCLE 22 SAMPLE 12', [1]], ['CYCLE 23 SAMPLE 1', [2, 3]], ['CYCLE 23 SAMPLE 2', [0]],
+  ]);
+  assert.equal(groupEqaSources([src('ĐỢT 09', 2026, 'AU'), src('ĐỢT 09', 2025, 'AU')]).length, 2, 'khác năm là khác đợt');
 });
 
 const TESTS = [
@@ -105,4 +118,7 @@ test('tổng quan: máy chưa có báo cáo theo chương trình–năm, kể c�
     round('x01', 2026, ['easy'], 'open', 'p2'),
   ]);
   assert.deepEqual([...missing], [['d08', ['dxc']]], 'đợt 08 nhập sau đợt 09 vẫn báo thiếu DxC; đợt huỷ, năm khác, chương trình khác không tính');
+  // Đợt đã khai máy trong lịch: so với đúng danh sách đó, kể cả đợt duy nhất của năm.
+  const planned = eqaMissingInstruments([{ ...round('d01', 2027, ['au']), expectedIds: ['au', 'c501'] }, { ...round('d02', 2027, ['au', 'dxc']), expectedIds: ['au'] }]);
+  assert.deepEqual([...planned], [['d01', ['c501']]], 'máy cố ý bỏ ra khỏi đợt không bị báo thiếu');
 });

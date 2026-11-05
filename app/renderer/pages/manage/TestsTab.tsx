@@ -42,13 +42,13 @@ const TEST_FIELD_ERRORS: FieldErrorMap = {
   'missing-name': 'name', 'duplicate-name': 'name', 'missing-instrument': 'instrumentIds', 'invalid-tea': 'tea',
 };
 
-/** Ô TEa của bảng danh mục: TEa vận hành kèm nguồn; thiếu TEa PXN thì nói rõ
- * và mở thẳng Bảng TEa tham chiếu. Nút nằm ở bảng chứ không trong hộp sửa,
- * vì rời hộp sửa sẽ bỏ mất phần đang nhập dở. */
+/** Ô TEa của bảng danh mục: TEa vận hành kèm nguồn; thiếu TEa PXN thì hiện
+ * hành động ngắn gọn để mở thẳng Bảng TEa tham chiếu. Nút nằm ở bảng chứ
+ * không trong hộp sửa, vì rời hộp sửa sẽ bỏ mất phần đang nhập dở. */
 function OperationalTeaCell({ tea, testName, onGoTeaRefs }: { tea: ReturnType<typeof operationalTeaText>; testName: string; onGoTeaRefs?: () => void }) {
   if (!tea.source) {
     return onGoTeaRefs
-      ? <button type="button" className="btn ghost sm" aria-label={`Chưa có TEa PXN cho ${testName}: mở Bảng TEa tham chiếu`} onClick={onGoTeaRefs}>Chưa có TEa PXN</button>
+      ? <button type="button" className="btn ghost sm" aria-label={`Chưa có TEa PXN cho ${testName}: mở Bảng TEa tham chiếu`} onClick={onGoTeaRefs}>Khai TEa PXN</button>
       : <span className="hint">Chưa có TEa PXN</span>;
   }
   return <>{tea.text} <span className="hint">({tea.sourceLabel})</span></>;
@@ -382,8 +382,8 @@ export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTe
                       <div className="field assay-span-all">
                         <label htmlFor="test-tea">TEa vận hành</label>
                         <input id="test-tea" readOnly aria-describedby="test-tea-hint" value={formTea.source ? `${formTea.text} (${formTea.sourceLabel})` : 'Chưa có TEa của PXN'} />
-                        <p id="test-tea-hint" className="hint">
-                          {formTea.source === 'lab' ? 'Theo Bảng TEa tham chiếu.' : formTea.source ? 'Chưa có TEa của PXN; đang dùng nguồn đã chọn ở Six Sigma. Khai ở Cấu hình chung → Bảng TEa tham chiếu.' : 'Khai TEa chung hoặc theo mức ở Cấu hình chung → Bảng TEa tham chiếu.'}
+                        <p id="test-tea-hint" className="hint assay-tea-hint">
+                          {formTea.source === 'lab' ? 'Theo Bảng TEa tham chiếu.' : formTea.source ? 'Đang dùng TEa từ Six Sigma. Khai TEa PXN tại Bảng TEa tham chiếu.' : 'Khai tại Cấu hình chung → Bảng TEa tham chiếu.'}
                         </p>
                         {/* Giữ nguyên `tea` cũ khi lưu: trang Six Sigma dùng nó cho nguồn EFLM. */}
                         <input type="hidden" name="tea" defaultValue={editing !== 'new' ? editing.tea : 0} />
@@ -402,10 +402,9 @@ export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTe
                     <div className="assay-machine-picker">
                       {displayedInstruments.map((instrument) => {
                         const assigned = editingAssignments.some(item => item.instrument_id === instrument.id);
-                        return <label key={instrument.id} className={assigned ? 'assigned' : ''}>
+                        return <label key={instrument.id} className={`choice-card${assigned ? ' assigned' : ''}`}>
                           <input type="checkbox" name={assigned ? undefined : 'instrumentIds'} value={instrument.id} defaultChecked={assigned} disabled={assigned} />
                           {assigned && <input type="hidden" name="instrumentIds" value={instrument.id} />}
-                          <span className="assay-machine-check" aria-hidden="true">✓</span>
                           <span className="assay-machine-copy">
                             <b>{instrument.name}</b>
                             <small>{instrument.section || 'Chưa gán khu vực'}{instrument.model ? ` · ${instrument.model}` : ''}</small>

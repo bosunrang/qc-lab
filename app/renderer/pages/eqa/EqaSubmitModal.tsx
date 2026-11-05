@@ -27,7 +27,7 @@ export function EqaSubmitModal({ row, onClose }: { row: EqaScheduleRow; onClose:
       <p className="eqa-submit-head"><b className="eqa-strong">{row.program_name} · {row.round}/{row.year}</b><span className="eqa-sub">Hạn nộp {vnDate(row.due_date)}</span></p>
       <div className="eqa-machine-picker" role="group" aria-label="Máy đã nộp kết quả">
         {row.instruments.map((m) => (
-          <label key={m.instrument_id}>
+          <label key={m.instrument_id} className="choice-card">
             <input type="checkbox" checked={m.reported || checked.has(m.instrument_id)} disabled={m.reported} onChange={(e) => {
               setChecked((prev) => { const next = new Set(prev); if (e.target.checked) next.add(m.instrument_id); else next.delete(m.instrument_id); return next; });
             }} />
