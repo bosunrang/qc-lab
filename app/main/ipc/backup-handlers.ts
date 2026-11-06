@@ -10,12 +10,13 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, st
 import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION, seedInitialRows } from '../db/schema';
 import { openExistingDatabase } from '../db/open-database';
-import { listTableNames, restoreAllTables, restoreAllTablesFromFile, vacuumInto, writeSafetySnapshot } from '../db/table-io';
+import { listTableNames, qcPointsLostByRestore, replaceAllTables, vacuumInto, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
 import { BACKUP_FILE_FORMAT, BACKUP_FILE_FORMAT_VERSION, validateBackupEnvelope, type BackupEnvelope } from '../domain/backup';
 import { type Actor, type IpcResult, nowIso, requireAdmin } from './shared';
-import { writeCommand } from './write-command';
+import { writeCommand, WriteCommandError } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
-import { keepOperationMode, readOperationMode, type OperationModeState } from '../db/operation-mode';
+import { keepOperationMode, operationModeRestoreMessage, readOperationMode, type OperationModeState } from '../db/operation-mode';
+import { MACHINE_LOCAL_META_KEYS } from '../domain/cloud-backup';
 
 /** Ngưỡng chỉ còn áp cho tệp sao lưu JSON cũ: phải đọc cả tệp thành chuỗi. */
 const LEGACY_JSON_MAX_BYTES = 128 * 1024 * 1024;
@@ -208,6 +209,15 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     // người đang dùng vẫn đăng nhập bằng mật khẩu hiện tại (như đồng bộ Firebase).
     const keep = options?.keepAccounts ? ['users'] : [];
     if (!inspected.ok) return fail(inspected.code, inspected.message);
+    const source: RestoreSource = inspected.kind === 'sqlite' ? { kind: 'sqlite', filePath } : { kind: 'json', data: inspected.envelope.data };
+
+    // Chế độ vận hành: phục hồi không được xoá cứng điểm QC (quy tắc "không
+    // xoá cứng điểm QC", ISO 15189:2022 8.4). Bản sao lưu thiếu điểm đang có,
+    // hoặc còn điểm mà ở đây đã huỷ, thì chặn trước khi chạm vào dữ liệu.
+    if (readOperationMode(db)) {
+      const lost = withRestoreSource(db, source, () => qcPointsLostByRestore(db, source));
+      if (lost > 0) return fail('operation-mode', operationModeRestoreMessage(lost));
+    }
 
     let snapshotPath: string;
     try {
@@ -216,23 +226,22 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
       return fail('snapshot-failed', `Không tạo được bản sao lưu an toàn trước khi phục hồi, đã HUỶ: ${e instanceof Error ? e.message : String(e)}`);
     }
 
+    // Thay dữ liệu, ghi lại cờ chế độ vận hành và dòng nhật ký là MỘT đơn vị:
+    // dừng giữa chừng thì không còn trạng thái "đã phục hồi mà mất cờ" hay
+    // "đã phục hồi mà không có nhật ký". Khoá ngoại và ATTACH phải chuẩn bị
+    // ngoài transaction nên `withRestoreSource` bọc ngoài `w.commit()`. Phục
+    // hồi đổi GẦN NHƯ MỌI bảng — báo rộng để mọi trang đang mở nạp lại.
     try {
-      keepOperationMode(db, () => {
-        if (inspected.kind === 'sqlite') restoreAllTablesFromFile(db, filePath, keep);
-        else restoreAllTables(db, inspected.envelope.data, keep);
-      });
+      withRestoreSource(db, source, () => w.commit((tx) => {
+        const outcome = keepOperationMode(db, () => replaceAllTables(db, source, { keep, keepMetaKeys: MACHINE_LOCAL_META_KEYS }));
+        const keptNote = outcome.keptActivity ? `, giữ ${outcome.keptActivity} dòng nhật ký phát sinh sau bản sao lưu` : '';
+        tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC${keep.length ? ', giữ tài khoản hiện tại' : ', thay cả tài khoản'}${keptNote}, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
+        tx.changed(listTableNames(db));
+      }));
     } catch (e) {
+      if (e instanceof WriteCommandError) throw e;
       return fail('restore-failed', e instanceof Error ? e.message : 'Phục hồi thất bại.');
     }
-    // Phần phục hồi đã tự chạy trong transaction của tầng CSDL (bản SQLite dùng
-    // ATTACH, không mở được bên trong transaction khác); lần ghi này chỉ còn
-    // nhật ký và lời báo. Phục hồi thay đổi GẦN NHƯ MỌI bảng cùng lúc — báo
-    // rộng hơn thường lệ để mọi trang đang mở refetch lại đúng, không cần khởi
-    // động lại app mới thấy dữ liệu đã phục hồi.
-    w.commit((tx) => {
-      tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC${keep.length ? ', giữ tài khoản hiện tại' : ', thay cả tài khoản'}, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
-      tx.changed(listTableNames(db));
-    });
     return { ok: true, data: { preRestoreSnapshotPath: snapshotPath } };
   });
 

@@ -161,7 +161,10 @@ A17 còn chờ lúc commit.
 3. N15, A14 — khớp lịch ↔ báo cáo: cho gắn chương trình khi nhập (chọn từ danh
    sách thay vì so nguyên văn), khớp năm theo cycle; thêm gộp chương trình.
 4. A19, A20, A21 — phục hồi ở chế độ vận hành: chặn hoặc chỉ phục hồi kiểu gộp,
-   luôn giữ `activity`, ghi cờ và audit trong cùng giao dịch.
+   luôn giữ `activity`, ghi cờ và audit trong cùng giao dịch. **Đã sửa
+   05/11/2026** (kèm A22): chặn khi bản sao lưu thiếu điểm QC hoặc mất dấu huỷ,
+   gộp nhật ký và nối lại chuỗi hash, giữ khoá riêng của máy — áp dụng cho cả
+   phục hồi từ tệp lẫn kéo Firebase.
 5. N16, N17 — lưu phạm vi luật theo phiên bản cấu hình; hàng chờ NCE xét mọi lô
    có điểm trong kỳ.
 6. N18, N20 — nâng quyền huỷ kỳ EQA; chặn ký/khoá tháng chưa kết thúc.

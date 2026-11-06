@@ -8,7 +8,7 @@
 // chạy bằng tệp CSDL (`sync/firebase-push-worker.ts`); đo cỡ trước khi gửi.
 import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
-import { listTableNames, restoreAllTables, writeSafetySnapshot } from '../db/table-io';
+import { listTableNames, qcPointsLostByRestore, replaceAllTables, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
 import { validateBackupEnvelope } from '../domain/backup';
 import { buildFirebasePayload, formatMb, sizeVerdict, FIREBASE_MAX_WRITE_BYTES, type FirebasePayload } from '../sync/firebase-payload';
 import type { PushResponse, PushRunner } from '../sync/firebase-payload';
@@ -20,7 +20,7 @@ import { MACHINE_LOCAL_META_KEYS, mergeUsersForPull } from '../domain/cloud-back
 import { type IpcResult } from './shared';
 import { writeCommand, writeCommandAsync, type WriteSteps } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
-import { keepOperationMode } from '../db/operation-mode';
+import { keepOperationMode, operationModeRestoreMessage, readOperationMode } from '../db/operation-mode';
 
 const CONFIG_KEY = 'firebaseConfig';
 const EMAIL_KEY = 'firebaseEmail';
@@ -206,27 +206,33 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
 
   /** Tải dữ liệu đám mây về, trong lần ghi `w` của thao tác gọi nó. Cấu hình
    * kết nối `keep` không bị remote cũ ghi đè; luôn tạo đường lùi vật lý trước
-   * khi RESTORE toàn bộ bảng. `restoreAllTables()` tự chạy transaction riêng
-   * (cần tắt khoá ngoại NGOÀI transaction), `w.commit()` giữ phần còn lại. */
+   * khi RESTORE toàn bộ bảng. Nhật ký của máy được gộp, không bị thay — xem
+   * hàm `replaceAllTables()`. */
   async function pullNow(w: WriteSteps, remote: FirebasePayload, keep: Connection): Promise<void> {
-    const snapshot = writeSafetySnapshot(db, userDataDir, 'pre-firebase-pull');
     // GV6: tài khoản của máy giữ nguyên, tài khoản chỉ có trên đám mây vào ở
     // trạng thái khoá (`mergeUsersForPull`); khoá riêng của máy (LIS, kết nối
     // Firebase) không bị bản đám mây ghi đè.
     const localUsers = db.prepare('SELECT * FROM users').all() as Record<string, unknown>[];
     const { users, addedLocked } = mergeUsersForPull(localUsers, remote.backup.data.users ?? []);
-    const placeholders = MACHINE_LOCAL_META_KEYS.map(() => '?').join(',');
-    const localMeta = db.prepare(`SELECT key, value FROM app_meta WHERE key IN (${placeholders})`).all(...MACHINE_LOCAL_META_KEYS) as { key: string; value: string }[];
-    const remoteMeta = (remote.backup.data.app_meta ?? []).filter((row) => !MACHINE_LOCAL_META_KEYS.includes(String(row.key)));
-    keepOperationMode(db, () => restoreAllTables(db, { ...remote.backup.data, users, app_meta: [...remoteMeta, ...localMeta] }));
-    w.commit((tx) => {
+    const source: RestoreSource = { kind: 'json', data: { ...remote.backup.data, users } };
+    // Chế độ vận hành: bản đám mây cũ hơn máy này không được xoá cứng điểm QC.
+    if (readOperationMode(db)) {
+      const lost = qcPointsLostByRestore(db, source);
+      if (lost > 0) throw new Error(operationModeRestoreMessage(lost));
+    }
+    const snapshot = writeSafetySnapshot(db, userDataDir, 'pre-firebase-pull');
+    // Thay dữ liệu, giữ cờ chế độ vận hành, lưu kết nối và ghi nhật ký là MỘT
+    // đơn vị; khoá ngoại phải tắt ngoài transaction nên `withRestoreSource` bọc ngoài.
+    withRestoreSource(db, source, () => w.commit((tx) => {
+      const outcome = keepOperationMode(db, () => replaceAllTables(db, source, { keepMetaKeys: MACHINE_LOCAL_META_KEYS }));
       writeConnection(keep);
       const usersNote = localUsers.length
         ? `; giữ nguyên ${localUsers.length} tài khoản của máy${addedLocked.length ? `, thêm ${addedLocked.length} tài khoản từ đám mây ở trạng thái khoá (${addedLocked.join(', ')})` : ''}`
         : '';
-      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây${usersNote}; bản an toàn trước đó tại ${snapshot}`, '');
+      const keptNote = outcome.keptActivity ? `; giữ ${outcome.keptActivity} dòng nhật ký của máy chưa có trên đám mây` : '';
+      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây${usersNote}${keptNote}; bản an toàn trước đó tại ${snapshot}`, '');
       tx.changed(listTableNames(db));
-    });
+    }));
     await pushNow(); // ghi lại audit vừa phát sinh để hai phía thực sự cùng trạng thái.
   }
 
