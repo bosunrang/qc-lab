@@ -10,7 +10,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, st
 import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION, seedInitialRows } from '../db/schema';
 import { openExistingDatabase } from '../db/open-database';
-import { listTableNames, qcPointsLostByRestore, replaceAllTables, vacuumInto, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
+import { chainWarningNote, listTableNames, recordsLostByRestore, replaceAllTables, vacuumInto, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
 import { BACKUP_FILE_FORMAT, BACKUP_FILE_FORMAT_VERSION, validateBackupEnvelope, type BackupEnvelope } from '../domain/backup';
 import { type Actor, type IpcResult, nowIso, requireAdmin } from './shared';
 import { writeCommand, WriteCommandError } from './write-command';
@@ -211,12 +211,13 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
     if (!inspected.ok) return fail(inspected.code, inspected.message);
     const source: RestoreSource = inspected.kind === 'sqlite' ? { kind: 'sqlite', filePath } : { kind: 'json', data: inspected.envelope.data };
 
-    // Chế độ vận hành: phục hồi không được xoá cứng điểm QC (quy tắc "không
-    // xoá cứng điểm QC", ISO 15189:2022 8.4). Bản sao lưu thiếu điểm đang có,
-    // hoặc còn điểm mà ở đây đã huỷ, thì chặn trước khi chạm vào dữ liệu.
+    // Chế độ vận hành: phục hồi không được xoá cứng hồ sơ (quy tắc "không
+    // xoá cứng điểm QC", ISO 15189:2022 8.4). Bản sao lưu thiếu điểm QC hay hồ
+    // sơ đang có (NCE, kỳ khoá, biên bản tháng, EQA…), hoặc mang bản cũ hơn,
+    // thì chặn trước khi chạm vào dữ liệu.
     if (readOperationMode(db)) {
-      const lost = withRestoreSource(db, source, () => qcPointsLostByRestore(db, source));
-      if (lost > 0) return fail('operation-mode', operationModeRestoreMessage(lost));
+      const losses = withRestoreSource(db, source, () => recordsLostByRestore(db, source));
+      if (losses.length) return fail('operation-mode', operationModeRestoreMessage(losses));
     }
 
     let snapshotPath: string;
@@ -235,7 +236,7 @@ export function createBackupHandlers(db: Db, userDataDir: string) {
       withRestoreSource(db, source, () => w.commit((tx) => {
         const outcome = keepOperationMode(db, () => replaceAllTables(db, source, { keep, keepMetaKeys: MACHINE_LOCAL_META_KEYS }));
         const keptNote = outcome.keptActivity ? `, giữ ${outcome.keptActivity} dòng nhật ký phát sinh sau bản sao lưu` : '';
-        tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC${keep.length ? ', giữ tài khoản hiện tại' : ', thay cả tài khoản'}${keptNote}, tạo trước 1 bản an toàn tại ${snapshotPath}`, '');
+        tx.audit('Phục hồi từ bản sao lưu', `Phục hồi ${inspected.summary.tables} bảng, ${inspected.summary.points} điểm QC${keep.length ? ', giữ tài khoản hiện tại' : ', thay cả tài khoản'}${keptNote}, tạo trước 1 bản an toàn tại ${snapshotPath}${chainWarningNote(outcome)}`, '');
         tx.changed(listTableNames(db));
       }));
     } catch (e) {

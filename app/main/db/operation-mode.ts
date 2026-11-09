@@ -1,6 +1,7 @@
 // Chế độ vận hành (GV3, kế hoạch khắc phục 2026-10-31): cờ một chiều trong
 // `app_meta`. Khi đã bật, main chặn "Xoá sạch dữ liệu thử", và phục hồi
-// backup hay tải từ Firebase bị chặn nếu làm mất điểm QC đang có — dữ liệu QC
+// backup hay tải từ Firebase bị chặn nếu làm mất điểm QC hay hồ sơ đang có (NCE,
+// kỳ khoá, biên bản tháng, EQA… — `recordsLostByRestore()`) — dữ liệu QC
 // thật chỉ còn đổi qua các quy trình có nhật ký (huỷ điểm, lưu trữ nhật ký…).
 // Không có thao tác tắt; phục hồi cũng giữ cờ này (xem `keepOperationMode`),
 // để không thể "tắt" bằng cách nạp dữ liệu cũ.
@@ -24,9 +25,11 @@ export function writeOperationMode(db: Db, state: OperationModeState): void {
   upsert.run(BY_KEY, state.enabledBy);
 }
 
-/** Lời từ chối khi phục hồi ở chế độ vận hành sẽ làm mất `lost` điểm QC. */
-export function operationModeRestoreMessage(lost: number): string {
-  return `Hệ thống đang ở chế độ vận hành. Dữ liệu này thiếu ${lost} điểm QC đang có (nhập hoặc huỷ sau thời điểm sao lưu); phục hồi sẽ xoá cứng các điểm đó nên đã bị chặn. Hãy dùng bản sao lưu mới hơn.`;
+/** Lời từ chối khi phục hồi ở chế độ vận hành sẽ làm mất hồ sơ đang có
+ * (`recordsLostByRestore()`), ví dụ "3 điểm QC, 1 hồ sơ NCE, 1 kỳ đã khoá". */
+export function operationModeRestoreMessage(losses: readonly { label: string; count: number }[]): string {
+  const list = losses.map((loss) => `${loss.count} ${loss.label}`).join(', ');
+  return `Hệ thống đang ở chế độ vận hành. Dữ liệu này thiếu hồ sơ đang có (ghi hoặc cập nhật sau thời điểm sao lưu): ${list}. Phục hồi sẽ xoá cứng hoặc đưa các hồ sơ đó về bản cũ nên đã bị chặn. Hãy dùng bản sao lưu mới hơn.`;
 }
 
 /** Chạy `replaceAll` (phục hồi toàn bộ bảng) rồi ghi lại cờ đã có trước đó.

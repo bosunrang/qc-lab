@@ -3,7 +3,7 @@ import type { Db } from './sqlite-like';
 import { applySchema, seedInitialRows } from './schema';
 import { withTransaction } from './transaction';
 import { quoteIdent, quoteIdents } from './sql-ident';
-import { auditEntryHash } from '../domain/audit-chain';
+import { auditEntryHash, verifyAuditChain, type AuditEntry } from '../domain/audit-chain';
 
 export function listTableNames(db: Db): string[] {
   return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[])
@@ -57,6 +57,22 @@ export interface RestoreOutcome {
   /** Số dòng nhật ký của máy này không có trong bản sao lưu, đã được nối
    * tiếp vào sau nhật ký của bản sao lưu. */
   keptActivity: number;
+  /** `seq` (trước phục hồi) của dòng nhật ký đầu tiên trên máy này làm chuỗi
+   * hash hỏng; `null` nếu chuỗi nguyên vẹn. Từ dòng đó trở đi, các dòng nối
+   * thêm giữ nguyên hash gốc thay vì được tính lại (A27). */
+  localChainBrokenAt: number | null;
+  /** `seq` của dòng đầu tiên làm chuỗi hash của BẢN SAO LƯU hỏng; `null` nếu
+   * nguyên vẹn. Dòng của bản sao lưu được chép nguyên văn nên chỗ hỏng vẫn
+   * phát hiện được sau phục hồi. */
+  sourceChainBrokenAt: number | null;
+}
+
+/** Ghi chú cho dòng nhật ký "Phục hồi…" khi một trong hai chuỗi hash hỏng. */
+export function chainWarningNote(outcome: RestoreOutcome): string {
+  const notes: string[] = [];
+  if (outcome.sourceChainBrokenAt != null) notes.push(`chuỗi hash nhật ký của dữ liệu phục hồi hỏng từ dòng số ${outcome.sourceChainBrokenAt}`);
+  if (outcome.localChainBrokenAt != null) notes.push(`chuỗi hash nhật ký của máy này hỏng từ dòng số ${outcome.localChainBrokenAt}, các dòng từ đó giữ nguyên hash gốc`);
+  return notes.length ? ` · CẢNH BÁO: ${notes.join('; ')}` : '';
 }
 
 
@@ -103,6 +119,70 @@ export function qcPointsLostByRestore(db: Db, source: RestoreSource): number {
   return current.filter((row) => !incoming.has(row.id) || (row.voided !== 0 && !incoming.get(row.id))).length;
 }
 
+/** Bảng hồ sơ mà chế độ vận hành không cho phục hồi xoá cứng (A26, đánh giá
+ * 09/11/2026). Đây là hồ sơ chỉ ghi thêm hoặc hồ sơ quyết định: mất
+ * `nce_cuts` thì chuỗi Westgard không còn bắt đầu lại sau sự cố và kết luận
+ * các lần chạy sau đổi hồi tố; mất `period_locks` thì tháng đã khoá tự mở;
+ * mất `qc_month_reviews` là mất chữ ký biên bản. `version`: cột khoá lạc
+ * quan — dòng có ở cả hai phía nhưng bản nguồn cũ hơn (vd hồ sơ NCE đã đóng ở
+ * đây, còn mở trong bản sao lưu) cũng tính là mất. Bảng danh mục/cấu hình
+ * không nằm ở đây: chúng đổi qua các màn hình cấu hình, có nhật ký riêng. */
+const PROTECTED_RECORD_TABLES: readonly { table: string; label: string; version?: string }[] = [
+  { table: 'nce_records', label: 'hồ sơ NCE', version: 'row_version' },
+  { table: 'nce_runs', label: 'lần chạy gắn hồ sơ NCE' },
+  { table: 'nce_actions', label: 'hành động khắc phục' },
+  { table: 'nce_decisions', label: 'quyết định NCE' },
+  { table: 'nce_revisions', label: 'lần sửa hồ sơ NCE' },
+  { table: 'nce_cuts', label: 'mốc bắt đầu lại chuỗi Westgard' },
+  { table: 'actions', label: 'hồ sơ khắc phục phiên bản cũ' },
+  { table: 'period_locks', label: 'kỳ đã khoá' },
+  { table: 'qc_month_reviews', label: 'chữ ký biên bản tháng' },
+  { table: 'rule_config_history', label: 'phiên bản cấu hình luật' },
+  { table: 'tea_ref_versions', label: 'phiên bản hồ sơ TEa' },
+  { table: 'eqa_rounds', label: 'đợt ngoại kiểm', version: 'row_version' },
+  { table: 'eqa_results', label: 'kết quả ngoại kiểm' },
+  { table: 'eqa_decisions', label: 'quyết định ngoại kiểm' },
+];
+
+export interface RestoreLoss { table: string; label: string; count: number }
+
+/** Số dòng của một bảng hồ sơ sẽ mất nếu thay bằng `source`: dòng không có
+ * trong nguồn (theo `id`), hoặc có mà phiên bản nguồn cũ hơn. */
+function recordRowsLost(db: Db, source: RestoreSource, table: string, version: string | undefined, sourceTables: Set<string>): number {
+  if (!sourceTables.has(table)) return Number((db.prepare(`SELECT COUNT(*) AS n FROM main.${quoteIdent(table)}`).get() as { n: number }).n);
+  if (source.kind === 'sqlite') {
+    const sourceCols = new Set((db.prepare(`PRAGMA backup_src.table_info(${quoteIdent(table)})`).all() as { name: string }[]).map((c) => c.name));
+    // Bản sao lưu cũ chưa có cột phiên bản: chỉ so có/không.
+    const newer = version && sourceCols.has(version) ? ` AND b.${quoteIdent(version)}>=m.${quoteIdent(version)}` : '';
+    return Number((db.prepare(`SELECT COUNT(*) AS n FROM main.${quoteIdent(table)} m WHERE NOT EXISTS (SELECT 1 FROM backup_src.${quoteIdent(table)} b WHERE b.id=m.id${newer})`).get() as { n: number }).n);
+  }
+  const rows = source.data[table] ?? [];
+  const incoming = new Map(rows.map((row) => [String(row.id), version && row[version] != null ? Number(row[version]) : null]));
+  const current = db.prepare(`SELECT id${version ? `, ${quoteIdent(version)} AS v` : ''} FROM main.${quoteIdent(table)}`).all() as { id: string; v?: number }[];
+  return current.filter((row) => {
+    if (!incoming.has(row.id)) return true;
+    const sourceVersion = incoming.get(row.id);
+    return sourceVersion != null && row.v != null && sourceVersion < Number(row.v);
+  }).length;
+}
+
+/** Mọi hồ sơ đang có sẽ mất nếu thay toàn bộ dữ liệu bằng `source` — điểm QC
+ * (kể cả mất dấu huỷ) và các bảng hồ sơ ở `PROTECTED_RECORD_TABLES`. Chỉ
+ * liệt kê bảng có mất mát. Với tệp SQLite phải gọi bên trong `withRestoreSource()`. */
+export function recordsLostByRestore(db: Db, source: RestoreSource): RestoreLoss[] {
+  const out: RestoreLoss[] = [];
+  const points = qcPointsLostByRestore(db, source);
+  if (points > 0) out.push({ table: 'qc_points', label: 'điểm QC', count: points });
+  const sourceTables = sourceTableNames(db, source);
+  const localTables = new Set(listTableNames(db));
+  for (const { table, label, version } of PROTECTED_RECORD_TABLES) {
+    if (!localTables.has(table)) continue;
+    const count = recordRowsLost(db, source, table, version, sourceTables);
+    if (count > 0) out.push({ table, label, count });
+  }
+  return out;
+}
+
 function copyTable(db: Db, source: RestoreSource, table: string, sourceTables: Set<string>): void {
   if (!sourceTables.has(table)) return;
   if (source.kind === 'sqlite') {
@@ -132,11 +212,18 @@ function copyTable(db: Db, source: RestoreSource, table: string, sourceTables: S
  * vừa phục hồi. Nhật ký là hồ sơ chỉ ghi thêm (ISO 15189:2022 8.4): phục hồi
  * dữ liệu không được làm biến mất dấu vết những gì đã xảy ra sau thời điểm
  * sao lưu. Dòng nối thêm được đánh số tiếp và nối lại chuỗi hash từ dòng cuối
- * của bản sao lưu, giống cách gộp nhật ký khi đồng bộ. */
-function appendPreviousActivity(db: Db): number {
+ * của bản sao lưu, giống cách gộp nhật ký khi đồng bộ.
+ *
+ * Chỉ nối lại phần chuỗi CÒN NGUYÊN VẸN (A27): nếu nhật ký của máy đã bị sửa
+ * tay, tính lại hash cho dòng bị sửa sẽ "rửa" nó thành hợp lệ. Từ dòng hỏng
+ * đầu tiên (`brokenId`) trở đi, dòng nối thêm giữ nguyên `prev_hash`/`hash`
+ * gốc nên kiểm tra chuỗi sau phục hồi vẫn chỉ ra chỗ hỏng. */
+function appendPreviousActivity(db: Db, brokenId: string | null): number {
   const rows = db.prepare(`SELECT * FROM temp.restore_prev_activity p
     WHERE NOT EXISTS (SELECT 1 FROM main.activity a WHERE a.id=p.id) ORDER BY p.seq`).all() as Record<string, unknown>[];
   if (!rows.length) return 0;
+  const brokenSeq = brokenId == null ? null
+    : Number((db.prepare('SELECT seq FROM temp.restore_prev_activity WHERE id=?').get(brokenId) as { seq: number } | undefined)?.seq ?? NaN);
   const last = db.prepare("SELECT hash FROM main.activity WHERE hash<>'' ORDER BY seq DESC LIMIT 1").get() as { hash: string } | undefined;
   const anchor = db.prepare("SELECT value FROM main.app_meta WHERE key='activityAnchor'").get() as { value: string } | undefined;
   let previous = last?.hash ?? anchor?.value ?? '';
@@ -144,13 +231,11 @@ function appendPreviousActivity(db: Db): number {
   const insert = db.prepare(`INSERT INTO main.activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   for (const row of rows) {
-    const entry = {
-      id: String(row.id ?? ''), seq: ++seq, ts: String(row.ts ?? ''), user: String(row.user ?? ''), username: String(row.username ?? ''),
-      userId: String(row.user_id ?? ''), role: String(row.role ?? ''), type: String(row.type ?? ''), detail: String(row.detail ?? ''),
-      target: String(row.target ?? ''), clientId: String(row.client_id ?? ''), prevHash: String(row.prev_hash ?? ''), hash: String(row.hash ?? ''),
-    };
+    const entry = auditEntryOf(row);
+    entry.seq = ++seq;
+    const untrusted = brokenSeq != null && !(Number(row.seq) < brokenSeq);
     // Dòng chưa từng có hash (dữ liệu rất cũ) giữ nguyên, như `relinkAuditChain`.
-    if (entry.hash || entry.prevHash) {
+    if ((entry.hash || entry.prevHash) && !untrusted) {
       entry.prevHash = previous;
       entry.hash = auditEntryHash(entry);
       previous = entry.hash;
@@ -159,6 +244,31 @@ function appendPreviousActivity(db: Db): number {
       entry.target, entry.clientId, entry.prevHash, entry.hash);
   }
   return rows.length;
+}
+
+function auditEntryOf(row: Record<string, unknown>): AuditEntry {
+  return {
+    id: String(row.id ?? ''), seq: Number(row.seq ?? 0), ts: String(row.ts ?? ''), user: String(row.user ?? ''), username: String(row.username ?? ''),
+    userId: String(row.user_id ?? ''), role: String(row.role ?? ''), type: String(row.type ?? ''), detail: String(row.detail ?? ''),
+    target: String(row.target ?? ''), clientId: String(row.client_id ?? ''), prevHash: String(row.prev_hash ?? ''), hash: String(row.hash ?? ''),
+  };
+}
+
+/** Nhật ký cần kiểm: bảng sống `main.activity` hoặc bản chụp của máy này
+ * trước phục hồi. Câu SQL viết sẵn, không ghép tên bảng. */
+const AUDIT_ROWS_SQL = {
+  main: 'SELECT * FROM main.activity ORDER BY seq',
+  previous: 'SELECT * FROM temp.restore_prev_activity ORDER BY seq',
+} as const;
+
+/** Dòng đầu tiên làm chuỗi hash hỏng (đọc theo `seq`), tính từ `anchor`;
+ * `null` nếu nguyên vẹn. */
+function firstBrokenAuditRow(db: Db, which: keyof typeof AUDIT_ROWS_SQL, anchor: string): { id: string; seq: number } | null {
+  const rows = (db.prepare(AUDIT_ROWS_SQL[which]).all() as Record<string, unknown>[]).map(auditEntryOf);
+  const result = verifyAuditChain(rows, anchor);
+  if (result.ok) return null;
+  const broken = rows[result.brokenIndex];
+  return broken ? { id: broken.id, seq: broken.seq } : null;
 }
 
 /** Thay toàn bộ bảng bằng `source` trong MỘT transaction (lồng được vào
@@ -172,9 +282,12 @@ export function replaceAllTables(db: Db, source: RestoreSource, options: Restore
     const tables = listTableNames(db).filter((table) => !keep.includes(table));
     const sourceTables = sourceTableNames(db, source);
     const mergeActivity = tables.includes('activity');
+    let localBroken: { id: string; seq: number } | null = null;
     if (mergeActivity) {
       db.exec(`DROP TABLE IF EXISTS temp.restore_prev_activity`);
       db.exec(`CREATE TEMP TABLE restore_prev_activity AS SELECT * FROM main.activity`);
+      // Kiểm chuỗi của máy này TRƯỚC khi app_meta (chứa anchor) bị thay.
+      localBroken = firstBrokenAuditRow(db, 'previous', activityAnchorOf(db));
     }
     const placeholders = keepMetaKeys.map(() => '?').join(',');
     const localMeta = keepMetaKeys.length
@@ -194,15 +307,22 @@ export function replaceAllTables(db: Db, source: RestoreSource, options: Restore
     // hoá luôn và một bản không nâng cấp được thì huỷ cả lần phục hồi.
     applySchema(db);
     seedInitialRows(db);
-    let keptActivity = 0;
+    let keptActivity = 0, sourceBroken: { id: string; seq: number } | null = null;
     if (mergeActivity) {
-      keptActivity = appendPreviousActivity(db);
+      // Nhật ký của nguồn được chép nguyên văn: chỗ hỏng (nếu có) vẫn còn đó
+      // để kiểm tra chuỗi phát hiện; ở đây chỉ ghi nhận để báo trong nhật ký.
+      sourceBroken = firstBrokenAuditRow(db, 'main', activityAnchorOf(db));
+      keptActivity = appendPreviousActivity(db, localBroken?.id ?? null);
       db.exec(`DROP TABLE temp.restore_prev_activity`);
     }
     const violations = db.prepare('PRAGMA main.foreign_key_check').all();
     if (violations.length) throw new Error(`Dữ liệu vi phạm ràng buộc khoá ngoại (${violations.length} dòng) — huỷ thao tác.`);
-    return { keptActivity };
+    return { keptActivity, localChainBrokenAt: localBroken?.seq ?? null, sourceChainBrokenAt: sourceBroken?.seq ?? null };
   });
+}
+
+function activityAnchorOf(db: Db): string {
+  return (db.prepare("SELECT value FROM main.app_meta WHERE key='activityAnchor'").get() as { value: string } | undefined)?.value ?? '';
 }
 
 /** Thay thế toàn bộ bảng bằng dữ liệu đã kiểm tra trong một transaction. */

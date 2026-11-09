@@ -8,7 +8,7 @@
 // chạy bằng tệp CSDL (`sync/firebase-push-worker.ts`); đo cỡ trước khi gửi.
 import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
-import { listTableNames, qcPointsLostByRestore, replaceAllTables, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
+import { chainWarningNote, listTableNames, recordsLostByRestore, replaceAllTables, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
 import { validateBackupEnvelope } from '../domain/backup';
 import { buildFirebasePayload, formatMb, sizeVerdict, FIREBASE_MAX_WRITE_BYTES, type FirebasePayload } from '../sync/firebase-payload';
 import type { PushResponse, PushRunner } from '../sync/firebase-payload';
@@ -215,10 +215,11 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     const localUsers = db.prepare('SELECT * FROM users').all() as Record<string, unknown>[];
     const { users, addedLocked } = mergeUsersForPull(localUsers, remote.backup.data.users ?? []);
     const source: RestoreSource = { kind: 'json', data: { ...remote.backup.data, users } };
-    // Chế độ vận hành: bản đám mây cũ hơn máy này không được xoá cứng điểm QC.
+    // Chế độ vận hành: bản đám mây cũ hơn máy này không được xoá cứng điểm QC
+    // hay hồ sơ (NCE, kỳ khoá, biên bản tháng, EQA…).
     if (readOperationMode(db)) {
-      const lost = qcPointsLostByRestore(db, source);
-      if (lost > 0) throw new Error(operationModeRestoreMessage(lost));
+      const losses = recordsLostByRestore(db, source);
+      if (losses.length) throw new Error(operationModeRestoreMessage(losses));
     }
     const snapshot = writeSafetySnapshot(db, userDataDir, 'pre-firebase-pull');
     // Thay dữ liệu, giữ cờ chế độ vận hành, lưu kết nối và ghi nhật ký là MỘT
@@ -230,7 +231,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
         ? `; giữ nguyên ${localUsers.length} tài khoản của máy${addedLocked.length ? `, thêm ${addedLocked.length} tài khoản từ đám mây ở trạng thái khoá (${addedLocked.join(', ')})` : ''}`
         : '';
       const keptNote = outcome.keptActivity ? `; giữ ${outcome.keptActivity} dòng nhật ký của máy chưa có trên đám mây` : '';
-      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây${usersNote}${keptNote}; bản an toàn trước đó tại ${snapshot}`, '');
+      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây${usersNote}${keptNote}; bản an toàn trước đó tại ${snapshot}${chainWarningNote(outcome)}`, '');
       tx.changed(listTableNames(db));
     }));
     await pushNow(); // ghi lại audit vừa phát sinh để hai phía thực sự cùng trạng thái.

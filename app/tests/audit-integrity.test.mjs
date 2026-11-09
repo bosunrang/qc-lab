@@ -148,7 +148,7 @@ test('chế độ vận hành: chặn phục hồi bản thiếu điểm QC ho�
   const blocked = backup.importBackupFrom(older, admin);
   assert.equal(blocked.ok, false);
   assert.equal(blocked.error.code, 'operation-mode');
-  assert.match(blocked.error.message, /thiếu 1 điểm QC/);
+  assert.match(blocked.error.message, /: 1 điểm QC./);
   assert.deepEqual(pointIds(db), ['p1:0', 'p2:0'], 'điểm nhập sau bản sao lưu còn nguyên');
   assert.equal(listActivity(db).length, activity, 'bị chặn thì không ghi gì');
 
@@ -253,4 +253,80 @@ test('phục hồi giữ khoá riêng của máy trong app_meta', (t) => {
   const meta = (key) => db.prepare('SELECT value FROM app_meta WHERE key=?').get(key)?.value;
   assert.equal(meta('lisGatewaySettings'), 'cua-may-nay');
   assert.equal(meta('firebaseLabCode'), undefined, 'không nhận kết nối Firebase của máy khác');
+});
+
+// A26 (đánh giá 2026-11-09): chế độ vận hành không chỉ giữ điểm QC. Hồ sơ NCE,
+// mốc bắt đầu lại chuỗi, kỳ đã khoá, chữ ký biên bản tháng, lịch sử luật, EQA…
+// ghi sau bản sao lưu cũng không được bị xoá cứng; hồ sơ đã cập nhật ở đây mà
+// bản sao lưu mang phiên bản cũ hơn cũng bị chặn.
+test('chế độ vận hành: chặn phục hồi làm mất hồ sơ NCE, kỳ đã khoá, biên bản tháng', (t) => {
+  const { db, dir, backup, settings } = backupFixture(t);
+  db.prepare("INSERT INTO nce_records(id,nce_id,status,row_version) VALUES ('n1','NCE-1','open',1)").run();
+  const older = path.join(dir, 'cu.sqlite');
+  assert.equal(backup.exportBackupTo(older, admin).ok, true);
+  settings.enableOperationMode(admin);
+
+  db.prepare("INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES ('c1','n1','t1','2026-10-05','2026-10-05-1')").run();
+  db.prepare("INSERT INTO period_locks(id,ym) VALUES ('lock-2026-10','2026-10')").run();
+  db.prepare("INSERT INTO qc_month_reviews(id,ym,conclusion) VALUES ('r1','2026-10','ok')").run();
+  db.prepare("UPDATE nce_records SET status='closed', row_version=2 WHERE id='n1'").run();
+  const activity = listActivity(db).length;
+
+  const blocked = backup.importBackupFrom(older, admin);
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.error.code, 'operation-mode');
+  for (const label of ['1 hồ sơ NCE', '1 mốc bắt đầu lại chuỗi Westgard', '1 kỳ đã khoá', '1 chữ ký biên bản tháng']) {
+    assert.ok(blocked.error.message.includes(label), `${label}: ${blocked.error.message}`);
+  }
+  assert.equal(db.prepare("SELECT status FROM nce_records WHERE id='n1'").get().status, 'closed', 'không đưa hồ sơ về bản cũ');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM period_locks').get().n, 1);
+  assert.equal(listActivity(db).length, activity, 'bị chặn thì không ghi gì');
+
+  const latest = path.join(dir, 'moi-nhat.sqlite');
+  assert.equal(backup.exportBackupTo(latest, admin).ok, true);
+  const restored = backup.importBackupFrom(latest, admin);
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  assert.equal(db.prepare("SELECT status FROM nce_records WHERE id='n1'").get().status, 'closed');
+});
+
+test('kiểm hồ sơ sẽ mất: nguồn JSON (gói Firebase) so theo id và row_version', (t) => {
+  const { recordsLostByRestore, dumpAllTables } = require('../../app-dist/main/db/table-io.js');
+  const db = openDatabase(':memory:'); t.after(() => db.close());
+  db.prepare("INSERT INTO eqa_programs(id,name) VALUES ('p1','VEQAS')").run();
+  db.prepare("INSERT INTO eqa_rounds(id,program_id,year,round,row_version) VALUES ('e1','p1',2026,'Đợt 1',1)").run();
+  const snapshot = dumpAllTables(db);
+  assert.deepEqual(recordsLostByRestore(db, { kind: 'json', data: snapshot }), []);
+  db.prepare("UPDATE eqa_rounds SET row_version=2 WHERE id='e1'").run();
+  db.prepare("INSERT INTO rule_config_history(id,seq,scope) VALUES ('h1',1,'global')").run();
+  assert.deepEqual(recordsLostByRestore(db, { kind: 'json', data: snapshot }).map((loss) => [loss.table, loss.count]),
+    [['rule_config_history', 1], ['eqa_rounds', 1]]);
+  // Bảng không có trong nguồn: mọi dòng đang có đều tính là mất.
+  const { rule_config_history: _drop, ...withoutHistory } = dumpAllTables(db);
+  assert.deepEqual(recordsLostByRestore(db, { kind: 'json', data: withoutHistory }).map((loss) => loss.table), ['rule_config_history']);
+});
+
+// A27: nhật ký của máy bị sửa tay sau bản sao lưu. Phục hồi không được tính
+// lại hash cho dòng bị sửa ("rửa" thành hợp lệ): chuỗi sau phục hồi vẫn báo
+// hỏng, và dòng nhật ký "Phục hồi" ghi rõ cảnh báo.
+test('phục hồi không rửa chuỗi hash: dòng nhật ký bị sửa tay vẫn bị phát hiện', (t) => {
+  const { db, dir, backup } = backupFixture(t);
+  const file = path.join(dir, 'ban-sao-luu.sqlite');
+  assert.equal(backup.exportBackupTo(file, admin).ok, true);
+  const config = createConfigHandlers(db);
+  assert.equal(config.saveInstrument({ data: { name: 'Máy B' } }, admin).ok, true);
+  assert.equal(config.saveInstrument({ data: { name: 'Máy C' } }, admin).ok, true);
+  const tampered = listActivity(db, 1000).find((row) => /Máy B/.test(row.detail));
+  db.prepare('UPDATE activity SET detail=? WHERE id=?').run('SUA TRAI PHEP', tampered.id);
+  const anchorOf = () => db.prepare("SELECT value FROM app_meta WHERE key='activityAnchor'").get()?.value ?? '';
+  assert.equal(verifyAuditChain(listActivity(db, 1000).reverse(), anchorOf()).ok, false, 'trước phục hồi: chuỗi hỏng');
+
+  const restored = backup.importBackupFrom(file, admin);
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  const rows = listActivity(db, 1000);
+  assert.ok(rows.some((row) => row.id === tampered.id && row.detail === 'SUA TRAI PHEP'), 'dòng bị sửa vẫn được giữ');
+  const chain = verifyAuditChain(rows.slice().reverse(), anchorOf());
+  assert.equal(chain.ok, false, 'sau phục hồi: chuỗi vẫn báo hỏng');
+  assert.equal(rows.slice().reverse()[chain.brokenIndex].id, tampered.id, 'chỗ hỏng chỉ đúng dòng bị sửa');
+  assert.equal(rows[0].type, 'Phục hồi từ bản sao lưu');
+  assert.match(rows[0].detail, /CẢNH BÁO: chuỗi hash nhật ký của máy này hỏng từ dòng số \d+/);
 });
