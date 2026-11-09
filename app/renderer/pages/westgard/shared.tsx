@@ -1,8 +1,11 @@
 // Phần dùng chung giữa bảng lô đang vận hành và tab nhóm lô đã dừng/lưu trữ
 // của trang Phân tích Westgard. Tách khỏi `WestgardPage.tsx` ngày 2026-09-26
 // (kế hoạch kiến trúc D.7).
+import { useMemo, useState } from 'react';
 import { vnDate as formatVnDate } from '../../lib/format';
 import type { LevelAnalysis } from '../../../shared/qc-api';
+import { Pagination, pageBounds } from '../../components/Pagination';
+import { POINT_FILTERS, POINT_PAGE_SIZE, effectiveFilter, filterCounts, pointRows, type PointFilter } from './point-filter';
 
 export const VERDICT_LABEL: Record<string, string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
 /** Định dạng ngày ISO theo cách hiển thị tiếng Việt. */
@@ -37,34 +40,55 @@ const runExclusionLabel = (point: { runRejectedBy?: number[] }) => {
  * sai số. Dùng chung cho lô đang vận hành, lô cũ đang mở và tab nhóm lô đã
  * dừng — trước đây là hai bản chép gần giống nhau; điểm lịch sử có
  * `cusumSignal: null` nên phần CUSUM tự ẩn. */
-export function WestgardPointTable({ points, decimals }: { points: LevelAnalysis['points']; decimals: number }) {
+export function WestgardPointTable({ points, decimals, label }: { points: LevelAnalysis['points']; decimals: number; label: string }) {
+  // `null` = chưa chọn: mặc định "Có vi phạm", hoặc "Tất cả" khi không có vi
+  // phạm nào (xem `effectiveFilter()`).
+  const [chosen, setChosen] = useState<PointFilter | null>(null);
+  const [page, setPage] = useState(1);
+  const counts = useMemo(() => filterCounts(points), [points]);
+  const filter = effectiveFilter(chosen, counts);
+  const view = useMemo(() => pointRows(points, filter, page), [points, filter, page]);
   return (
-    <div className="chart-scroll">
-      <table className="wg-table">
-        <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th className="wg-verdict-head">Kết luận</th><th className="wg-evidence-head">Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
-        <tbody>
-          {points.map((p, i) => (
-            <tr key={p.id}>
-              <td title={`Mã lần chạy: ${p.runId}`}>{i + 1}</td><td title={`Mã lần chạy: ${p.runId}`}>{vnDate(p.date)}<small className="hint" style={{ display: 'block' }}>{runLabel(p.runId)}</small></td>
-              <td className="num">{p.val.toFixed(decimals)}</td>
-              <td className="num">{zText(p.z)}</td>
-              <td className="wg-verdict-cell">
-                <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag none" title="Điểm này đạt riêng lẻ nhưng không được dùng cho thống kê vì một mức khác trong cùng run bị loại">{runExclusionLabel(p)}</span>}
-                {p.cusumSignal && <span className="tag warn" title="Tín hiệu xu hướng CUSUM; không tự loại điểm QC">Cảnh báo CUSUM</span>}
-              </td>
-              <td className="wg-evidence-cell">
-                <div className="wg-rule-chips">
-                {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}
-                {p.cusumSignal && <span className="pill warn" title="CUSUM vượt ngưỡng h; cần rà soát xu hướng">{p.cusumSignal}</span>}
-                {p.supportRules.map((r) => <span className="pill hint wg-support-rule" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng" aria-label={`Bằng chứng lịch sử cho luật ${r}`}><span aria-hidden="true">↩</span><span>{r}</span></span>)}
-                {!p.rules.length && !p.cusumSignal && !p.supportRules.length && '—'}
-                </div>
-              </td>
-              <td className="hint">{p.errorType !== '—' ? <div className="wg-error-type"><b>{p.errorType}</b><small>{p.errorDesc}</small></div> : '—'}</td>
-            </tr>
+    <>
+      <div className="wg-table-filter">
+        <div className="dayseg" role="group" aria-label={`Lọc điểm QC ${label}`}>
+          {POINT_FILTERS.map(({ key, label: text }) => (
+            <button type="button" key={key} className={filter === key ? 'on' : ''} aria-pressed={filter === key}
+              onClick={() => { setChosen(key); setPage(1); }}>{text} ({counts[key]})</button>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </div>
+        <span className="hint">Mới nhất trước</span>
+      </div>
+      <div className="chart-scroll">
+        <table className="wg-table">
+          <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th className="wg-verdict-head">Kết luận</th><th className="wg-evidence-head">Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
+          <tbody>
+            {!view.rows.length && <tr><td colSpan={7} className="hint wg-table-empty">Không có điểm nào thuộc nhóm "{POINT_FILTERS.find((item) => item.key === filter)?.label}".</td></tr>}
+            {view.rows.map(({ point: p, seq }) => (
+              <tr key={p.id}>
+                <td title={`Mã lần chạy: ${p.runId}`}>{seq}</td><td title={`Mã lần chạy: ${p.runId}`}>{vnDate(p.date)}<small className="hint" style={{ display: 'block' }}>{runLabel(p.runId)}</small></td>
+                <td className="num">{p.val.toFixed(decimals)}</td>
+                <td className="num">{zText(p.z)}</td>
+                <td className="wg-verdict-cell">
+                  <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag none" title="Điểm này đạt riêng lẻ nhưng không được dùng cho thống kê vì một mức khác trong cùng run bị loại">{runExclusionLabel(p)}</span>}
+                  {p.cusumSignal && <span className="tag warn" title="Tín hiệu xu hướng CUSUM; không tự loại điểm QC">Cảnh báo CUSUM</span>}
+                </td>
+                <td className="wg-evidence-cell">
+                  <div className="wg-rule-chips">
+                  {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}
+                  {p.cusumSignal && <span className="pill warn" title="CUSUM vượt ngưỡng h; cần rà soát xu hướng">{p.cusumSignal}</span>}
+                  {p.supportRules.map((r) => <span className="pill hint wg-support-rule" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng" aria-label={`Bằng chứng lịch sử cho luật ${r}`}><span aria-hidden="true">↩</span><span>{r}</span></span>)}
+                  {!p.rules.length && !p.cusumSignal && !p.supportRules.length && '—'}
+                  </div>
+                </td>
+                <td className="hint">{p.errorType !== '—' ? <div className="wg-error-type"><b>{p.errorType}</b><small>{p.errorDesc}</small></div> : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={view.page} pageCount={view.pageCount} {...pageBounds(view.page, POINT_PAGE_SIZE, view.total)} total={view.total}
+        unit="điểm" label={`Phân trang điểm QC ${label}`} onPageChange={setPage} />
+    </>
   );
 }

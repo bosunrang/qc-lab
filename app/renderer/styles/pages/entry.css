@@ -16,8 +16,11 @@
    nên vạch kéo nằm chính giữa hai khối. */
 .entry-tree-dock{position:sticky; top:112px; align-self:start; display:flex; max-height:calc(100vh - 132px);}
 .entry-tree-dock>.resize-handle{width:var(--space-4);}
+/* Cây tự giãn theo tên dài nhất nhưng không quá 20vw (≈290px ở 1440, ≈380px ở
+   1920): rộng hơn thì bảng nhập (tối thiểu 780px) phải cuộn ngang ngay ở màn
+   1440 (đánh giá 09/11/2026). Tên dài xuống dòng trong nút cây. */
 .tree{
-  max-height:calc(100vh - 132px); width:max-content; min-width:280px; max-width:min(440px,34vw); padding:0;
+  max-height:calc(100vh - 132px); width:max-content; min-width:240px; max-width:clamp(240px,20vw,440px); padding:0;
   overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
 }
 .entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-1-5) var(--space-2-5) var(--space-1-5) var(--space-3);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);}
@@ -47,16 +50,20 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .tnode:hover .caret{border-color:var(--accent-border-hover);background:var(--surface-subtle);color:var(--accent-text);}
 /* Trạng thái trong cây là `.tag` chuẩn; ở đây chỉ canh phải trong hàng. */
 .tree .tnode .tag{justify-self:end;margin-left:var(--space-1-5);}
+/* Cây có trần độ rộng (xem `.tree`): tên dài (máy, nhóm lô, xét nghiệm) xuống
+   dòng trong cột giữa thay vì tràn đè lên nhãn trạng thái; nhãn giữ một dòng. */
+.tree .tnode{white-space:normal;line-height:var(--leading-heading);}
+.tree .tnode .tag{white-space:nowrap;}
 
 /* ---- Bảng nhập QC (worksheet theo lịch tháng) ---- */
 .qc-sheet-panel{border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
-.qc-sheet-heading{background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);display:grid;align-items:center;justify-content:space-between;gap:var(--space-3-5);min-height:64px;padding:var(--space-2-5) var(--panel-header-px);position:sticky;top:0;z-index:var(--z-sticky-head);grid-template-columns:minmax(220px,1fr) auto;}
+.qc-sheet-heading{background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);display:grid;align-items:center;justify-content:space-between;gap:var(--space-3-5);min-height:64px;padding:var(--space-2-5) var(--panel-header-px);position:sticky;top:0;z-index:var(--z-sticky-head);grid-template-columns:minmax(180px,1fr) minmax(0,max-content);}
 .qc-sheet-title{display:flex;gap:var(--space-0-5);min-width:0;align-items:baseline;flex-wrap:wrap;column-gap:var(--space-2);row-gap:var(--space-0-5);}
 .qc-sheet-title span{color:var(--text-accent);font-size:var(--title-panel);font-weight:var(--weight-semibold);}
 .qc-sheet-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--title-panel);color:var(--text-strong);letter-spacing:-.01em;line-height:var(--leading-heading);}
 .qc-sheet-title small{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:700;flex-basis:100%;}
 .qc-month-area{flex:0 0 auto;display:grid;justify-items:end;gap:var(--space-1);align-items:center;flex-wrap:wrap;}
-.qc-month-picker{display:flex;justify-content:flex-end;flex-wrap:nowrap;gap:var(--space-1-5);align-items:center;}
+.qc-month-picker{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:var(--space-1-5);align-items:center;}
 .qc-month-picker select{width:auto;padding-top:0;padding-bottom:0;background:var(--surface);font-weight:var(--weight-bold);}
 .qc-month-picker select,.qc-current-month{height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-2-5);font-size:var(--text-sm);}
 .qc-month-picker select:first-of-type{min-width:92px;}
@@ -64,19 +71,20 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 /* Chiều cao vùng cuộn bám theo cửa sổ thay vì cố định 574px (vốn chỉ vừa
    cửa sổ cao ~768px): khi cuộn trang để bảng nằm ngay dưới header dính
    (`.head` 88px), phần còn lại gồm tiêu đề bảng (64–90px khi tên xét nghiệm
-   xuống dòng), margin 14px hai đầu và viền panel — trừ 208px là đáy bảng
+   xuống dòng), margin 14px trên dưới và viền panel — trừ 208px là đáy bảng
    luôn nằm trong cửa sổ. Sàn 360px giữ đủ khoảng 7 hàng ngày khi cửa sổ
    thấp hơn `minHeight` 700px của Electron (vd trình duyệt preview). */
-.qc-sheet-wrap{display:block;max-width:100%;margin:var(--space-3-5);border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:max(360px,calc(100vh - 208px));overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
-.entry-sheet-message{display:grid;gap:var(--space-2);margin:var(--space-3) var(--space-4) var(--space-4);}
+.qc-sheet-wrap{display:block;max-width:100%;margin:var(--space-3-5) var(--panel-padding);border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:max(360px,calc(100vh - 208px));overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
+.entry-sheet-message{display:grid;gap:var(--space-2);margin:var(--space-3) var(--panel-padding) var(--space-4);}
 /* Một sàn bề rộng DUY NHẤT, không đổi theo cửa sổ. Bản trước đặt 1080px ở
    trên 1280px rồi hạ 840/780px ở cửa sổ hẹp, nên ở 1366px bảng bị ép rộng
    1080px trong vùng chỉ ~740px — cuộn ngang NHIỀU hơn ở 1280px (sàn 840px).
    Bảng đã `width:100%` (rule `table` chung) nên tự giãn hết vùng khi rộng;
    khi hẹp, trình duyệt không bao giờ ép bảng dưới bề rộng min-content của
-   nội dung, nên 780px chỉ là sàn cho xét nghiệm ít mức. Lượng cuộn ngang vì
-   thế chỉ giảm dần khi cửa sổ rộng ra. */
-.qc-sheet{min-width:780px;border:none;margin:0;table-layout:auto;border-radius:0;border-collapse:separate;border-spacing:0;overflow:visible;}
+   nội dung, nên sàn này chỉ có tác dụng với xét nghiệm ít mức. Lượng cuộn
+   ngang vì thế chỉ giảm dần khi cửa sổ rộng ra. 748px (09/11/2026): vừa khung
+   ở màn 1440 sau khi lề bảng theo `--panel-padding`; bảng 2 mức chỉ cần ~730px. */
+.qc-sheet{min-width:748px;border:none;margin:0;table-layout:auto;border-radius:0;border-collapse:separate;border-spacing:0;overflow:visible;}
 .qc-sheet thead{position:relative;z-index:var(--z-sticky-head);}
 .qc-sheet thead tr{position:sticky;top:0;z-index:var(--z-sticky-head);}
 /* Header sticky đã có `border-bottom` 1px từ rule bảng chung. Không thêm
@@ -128,17 +136,23 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-cumulative b{color:var(--accent-text);display:block;margin-top:var(--space-0-5);font-size:var(--text-sm);font-variant-numeric:tabular-nums;}
 
 /* ---- Biểu đồ Levey-Jennings xếp chồng ---- */
-.lj-toolbar{display:grid;align-items:center;min-height:var(--panel-header-h);margin:0;padding:var(--space-2-5) var(--panel-header-px);gap:var(--space-3-5) var(--space-4);grid-template-columns:minmax(180px,1fr) auto;background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;box-shadow:none;}
+/* Flex xuống dòng thay cho lưới hai cột: khi panel hẹp (cửa sổ ~1024px), cả
+   khối lọc ngày xuống hàng dưới tiêu đề thay vì bị ép rồi cắt mất nút
+   "60 ngày", "90 ngày" (đánh giá 09/11/2026). */
+.lj-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;min-height:var(--panel-header-h);margin:0;padding:var(--space-2-5) var(--panel-header-px);gap:var(--space-3-5) var(--space-4);background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;box-shadow:none;}
 .lj-toolbar h2.panel-title{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;}
 .lj-filter{display:flex;gap:var(--space-3);align-items:center;justify-content:flex-end;flex-wrap:wrap;}
-.lj-range{margin:var(--panel-content-gap) var(--space-4) var(--space-3);font-size:var(--text-sm);}
-/* Trái/phải đổi 10px→14px: khoảng cách viền-với-viền (từ viền panel ngoài
-   tới viền từng thẻ `.lj-mini` bên trong) khớp đúng `.qc-sheet-wrap`/
-   `.qc-table-grid` — theo yêu cầu người dùng, đồng bộ khoảng cách này xuyên
-   suốt mọi khối bảng/biểu đồ trong trang Nhập QC. */
-.lj-stack{display:grid;gap:var(--space-3);margin:0 var(--space-3-5) var(--space-2);}
+.lj-range{margin:var(--panel-content-gap) var(--panel-padding) var(--space-3);font-size:var(--text-sm);}
+/* Lề trái/phải từ viền panel tới viền từng thẻ `.lj-mini` bên trong khớp
+   đúng `.qc-sheet-wrap`/`.qc-table-grid` — theo yêu cầu người dùng, mọi khối
+   bảng/biểu đồ trong trang Nhập QC cách viền panel như nhau. Từ 09/11/2026 là
+   `--panel-padding` (20px), bằng lề tiêu đề panel như các trang khác, thay cho
+   14/16px riêng của trang. */
+.lj-stack{display:grid;gap:var(--space-3);margin:0 var(--panel-padding) var(--space-2);}
 
-.chart-scroll{padding:var(--space-3-5);}
+/* Chỉ trong trang Nhập QC: CSS các trang gộp một gói, viết trơn `.chart-scroll`
+   thì lề 14px này lan sang khung biểu đồ của Phân tích Westgard. */
+.entrygrid .chart-scroll{padding:var(--space-3-5);}
 .chart-scroll canvas.entryLJStack{width:100%;max-width:none;}
 .lj-mini canvas{cursor:crosshair;}
 
@@ -201,7 +215,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    `.qc-sheet-wrap` phải LUÔN cùng margin, dù `.entry-secondary-body` (cha)
    không có padding ngang nào. Bố cục được tối ưu cho desktop nên duy trì cùng
    một khoảng đệm ở toàn bộ vùng bảng. */
-.qc-table-grid{display:flex;flex-wrap:wrap;gap:var(--space-4);margin:var(--space-4);}
+.qc-table-grid{display:flex;flex-wrap:wrap;gap:var(--space-4);margin:var(--space-4) var(--panel-padding);}
 /* Bỏ `max-width:640px` (từng thêm để trị nhầm vụ "khoảng cách viền chưa
    đúng" — hoá ra lỗi thật nằm ở `.entry-secondary-body` cộng dồn padding
    với margin của `.qc-table-grid`, đã sửa ở trên; cap ở đây chỉ khiến bảng
@@ -209,8 +223,10 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    thanh điều hướng/danh mục xét nghiệm — đúng điều người dùng phản hồi
    không muốn). Không còn trần: `flex:1 1 340px` co giãn TỰ DO theo chỗ dư. */
 .qc-table-card{display:block;flex:1 1 340px;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;}
-/* Thu gọn bảng chi tiết để hai mức QC vừa cạnh nhau ở bố cục desktop. */
-.qc-table-card h4,.qc-table-card table,.qc-cumulative{min-width:540px;}
+/* Thu gọn bảng chi tiết để hai mức QC vừa cạnh nhau ở bố cục desktop. 540px
+   làm mỗi thẻ cuộn ngang ngay ở màn 1440 và nút "Huỷ" ở cột cuối bị khuất
+   (đánh giá 09/11/2026); 440px vẫn đủ cho ngày, giá trị, z, kết luận, luật. */
+.qc-table-card h4,.qc-table-card table,.qc-cumulative{min-width:440px;}
 /* CHỈ thêm phần khai RIÊNG cho `.qc-table-card h4` ngoài rule dùng
    chung (`.qc-table-card h4,.lj-mini-h,.tree h4` ở trên) —
    không lặp lại background/border-bottom/margin/padding/font-size, nếu
@@ -221,8 +237,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-card h4{position:sticky;left:0;z-index:var(--z-sticky-head);display:flex;align-items:center;box-sizing:border-box;width:100%;font-size:var(--title-sub);font-weight:var(--title-sub-weight);}
 .qc-table-card h4>span{display:flex;align-items:center;gap:var(--space-2-5);min-width:0;flex-wrap:wrap;}
 .qc-table-count{font-weight:700;white-space:nowrap;color:var(--text-tertiary);font-size:var(--text-xs);}
-.qc-table-card table{border:none;border-radius:0;table-layout:fixed;width:100%;}
-.qc-table-card th,.qc-table-card td{text-align:center;font-size:var(--table-body-size);}
+.qc-table-card table{border:none;border-radius:0;table-layout:fixed;width:100%;overflow:visible;}
+.qc-table-card th,.qc-table-card td{text-align:center;font-size:var(--table-body-size);padding-left:var(--space-1-5);padding-right:var(--space-1-5);}
 .qc-table-card th,.qc-sheet thead th{font-weight:var(--weight-bold);}
 .qc-table-card td.num,.qc-table-card th.num{text-align:center;font-variant-numeric:tabular-nums;}
 .qc-table-card th:nth-child(1),.qc-table-card td:nth-child(1),.qc-table-card th:nth-child(3),.qc-table-card td:nth-child(3){width:14.25%;}
@@ -231,19 +247,24 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-table-card th:nth-child(5),.qc-table-card td:nth-child(5){width:18%;}
 .qc-table-card>table th:nth-child(-n+5),.qc-table-card>table td:nth-child(-n+5){width:calc((100% - 76px) / 5);}
 .qc-table-card th:nth-child(6),.qc-table-card td:nth-child(6){width:76px;padding-left:var(--space-1-5);padding-right:var(--space-1-5);white-space:nowrap;}
+/* Hai mức xếp cạnh nhau nên thẻ có thể hẹp hơn bảng và cuộn ngang: ghim cột
+   thao tác ở mép phải để nút "Huỷ" luôn nhìn thấy (đánh giá 09/11/2026). Hàng
+   cảnh báo/loại bỏ tự tô nền ô ở rule bên dưới. */
+.qc-table-card td:nth-child(6){position:sticky;right:0;background:var(--surface);}
+.qc-table-card th:nth-child(6){position:sticky;right:0;background:var(--table-head-bg);}
 .qc-table-card tbody tr.qc-point-rej td{background:var(--danger-surface);border-bottom-color:var(--danger-border);}
 .qc-table-card tbody tr.qc-point-rej:hover td{background:var(--danger-surface);}
 .qc-table-card tbody tr.qc-point-warn td{background:var(--warning-surface);border-bottom-color:var(--warning-border);}
 .qc-table-card tbody tr.qc-point-warn:hover td{background:var(--warning-surface);}
 /* Chỉ chỉnh khoảng cách quanh EmptyState trong thẻ bảng; kiểu dáng thuộc component. */
-.qc-table-empty{margin:var(--space-3-5);}
+.qc-table-empty{margin:var(--space-3-5) var(--panel-padding);}
 .qc-row-actions{text-align:center;white-space:nowrap;}
 .qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border:1px solid var(--danger-border-soft);border-radius:var(--radius-sm);background:var(--surface);color:var(--danger-text);cursor:pointer;transition:var(--motion-fast) ease;}
 .qc-row-void svg{width:var(--icon-sm);height:var(--icon-sm);}
 .qc-row-void:hover{border-color:var(--danger-accent);background:var(--danger-surface);}
 /* Đây là mô tả phạm vi dữ liệu, dài và cần đọc như nội dung; không phải nhãn
    phụ ngắn nên dùng cấp thân chữ 13px thay vì `.hint` mặc định 12px. */
-.qc-cumulative-note{margin:var(--panel-content-gap) var(--space-4) 0;font-size:var(--text-sm);}
+.qc-cumulative-note{margin:var(--panel-content-gap) var(--panel-padding) 0;font-size:var(--text-sm);}
 /* Số điểm ĐÃ GHI NHẬN so với số điểm vào thống kê — dòng truy vết, để ngay
    dưới dải Mean/SD/CV nên bám trái cùng với nó khi thẻ cuộn ngang. */
 .qc-cumulative-source{position:sticky;left:0;padding:var(--space-1-5) var(--space-2-5);border-bottom:1px solid var(--border-subtle);font-size:var(--text-xs);}
@@ -315,8 +336,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-sheet th.qc-level-head:hover, .qc-sheet th.qc-level-head:focus-visible{z-index:var(--z-float);}
 .qc-sheet th.qc-level-head:focus-visible{outline-offset:-2px;}
 .qc-sheet th.qc-level-head:hover::after, .qc-sheet th.qc-level-head:focus-visible::after{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);}
-.tree .tn-config .config-name{min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;overflow-wrap:normal;line-height:var(--leading-heading);}
-.range-band-note{display:flex;align-items:center;gap:var(--space-2-5);margin:var(--space-3) var(--space-3-5) 0;padding:var(--space-3-5) var(--space-4);border:0;border-left:3px solid var(--info-accent);border-radius:var(--radius-lg);background:var(--info-surface);color:var(--text-primary);line-height:var(--leading-body);}.range-band-copy{min-width:0;flex:1;}.range-band-action{flex:none;}
+.tree .tn-config .config-name{min-width:0;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:normal;line-height:var(--leading-heading);}
+.range-band-note{display:flex;align-items:center;gap:var(--space-2-5);margin:var(--space-3) var(--panel-padding) 0;padding:var(--space-3-5) var(--space-4);border:0;border-left:3px solid var(--info-accent);border-radius:var(--radius-lg);background:var(--info-surface);color:var(--text-primary);line-height:var(--leading-body);}.range-band-copy{min-width:0;flex:1;}.range-band-action{flex:none;}
 .range-workflow-actions{display:flex;justify-content:flex-end;gap:var(--space-2);margin:var(--space-3) var(--space-3-5) 0;flex-wrap:wrap;}
 
 .range-workflow-meta{margin:0 0 var(--space-3);color:var(--text-tertiary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}

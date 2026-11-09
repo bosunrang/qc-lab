@@ -389,7 +389,7 @@ export function WestgardPage() {
               <>
                 {analysis?.evaluationNote && <div className="alert warn wg-target-warning">{analysis.evaluationNote}</div>}
                 {noTarget && <div className="alert warn wg-target-warning"><b>Mức {l.level} chưa có Mean/SD hợp lệ</b> — điểm QC mức này không được đánh giá Westgard.</div>}
-                <WestgardPointTable points={analysis?.points || []} decimals={currentSummary?.decimalPlaces ?? 2} />
+                <WestgardPointTable points={analysis?.points || []} decimals={currentSummary?.decimalPlaces ?? 2} label={`mức ${l.level}`} />
               </>
             )}
           </div>

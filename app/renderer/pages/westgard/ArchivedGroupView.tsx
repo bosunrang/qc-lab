@@ -75,7 +75,7 @@ export function ArchivedGroupResults({ state }: { state: ArchivedWestgardState }
           {!b.analysis.points.length ? (
             <EmptyState title="Chưa có dữ liệu">Không tìm thấy điểm QC nào cho lô này.</EmptyState>
           ) : (
-            <WestgardPointTable points={b.analysis.points} decimals={archivedDecimals} />
+            <WestgardPointTable points={b.analysis.points} decimals={archivedDecimals} label={`mức ${b.level} lô ${b.lotNo}`} />
           )}
         </div>
       ))}

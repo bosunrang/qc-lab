@@ -7,7 +7,7 @@
 // sidebar và route dùng CÙNG một bảng; chặn truy cập thật theo route nằm ở
 // router.tsx, chặn ghi thật nằm ở main. Quyền theo từng người dùng
 // (`pagePerms`) được tính cùng bảng đó qua `canUserAccessPage()`.
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageErrorBoundary } from './ErrorBoundary';
@@ -65,6 +65,13 @@ export function AppShell() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Vùng nội dung là khung cuộn chung của mọi trang: đổi trang thì đưa về đầu,
+  // nếu không trang mới mở ngay ở vị trí cuộn của trang trước (đánh giá
+  // 09/11/2026). Chỉ theo đường dẫn, nên đổi tham số trên cùng một trang (bộ
+  // lọc, xét nghiệm đang chọn) vẫn giữ vị trí.
+  const mainRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, [pathname]);
+
   function toggleCollapsed() {
     setCollapsed((prev) => {
       const next = !prev;
@@ -117,7 +124,7 @@ export function AppShell() {
           </div>
         </div>
       </aside>
-      <main tabIndex={-1}>
+      <main ref={mainRef} tabIndex={-1}>
         {/* Lỗi hiển thị của một trang chỉ thay vùng nội dung; đổi trang thì
             tự bỏ trạng thái lỗi. */}
         <PageErrorBoundary resetKey={pathname}>

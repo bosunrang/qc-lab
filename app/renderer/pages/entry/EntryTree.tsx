@@ -51,7 +51,8 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
   const [closedMachines, setClosedMachines] = useState<Set<string>>(new Set());
   const [openTests, setOpenTests] = useState<Set<string>>(new Set());
   // Chưa kéo thì cây tự giãn theo tên dài nhất (CSS `width:max-content`);
-  // kéo rồi thì giữ độ rộng người dùng chọn, tối đa 42% bề ngang trang.
+  // kéo rồi thì giữ độ rộng người dùng chọn, tối đa 42% bề ngang trang lúc
+  // kéo và 36vw khi cửa sổ thu hẹp sau đó, để bảng nhập không bị ép (U26).
   const treeRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState<number>();
   function resizeTree(next: number) {
@@ -99,7 +100,7 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
 
   return (
     <div className="entry-tree-dock">
-      <div className="tree" id="entryTreePanel" ref={treeRef} style={width ? { width, maxWidth: 'none' } : undefined}>
+      <div className="tree" id="entryTreePanel" ref={treeRef} style={width ? { width, maxWidth: '36vw' } : undefined}>
         <div className="entry-tree-head">
           <h4>Danh mục nội kiểm</h4>
           <button type="button" className="btn ghost entry-tree-toggle" onClick={onCollapse}
