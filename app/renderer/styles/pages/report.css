@@ -203,6 +203,11 @@
 .monthly-review-table th{white-space:nowrap;}
 .monthly-review-table th:not(:first-child),.monthly-review-table td:not(:first-child){text-align:center;}
 .monthly-review-table td.num{white-space:nowrap;}
+/* Máy, mức, lô không gãy giữa chừng ("BR-" / "24A1"); tên xét nghiệm có sàn
+   bề rộng để không dựng thành ba dòng (đánh giá giao diện 09/11/2026). Bảng
+   đã nằm trong khung cuộn ngang nên cửa sổ hẹp vẫn xem đủ. */
+.monthly-review-table td:nth-child(n+2):nth-child(-n+4){white-space:nowrap;}
+.monthly-review-table td:first-child{min-width:200px;}
 .monthly-review-sign{display:grid;gap:var(--space-3);margin-top:var(--space-4);}
 .monthly-review-status{margin:0;color:var(--text-secondary);font-size:var(--text-sm);}
 .monthly-review-sign-form{display:grid;grid-template-columns:minmax(200px,260px) minmax(0,1fr) max-content;align-items:end;gap:var(--field-gap);}

@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { infoDialog, errorDialog, reauthDialog, choiceDialog } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
-import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
+import { normalizeTargetPick, syncTargetRange, targetInputText } from '../../lib/target-range';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 
@@ -222,10 +222,10 @@ export function TargetsTab() {
               return <div className="target-row" key={`${test.id}:${level}:${lotId}:${planned ? `p${planned.mean}/${planned.sd}` : 'live'}`} data-test={test.id} data-lot={lotId} data-decimals={decimals} data-k={k}>
               <label className="lot-assay-check" title={locked ? 'Lô QC đã hết dùng' : ''}><input className="tm-use" type="checkbox" disabled={locked} defaultChecked={checked} onChange={(e) => toggleTargetRow(e.currentTarget)} /><span /></label>
               <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
-              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={shownMean ?? ''} placeholder="Trung bình" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownMean, decimals)} placeholder="Trung bình" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
               <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! - k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
               <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! + k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={shownSd ?? ''} placeholder="Độ lệch chuẩn" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownSd, decimals)} placeholder="Độ lệch chuẩn" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
               <span>{status}</span>
             </div>;
             })}

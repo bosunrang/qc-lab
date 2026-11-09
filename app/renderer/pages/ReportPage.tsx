@@ -23,6 +23,7 @@ import { DOCUMENT_CSS, documentHeader, loadPrintIdentity, signatureBlock, type P
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { LoadNotice } from '../components/LoadNotice';
 import type { NceRecordRow, ReportForm, ReportFormKind, ReportPointRow, ReportTemplateSettings, TestSummary } from '../../shared/qc-api';
 import { REPORT_FORM_KINDS, REPORT_FORM_LABELS } from '../../main/domain/report-template-validation';
 import { NCE_SOURCE_LABEL, NCE_STATUS_LABEL, NCE_TIER_LABEL } from '../../main/domain/nce/labels';
@@ -125,7 +126,7 @@ export function ReportPage() {
   const [forms, setForms] = useState<ReportTemplateSettings | null>(null);
 
   useEffect(() => { loadLocks(); loadTemplate(); }, [loadLocks, loadTemplate]);
-  useCatalog(['summaries']);
+  const catalogStatus = useCatalog(['summaries']);
   useEffect(() => { if (template) setForms(template); }, [template]);
   useStoreInvalidation(['period_locks', 'report_templates'], undefined, () => { loadLocks(); loadTemplate(); });
 
@@ -254,7 +255,9 @@ export function ReportPage() {
         </div>
       </section>}
 
-      {summaries.length ? (
+      {catalogStatus.state !== 'ready' ? (
+        <LoadNotice state={catalogStatus.state} error={catalogStatus.error} what="danh sách xét nghiệm" onRetry={catalogStatus.retry} />
+      ) : summaries.length ? (
         <div className="panel has-popover">
           <h2 className="panel-title">Báo cáo nội kiểm theo ngày</h2>
           <div className="report-panel-body">

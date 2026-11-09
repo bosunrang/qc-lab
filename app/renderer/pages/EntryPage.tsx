@@ -16,6 +16,7 @@ import { canWrite, isAdmin } from '../lib/permissions';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { LoadNotice } from '../components/LoadNotice';
 import { confirmDialog, reasonDialog } from '../state/dialog-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
 import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
@@ -87,7 +88,7 @@ export function EntryPage() {
   // Danh mục tự nạp lại khi quản trị viên đổi máy, xét nghiệm, lô, nhóm lô
   // hay Panel ở máy khác. Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`
   // của MỌI xét nghiệm, nên không lọc theo testId.
-  useCatalog(['instruments', 'lots', 'lotGroups', 'summaries', 'tests', 'panels']);
+  const catalogStatus = useCatalog(['instruments', 'lots', 'lotGroups', 'summaries', 'tests', 'panels']);
   // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
   // Mean/SD và Lịch sử dữ liệu cần thấy cả mức đã dừng). Thẻ Nhập QC thì chỉ
   // được dựng cột cho mức ĐANG VẬN HÀNH — cùng tập mà `listOperationalLevels()`
@@ -333,7 +334,9 @@ export function EntryPage() {
   return (
     <div>
       <PageHeader title="Nhập QC & Biểu đồ" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
-      {emptyState ? (
+      {catalogStatus.state !== 'ready' ? (
+        <LoadNotice state={catalogStatus.state} error={catalogStatus.error} what="danh mục nội kiểm" onRetry={catalogStatus.retry} />
+      ) : emptyState ? (
         <div className="panel">
           <EmptyState
             title={emptyState.title}

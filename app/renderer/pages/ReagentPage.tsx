@@ -8,7 +8,7 @@
 //
 // Toàn bộ phép tính đến từ `calculateReagentComparison()` ở main — trang
 // này chỉ trình bày, không tự tính lại thống kê nào.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalog } from '../lib/useCatalog';
 import { useReagentStore } from '../store/reagent-store';
@@ -17,6 +17,7 @@ import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { LoadNotice } from '../components/LoadNotice';
 import { StatCard } from '../components/StatCard';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
@@ -305,6 +306,10 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
   );
 }
 
+/** Danh sách phép so sánh đã nạp thành công trong phiên: quay lại trang thì
+ * không hiện "Đang tải…" lần nữa (U30). */
+let comparisonsLoadedOnce = false;
+
 export function ReagentPage() {
   const store = useReagentStore(useShallow((s) => ({ comparisons: s.comparisons, create: s.create, load: s.load, remove: s.remove, saveMetadata: s.saveMetadata, saveRows: s.saveRows })));
   const role = useAuthStore((s) => s.user)?.role;
@@ -316,7 +321,21 @@ export function ReagentPage() {
   const [quickType, setQuickType] = useState<'operator' | 'sampleType' | null>(null);
   const [rowsDraft, setRowsDraft] = useState<[string, string][]>([]);
 
-  useEffect(() => { store.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Lần nạp đầu có trạng thái riêng: store khởi tạo mảng rỗng nên nếu không,
+  // trang báo "Chưa có phép so sánh nào" cả khi dữ liệu chưa về hay nạp lỗi.
+  const [listState, setListState] = useState<{ state: 'loading' | 'ready' | 'error'; error: string }>(
+    () => ({ state: comparisonsLoadedOnce ? 'ready' : 'loading', error: '' }));
+  const loadList = useCallback(async () => {
+    if (!comparisonsLoadedOnce) setListState({ state: 'loading', error: '' });
+    try {
+      await useReagentStore.getState().load();
+      comparisonsLoadedOnce = true;
+      setListState({ state: 'ready', error: '' });
+    } catch (e) {
+      setListState({ state: 'error', error: e instanceof Error ? e.message : String(e) });
+    }
+  }, []);
+  useEffect(() => { void loadList(); }, [loadList]);
   useStoreInvalidation(['reagent_tests'], undefined, store.load);
 
   const current = useMemo(
@@ -324,6 +343,15 @@ export function ReagentPage() {
     [store.comparisons, currentId],
   );
   useEffect(() => { if (current) setRowsDraft(current.rows); }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (listState.state !== 'ready') {
+    return (
+      <div>
+        <PageHeader title="So sánh hoá chất" subtitle="Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP" />
+        <LoadNotice state={listState.state} error={listState.error} what="danh sách phép so sánh" onRetry={() => { void loadList(); }} />
+      </div>
+    );
+  }
 
   if (!current) {
     return (
