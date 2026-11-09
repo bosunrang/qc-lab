@@ -211,9 +211,9 @@ export function WestgardPage() {
       <div className="panel wg-setup-panel has-popover">
         <h2 className="panel-title">Thiết lập phân tích</h2>
         {archivedGroups.length > 0 && (
-          <div className="dayseg wg-archive-view-mode">
-            <button className={view === 'current' ? 'on' : ''} onClick={() => setView('current')}>Xét nghiệm đang vận hành</button>
-            <button className={view === 'archived' ? 'on' : ''} onClick={() => setView('archived')}>Nhóm lô đã dừng/lưu trữ ({archivedGroups.length})</button>
+          <div className="dayseg wg-archive-view-mode" role="group" aria-label="Phạm vi phân tích">
+            <button type="button" className={view === 'current' ? 'on' : ''} aria-pressed={view === 'current'} onClick={() => setView('current')}>Xét nghiệm đang vận hành</button>
+            <button type="button" className={view === 'archived' ? 'on' : ''} aria-pressed={view === 'archived'} onClick={() => setView('archived')}>Nhóm lô đã dừng/lưu trữ ({archivedGroups.length})</button>
           </div>
         )}
 
@@ -268,9 +268,9 @@ export function WestgardPage() {
 
                 <div className="wg-chart-control">
                   <span className="wg-chart-mode-label">Chế độ biểu đồ</span>
-                  <div className="dayseg wg-chart-mode">
-                    <button className={chartMode === 'lj' ? 'on' : ''} onClick={() => setChartMode('lj')}>Levey-Jennings</button>
-                    <button className={chartMode === 'cusum' ? 'on' : ''} onClick={() => setChartMode('cusum')}>Xu hướng CUSUM</button>
+                  <div className="dayseg wg-chart-mode" role="group" aria-label="Chế độ biểu đồ">
+                    <button type="button" className={chartMode === 'lj' ? 'on' : ''} aria-pressed={chartMode === 'lj'} onClick={() => setChartMode('lj')}>Levey-Jennings</button>
+                    <button type="button" className={chartMode === 'cusum' ? 'on' : ''} aria-pressed={chartMode === 'cusum'} onClick={() => setChartMode('cusum')}>Xu hướng CUSUM</button>
                   </div>
                 </div>
               </>
@@ -302,9 +302,9 @@ export function WestgardPage() {
         <div className="panel wg-multi-panel">
           <div className="wg-cusum-heading">
             <h2 className="panel-title">Xu hướng CUSUM tổng hợp</h2>
-            <div className="dayseg wg-cusum-view-mode" aria-label="Cách xem biểu đồ CUSUM">
-              <button className="on" onClick={() => setCusumView('summary')}>Tổng hợp</button>
-              <button onClick={() => setCusumView('levels')}>Từng mức</button>
+            <div className="dayseg wg-cusum-view-mode" role="group" aria-label="Cách xem biểu đồ CUSUM">
+              <button type="button" className="on" aria-pressed="true" onClick={() => setCusumView('summary')}>Tổng hợp</button>
+              <button type="button" aria-pressed="false" onClick={() => setCusumView('levels')}>Từng mức</button>
             </div>
           </div>
           <div className="hint wg-panel-intro">Mỗi mức tính CUSUM riêng theo Mean/SD của mức đó, chỉ dùng chung trục để so sánh. Dấu +/− trong chú giải chỉ nhánh CUSUM.</div>
@@ -315,9 +315,9 @@ export function WestgardPage() {
         <div className="panel wg-multi-panel wg-cusum-switch-panel">
           <div className="wg-cusum-heading">
             <h2 className="panel-title">Xu hướng CUSUM theo từng mức</h2>
-            <div className="dayseg wg-cusum-view-mode" aria-label="Cách xem biểu đồ CUSUM">
-              <button onClick={() => setCusumView('summary')}>Tổng hợp</button>
-              <button className="on" onClick={() => setCusumView('levels')}>Từng mức</button>
+            <div className="dayseg wg-cusum-view-mode" role="group" aria-label="Cách xem biểu đồ CUSUM">
+              <button type="button" aria-pressed="false" onClick={() => setCusumView('summary')}>Tổng hợp</button>
+              <button type="button" className="on" aria-pressed="true" onClick={() => setCusumView('levels')}>Từng mức</button>
             </div>
           </div>
         </div>

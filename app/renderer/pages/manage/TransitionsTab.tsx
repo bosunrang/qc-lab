@@ -211,7 +211,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                     `.target-row` của bảng Mean/SD (cùng CSS, cùng `syncTargetRange`). */}
                 <div className="lot-trans-target-head-row">
                   <label>Mean/SD cho lô mới {draftToLot?.lot_no || ''}</label>
-                  {targetTableReady ? <input type="search" className="lot-trans-target-search" placeholder="Tìm xét nghiệm..."
+                  {targetTableReady ? <input type="search" className="lot-trans-target-search" placeholder="Tìm xét nghiệm..." aria-label="Tìm xét nghiệm trong bảng Mean/SD lô mới"
                     value={targetQuery} onChange={(event) => setTargetQuery(event.target.value)} /> : null}
                 </div>
                 {targetTableReady ? <div className="target-table lot-trans-target-table">
@@ -243,12 +243,12 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                         {/* checkbox chỉ trang trí, luôn đã chọn — mọi xét nghiệm
                             đang dùng lô cũ đều là ứng viên, không có nút bỏ
                             chọn từng dòng (`checked disabled readOnly`). */}
-                        <label className="lot-assay-check"><input type="checkbox" checked disabled readOnly /><span></span></label>
+                        <label className="lot-assay-check"><input type="checkbox" checked disabled readOnly aria-label={`Đưa ${test.name} vào chuyển lô`} /><span></span></label>
                         <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
-                        <input className="tm-mean" type="number" step="any" defaultValue={mean ?? ''} placeholder="Trung bình" onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
-                        <input className="tm-low" type="number" step="any" defaultValue={ready ? (mean! - k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
-                        <input className="tm-high" type="number" step="any" defaultValue={ready ? (mean! + k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
-                        <input className="tm-sd" type="number" step="any" defaultValue={sd ?? ''} placeholder="Độ lệch chuẩn" onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
+                        <input className="tm-mean" type="number" step="any" defaultValue={mean ?? ''} placeholder="Trung bình" aria-label={`Trung bình mục tiêu mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
+                        <input className="tm-low" type="number" step="any" defaultValue={ready ? (mean! - k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" aria-label={`Giới hạn dưới mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
+                        <input className="tm-high" type="number" step="any" defaultValue={ready ? (mean! + k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" aria-label={`Giới hạn trên mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
+                        <input className="tm-sd" type="number" step="any" defaultValue={sd ?? ''} placeholder="Độ lệch chuẩn" aria-label={`Độ lệch chuẩn mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
                         <span><b className={`tag ${saved ? 'ok' : 'none'}`}>{status}</b></span>
                       </div>;
                     })}

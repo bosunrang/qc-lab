@@ -260,6 +260,9 @@
 .nce-queue-tools select{width:auto;max-width:320px;}
 .nce-queue-table .nce-queue-group th{padding-top:var(--space-2);padding-bottom:var(--space-2);background:var(--surface-section-header);color:var(--text-primary);font-weight:var(--weight-semibold);text-align:left;}
 .nce-queue-table tbody+tbody .nce-queue-group th{border-top:1px solid var(--surface-divider);}
+/* Lần chạy đã có hồ sơ (chỉ hiện khi bật "Xem cả lần đã có hồ sơ") nhạt hơn
+   lần còn chờ lập hồ sơ, như viền màu khác của thẻ trước đây. */
+.nce-queue-table tr.nce-queue-item.is-tracked>td:first-child{color:var(--text-tertiary);}
 .nce-queue-levels{display:flex;align-items:center;justify-content:center;gap:var(--space-1-5);flex-wrap:wrap;}
 .nce-queue-actions{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:nowrap;white-space:nowrap;}
 .nce-record-search{flex:0 1 420px;min-width:0;max-width:100%;margin-left:auto;}

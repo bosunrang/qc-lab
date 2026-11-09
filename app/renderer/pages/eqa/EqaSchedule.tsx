@@ -209,9 +209,9 @@ export function EqaSchedule({ onOpenRound }: { onOpenRound: (id: string) => void
         <div className="panel-head">
           <h2>Lịch năm {year} <span className="count">{yearRows.length}</span></h2>
           <div className="eqa-cal-nav">
-            <div className="dayseg eqa-year-view" role="tablist" aria-label="Cách xem lịch năm">
-              <button type="button" role="tab" aria-selected={layout === 'timeline'} className={layout === 'timeline' ? 'on' : ''} onClick={() => setLayout('timeline')}>Dòng thời gian</button>
-              <button type="button" role="tab" aria-selected={layout === 'table'} className={layout === 'table' ? 'on' : ''} onClick={() => setLayout('table')}>Bảng</button>
+            <div className="dayseg eqa-year-view" role="group" aria-label="Cách xem lịch năm">
+              <button type="button" aria-pressed={layout === 'timeline'} className={layout === 'timeline' ? 'on' : ''} onClick={() => setLayout('timeline')}>Dòng thời gian</button>
+              <button type="button" aria-pressed={layout === 'table'} className={layout === 'table' ? 'on' : ''} onClick={() => setLayout('table')}>Bảng</button>
             </div>
             <select className="eqa-year-select" aria-label="Loại mẫu" value={sampleFilter} onChange={(e) => setSampleFilter(e.target.value)}>
               <option value="">Mọi loại mẫu</option>

@@ -28,8 +28,8 @@ export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, r
         <span>Thống kê toàn bộ &amp; Dải kiểm soát</span>
         <small>{rangeSummaryText}</small>
         {levelNums.length > 1 && (
-          <div className="dayseg" role="tablist" aria-label="Chọn mức QC cho thống kê và dải kiểm soát">
-            {levelNums.map((level) => <button type="button" key={level} role="tab" aria-selected={rangeLevel === level}
+          <div className="dayseg" role="group" aria-label="Chọn mức QC cho thống kê và dải kiểm soát">
+            {levelNums.map((level) => <button type="button" key={level} aria-pressed={rangeLevel === level}
               className={rangeLevel === level ? 'on' : ''} onClick={() => onRangeLevel(level)}>Mức {level}</button>)}
           </div>
         )}

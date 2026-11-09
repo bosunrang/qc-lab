@@ -54,9 +54,9 @@ export function EqaPage() {
         : id
         ? <EqaRoundDetail key={id} id={id} focusedResultId={params.get('point') ?? undefined} onBack={back} onOpenTest={openTest} />
         : <>
-          <div className="dayseg eqa-view-switch" role="tablist" aria-label="Chế độ xem ngoại kiểm">
-            <button type="button" role="tab" aria-selected={view === 'overview'} className={view === 'overview' ? 'on' : ''} onClick={() => switchView()}>Tổng quan</button>
-            <button type="button" role="tab" aria-selected={view === 'schedule'} className={view === 'schedule' ? 'on' : ''} onClick={() => switchView(true)}>Lịch</button>
+          <div className="dayseg eqa-view-switch" role="group" aria-label="Chế độ xem ngoại kiểm">
+            <button type="button" aria-pressed={view === 'overview'} className={view === 'overview' ? 'on' : ''} onClick={() => switchView()}>Tổng quan</button>
+            <button type="button" aria-pressed={view === 'schedule'} className={view === 'schedule' ? 'on' : ''} onClick={() => switchView(true)}>Lịch</button>
           </div>
           {view === 'schedule'
             ? <EqaSchedule onOpenRound={openRound} />

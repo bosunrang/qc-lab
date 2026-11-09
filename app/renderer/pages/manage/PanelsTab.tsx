@@ -81,7 +81,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
         <div className="rcfg-toolbar">
           <div><h2>Panel QC</h2><p>Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.</p></div>
           <div className="rcfg-tools">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên panel QC, máy và xét nghiệm..." />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên panel QC, máy và xét nghiệm..." aria-label="Tìm Panel QC" />
             <button className="btn teal" onClick={openNew}>＋ Thêm Panel QC</button>
           </div>
       </div>

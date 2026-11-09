@@ -4,7 +4,7 @@ import { useEqaStore } from '../../store/eqa-store';
 import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchSelect } from '../../components/SearchSelect';
-import { ResizeHandle } from '../../components/ResizeHandle';
+import { ResizeHandle, useStoredWidth } from '../../components/ResizeHandle';
 import type { EqaInstrumentGridRow } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { normalizeSearchText } from '../../lib/search-options';
@@ -65,11 +65,12 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
   const layoutRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLElement>(null);
   const assayItemsRef = useRef<HTMLDivElement>(null);
-  const [listWidth, setListWidth] = useState(340);
+  const [storedWidth, setListWidth] = useStoredWidth('qclab.eqaAssayListWidth', 340);
+  const listWidth = storedWidth ?? 340;
   const stacked = useSyncExternalStore(subscribeLayout, isStacked);
+  const listMaxNow = () => Math.min(480, (layoutRef.current?.clientWidth ?? 1000) * 0.42);
   function resizeList(width: number) {
-    const available = layoutRef.current?.clientWidth ?? 1000;
-    setListWidth(Math.round(Math.max(280, Math.min(width, Math.min(480, available * 0.42)))));
+    setListWidth(Math.round(Math.max(280, Math.min(width, listMaxNow()))));
   }
   function openAssay(id: string) {
     const top = assayItemsRef.current?.scrollTop ?? useEqaStore.getState().analysisListScroll;
@@ -164,7 +165,7 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
           })}</div>}
       </section>
       <ResizeHandle className="eqa-analysis-resize" targetRef={listRef} label="Độ rộng danh sách xét nghiệm"
-        value={listWidth} min={280} max={480} onResize={resizeList} />
+        value={listWidth} min={280} max={480} maxNow={listMaxNow} onResize={resizeList} />
       <div className="eqa-analysis-main">
         {result.error ? <section className="panel"><EmptyState title="Không tải được chuỗi ngoại kiểm" action={<button className="btn ghost sm" onClick={result.retry}>Thử lại</button>}>{result.error}</EmptyState></section>
           : view === undefined ? <section className="panel"><EmptyState title="Đang tải chuỗi ngoại kiểm…" /></section>
@@ -176,7 +177,7 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
           <StatCard tone={selected?.within_tea === false ? 'danger' : 'neutral'} label="% lệch đang chọn" value={pctText(selected?.pct)} detail={!selected ? 'Chưa chọn kết quả' : selected.tea_pct === null ? 'Chưa khai TEa' : `TEa ${pctText(selected.tea_pct)}`} />
         </div>
         <section className="panel" aria-label="Biểu đồ phân tích xét nghiệm"><div className="panel-head"><h2>Diễn biến qua các đợt</h2>
-          <div className="dayseg" role="tablist" aria-label="Chỉ số biểu đồ"><button type="button" role="tab" className={mode === 'z' ? 'on' : ''} aria-selected={mode === 'z'} onClick={() => setMode('z')}>z-score</button><button type="button" role="tab" className={mode === 'pct' ? 'on' : ''} aria-selected={mode === 'pct'} onClick={() => setMode('pct')}>% lệch / TEa</button></div>
+          <div className="dayseg" role="group" aria-label="Chỉ số biểu đồ"><button type="button" className={mode === 'z' ? 'on' : ''} aria-pressed={mode === 'z'} onClick={() => setMode('z')}>z-score</button><button type="button" className={mode === 'pct' ? 'on' : ''} aria-pressed={mode === 'pct'} onClick={() => setMode('pct')}>% lệch / TEa</button></div>
         </div><div className="eqa-section-body">
           {program && !program.enough && <div className="alert info">Chương trình này mới có {program.rounds} đợt; cần ít nhất {view.min_points} đợt để kết luận về xu hướng. Tín hiệu |z| ≥ {view.config.z_reject} và "không thành công" vẫn có hiệu lực.</div>}
           <EqaSeriesChart points={points} selectedId={selected?.result_id} onSelect={(p) => scope.select({ testId, roundId: p.round_id, resultId: p.result_id }, { programId })} mode={mode} config={view.config} unit={view.unit} />

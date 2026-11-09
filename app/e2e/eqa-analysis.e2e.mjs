@@ -150,7 +150,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await page.mouse.move(handle.x + handle.width / 2 + 20, dragY, { steps: 4 });
     await page.mouse.up();
     await page.waitForFunction(() => document.querySelector('.eqa-assay-list').getBoundingClientRect().width >= 379);
-    await page.getByRole('tab', { name: '% lệch / TEa', exact: true }).click();
+    await page.getByRole('button', { name: '% lệch / TEa', exact: true }).click();
     await page.getByRole('group', { name: '% lệch qua các đợt ngoại kiểm' }).waitFor();
     const assayItems = page.locator('.eqa-assay-items');
     const ureAssay = page.locator('.eqa-assay-item', { hasText: 'Ure' });
@@ -228,7 +228,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await setDetailScope(page, { year: 2026 });
     await page.getByText(/Đang xem năm 2026/).waitFor();
     await page.getByRole('button', { name: 'Quay lại', exact: false }).click();
-    await page.getByRole('tab', { name: 'Lịch', exact: true }).click();
+    await page.getByRole('button', { name: 'Lịch', exact: true }).click();
     await page.locator('.eqa-year-view').waitFor();
     const yearToolbarHeights = await page.evaluate(() => ({
       view: document.querySelector('.eqa-year-view')?.getBoundingClientRect().height,

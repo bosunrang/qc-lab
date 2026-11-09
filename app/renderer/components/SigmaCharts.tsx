@@ -6,7 +6,7 @@ import { EmptyState } from './EmptyState';
 import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 
 const LEVEL_COLORS = ['#0e4d4a', '#7a4f9a', '#c47d12'];
-const SIGMA_BOUNDS: Array<[number, string]> = [[2, '#c0362c'], [3, '#dd8b1f'], [4, '#b59a00'], [5, '#3f9a55'], [6, '#0e8f8f']];
+const SIGMA_BOUNDS: Array<[number, string]> = [[2, '#c0362c'], [3, '#a35c00'], [4, '#b59a00'], [5, '#2e7d43'], [6, '#0e8f8f']];
 
 /** Chỉ kỳ có ít nhất một mức đã tính Sigma mới xuất hiện trên biểu đồ; kỳ mới
  * chưa nhập CV/Bias không tạo một biểu đồ trống. */

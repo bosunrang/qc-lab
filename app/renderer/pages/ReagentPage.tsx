@@ -236,7 +236,7 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
         </div>
       ))}
       <div className="rc-quick-add">
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Thêm ${label} mới`}
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Thêm ${label} mới`} aria-label={`Thêm ${label} mới`}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
         <button type="button" className="btn teal sm" onClick={add}>Thêm</button>
       </div>
@@ -253,7 +253,7 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
   const rows = comparisons.filter((c) => !needle || comparisonLabel(c).toLowerCase().includes(needle));
   return (
     <Modal title="Chọn phép so sánh" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." autoFocus />
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." aria-label="Tìm phép so sánh" autoFocus />
       <div className="flow-control rc-picker-list">
         {rows.length ? rows.map((comparison) => (
           <div className={`mrow ${comparison.id === currentId ? 'on' : ''}`} key={comparison.id}>
@@ -291,7 +291,7 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
 
   return (
     <Modal title="Thêm hoá chất" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hoá chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hoá chất mới..." autoFocus />
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hoá chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hoá chất mới..." aria-label="Tìm xét nghiệm hoặc nhập tên hoá chất mới" autoFocus />
       <div className="flow-control">
         <button className="refrow rc-create-typed" onClick={() => create(query.trim() || 'Hoá chất mới')}>+ Tạo {query.trim() ? `"${query.trim()}"` : 'hoá chất trống'}</button>
       </div>
@@ -513,8 +513,8 @@ export function ReagentPage() {
               return (
                 <div className="rc-pair-row" data-rc-row={i} key={`${rowsDraft.length}-${i}`}>
                   <div className="rc-idx">{i + 1}</div>
-                  <input {...wp} type="number" step="any" placeholder="–" value={row[0]} onChange={(e) => updateCell(i, 0, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
-                  <input {...wp} type="number" step="any" placeholder="–" value={row[1]} onChange={(e) => updateCell(i, 1, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
+                  <input {...wp} type="number" step="any" placeholder="–" aria-label={`Mẫu ${i + 1} – lô cũ`} value={row[0]} onChange={(e) => updateCell(i, 0, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
+                  <input {...wp} type="number" step="any" placeholder="–" aria-label={`Mẫu ${i + 1} – lô mới`} value={row[1]} onChange={(e) => updateCell(i, 1, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
                   <div className="rc-calc">{both ? fmtFixed((o + nv) / 2) : '–'}</div>
                   <div className={`rc-calc dif${dif != null && dif < 0 ? ' neg' : ''}`}>{dif != null ? fmtFixed(dif) : '–'}</div>
                   {writable

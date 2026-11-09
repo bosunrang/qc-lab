@@ -78,13 +78,16 @@ export function designRunText(design: { n: number; r: number; alternatives: { n:
   return [one(design.n, design.r), ...alts].join(' hoặc ');
 }
 
-/** Năm bậc màu và ngưỡng diễn giải Sigma dùng thống nhất trong toàn thẻ. */
+/** Năm bậc màu và ngưỡng diễn giải Sigma dùng thống nhất trong toàn thẻ.
+ * Cận biên và Tốt làm đậm ngày 09/11/2026 (U5/U19, người dùng chọn): chữ trắng
+ * trên #dd8b1f chỉ 2,70:1 và trên #3f9a55 chỉ 3,52:1; nay 5,14:1 và 5,08:1,
+ * giữ nguyên tông màu. Cùng giá trị với dải màu ở `SigmaCharts.tsx`. */
 export function sigmaZone(value: number | null | undefined): { c: string; label: string } {
   const sigma = value == null ? NaN : Number(value);
   if (!Number.isFinite(sigma)) return { c: '#506674', label: '—' };
   if (sigma >= 6) return { c: '#13603f', label: 'Đẳng cấp thế giới' };
   if (sigma >= 5) return { c: '#2c7d5c', label: 'Xuất sắc' };
-  if (sigma >= 4) return { c: '#3f9a55', label: 'Tốt' };
-  if (sigma >= 3) return { c: '#dd8b1f', label: 'Cận biên' };
+  if (sigma >= 4) return { c: '#2e7d43', label: 'Tốt' };
+  if (sigma >= 3) return { c: '#a35c00', label: 'Cận biên' };
   return { c: '#c0362c', label: 'Không đạt' };
 }

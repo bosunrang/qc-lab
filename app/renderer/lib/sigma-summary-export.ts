@@ -55,7 +55,7 @@ export const SIGMA_GRADE_LEGEND: ReadonlyArray<{ sample: number; range: string }
 ];
 
 const LEVEL_COLORS = ['#0E4D4A', '#7A4F9A', '#C47D12', '#247C57'];
-const SIGMA_BOUNDS: Array<[number, string]> = [[2, '#C0362C'], [3, '#DD8B1F'], [4, '#B59A00'], [5, '#3F9A55'], [6, '#0E8F8F']];
+const SIGMA_BOUNDS: Array<[number, string]> = [[2, '#C0362C'], [3, '#A35C00'], [4, '#B59A00'], [5, '#2E7D43'], [6, '#0E8F8F']];
 const REPORT_TEAL = 'FF215968';
 // Hàng tiêu đề bảng và bảng chú thích theo màu xanh lam trong mẫu báo cáo.
 const SECTION_TEAL = 'FF31869B';

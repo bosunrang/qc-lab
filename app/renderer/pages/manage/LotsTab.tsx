@@ -193,7 +193,7 @@ export function LotsTab() {
           <p>Quản lý từng lô và nhóm lô QC.</p>
         </div>
         <div className="rcfg-tools">
-          <input value={query} onChange={(e) => { setQuery(e.target.value); setLotPage(1); setLotGroupPage(1); }} placeholder="Tìm theo số lô, nhóm lô QC..." />
+          <input value={query} onChange={(e) => { setQuery(e.target.value); setLotPage(1); setLotGroupPage(1); }} placeholder="Tìm theo số lô, nhóm lô QC..." aria-label="Tìm lô hoặc nhóm lô QC" />
         </div>
       </div>
       <div className="lot-config-grid">

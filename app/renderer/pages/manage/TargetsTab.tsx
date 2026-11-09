@@ -183,7 +183,7 @@ export function TargetsTab() {
         {panel && selectedGroup ? <div className="target-summary"><span className="tag ok"><b>{linked}</b> đã gán mức này</span><span className={`tag ${other ? 'warn' : 'none'}`}><b>{other}</b> đang dùng lô khác</span><span className={`tag ${empty ? 'warn' : 'none'}`}><b>{empty}</b> chưa gán lô</span><span className={`tag ${missing ? 'warn' : 'ok'}`}><b>{missing}</b> thiếu Mean/SD</span></div> : null}
       </div>
       {panel && selectedGroup ? <>
-        <div className="target-level-toolbar"><div><b>Mức {level}</b><span className="target-level-lot">{levelLots.map((lot) => lot.lot_no).join(' / ') || '—'}</span></div><div className="dayseg">{groupLevels.map((item) => <button type="button" key={item} className={item === level ? 'on' : ''} onClick={() => setLevel(item)}>Mức {item}</button>)}</div></div>
+        <div className="target-level-toolbar"><div><b>Mức {level}</b><span className="target-level-lot">{levelLots.map((lot) => lot.lot_no).join(' / ') || '—'}</span></div><div className="dayseg" role="group" aria-label="Chọn mức QC">{groupLevels.map((item) => <button type="button" key={item} className={item === level ? 'on' : ''} aria-pressed={item === level} onClick={() => setLevel(item)}>Mức {item}</button>)}</div></div>
           <div className="target-table">
             <div className="target-head"><span>Dùng</span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>
             {rows.map(({ test, target }) => {
@@ -220,12 +220,12 @@ export function TargetsTab() {
               const shownSd = planned ? planned.sd : target?.sd;
               const shownReady = shownMean != null && shownSd != null && shownSd > 0;
               return <div className="target-row" key={`${test.id}:${level}:${lotId}:${planned ? `p${planned.mean}/${planned.sd}` : 'live'}`} data-test={test.id} data-lot={lotId} data-decimals={decimals} data-k={k}>
-              <label className="lot-assay-check" title={locked ? 'Lô QC đã hết dùng' : ''}><input className="tm-use" type="checkbox" disabled={locked} defaultChecked={checked} onChange={(e) => toggleTargetRow(e.currentTarget)} /><span /></label>
+              <label className="lot-assay-check" title={locked ? 'Lô QC đã hết dùng' : ''}><input className="tm-use" type="checkbox" disabled={locked} defaultChecked={checked} onChange={(e) => toggleTargetRow(e.currentTarget)} aria-label={`Dùng Mean/SD mức ${level} cho ${test.name}`} /><span /></label>
               <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
-              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownMean, decimals)} placeholder="Trung bình" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
-              <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! - k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! + k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownSd, decimals)} placeholder="Độ lệch chuẩn" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownMean, decimals)} placeholder="Trung bình" aria-label={`Trung bình mục tiêu mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! - k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" aria-label={`Giới hạn dưới mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
+              <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! + k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" aria-label={`Giới hạn trên mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
+              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownSd, decimals)} placeholder="Độ lệch chuẩn" aria-label={`Độ lệch chuẩn mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
               <span>{status}</span>
             </div>;
             })}

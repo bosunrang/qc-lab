@@ -95,8 +95,8 @@ export const EntrySheet = memo(function EntrySheet({
         <div className="qc-sheet-title"><span>Bảng nhập QC</span><strong>{testName}</strong><small>Lô {entryColumns.map((column) => `${column.lot}${column.parallel ? ' (song song)' : ''}`).join(' / ') || '—'}</small></div>
         <div className="qc-month-area">
           <div className="qc-month-picker">
-            <select value={viewMonth} onChange={(e) => onViewMonth(Number(e.target.value))}>{MONTHS.map((m) => <option key={m} value={m}>Tháng {m}</option>)}</select>
-            <select value={viewYear} onChange={(e) => onViewYear(Number(e.target.value))}>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+            <select value={viewMonth} onChange={(e) => onViewMonth(Number(e.target.value))} aria-label="Tháng của bảng nhập">{MONTHS.map((m) => <option key={m} value={m}>Tháng {m}</option>)}</select>
+            <select value={viewYear} onChange={(e) => onViewYear(Number(e.target.value))} aria-label="Năm của bảng nhập">{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
             <button className="btn ghost sm qc-current-month" onClick={() => { onViewYear(today.getFullYear()); onViewMonth(today.getMonth() + 1); }}>Tháng hiện tại</button>
             <button className="btn teal sm qc-today-jump" onClick={goToday}>Tới hôm nay</button>
           </div>

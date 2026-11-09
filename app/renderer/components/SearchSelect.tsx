@@ -78,10 +78,13 @@ export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTI
       setOpen(false); setDirtyQuery(false); setQuery('');
     }}>
       <input ref={inputRef} id={id} type="search" role="combobox" autoComplete="off" spellCheck={false}
-        aria-label={ariaLabel} aria-expanded={open} aria-controls={listId} aria-autocomplete="list"
+        aria-label={ariaLabel} aria-expanded={open} aria-controls={open ? listId : undefined} aria-autocomplete="list"
         aria-activedescendant={open && safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
         placeholder={placeholder} value={dirtyQuery ? query : selected?.label ?? ''}
-        onFocus={(event) => { showOptions(); event.currentTarget.select(); }}
+        // Nhận focus (kể cả Tab đi ngang qua) chỉ bôi đen chữ để gõ đè; danh sách
+        // mở khi bấm chuột, gõ chữ hoặc ↓/↑ (gồm Alt+↓). Trước đây Tab qua bộ lọc
+        // Báo cáo là danh sách bung ra che các nút Xuất bên dưới (U31).
+        onFocus={(event) => { event.currentTarget.select(); }}
         onClick={(event) => { showOptions(); event.currentTarget.select(); }}
         onChange={(event) => { setQuery(event.target.value); setDirtyQuery(true); setOpen(true); setActiveIndex(0); }}
         onKeyDown={onInputKeyDown} />

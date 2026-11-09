@@ -2,7 +2,7 @@
 // Giữ riêng trạng thái tìm kiếm, lọc máy và nhánh đang mở, nên gõ vào ô tìm
 // chỉ vẽ lại cây, không vẽ lại bảng nhập và biểu đồ.
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { ResizeHandle } from '../../components/ResizeHandle';
+import { ResizeHandle, useStoredWidth } from '../../components/ResizeHandle';
 import { handleTreeKeyDown } from '../../lib/entry-tree-navigation';
 import { normalizeSearch } from '../../lib/useTestSelection';
 import { latestOf, type OperationalCatalog, type TreeVerdict } from './operational';
@@ -54,10 +54,10 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
   // kéo rồi thì giữ độ rộng người dùng chọn, tối đa 42% bề ngang trang lúc
   // kéo và 36vw khi cửa sổ thu hẹp sau đó, để bảng nhập không bị ép (U26).
   const treeRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState<number>();
+  const [width, setWidth] = useStoredWidth('qclab.entryTreeWidth');
+  const treeMaxNow = () => Math.min(TREE_MAX_WIDTH, (treeRef.current?.parentElement?.parentElement?.clientWidth ?? 1000) * 0.42);
   function resizeTree(next: number) {
-    const available = treeRef.current?.parentElement?.parentElement?.clientWidth ?? 1000;
-    setWidth(Math.round(Math.max(TREE_MIN_WIDTH, Math.min(next, TREE_MAX_WIDTH, available * 0.42))));
+    setWidth(Math.round(Math.max(TREE_MIN_WIDTH, Math.min(next, treeMaxNow()))));
   }
 
   const tree = useMemo(() => {
@@ -107,8 +107,8 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
             title="Ẩn danh mục nội kiểm" aria-label="Ẩn danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
         </div>
         <div className="tree-tools">
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm xét nghiệm, máy…" />
-          <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}>
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm xét nghiệm, máy…" aria-label="Tìm xét nghiệm hoặc máy trong danh mục" />
+          <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)} aria-label="Lọc danh mục theo máy">
             <option value="">Tất cả máy</option>
             {instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
@@ -157,7 +157,7 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
         </div>
       </div>
       <ResizeHandle targetRef={treeRef} label="Độ rộng danh mục nội kiểm" value={width}
-        min={TREE_MIN_WIDTH} max={TREE_MAX_WIDTH} onResize={resizeTree} />
+        min={TREE_MIN_WIDTH} max={TREE_MAX_WIDTH} maxNow={treeMaxNow} onResize={resizeTree} />
     </div>
   );
 });

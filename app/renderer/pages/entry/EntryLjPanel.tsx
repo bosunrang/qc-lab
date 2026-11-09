@@ -46,9 +46,9 @@ export const EntryLjPanel = memo(function EntryLjPanel({
         <div className="lj-filter">
           <label className="lj-date-field"><span className="hint">Từ ngày</span><DateField value={ljFrom} onChange={onFrom} /></label>
           <label className="lj-date-field"><span className="hint">Đến ngày</span><DateField value={ljTo} onChange={onTo} /></label>
-          <div className="dayseg">
+          <div className="dayseg" role="group" aria-label="Khoảng ngày của biểu đồ">
             {[7, 14, 30, 60, 90].map((d) => (
-              <button key={d} className={ljDays === d ? 'on' : ''} onClick={() => onPreset(d)}>{d} ngày</button>
+              <button type="button" key={d} className={ljDays === d ? 'on' : ''} aria-pressed={ljDays === d} onClick={() => onPreset(d)}>{d} ngày</button>
             ))}
           </div>
         </div>
