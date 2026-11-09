@@ -33,7 +33,7 @@ test('nhập điểm, điểm vi phạm, lập NCE, huỷ điểm', { timeout: 1
 
     // Lần chạy bị loại vào hàng chờ, một dòng cho một lần chạy; lập hồ sơ ngay trên dòng đó.
     await openPage(page, 'Khắc phục sự cố');
-    const queueRow = page.locator('article.nce-queue-item', { hasText: seeded.testName }).first();
+    const queueRow = page.locator(`tr.nce-queue-item[aria-label^="Sự cố ${seeded.testName} "]`).first();
     await queueRow.waitFor();
     assert.match(await queueRow.innerText(), /M2 \(1-3s\)/);
     await queueRow.getByRole('button', { name: 'Lập hồ sơ' }).click();

@@ -34,7 +34,7 @@ export function SigmaStatusPanel({ period, testName, teaText }: { period: SigmaP
                 );
               })}
             </div></div>
-            {period.levels.map((lv) => <ImprovementCard key={lv.level} level={lv.level} result={lv} tea={lv.tea} />)}
+            <ImprovementCard levels={period.levels.map((lv) => ({ level: lv.level, result: lv, tea: lv.tea }))} />
           </>
         )}
     </div>

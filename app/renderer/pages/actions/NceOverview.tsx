@@ -13,6 +13,8 @@ import { filterNceRecords, nceFilterCounts, nceRunLabel, NCE_LIST_FILTERS, type 
 import { CreateNceModal, type NceCreatePrefill } from './CreateNceModal';
 import { dateText } from './shared';
 import { nceSearchText, NEXT_STEP_TEXT } from './workflow';
+import { QUEUE_PAGE_SIZE, queuePage, queueTestOptions } from './queue-groups';
+import { Pagination, pageBounds } from '../../components/Pagination';
 
 function queueSummary(row: NceQueueRowView): string {
   return row.rejected_levels.map(queueLevelLabel).join('; ');
@@ -40,7 +42,8 @@ function SummaryCard({ tone, urgent = false, label, value, detail, onClick }: {
   );
 }
 
-function QueueCard({ row, writable, onOpen, onAttach, onCreate }: {
+/** Một lần chạy trong bảng hàng chờ; tên xét nghiệm nằm ở dòng nhóm phía trên. */
+function QueueRow({ row, writable, onOpen, onAttach, onCreate }: {
   row: NceQueueRowView;
   writable: boolean;
   onOpen: (id: string) => void;
@@ -51,26 +54,23 @@ function QueueCard({ row, writable, onOpen, onAttach, onCreate }: {
   const attachTo = row.attach_to;
 
   return (
-    <article className={`nce-queue-item${dossier ? ' is-tracked' : ''}`} aria-label={`Sự cố ${row.test_name} ${row.date} ${row.run_id}`}>
-      <div className="nce-queue-content">
-        <div className="nce-queue-title">
-          <h3>{row.test_name}</h3>
-          <span className={`tag ${dossier ? 'warn' : 'rej'}`}>{dossier ? 'Đã có hồ sơ' : 'Chưa có hồ sơ'}</span>
-        </div>
-        <p className="nce-note">{nceRunLabel({ date: row.date, runId: row.run_id })}</p>
-        <div className="nce-queue-levels">
-          {row.rejected_levels.map((level) => <span className="tag rej" key={`${level.level}:${level.point_id}`}>{queueLevelLabel(level)}</span>)}
-        </div>
+    <tr className={`nce-queue-item${dossier ? ' is-tracked' : ''}`} aria-label={`Sự cố ${row.test_name} ${row.date} ${row.run_id}`}>
+      <td>{nceRunLabel({ date: row.date, runId: row.run_id })}</td>
+      <td><div className="nce-queue-levels">
+        {row.rejected_levels.map((level) => <span className="tag rej" key={`${level.level}:${level.point_id}`}>{queueLevelLabel(level)}</span>)}
+      </div></td>
+      <td>
+        <span className={`tag ${dossier ? 'warn' : 'rej'}`}>{dossier ? 'Đã có hồ sơ' : 'Chưa có hồ sơ'}</span>
         {dossier
-          ? <p className="nce-note">Đang xử lý trong {dossier.nce_id}</p>
-          : attachTo && <p className="nce-note">Cùng xét nghiệm có hồ sơ {attachTo.nce_id} đang mở.</p>}
-      </div>
-      <div className="nce-queue-actions">
+          ? <div className="nce-sub">Đang xử lý trong {dossier.nce_id}</div>
+          : attachTo && <div className="nce-sub">Cùng xét nghiệm có hồ sơ {attachTo.nce_id} đang mở.</div>}
+      </td>
+      <td className="nce-col-action"><div className="nce-queue-actions">
         {dossier && <button type="button" className="btn ghost sm" onClick={() => onOpen(dossier.id)}>Mở hồ sơ</button>}
         {!dossier && attachTo && writable && <button type="button" className="btn sm" onClick={() => onAttach(row)}>Gắn vào {attachTo.nce_id}</button>}
         {!dossier && writable && <button type="button" className={`btn sm${attachTo ? ' ghost' : ''}`} onClick={() => onCreate(row)}>Lập hồ sơ</button>}
-      </div>
-    </article>
+      </div></td>
+    </tr>
   );
 }
 
@@ -87,6 +87,12 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
   const counts = useMemo(() => nceFilterCounts(records, user?.id ?? ''), [records, user?.id]);
   const untracked = queue.filter((row) => !row.record);
   const visibleQueue = showTracked ? queue : untracked;
+  const [queueTest, setQueueTest] = useState('');
+  const [queuePageNo, setQueuePageNo] = useState(1);
+  const testOptions = useMemo(() => queueTestOptions(visibleQueue), [visibleQueue]);
+  // Xét nghiệm đang lọc không còn trong hàng chờ (đã lập hồ sơ hết) thì về "Tất cả".
+  const activeTest = testOptions.some((option) => option.testId === queueTest) ? queueTest : '';
+  const queueView = useMemo(() => queuePage(visibleQueue, activeTest, queuePageNo), [visibleQueue, activeTest, queuePageNo]);
   const shown = useMemo(() => {
     const search = nceSearchText(query);
     return filterNceRecords(records, filter, user?.id ?? '')
@@ -137,14 +143,32 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
       <section className="panel nce-overview-section" aria-label="Lần chạy QC cần xử lý" ref={queueRef}>
         <div className="panel-head">
           <h2>Lần chạy QC cần xử lý <span className="count">{visibleQueue.length}</span></h2>
-          {queue.some((row) => row.record) && <button type="button" className="btn ghost sm" aria-pressed={showTracked} onClick={() => setShowTracked((value) => !value)}>{showTracked ? 'Chỉ xem lần chưa có hồ sơ' : `Xem cả lần đã có hồ sơ (${queue.length - untracked.length})`}</button>}
+          <div className="nce-queue-tools">
+            {testOptions.length > 1 && <select aria-label="Lọc lần chạy theo xét nghiệm" value={activeTest} onChange={(event) => { setQueueTest(event.target.value); setQueuePageNo(1); }}>
+              <option value="">Tất cả xét nghiệm ({visibleQueue.length})</option>
+              {testOptions.map((option) => <option key={option.testId} value={option.testId}>{option.testName} ({option.count})</option>)}
+            </select>}
+            {queue.some((row) => row.record) && <button type="button" className="btn ghost sm" aria-pressed={showTracked} onClick={() => { setShowTracked((value) => !value); setQueuePageNo(1); }}>{showTracked ? 'Chỉ xem lần chưa có hồ sơ' : `Xem cả lần đã có hồ sơ (${queue.length - untracked.length})`}</button>}
+          </div>
         </div>
         <div className="nce-section-body">
           {!visibleQueue.length
             ? <EmptyState size="compact" title="Không có lần chạy QC mới cần lập hồ sơ">{queue.length ? 'Các lần chạy bị loại đã có hồ sơ. Tiếp tục xử lý trong danh sách bên dưới.' : 'Các sự cố đã ghi nhận vẫn được theo dõi trong danh sách hồ sơ bên dưới.'}</EmptyState>
-            : <div className="nce-queue-list">{visibleQueue.map((row) => (
-              <QueueCard key={`${row.test_id}:${row.date}:${row.run_id}`} row={row} writable={writable} onOpen={onOpen} onAttach={(selected) => void attach(selected)} onCreate={createFromRun} />
-            ))}</div>}
+            : <>
+              <div className="nce-record-table"><table className="nce-table nce-queue-table">
+                <thead><tr><th scope="col">Lần chạy</th><th scope="col">Mức vi phạm</th><th scope="col">Hồ sơ</th><th scope="col" className="nce-col-action">Thao tác</th></tr></thead>
+                {queueView.groups.map((group) => (
+                  <tbody key={group.testId}>
+                    <tr className="nce-queue-group"><th scope="rowgroup" colSpan={4}>{group.testName} <span className="count">{group.total}</span></th></tr>
+                    {group.rows.map((row) => (
+                      <QueueRow key={`${row.test_id}:${row.date}:${row.run_id}`} row={row} writable={writable} onOpen={onOpen} onAttach={(selected) => void attach(selected)} onCreate={createFromRun} />
+                    ))}
+                  </tbody>
+                ))}
+              </table></div>
+              <Pagination page={queueView.page} pageCount={queueView.pageCount} {...pageBounds(queueView.page, QUEUE_PAGE_SIZE, queueView.total)} total={queueView.total}
+                unit="lần chạy" label="Phân trang lần chạy QC cần xử lý" onPageChange={setQueuePageNo} />
+            </>}
         </div>
       </section>
 

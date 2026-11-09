@@ -43,7 +43,7 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
 
     // 1. Lập hồ sơ từ hàng chờ.
     await openPage(page, 'Khắc phục sự cố');
-    const queueRow = page.locator('article.nce-queue-item', { hasText: seeded.testName }).first();
+    const queueRow = page.locator(`tr.nce-queue-item[aria-label^="Sự cố ${seeded.testName} "]`).first();
     await queueRow.getByRole('button', { name: 'Lập hồ sơ' }).click();
     const modal = page.locator('.modal[role=dialog]', { hasText: 'Lập hồ sơ NCE' });
     await modal.locator('#nceCorrection').fill('Dừng trả kết quả mức 2, chạy lại QC với lọ mới.');

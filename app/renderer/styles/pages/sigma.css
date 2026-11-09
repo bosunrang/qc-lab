@@ -1,7 +1,10 @@
 /* Six Sigma & Sai số: thiết lập, bảng kỳ, nạp CV theo lô IQC, OPSpecs, MU và
    biểu đồ. */
 
-.sg-top-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:var(--space-5);align-items:stretch;}
+/* Mỗi panel cao theo nội dung của nó: cột Tình trạng (thẻ Sigma + khuyến nghị)
+   thường dài hơn hẳn phần thiết lập, kéo giãn bằng nhau thì panel trái thành
+   một khoảng trắng lớn bên trong khung (đánh giá giao diện 09/11/2026). */
+.sg-top-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:var(--space-5);align-items:start;}
 .sg-top-grid>.panel{min-width:0;}
 /* Rule riêng của Sigma nằm trong file này; `pages.css` chỉ giữ phần dùng chung. */
 .sg-control-row>.sg-test-picker{flex:1 1 360px;max-width:420px;}
@@ -169,6 +172,9 @@
 @media(max-width:1180px){.sg-eflm-box{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}.sg-eflm-field:last-child{grid-column:1 / -1;}}
 .sg-improvement-card{display:block;margin:0 var(--space-4) var(--space-4);background:var(--surface);border-left:3px solid var(--sg-color);border-radius:var(--radius-md);color:var(--text-primary);}
 .sg-improvement-card > b{color:var(--sg-color);}
+/* Một thẻ cho mọi mức: mỗi mức một đoạn chẩn đoán, ngăn bằng đường kẻ mảnh. */
+.sg-improvement-level+.sg-improvement-level{margin-top:var(--space-2);padding-top:var(--space-2);border-top:1px solid var(--surface-divider);}
+.sg-improvement-level-name{display:block;color:var(--text-primary);}
 /* Đặt lại margin/padding mặc định của `ul` để dấu đầu dòng dùng indent 24px,
    cùng nhịp với nội dung cảnh báo khác trong app. */
 .sg-improvement-card .sg-improvement-list{margin:var(--space-1) 0 0;padding-left:var(--space-6);list-style-position:outside;}

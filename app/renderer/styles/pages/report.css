@@ -4,8 +4,18 @@
   padding:var(--space-1) var(--panel-padding) var(--panel-padding);
 }
 
-.report-template-panel{margin-bottom:var(--space-5);}
-.report-template-body{padding:var(--space-1) var(--panel-padding) var(--panel-padding);}
+/* Khối thu gọn ở cuối trang: dải tiêu đề bấm để mở, cùng kiểu với các khối
+   thu gọn ở Six Sigma; đóng thì chỉ còn một dải. */
+.report-template-panel{padding:0;overflow:hidden;}
+.report-template-summary{display:flex;align-items:center;gap:var(--space-3);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--panel-header-px);border-bottom:1px solid transparent;background:var(--surface-section-header);color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);cursor:pointer;list-style:none;}
+.report-template-summary::-webkit-details-marker{display:none;}
+/* Dải căn giữa theo chiều dọc; tiêu đề và dòng mô tả thẳng chân chữ với nhau. */
+.report-template-summary-text{display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--space-1) var(--space-3);min-width:0;}
+.report-template-summary small{color:var(--text-tertiary);font-size:var(--text-sm);font-weight:var(--weight-normal);}
+.report-template-summary::after{content:"+";margin-left:auto;color:var(--text-tertiary);font-size:var(--text-md);font-weight:var(--weight-bold);}
+.report-template-panel[open]>.report-template-summary{border-bottom-color:var(--border-subtle);}
+.report-template-panel[open]>.report-template-summary::after{content:"−";}
+.report-template-body{padding:var(--panel-content-gap) var(--panel-padding) var(--panel-padding);}
 .report-template-body>.hint{display:block;margin:0;color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
 .report-template-fields{display:grid;grid-template-columns:minmax(150px,190px) minmax(160px,240px) minmax(110px,150px) minmax(150px,180px) max-content;align-items:end;gap:var(--field-gap);margin-top:var(--space-4);}
 /* Không cộng thêm khoảng dành cho chú thích khi hàng biểu mẫu đứng đầu khối. */

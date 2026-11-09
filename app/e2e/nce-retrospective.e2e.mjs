@@ -22,7 +22,7 @@ test('NCE hồi cứu: đính chính có lịch sử, giải thích QC bị lọ
       return day;
     }, seeded.testId);
     await openPage(page, 'Khắc phục sự cố');
-    await page.locator('.nce-queue-item', { hasText: seeded.testName }).getByRole('button', { name: 'Lập hồ sơ' }).click();
+    await page.locator(`tr.nce-queue-item[aria-label^="Sự cố ${seeded.testName} "]`).getByRole('button', { name: 'Lập hồ sơ' }).click();
     const modal = page.getByRole('dialog');
     await modal.getByLabel(/Nhập hồi cứu/).check();
     assert.equal(await modal.locator('#nceDetected').inputValue(), '', 'không tự lùi ngày phát hiện theo ngày QC');

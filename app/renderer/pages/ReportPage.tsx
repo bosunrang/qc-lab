@@ -235,26 +235,6 @@ export function ReportPage() {
     <>
       <PageHeader title="Báo cáo & Biểu mẫu" subtitle={summaries.length ? 'Tổng hợp hồ sơ nội kiểm theo khoảng ngày lựa chọn' : ''} />
 
-      {admin && <section className="panel report-template-panel">
-        <h2 className="panel-title">Biểu mẫu báo cáo PDF</h2>
-        <div className="report-template-body">
-          {REPORT_FORM_KINDS.map((kind) => {
-            const form = forms?.[kind];
-            const saved = template?.[kind];
-            const dirty = !!form && !!saved && (form.formCode !== saved.formCode || form.version !== saved.version || form.effectiveDate !== saved.effectiveDate);
-            return (
-              <div className="report-template-fields" key={kind}>
-                <div className="report-template-name">{REPORT_FORM_LABELS[kind]}</div>
-                <div className="field"><label htmlFor={`reportFormCode-${kind}`}>Mã biểu mẫu</label><input id={`reportFormCode-${kind}`} value={form?.formCode ?? ''} maxLength={40} onChange={(event) => editForm(kind, { formCode: event.target.value })} /></div>
-                <div className="field"><label htmlFor={`reportFormVersion-${kind}`}>Phiên bản</label><input id={`reportFormVersion-${kind}`} value={form?.version ?? ''} maxLength={20} onChange={(event) => editForm(kind, { version: event.target.value })} /></div>
-                <div className="field"><label htmlFor={`reportFormDate-${kind}`}>Ngày hiệu lực</label><DateField id={`reportFormDate-${kind}`} value={form?.effectiveDate ?? ''} onChange={(value) => editForm(kind, { effectiveDate: value })} /></div>
-                <div className="report-template-action"><button className="btn teal" onClick={() => saveTemplateSettings(kind)} disabled={busy || !dirty}>Lưu</button></div>
-              </div>
-            );
-          })}
-        </div>
-      </section>}
-
       {catalogStatus.state !== 'ready' ? (
         <LoadNotice state={catalogStatus.state} error={catalogStatus.error} what="danh sách xét nghiệm" onRetry={catalogStatus.retry} />
       ) : summaries.length ? (
@@ -329,6 +309,29 @@ export function ReportPage() {
           </div>
         </div>
       </div>
+
+      {/* Cài đặt dùng một lần (mã biểu mẫu, phiên bản, ngày hiệu lực in ở đầu PDF):
+          để cuối trang và thu gọn mặc định, nhường màn hình đầu cho việc lập báo
+          cáo hằng ngày (đánh giá giao diện 09/11/2026). */}
+      {admin && <details className="panel report-template-panel">
+        <summary className="report-template-summary"><span className="report-template-summary-text"><span role="heading" aria-level={2}>Biểu mẫu báo cáo PDF</span><small>Mã biểu mẫu, phiên bản và ngày hiệu lực in ở đầu mỗi PDF</small></span></summary>
+        <div className="report-template-body">
+          {REPORT_FORM_KINDS.map((kind) => {
+            const form = forms?.[kind];
+            const saved = template?.[kind];
+            const dirty = !!form && !!saved && (form.formCode !== saved.formCode || form.version !== saved.version || form.effectiveDate !== saved.effectiveDate);
+            return (
+              <div className="report-template-fields" key={kind}>
+                <div className="report-template-name">{REPORT_FORM_LABELS[kind]}</div>
+                <div className="field"><label htmlFor={`reportFormCode-${kind}`}>Mã biểu mẫu</label><input id={`reportFormCode-${kind}`} value={form?.formCode ?? ''} maxLength={40} onChange={(event) => editForm(kind, { formCode: event.target.value })} /></div>
+                <div className="field"><label htmlFor={`reportFormVersion-${kind}`}>Phiên bản</label><input id={`reportFormVersion-${kind}`} value={form?.version ?? ''} maxLength={20} onChange={(event) => editForm(kind, { version: event.target.value })} /></div>
+                <div className="field"><label htmlFor={`reportFormDate-${kind}`}>Ngày hiệu lực</label><DateField id={`reportFormDate-${kind}`} value={form?.effectiveDate ?? ''} onChange={(value) => editForm(kind, { effectiveDate: value })} /></div>
+                <div className="report-template-action"><button className="btn teal" onClick={() => saveTemplateSettings(kind)} disabled={busy || !dirty}>Lưu</button></div>
+              </div>
+            );
+          })}
+        </div>
+      </details>}
 
       {unlocking && <UnlockModal ym={unlocking} onClose={() => setUnlocking(null)}
         onDone={async (note) => {

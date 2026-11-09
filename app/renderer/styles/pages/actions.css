@@ -254,13 +254,14 @@
 .nce-summary-card>small{font-size:var(--text-xs);color:var(--text-tertiary);line-height:var(--leading-snug);}
 .nce-summary-card.is-urgent>b{color:var(--danger-text);}
 .nce-overview-section{scroll-margin-top:calc(var(--panel-header-h) * 2 + var(--space-4));}
-.nce-queue-list{display:grid;gap:var(--space-3);}
-.nce-queue-item{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--surface-border);border-left:3px solid var(--danger-accent);border-radius:var(--radius-md);background:var(--surface);}
-.nce-queue-item.is-tracked{border-left-color:var(--warning-accent);}
-.nce-queue-content{display:grid;gap:var(--space-2);min-width:0;}
-.nce-queue-title,.nce-queue-levels,.nce-queue-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
-.nce-queue-title h3{margin:0;color:var(--text-primary);font-size:var(--title-sub);font-weight:var(--title-sub-weight);}
-.nce-queue-actions{justify-content:flex-end;flex-shrink:0;}
+/* Hàng chờ "Lần chạy QC cần xử lý" là bảng gọn nhóm theo xét nghiệm (đánh giá
+   giao diện 09/11/2026), cùng khung `.nce-record-table` với danh sách hồ sơ. */
+.nce-queue-tools{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:wrap;margin-left:auto;}
+.nce-queue-tools select{width:auto;max-width:320px;}
+.nce-queue-table .nce-queue-group th{padding-top:var(--space-2);padding-bottom:var(--space-2);background:var(--surface-section-header);color:var(--text-primary);font-weight:var(--weight-semibold);text-align:left;}
+.nce-queue-table tbody+tbody .nce-queue-group th{border-top:1px solid var(--surface-divider);}
+.nce-queue-levels{display:flex;align-items:center;justify-content:center;gap:var(--space-1-5);flex-wrap:wrap;}
+.nce-queue-actions{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:nowrap;white-space:nowrap;}
 .nce-record-search{flex:0 1 420px;min-width:0;max-width:100%;margin-left:auto;}
 .nce-record-table{overflow-x:auto;}
 /* Chỉ căn giữa các cột ngắn của danh sách hồ sơ; mô tả sự kiện vẫn căn trái. */
@@ -325,7 +326,6 @@
   .nce-identity-status>div:nth-child(4){border-top:1px solid var(--surface-divider);}
   .nce-col-text{min-width:0;}
   .nce-summary,.nce-dossier-meta{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .nce-queue-item{align-items:flex-start;flex-direction:column;}
   .nce-workflow-nav .nce-steps{grid-template-columns:repeat(2,minmax(0,1fr));}
   .nce-checklist-summary{flex-wrap:wrap;}
   .nce-checklist-summary progress{max-width:none;}
