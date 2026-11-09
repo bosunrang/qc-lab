@@ -18,6 +18,8 @@ import { RowActionButton } from '../components/RowActionButton';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { DateField } from '../components/DateField';
+import { SearchSelect } from '../components/SearchSelect';
+import type { SearchSelectOption } from '../lib/search-options';
 import { printHtmlToPdf } from '../lib/export';
 import { exportSigmaReportXlsx } from '../lib/sigma-summary-export';
 import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib/sigma-print-report';
@@ -52,7 +54,6 @@ export function SigmaPage() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [historyMonthFilter, setHistoryMonthFilter] = useState('');
   const [historyYearFilter, setHistoryYearFilter] = useState('');
-  const [testSearch, setTestSearch] = useState('');
   useEffect(() => { setSelectedPeriodId(null); setHistoryMonthFilter(''); setHistoryYearFilter(''); }, [testId]);
   const [biasModal, setBiasModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [muModal, setMuModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
@@ -94,16 +95,11 @@ export function SigmaPage() {
     const machine = instruments.find((instrument) => instrument.id === item.instrument_id)?.name;
     return machine ? `${item.name} — ${machine}` : item.name;
   };
-  const normalizedTestSearch = testSearch.trim().toLocaleLowerCase('vi');
-  const visibleSigmaTests = useMemo(() => sigmaTests.filter((item) => {
-    if (!normalizedTestSearch) return true;
-    const machine = instruments.find((instrument) => instrument.id === item.instrument_id)?.name || '';
-    return [item.name, machine, item.unit, item.section].some((value) => value.toLocaleLowerCase('vi').includes(normalizedTestSearch));
-  }), [sigmaTests, instruments, normalizedTestSearch]);
-  const selectedVisible = visibleSigmaTests.some((item) => item.id === testId);
-  useEffect(() => {
-    if (normalizedTestSearch && visibleSigmaTests.length && !selectedVisible) setTestId(visibleSigmaTests[0].id);
-  }, [normalizedTestSearch, visibleSigmaTests, selectedVisible]);
+  // Ô chọn xét nghiệm có tìm kiếm (`SearchSelect`, cùng ô ở Westgard và Ngoại
+  // kiểm): gõ tên, máy, đơn vị hoặc nhóm, không cần dấu.
+  const testOptions = useMemo(() => sigmaTests.map((item): SearchSelectOption => ({
+    value: item.id, label: sigmaTestLabel(item), keywords: [item.unit, item.section].filter(Boolean).join(' '),
+  })), [sigmaTests, instruments]); // eslint-disable-line react-hooks/exhaustive-deps -- `sigmaTestLabel` chỉ đọc `instruments`
   // Có hồ sơ TEa của PXN thì mở trang ở nguồn PXN — cùng TEa vận hành mà cổng
   // lập dải và ngoại kiểm dùng (`resolveOperationalTea()`). Đổi sang nguồn
   // khác vẫn được để so sánh; `tea_source` đã lưu chỉ là nguồn dự phòng khi
@@ -326,8 +322,8 @@ export function SigmaPage() {
   if (!tableLevels.length && levelsByTestId[testId] !== undefined && !loading) {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
-      <div className="panel sg-no-level-panel">
-        <div className="row-flex sg-control-row"><div className="field sg-test-picker"><label htmlFor="sgTestSelectNoLevel">Chọn xét nghiệm</label><select id="sgTestSelectNoLevel" value={testId} onChange={(e) => setTestId(e.target.value)}>{sigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}</select></div>
+      <div className="panel sg-no-level-panel has-popover">
+        <div className="row-flex sg-control-row"><div className="field sg-test-picker"><label htmlFor="sgTestSelectNoLevel">Chọn xét nghiệm</label><SearchSelect id="sgTestSelectNoLevel" ariaLabel="Chọn xét nghiệm" placeholder="Gõ tên xét nghiệm…" value={testId} options={testOptions} onChange={setTestId} /></div>
         </div>
         <div className="alert warn sg-no-level-alert">Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.
           {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Cấu hình Mean/SD</button>}
@@ -349,27 +345,21 @@ export function SigmaPage() {
       {loading && <div className="hint" role="status">Đang tải dữ liệu Sigma…</div>}
       {loadError && <div className="alert rej" role="alert">{loadError} <button className="btn ghost sm" onClick={() => loadPeriods(testId)}>Thử lại</button></div>}
       <div className="sg-top-grid">
-        <div className="panel">
+        <div className="panel has-popover">
           <div className="sg-setup-heading">
             <h2 className="panel-title">Thiết lập phân tích</h2>
-            <div className="sg-setup-search">
-              <input type="search" value={testSearch} onChange={(event) => setTestSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setTestSearch(''); }} placeholder="Tìm nhanh xét nghiệm…" aria-label="Tìm nhanh xét nghiệm" />
-            </div>
           </div>
           <div className="row-flex sg-control-row">
             <div className="field sg-test-picker">
               <label htmlFor="sgTestSelect">Chọn xét nghiệm</label>
-              <select id="sgTestSelect" aria-label="Chọn xét nghiệm" value={selectedVisible ? testId : ''} onChange={(event) => { setTestId(event.target.value); setTestSearch(''); }}>
-                {!visibleSigmaTests.length && <option value="" disabled>Không tìm thấy xét nghiệm phù hợp</option>}
-                {visibleSigmaTests.map((item) => <option key={item.id} value={item.id}>{sigmaTestLabel(item)}</option>)}
-              </select>
+              <SearchSelect id="sgTestSelect" ariaLabel="Chọn xét nghiệm" placeholder="Gõ tên xét nghiệm…" value={testId} options={testOptions} onChange={setTestId} />
             </div>
             <div className="field sg-unit-field"><label htmlFor="sg-unit">Đơn vị</label><input id="sg-unit" value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
             <div className="field sg-instrument-field"><label htmlFor="sg-instrument">Thiết bị</label><input id="sg-instrument" value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
           </div>
           <div className="sg-setup-fields sg-analysis-fields">
             <div className="field sg-tea-source">
-              <label htmlFor="sg-tea-source">Nguồn TEa</label>
+              <label htmlFor="sg-tea-source">Nguồn TEa {writable && !teaEditable && <span className="hint" title={QC_CONFIG_DENIED_MESSAGE}>(cần quyền cấu hình tiêu chí QC)</span>}</label>
               <select id="sg-tea-source" aria-label="Nguồn TEa" disabled={!teaEditable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
                 {TEA_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label} · {teaSourceValueText(s.value)}</option>)}
               </select>
@@ -379,7 +369,6 @@ export function SigmaPage() {
               <input id="sg-tea-value" key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !teaEditable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Nhập TEa%' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
             </div>
           </div>
-          {writable && !teaEditable && <p className="hint">{QC_CONFIG_DENIED_MESSAGE}</p>}
           {teaSource === 'eflm' && test && <div className="sg-eflm-box">
             <div className="field sg-eflm-field"><label htmlFor="sg-eflm-analyte">Xét nghiệm trên EFLM</label><input id="sg-eflm-analyte" disabled={!teaEditable} defaultValue={test.eflm_analyte || test.name} placeholder="VD: Glucose" onBlur={(e) => { if (e.currentTarget.value.trim() !== (test.eflm_analyte || test.name).trim()) saveTeaConfig({ eflmAnalyte: e.currentTarget.value }); }} /></div>
             <div className="field sg-eflm-field"><label htmlFor="sg-eflm-aps">Mức APS</label><select id="sg-eflm-aps" disabled={!teaEditable} value={test.eflm_aps || 'desirable'} onChange={(e) => saveTeaConfig({ eflmAps: e.target.value })}><option value="minimum">minimum</option><option value="desirable">desirable</option><option value="optimum">optimum</option></select></div>

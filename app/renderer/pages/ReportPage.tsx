@@ -129,17 +129,15 @@ export function ReportPage() {
   useEffect(() => { if (template) setForms(template); }, [template]);
   useStoreInvalidation(['period_locks', 'report_templates'], undefined, () => { loadLocks(); loadTemplate(); });
 
-  // Tìm không dấu trên nhãn hiển thị; lựa chọn mất khỏi danh sách khớp thì
-  // nhảy về phần tử đầu.
-  const selection = useTestSelection({ items: summaries, idOf: (t) => t.testId, searchTextOf: (t) => testSelectLabel(t, summaries) });
-  const { matched, selectedId } = selection;
+  const selection = useTestSelection({ items: summaries, idOf: (t) => t.testId });
+  const { selectedId } = selection;
 
-  const selected = matched.find((t) => t.testId === selectedId) || null;
+  const selected = summaries.find((t) => t.testId === selectedId) || null;
   // Đảo ngược Từ/Đến thì mọi truy vấn trả rỗng và báo cáo in ra một bảng
   // trắng — trông y như "kỳ này không có dữ liệu". Chặn ở nút xuất và nói rõ
   // lý do, thay vì để người dùng tự đoán.
   const rangeInvalid = !!start && !!end && start > end;
-  const disabled = !matched.length || busy || rangeInvalid;
+  const disabled = !summaries.length || busy || rangeInvalid;
   const year = Number(lockYm.slice(0, 4)) || new Date().getFullYear();
   const month = Number(lockYm.slice(5, 7)) || 1;
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 3 + i);
@@ -257,13 +255,12 @@ export function ReportPage() {
       </section>}
 
       {summaries.length ? (
-        <div className="panel">
+        <div className="panel has-popover">
           <h2 className="panel-title">Báo cáo nội kiểm theo ngày</h2>
           <div className="report-panel-body">
             <div className="grid4 report-filter-grid">
-              <TestPicker selection={selection} total={summaries.length} idOf={(t) => t.testId} labelOf={(t) => testSelectLabel(t, summaries)}
-                searchId="reportSearch" searchLabel="Tìm xét nghiệm" searchPlaceholder="Tìm tên xét nghiệm"
-                selectId="rTest" selectLabel="Xét nghiệm" selectAriaLabel="Xét nghiệm" countId="reportTestCount" />
+              <TestPicker items={summaries} selectedId={selectedId} onSelect={selection.select} idOf={(t) => t.testId} labelOf={(t) => testSelectLabel(t, summaries)}
+                id="rTest" label="Xét nghiệm" countId="reportTestCount" />
               <div className="field"><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
               <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
             </div>

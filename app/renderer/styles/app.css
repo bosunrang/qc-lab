@@ -96,6 +96,10 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 /* Panel không mang padding chung để header phủ trọn chiều ngang. Header và
    từng vùng nội dung tự quản lý khoảng đệm, tránh cộng dồn gutter. */
 .panel{background:var(--surface);border:1px solid var(--surface-divider);border-radius:var(--radius-md);box-shadow:var(--panel-shadow);overflow:hidden;padding:0;margin-bottom:var(--space-5);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
+/* Panel chứa ô chọn có tìm kiếm (`SearchSelect`): không cắt phần tràn để danh
+   sách thả xuống vượt được đáy panel; header tự bo góc thay cho `overflow:hidden`. */
+.panel.has-popover{overflow:visible;}
+.panel.has-popover>:first-child{border-radius:var(--radius-md) var(--radius-md) 0 0;}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2-5);flex-wrap:wrap;margin-bottom:var(--panel-content-gap,var(--space-4));}
 .panel-head h2{font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);color:var(--text-primary);letter-spacing:0;text-transform:none;}
 
@@ -161,6 +165,12 @@ aside :focus-visible,.dayseg button.on:focus-visible{outline-color:var(--focus-r
 input:not([type="checkbox"]):not([type="radio"]):focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){border-color:var(--accent-border);box-shadow:none;}
 input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:var(--surface-subtle);color:var(--text-readonly);border-color:var(--border-subtle);}
 input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--surface-page);color:var(--text-disabled);border-color:var(--border-subtle);cursor:not-allowed;}
+
+/* Thanh kéo đổi độ rộng cột danh sách (`ResizeHandle`): một vạch mảnh giữa
+   hai cột, đổi màu nhấn khi rê chuột hoặc đang focus bằng bàn phím. */
+.resize-handle{position:relative;flex:none;width:var(--space-2);align-self:stretch;cursor:col-resize;touch-action:none;}
+.resize-handle::before{content:'';position:absolute;top:0;bottom:0;left:calc(50% - var(--space-0-5) / 2);width:var(--space-0-5);border-radius:var(--radius-full);background:var(--surface-divider);}
+.resize-handle:hover::before,.resize-handle:focus-visible::before{background:var(--accent);}
 
 /* Ô chọn có tìm kiếm dùng cho danh sách dài. Popup nằm trong cùng lớp với ô
    nhập để focus trap của modal và thao tác bàn phím vẫn hoạt động thống nhất. */

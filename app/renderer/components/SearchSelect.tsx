@@ -3,7 +3,9 @@ import { filterSearchOptions, prioritizeSearchOptions, type SearchSelectOption }
 
 const NO_SUGGESTIONS: readonly string[] = [];
 
-export function SearchSelect({ value, options, suggestedValues = NO_SUGGESTIONS, onChange, ariaLabel, placeholder = 'Gõ để tìm kiếm…' }: {
+export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTIONS, onChange, ariaLabel, placeholder = 'Gõ để tìm kiếm…' }: {
+  /** Id của ô nhập, để `<label htmlFor>` bên ngoài gắn được vào. */
+  id?: string;
   value: string;
   options: readonly SearchSelectOption[];
   suggestedValues?: readonly string[];
@@ -75,7 +77,7 @@ export function SearchSelect({ value, options, suggestedValues = NO_SUGGESTIONS,
       if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
       setOpen(false); setDirtyQuery(false); setQuery('');
     }}>
-      <input ref={inputRef} type="search" role="combobox" autoComplete="off" spellCheck={false}
+      <input ref={inputRef} id={id} type="search" role="combobox" autoComplete="off" spellCheck={false}
         aria-label={ariaLabel} aria-expanded={open} aria-controls={listId} aria-autocomplete="list"
         aria-activedescendant={open && safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
         placeholder={placeholder} value={dirtyQuery ? query : selected?.label ?? ''}

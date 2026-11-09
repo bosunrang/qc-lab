@@ -4,6 +4,7 @@ import { useEqaStore } from '../../store/eqa-store';
 import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchSelect } from '../../components/SearchSelect';
+import { ResizeHandle } from '../../components/ResizeHandle';
 import type { EqaInstrumentGridRow } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { normalizeSearchText } from '../../lib/search-options';
@@ -162,13 +163,8 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
             </button>;
           })}</div>}
       </section>
-      <div className="eqa-analysis-resize" role="separator" aria-label="Độ rộng danh sách xét nghiệm" aria-orientation="vertical" tabIndex={0}
-        aria-valuemin={280} aria-valuemax={480} aria-valuenow={listWidth}
-        onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); }}
-        onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId) && layoutRef.current) resizeList(e.clientX - layoutRef.current.getBoundingClientRect().left); }}
-        onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
-        onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); resizeList((listRef.current?.getBoundingClientRect().width ?? 320) + (e.key === 'ArrowRight' ? 20 : -20)); } }}
-        title="Kéo để đổi độ rộng · phím ← →" />
+      <ResizeHandle className="eqa-analysis-resize" targetRef={listRef} label="Độ rộng danh sách xét nghiệm"
+        value={listWidth} min={280} max={480} onResize={resizeList} />
       <div className="eqa-analysis-main">
         {result.error ? <section className="panel"><EmptyState title="Không tải được chuỗi ngoại kiểm" action={<button className="btn ghost sm" onClick={result.retry}>Thử lại</button>}>{result.error}</EmptyState></section>
           : view === undefined ? <section className="panel"><EmptyState title="Đang tải chuỗi ngoại kiểm…" /></section>

@@ -7,6 +7,10 @@
 .wg-test-picker.wg-test-picker-3{
   grid-template-columns:minmax(200px,0.9fr) minmax(220px,1fr) minmax(270px,auto); max-width:1100px;
 }
+/* Xét nghiệm đang vận hành: một ô chọn xét nghiệm, nút xuất đứng ngay sau. */
+.wg-test-picker.wg-test-picker-current{
+  grid-template-columns:minmax(300px,520px) auto; justify-content:start; max-width:none;
+}
 .wg-rules{
   margin:var(--space-3) var(--panel-padding) 0;
 }

@@ -18,7 +18,7 @@
 .report-template-action{display:flex;align-items:end;min-height:var(--control-h);}
 
 .report-filter-grid.grid4{
-  grid-template-columns:minmax(180px,.9fr) minmax(300px,1.35fr) minmax(176px,.7fr) minmax(176px,.7fr);
+  grid-template-columns:minmax(300px,1.35fr) minmax(176px,.7fr) minmax(176px,.7fr);
   align-items:end;
   gap:var(--field-gap);
 }
@@ -179,7 +179,7 @@
 
 @media(max-width:1280px){
   .report-filter-grid.grid4{
-    grid-template-columns:minmax(220px,1fr) minmax(280px,1.35fr);
+    grid-template-columns:minmax(240px,1.2fr) minmax(160px,.7fr) minmax(160px,.7fr);
   }
 }
 
@@ -190,6 +190,7 @@
 
 @media(max-width:1050px){
   .report-filter-grid.grid4{grid-template-columns:1fr 1fr;}
+  .report-filter-grid.grid4>.field:first-child{grid-column:1/-1;}
   .report-lock-controls{grid-template-columns:1fr 1fr;}
   .report-lock-action{grid-column:1/-1;}
   .report-template-fields{grid-template-columns:1fr 1fr;}
@@ -203,6 +204,7 @@
 .monthly-review-table th:not(:first-child),.monthly-review-table td:not(:first-child){text-align:center;}
 .monthly-review-table td.num{white-space:nowrap;}
 .monthly-review-sign{display:grid;gap:var(--space-3);margin-top:var(--space-4);}
+.monthly-review-status{margin:0;color:var(--text-secondary);font-size:var(--text-sm);}
 .monthly-review-sign-form{display:grid;grid-template-columns:minmax(200px,260px) minmax(0,1fr) max-content;align-items:end;gap:var(--field-gap);}
 .monthly-review-sign-form .field{margin:0;}
 @media (max-width:900px){.monthly-review-sign-form{grid-template-columns:1fr;}}

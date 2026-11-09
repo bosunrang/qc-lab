@@ -72,3 +72,14 @@ test('QcChart vẽ mọi điểm qua traceMarker, không còn chấm tròn tự 
     assert.match(fs.readFileSync(path.join(APP, 'renderer', file), 'utf8'), /<QcChartLegend \/>/, `${file} có chú giải hình điểm`);
   }
 });
+
+test('PDF Westgard có biểu đồ L-J tổng hợp đặt trên bảng số liệu', () => {
+  const chart = fs.readFileSync(path.join(APP, 'renderer', 'components', 'QcChart.tsx'), 'utf8');
+  const page = fs.readFileSync(path.join(APP, 'renderer', 'pages', 'WestgardPage.tsx'), 'utf8');
+  // Ảnh in vẽ bằng chính `drawMulti()` của biểu đồ trên màn hình, không có bản vẽ thứ hai.
+  assert.match(chart, /export function renderQcMultiChartPng\([^)]*\)[^{]*\{[\s\S]*?drawMulti\(ctx, width, height, series\);/);
+  const printPdf = page.slice(page.indexOf('async function printPdf('), page.indexOf('printHtmlToPdf(html'));
+  assert.match(printPdf, /renderQcMultiChartPng\(multiSeries\)/, 'PDF dùng cùng các đường đang xem trên màn hình');
+  assert.match(printPdf, /\$\{chart\}<table>/, 'biểu đồ đứng ngay trên bảng số liệu');
+  assert.match(printPdf, /hình rỗng: lần chạy bị loại/, 'bản in có chú giải hình điểm bằng chữ');
+});

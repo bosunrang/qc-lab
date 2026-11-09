@@ -10,7 +10,7 @@ import { useWestgardStore } from '../store/westgard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
 import { isAdmin } from '../lib/permissions';
-import { QcChart, QcChartLegend, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
+import { QcChart, QcChartLegend, QcMultiChart, QcMultiCusumChart, renderQcMultiChartPng, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
@@ -18,7 +18,6 @@ import { DOCUMENT_CSS, documentHeader, loadPrintIdentity, signatureBlock } from 
 import { errorDialog } from '../state/dialog-store';
 import { DownloadIcon, PrintIcon, RestoreIcon } from '../components/BtnIcons';
 import { observedStats } from '../../main/domain/observed-stats';
-import { NOT_RETROACTIVE_NOTE } from '../../main/domain/rule-config';
 import { displayedWestgardBlocks, statText, westgardExportRows, WESTGARD_EXPORT_HEADERS, escapeHtml } from '../lib/westgard-view';
 import { WestgardPointTable } from './westgard/shared';
 import { useArchivedWestgard } from './westgard/useArchivedWestgard';
@@ -45,13 +44,7 @@ export function WestgardPage() {
   const lanStation = isLanStation();
   const ruleSettingsEditable = admin && !lanStation;
   const [view, setView] = useState<'current' | 'archived'>('current');
-  // Tìm nhanh theo tên xét nghiệm, LOT hoặc máy (không dấu); tự chọn xét
-  // nghiệm đầu tiên khi lựa chọn hiện tại không còn trong danh sách. Không còn
-  // mục nào khớp thì giữ xét nghiệm đang xem để vùng phân tích không trắng.
-  const selection = useTestSelection({
-    items: summaries, idOf: (s) => s.testId, keepWhenNoMatch: true,
-    searchTextOf: (s) => [s.testName, s.instrumentName, ...s.levels.map((lv) => lv.lot)].filter(Boolean).join(' '),
-  });
+  const selection = useTestSelection({ items: summaries, idOf: (s) => s.testId });
   const testId = selection.selectedId;
   const selectedTestRef = useRef(testId);
   selectedTestRef.current = testId;
@@ -172,14 +165,21 @@ export function WestgardPage() {
     const rows = westgardExportRows(displayBlocks);
     const body = rows.map(row => '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>').join('');
     const title = `Phân tích Westgard — ${currentSummary?.testName || ''}`;
+    // Biểu đồ L-J tổng hợp đặt trên bảng, cùng các đường đang xem trên màn
+    // hình (kể cả lô cũ khi bật "Xem lô cũ"). Chú giải hình điểm viết bằng
+    // chữ vì chú giải trên màn hình là HTML, không nằm trong ảnh.
+    const chartPng = multiSeries.some((s) => s.points.length) ? renderQcMultiChartPng(multiSeries) : null;
+    const chart = chartPng ? `<figure class="lj"><img src="${chartPng}" alt="Biểu đồ Levey-Jennings tổng hợp">
+      <figcaption>Các mức quy về Z-score trên cùng trục. Tròn: đạt · tam giác: cảnh báo · vuông: loại bỏ theo luật Westgard · hình rỗng: lần chạy bị loại, không vào thống kê.</figcaption></figure>` : '';
     const identity = await loadPrintIdentity('westgard');
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
       <style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#183843;margin:0}
-      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9d6;padding:4px 5px;text-align:left;overflow-wrap:anywhere}
+      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9d6;padding:4px 5px;text-align:center;vertical-align:middle;overflow-wrap:anywhere}
       thead{display:table-header-group}tr{break-inside:avoid}th{background:#e9f1f2;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-      p.note{margin:0 0 8px;color:#455f69}${DOCUMENT_CSS}</style></head>
+      p.note{margin:0 0 8px;color:#455f69}figure.lj{margin:0 0 10px;break-inside:avoid}figure.lj img{display:block;width:100%;height:auto}
+      figure.lj figcaption{margin-top:4px;color:#455f69;font-size:9px;text-align:center}${DOCUMENT_CSS}</style></head>
       <body>${documentHeader(identity, 'Phân tích Westgard', currentSummary?.testName || '', [])}<p class="note">Kết luận được đánh giá theo cấu hình luật hiện tại. Thống kê chỉ dùng các lần chạy được chấp nhận.</p>
-      <table><thead><tr>${WESTGARD_EXPORT_HEADERS.map(header => '<th>' + escapeHtml(header) + '</th>').join('')}</tr></thead><tbody>${body}</tbody></table>${signatureBlock()}</body></html>`;
+      ${chart}<table><thead><tr>${WESTGARD_EXPORT_HEADERS.map(header => '<th>' + escapeHtml(header) + '</th>').join('')}</tr></thead><tbody>${body}</tbody></table>${signatureBlock()}</body></html>`;
     const error = await printHtmlToPdf(html, `westgard-${currentSummary?.testName || 'xet-nghiem'}.pdf`, { pageNumbers: true });
     if (error) await errorDialog(error);
   }
@@ -208,7 +208,7 @@ export function WestgardPage() {
     <div>
       <PageHeader title="Phân tích Westgard" subtitle={view === 'archived' ? 'Xem lại Westgard theo nhóm lô đã dừng/lưu trữ' : 'Đối chiếu luật theo mức QC, lô và lần chạy'} />
 
-      <div className="panel wg-setup-panel">
+      <div className="panel wg-setup-panel has-popover">
         <h2 className="panel-title">Thiết lập phân tích</h2>
         {archivedGroups.length > 0 && (
           <div className="dayseg wg-archive-view-mode">
@@ -219,10 +219,10 @@ export function WestgardPage() {
 
         {view === 'current' && (
           <>
-            <div className={`wg-test-picker${chartMode === 'lj' ? ' wg-test-picker-3' : ''}`}>
-              <TestPicker selection={selection} total={summaries.length} idOf={(s) => s.testId} labelOf={testPickerLabel}
-                searchId="wgTestSearch" searchLabel="Tìm nhanh" searchPlaceholder="Tên xét nghiệm, LOT hoặc máy..."
-                selectId="wgTestSelect" selectLabel="Chọn xét nghiệm" selectAriaLabel="Chọn xét nghiệm" countId="wgTestCount" />
+            <div className="wg-test-picker wg-test-picker-current">
+              <TestPicker items={summaries} selectedId={testId} onSelect={selection.select} idOf={(s) => s.testId} labelOf={testPickerLabel}
+                keywordsOf={(s) => s.levels.map((lv) => lv.lot).filter(Boolean).join(' ')}
+                id="wgTestSelect" label="Chọn xét nghiệm" countId="wgTestCount" />
               {chartMode === 'lj' && (
                 <div>
                   <label>&nbsp;</label>
@@ -247,7 +247,6 @@ export function WestgardPage() {
                     {!ruleSettingsEditable && <span className="hint-inline">{lanStation ? 'Chỉ đổi được trên máy chính.' : 'Chỉ quản trị viên đổi được.'}</span>}
                     {ruleSettingsEditable && <span className="wg-rule-reset"><button className="btn ghost sm" title="Khôi phục mặc định" aria-label="Khôi phục mặc định" onClick={resetRules}><RestoreIcon />Khôi phục</button></span>}
                   </div>
-                  {ruleSettingsEditable && <div className="hint">{NOT_RETROACTIVE_NOTE}</div>}
                 </div>
 
                 <details className="wg-guide">

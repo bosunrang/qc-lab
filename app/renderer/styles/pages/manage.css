@@ -215,6 +215,11 @@ main:has(.config-shell){padding-bottom:var(--space-4);}
 .target-matrix-panel > .target-actions{flex:0 0 auto;}
 .target-matrix-panel > .target-table,
 .target-matrix-panel > .rcfg-list{flex:0 1 auto;min-height:0;overflow:auto;}
+/* Lịch sử: danh sách của ô chọn có tìm kiếm phải tràn ra ngoài khung (bảng
+   chỉ 2 dòng thì khung thấp hơn danh sách). Vùng cuộn vẫn là `.rcfg-list`;
+   bo góc đáy cho nó vì khung không còn cắt góc hộ. */
+.config-shell-main > .target-matrix-panel.has-popover{overflow:visible;}
+.target-matrix-panel.has-popover > :last-child{border-radius:0 0 var(--radius-md) var(--radius-md);}
 
 /* Lô & Nhóm QC: lưới 2 cột chiếm hết phần còn lại để `max-height:100%` của
    hai thẻ con có mốc mà tính; `align-items:start` giữ nguyên nên thẻ ngắn

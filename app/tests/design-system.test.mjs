@@ -300,12 +300,9 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
     'đơn vị nằm trong hàng nhận diện xét nghiệm');
   assert.match(sigmaPage, /const sigmaTestLabel = \(item: typeof tests\[number\]\) => \{[\s\S]*?item\.instrument_id[\s\S]*?`\$\{item\.name\} — \$\{machine\}`/,
     'lựa chọn Sigma nêu cả máy khi một xét nghiệm có nhiều cấu hình máy');
-  assert.match(sigmaPage, /placeholder="Tìm nhanh xét nghiệm…" aria-label="Tìm nhanh xét nghiệm"/,
-    'header thiết lập có ô lọc nhanh xét nghiệm');
-  assert.match(sigmaPage, /const visibleSigmaTests = useMemo\(\(\) => sigmaTests\.filter\(/,
-    'ô tìm kiếm lọc danh sách xét nghiệm trước khi chọn');
-  assert.match(sigma, /\.sg-setup-search input\[type="search"\]\{[^}]*height:var\(--control-h-compact\)/,
-    'ô tìm nhanh dùng chiều cao control gọn của header');
+  // 2026-11-06: bỏ ô tìm nhanh ở header; chọn xét nghiệm bằng `select` của hệ thống như Westgard.
+  assert.doesNotMatch(sigmaPage, /Tìm nhanh xét nghiệm/, 'không còn ô tìm nhanh riêng');
+  assert.doesNotMatch(sigma, /\.sg-setup-search/, 'không còn CSS của ô tìm nhanh');
 });
 
 test('thao tác xoá kỳ dùng RowActionButton chung', () => {

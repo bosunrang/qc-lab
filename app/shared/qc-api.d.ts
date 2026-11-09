@@ -570,7 +570,7 @@ export interface StorageInfo {
   storageMode: 'file' | 'memory' | 'browser-preview';
 }
 /** Loại PDF có biểu mẫu kiểm soát riêng: nội kiểm, Westgard, Six Sigma, so sánh hoá chất. */
-export type ReportFormKind = 'iqc' | 'westgard' | 'sigma' | 'reagent' | 'review';
+export type ReportFormKind = 'iqc' | 'westgard' | 'sigma' | 'reagent' | 'review' | 'eqa';
 /** Thông tin kiểm soát tài liệu in ở đầu PDF. `effectiveDate` là `YYYY-MM-DD` hoặc rỗng. */
 export interface ReportForm { formCode: string; version: string; effectiveDate: string }
 export type ReportTemplateSettings = Record<ReportFormKind, ReportForm>;

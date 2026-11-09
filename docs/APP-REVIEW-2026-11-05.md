@@ -115,7 +115,7 @@ tệp giữ `MACHINE_LOCAL_META_KEYS`; chưa có test render React.
 | # | Mức | Kiểm | Phát hiện | Bằng chứng |
 |---|---|---|---|---|
 | U13 (D) | **Cao** | ✔ | **Hồi quy bước ánh xạ nhập PDF EQA**: effect xem trước nay gọi `setPreview(null)` (HEAD không có). Mỗi lần chọn một xét nghiệm, cả bảng ánh xạ thành "Đang kiểm tra dữ liệu…", ô vừa chọn bị gỡ khỏi DOM → mất focus và vị trí cuộn; ánh xạ N cặp phải dò lại N lần. Sửa: bỏ `setPreview(null)`, giữ bản cũ khi `loading`. | `pages/eqa/EqaImportModal.tsx:205` |
-| U14 (D) | TB | ✔ | Diff **xoá lời nhắc "không hồi tố"** (`NOT_RETROACTIVE_NOTE`) ở panel luật Westgard chung — đi ngược quyết định GV2 (`APP-REMEDIATION-PLAN:111-112`). | `pages/WestgardPage.tsx` |
+| U14 (D) | TB | ✔ | Diff **xoá lời nhắc "không hồi tố"** (`NOT_RETROACTIVE_NOTE`) ở panel luật Westgard chung — đi ngược quyết định GV2 (`APP-REMEDIATION-PLAN:111-112`). **Không phải lỗi (06/11/2026):** người dùng chủ ý bỏ lời nhắc này khỏi giao diện cho gọn; nội dung vẫn ghi trong nhật ký mỗi lần đổi luật. | `pages/WestgardPage.tsx` |
 | U15 (D) | TB | ○ | Nhập hàng loạt: đã ghi một phần, bấm "Quay lại chọn máy" rồi kiểm tra lại → các đợt vừa ghi hiện "Cần xem trước" và đòi lý do nhập lại → dễ nhập trùng phiên bản. Khoá nút quay lại sau lần ghi đầu. | `EqaImportModal.tsx:107,353,430` |
 | U16 (D) | TB | ○ | Bước chọn tệp: nút "Xem trước" bị khoá không nói lý do; ô năm/máy sai không có `aria-invalid`; lỗi chặn "hai file cùng máy" hiện màu vàng `warn` (trái U8). | `EqaImportModal.tsx:92,113,151-166` |
 | U17 (D) | TB | ○ | Bảng TEa tham chiếu thêm cột "Hồ sơ", `min-width` 920 → 1080px → cuộn ngang ở 1280–1366, cột Trạng thái và nút Xoá khuất (lặp lại U10). | `styles/pages/manage.css:402-411` |
@@ -149,10 +149,10 @@ tệp giữ `MACHINE_LOCAL_META_KEYS`; chưa có test render React.
 
 ## 8. Lộ trình đề xuất
 
-**Trước khi commit lô EQA hiện tại** — U13, U14, U15, A12, A13 đã sửa 05/11/2026;
+**Trước khi commit lô EQA hiện tại** — U13, U15, A12, A13 đã sửa 05/11/2026; U14 không phải lỗi;
 A17 còn chờ lúc commit.
 
-1. U13 bỏ `setPreview(null)`; U14 trả lời nhắc "không hồi tố"; A12 sửa thứ tự
+1. U13 bỏ `setPreview(null)`; A12 sửa thứ tự
    `loadAll`/`signedOut`; A17 thêm 13 tệp mới vào commit.
 2. A13 migration cập nhật cả `eqa_schedule.round_no`; U15 khoá "Quay lại" sau khi ghi.
 

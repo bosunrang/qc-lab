@@ -3,6 +3,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { Pagination, pageBounds } from '../../components/Pagination';
+import { SearchSelect } from '../../components/SearchSelect';
+import type { SearchSelectOption } from '../../lib/search-options';
 import type { HistoryQcPointView, Test, TestLevel, QcLot } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from './shared';
@@ -86,7 +88,6 @@ export function HistoryTab() {
   const [detailPage, setDetailPage] = useState(1);
   // Mở một lô khác thì về trang đầu của lô đó.
   useEffect(() => { setDetailPage(1); }, [detail?.key]);
-  const [query, setQuery] = useState('');
 
   useEffect(() => { if (!testId && tests.length) setTestId(tests[0].id); }, [testId, tests]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
@@ -161,6 +162,13 @@ export function HistoryTab() {
     return [...currentRow, ...past];
   }), [levels, lots, lotGroups]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Ô chọn tìm được theo tên xét nghiệm, máy, chuyên khoa, mức và số lô QC
+  // (kể cả lô cũ trong lịch sử); thay cho ô lọc riêng trên thanh công cụ.
+  const testOptions = useMemo<SearchSelectOption[]>(() => tests.map((test) => {
+    const machine = instruments.find((item) => item.id === test.instrument_id)?.name || 'Máy không còn tồn tại';
+    return { value: test.id, label: `${test.name} — ${machine}`, keywords: testSearchValues(test, levelsByTestId[test.id] || [], lots, machine).join(' ') };
+  }), [tests, instruments, levelsByTestId, lots]);
+
   const pointsOf = (row: HistoryRow) => points.filter((point) =>
     point.level === row.level && (row.lotNo ? (point.lot || '') === row.lotNo : true));
 
@@ -168,20 +176,11 @@ export function HistoryTab() {
     <>
       <div className="rcfg-toolbar">
         <div><h2>Lịch sử dữ liệu QC</h2><p>Chọn một xét nghiệm và máy để xem các lô/Mean-SD đã từng dùng.</p></div>
-        <div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo xét nghiệm hoặc máy..." /></div>
       </div>
-      <div className="panel target-matrix-panel">
+      <div className="panel target-matrix-panel has-popover">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD.</EmptyState> : <>
         <div className="target-selector history-selector">
-          <div className="field"><label htmlFor="history-test">Xét nghiệm / Máy</label><select id="history-test" value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {
-            const q = query.trim().toLowerCase();
-            const instrument = instruments.find((item) => item.id === test.instrument_id);
-            return !q || testSearchValues(test, levelsByTestId[test.id] || [], lots, instrument?.name || '').some((v) => v.toLowerCase().includes(q));
-          }).map((test) => {
-            const instrument = instruments.find((item) => item.id === test.instrument_id);
-            const machine = instrument?.name || 'Máy không còn tồn tại';
-            return <option key={test.id} value={test.id}>{test.name} — {machine}</option>;
-          })}</select></div>
+          <div className="field"><label htmlFor="history-test">Xét nghiệm / Máy</label><SearchSelect id="history-test" value={testId} options={testOptions} onChange={setTestId} ariaLabel="Xét nghiệm / Máy" placeholder="Tìm theo xét nghiệm, máy hoặc số lô…" /></div>
         </div>
         <div className="rcfg-list">
           {rows.length ? (

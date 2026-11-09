@@ -1,7 +1,8 @@
 // Cây "Danh mục nội kiểm" của trang Nhập QC: máy → nhóm lô → xét nghiệm.
 // Giữ riêng trạng thái tìm kiếm, lọc máy và nhánh đang mở, nên gõ vào ô tìm
 // chỉ vẽ lại cây, không vẽ lại bảng nhập và biểu đồ.
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { ResizeHandle } from '../../components/ResizeHandle';
 import { handleTreeKeyDown } from '../../lib/entry-tree-navigation';
 import { normalizeSearch } from '../../lib/useTestSelection';
 import { latestOf, type OperationalCatalog, type TreeVerdict } from './operational';
@@ -9,6 +10,10 @@ import type { Instrument, TestSummary } from '../../../shared/qc-api';
 
 /** Nhãn ngắn dùng riêng cho cây điều hướng ('Loại', không phải 'Loại bỏ'). */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
+
+/** Khoảng kéo được, cùng giới hạn với danh sách ở Phân tích ngoại kiểm. */
+const TREE_MIN_WIDTH = 280;
+const TREE_MAX_WIDTH = 480;
 
 /** Cùng hình chevron và hướng xoay với nút thu gọn thanh điều hướng. */
 export function TreeToggleIcon() {
@@ -45,6 +50,14 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
   // vẫn hiển thị đủ dữ liệu ngay lần đầu vào trang.
   const [closedMachines, setClosedMachines] = useState<Set<string>>(new Set());
   const [openTests, setOpenTests] = useState<Set<string>>(new Set());
+  // Chưa kéo thì cây tự giãn theo tên dài nhất (CSS `width:max-content`);
+  // kéo rồi thì giữ độ rộng người dùng chọn, tối đa 42% bề ngang trang.
+  const treeRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number>();
+  function resizeTree(next: number) {
+    const available = treeRef.current?.parentElement?.parentElement?.clientWidth ?? 1000;
+    setWidth(Math.round(Math.max(TREE_MIN_WIDTH, Math.min(next, TREE_MAX_WIDTH, available * 0.42))));
+  }
 
   const tree = useMemo(() => {
     // Tìm không dấu, theo cả tên xét nghiệm lẫn tên máy (placeholder hứa "Tìm xét nghiệm, máy…").
@@ -85,61 +98,65 @@ export const EntryTree = memo(function EntryTree({ summaries, instruments, catal
   }, [testId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="tree" id="entryTreePanel">
-      <div className="entry-tree-head">
-        <h4>Danh mục nội kiểm</h4>
-        <button type="button" className="btn ghost entry-tree-toggle" onClick={onCollapse}
-          title="Ẩn danh mục nội kiểm" aria-label="Ẩn danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
-      </div>
-      <div className="tree-tools">
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm xét nghiệm, máy…" />
-        <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}>
-          <option value="">Tất cả máy</option>
-          {instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-        </select>
-      </div>
-      <div role="tree">
-        {tree.map(([machine, groups]) => {
-          const machineKey = `machine:${machine}`;
-          const machineOpen = !closedMachines.has(machineKey);
-          return (
-          <div key={machine}>
-            <div className="tnode tn-machine" role="treeitem" aria-expanded={machineOpen}
-              tabIndex={0} onKeyDown={handleTreeKeyDown}
-              onClick={() => setClosedMachines((current) => { const next = new Set(current); next.has(machineKey) ? next.delete(machineKey) : next.add(machineKey); return next; })}>
-              <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={machineOpen} /></span>{machine}
-            </div>
-            {machineOpen && groups.map(([groupKey, group]) => {
-              const open = openTests.has(groupKey);
-              const rank = { none: -1, ok: 0, warn: 1, rej: 2 } as const;
-              const groupWorst = group.tests.reduce<TreeVerdict>((acc, s) => rank[latestOf(s)] > rank[acc] ? latestOf(s) : acc, 'none');
-              return (
-                <div key={groupKey}>
-                  <div className={`tnode tn-test${open ? ' open' : ''}`} role="treeitem" aria-expanded={open}
-                    tabIndex={0} onKeyDown={handleTreeKeyDown}
-                    onClick={() => setOpenTests((s) => { const next = new Set(s); next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey); return next; })}>
-                    <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={open} /></span>{group.name}
-                    <span className={`tag ${groupWorst}`}>{TREE_STATE[groupWorst]}</span>
+    <div className="entry-tree-dock">
+      <div className="tree" id="entryTreePanel" ref={treeRef} style={width ? { width, maxWidth: 'none' } : undefined}>
+        <div className="entry-tree-head">
+          <h4>Danh mục nội kiểm</h4>
+          <button type="button" className="btn ghost entry-tree-toggle" onClick={onCollapse}
+            title="Ẩn danh mục nội kiểm" aria-label="Ẩn danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
+        </div>
+        <div className="tree-tools">
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm xét nghiệm, máy…" />
+          <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}>
+            <option value="">Tất cả máy</option>
+            {instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        </div>
+        <div role="tree">
+          {tree.map(([machine, groups]) => {
+            const machineKey = `machine:${machine}`;
+            const machineOpen = !closedMachines.has(machineKey);
+            return (
+            <div key={machine}>
+              <div className="tnode tn-machine" role="treeitem" aria-expanded={machineOpen}
+                tabIndex={0} onKeyDown={handleTreeKeyDown}
+                onClick={() => setClosedMachines((current) => { const next = new Set(current); next.has(machineKey) ? next.delete(machineKey) : next.add(machineKey); return next; })}>
+                <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={machineOpen} /></span>{machine}
+              </div>
+              {machineOpen && groups.map(([groupKey, group]) => {
+                const open = openTests.has(groupKey);
+                const rank = { none: -1, ok: 0, warn: 1, rej: 2 } as const;
+                const groupWorst = group.tests.reduce<TreeVerdict>((acc, s) => rank[latestOf(s)] > rank[acc] ? latestOf(s) : acc, 'none');
+                return (
+                  <div key={groupKey}>
+                    <div className={`tnode tn-test${open ? ' open' : ''}`} role="treeitem" aria-expanded={open}
+                      tabIndex={0} onKeyDown={handleTreeKeyDown}
+                      onClick={() => setOpenTests((s) => { const next = new Set(s); next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey); return next; })}>
+                      <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={open} /></span>{group.name}
+                      <span className={`tag ${groupWorst}`}>{TREE_STATE[groupWorst]}</span>
+                    </div>
+                    {open && group.tests.map((s) => {
+                      const state = latestOf(s);
+                      return (
+                        <div key={s.testId} className={`tnode tn-config${testId === s.testId ? ' on' : ''}`} role="treeitem"
+                          tabIndex={0} onKeyDown={handleTreeKeyDown}
+                          aria-current={testId === s.testId ? 'true' : 'false'} onClick={() => onSelect(s.testId)}>
+                          <span className="config-name">{s.testName}</span>
+                          <span className={`tag ${state}`}>{TREE_STATE[state]}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {open && group.tests.map((s) => {
-                    const state = latestOf(s);
-                    return (
-                      <div key={s.testId} className={`tnode tn-config${testId === s.testId ? ' on' : ''}`} role="treeitem"
-                        tabIndex={0} onKeyDown={handleTreeKeyDown}
-                        aria-current={testId === s.testId ? 'true' : 'false'} onClick={() => onSelect(s.testId)}>
-                        <span className="config-name">{s.testName}</span>
-                        <span className={`tag ${state}`}>{TREE_STATE[state]}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-          );
-        })}
-        {!tree.length && <div className="tree-empty">Không có xét nghiệm phù hợp.</div>}
+                );
+              })}
+            </div>
+            );
+          })}
+          {!tree.length && <div className="tree-empty">Không có xét nghiệm phù hợp.</div>}
+        </div>
       </div>
+      <ResizeHandle targetRef={treeRef} label="Độ rộng danh mục nội kiểm" value={width}
+        min={TREE_MIN_WIDTH} max={TREE_MAX_WIDTH} onResize={resizeTree} />
     </div>
   );
 });

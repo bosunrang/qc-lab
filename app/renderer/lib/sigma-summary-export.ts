@@ -14,7 +14,9 @@ export interface SigmaReportInput {
 
 type Zone = { label: string; fill: string; ink: string };
 
-function zone(value: number | null | undefined): Zone {
+/** Bậc Sigma kèm màu nền/chữ dạng ARGB. Bản in PDF (`sigma-print-report.ts`)
+ * dùng lại đúng các màu này để hai bản báo cáo tô cùng một bậc. */
+export function zone(value: number | null | undefined): Zone {
   if (!Number.isFinite(value)) return { label: 'Chưa đủ dữ liệu', fill: 'FFF2F7F4', ink: 'FF506674' };
   if (Number(value) >= 6) return { label: 'Đẳng cấp thế giới', fill: 'FF1F5C3A', ink: 'FFFFFFFF' };
   if (Number(value) >= 5) return { label: 'Xuất sắc', fill: 'FF5D926E', ink: 'FFFFFFFF' };
@@ -32,18 +34,25 @@ function columnName(index: number): string {
 }
 
 function numberOrBlank(value: number | null | undefined): number | '' { return Number.isFinite(value) ? Number(value) : ''; }
-function levelAt(period: SigmaPeriodView, level: number): SigmaLevelResult | undefined { return period.levels.find((item) => item.level === level); }
-function sigmaOf(level: SigmaLevelResult | undefined): number | null { return Number.isFinite(level?.sigma?.sigma) ? Number(level!.sigma!.sigma) : null; }
+export function levelAt(period: SigmaPeriodView, level: number): SigmaLevelResult | undefined { return period.levels.find((item) => item.level === level); }
+export function sigmaOf(level: SigmaLevelResult | undefined): number | null { return Number.isFinite(level?.sigma?.sigma) ? Number(level!.sigma!.sigma) : null; }
 function periodLabel(period: string): string { return /^\d{4}-\d{2}$/.test(period) ? `${period.slice(5, 7)}/${period.slice(0, 4)}` : period; }
 
-function teaText(period: SigmaPeriodView): string | number {
+export function teaText(period: SigmaPeriodView): string | number {
   const values = Array.from(new Set(period.levels.map((level) => level.tea).filter((tea): tea is number => Number.isFinite(tea))));
   return values.length === 1 ? values[0] : values.length > 1 ? 'Theo mức QC' : '—';
 }
 
-function qcDesign(level: SigmaLevelResult | undefined): string {
+export function qcDesign(level: SigmaLevelResult | undefined): string {
   return level?.qualityDesign ? `N=${level.qualityDesign.n}, R=${level.qualityDesign.r}` : '—';
 }
+
+/** Bảng "Giải thích bậc Sigma": một giá trị mẫu của mỗi bậc (để lấy nhãn và
+ * màu qua `zone()`) kèm khoảng Sigma. Excel và PDF cùng đọc danh sách này. */
+export const SIGMA_GRADE_LEGEND: ReadonlyArray<{ sample: number; range: string }> = [
+  { sample: 6, range: 'Sigma ≥ 6' }, { sample: 5, range: '5 ≤ Sigma < 6' }, { sample: 4, range: '4 ≤ Sigma < 5' },
+  { sample: 3, range: '3 ≤ Sigma < 4' }, { sample: 2, range: 'Sigma < 3' },
+];
 
 const LEVEL_COLORS = ['#0E4D4A', '#7A4F9A', '#C47D12', '#247C57'];
 const SIGMA_BOUNDS: Array<[number, string]> = [[2, '#C0362C'], [3, '#DD8B1F'], [4, '#B59A00'], [5, '#3F9A55'], [6, '#0E8F8F']];
@@ -51,13 +60,20 @@ const REPORT_TEAL = 'FF215968';
 // Hàng tiêu đề bảng và bảng chú thích theo màu xanh lam trong mẫu báo cáo.
 const SECTION_TEAL = 'FF31869B';
 
+/** Bề ngang biểu đồ Sigma theo số kỳ: mỗi kỳ khoảng 160px, từ 560 đến 1600px.
+ * Trước 06/11/2026 tối thiểu 960px nên một kỳ chỉ còn hai cột nhỏ giữa khung
+ * trống. Ảnh Excel và PDF cùng đọc con số này. */
+export function periodChartWidth(periodCount: number): number {
+  return Math.max(560, Math.min(1600, 160 * periodCount + 300));
+}
+
 /** Vẽ MỘT biểu đồ nhóm cho toàn bộ mức QC. Canvas được raster hoá 4× để ảnh
  * nhúng trong Excel vẫn rõ khi xem và in ở kích thước báo cáo. */
-function drawPeriodChart(periods: SigmaPeriodView[], levels: number[]): string | null {
+export function drawPeriodChart(periods: SigmaPeriodView[], levels: number[]): string | null {
   if (typeof document === 'undefined' || !periods.length) return null;
   const values = periods.flatMap((period) => levels.map((level) => sigmaOf(levelAt(period, level))).filter((value): value is number => value != null));
   if (!values.length) return null;
-  const width = Math.max(960, Math.min(1600, 160 * periods.length + 300));
+  const width = periodChartWidth(periods.length);
   const height = 420, left = 60, right = 28, top = 42, bottom = 62, renderScale = 4;
   const chartWidth = width - left - right, chartHeight = height - top - bottom;
   const maxSigma = Math.max(8, Math.ceil(Math.max(...values) * 1.08));
@@ -81,7 +97,7 @@ function drawPeriodChart(periods: SigmaPeriodView[], levels: number[]): string |
       const sigma = sigmaOf(levelAt(period, level)); if (sigma == null) return;
       const x = groupLeft + levelIndex * (barWidth + gap), barTop = y(sigma), color = LEVEL_COLORS[levelIndex % LEVEL_COLORS.length];
       context.fillStyle = color; context.fillRect(x, barTop, barWidth, y(0) - barTop);
-      context.fillStyle = '#173c25'; context.font = 'bold 11px Arial'; context.textAlign = 'center'; context.fillText(sigma.toFixed(2), x + barWidth / 2, barTop - 7);
+      context.fillStyle = '#173c25'; context.font = 'bold 11px Arial'; context.textAlign = 'center'; context.fillText(sigma.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), x + barWidth / 2, barTop - 7);
     });
     context.fillStyle = '#425750'; context.font = '10px Arial'; context.fillText(periodLabel(period.period), left + slot * index + slot / 2, height - bottom + 18);
   });
@@ -97,7 +113,7 @@ function drawPeriodChart(periods: SigmaPeriodView[], levels: number[]): string |
 }
 
 /** Dùng cùng tỷ lệ CV/TEa và |Bias|/TEa với biểu đồ MDC trong ứng dụng. */
-function drawMdcChart(periods: SigmaPeriodView[], levels: number[]): string | null {
+export function drawMdcChart(periods: SigmaPeriodView[], levels: number[]): string | null {
   if (typeof document === 'undefined') return null;
   const points = levels.flatMap((level, levelIndex) => periods.flatMap((period, periodIndex) => {
     const levelData = levelAt(period, level), ratios = levelData ? mdcRatios(levelData) : null;
@@ -122,8 +138,8 @@ function drawMdcChart(periods: SigmaPeriodView[], levels: number[]): string | nu
   context.scale(renderScale, renderScale); context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height);
   context.fillStyle = '#ffffff'; context.strokeStyle = '#dce3e9'; context.strokeRect(left, top, plotWidth, plotHeight);
   context.strokeStyle = '#e5ecef'; context.lineWidth = .7; context.fillStyle = '#70818d'; context.font = '10px Arial'; context.textAlign = 'right';
-  ticks(yAxis).forEach((value) => { const y = py(value); context.beginPath(); context.moveTo(left, y); context.lineTo(width - right, y); context.stroke(); context.fillText(String(value), left - 7, y + 3); });
-  context.textAlign = 'center'; ticks(xAxis).forEach((value) => context.fillText(String(value), px(value), height - bottom + 15));
+  ticks(yAxis).forEach((value) => { const y = py(value); context.beginPath(); context.moveTo(left, y); context.lineTo(width - right, y); context.stroke(); context.fillText(value.toLocaleString('vi-VN'), left - 7, y + 3); });
+  context.textAlign = 'center'; ticks(xAxis).forEach((value) => context.fillText(value.toLocaleString('vi-VN'), px(value), height - bottom + 15));
   context.save(); context.beginPath(); context.rect(left, top, plotWidth, plotHeight); context.clip();
   SIGMA_BOUNDS.forEach(([sigma, color]) => {
     const endX = Math.min(xAxis.max, 100 / sigma), endY = 100 - sigma * endX;
@@ -196,13 +212,13 @@ export async function exportSigmaReportXlsx(input: SigmaReportInput): Promise<st
     sheet.getCell(`A${legendStart}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: SECTION_TEAL } };
     sheet.getCell(`A${legendStart}`).alignment = { horizontal: 'center', vertical: 'middle' };
     sheet.getRow(legendStart).height = 22;
-    const legend = [['Đẳng cấp thế giới', 'Sigma ≥ 6'], ['Xuất sắc', '5 ≤ Sigma < 6'], ['Tốt', '4 ≤ Sigma < 5'], ['Cận biên', '3 ≤ Sigma < 4'], ['Không đạt', 'Sigma < 3']];
-    legend.forEach(([label, explanation], index) => {
+    const legend = SIGMA_GRADE_LEGEND;
+    legend.forEach(({ sample, range }, index) => {
       const row = legendStart + index + 1;
-      const grade = zone(index === 0 ? 6 : index === 1 ? 5 : index === 2 ? 4 : index === 3 ? 3 : 2);
+      const grade = zone(sample);
       sheet.mergeCells(row, 2, row, 3);
-      sheet.getCell(row, 1).value = label;
-      sheet.getCell(row, 2).value = explanation;
+      sheet.getCell(row, 1).value = grade.label;
+      sheet.getCell(row, 2).value = range;
       sheet.getRow(row).height = 22;
       for (let column = 1; column <= 3; column++) {
         const cell = sheet.getCell(row, column);
@@ -225,7 +241,7 @@ export async function exportSigmaReportXlsx(input: SigmaReportInput): Promise<st
       sheet.getCell(chartRow, 1).value = 'BIỂU ĐỒ SIGMA – SO SÁNH CÁC MỨC QC';
       sheet.getCell(chartRow, 1).font = { name: 'Arial', size: 10, bold: true, color: { argb: REPORT_TEAL } };
       const image = workbook.addImage({ base64: sigmaChart, extension: 'png' });
-      sheet.addImage(image, { tl: { col: 0, row: chartRow }, ext: { width: Math.max(960, Math.min(1600, 160 * periods.length + 300)), height: 420 } });
+      sheet.addImage(image, { tl: { col: 0, row: chartRow }, ext: { width: periodChartWidth(periods.length), height: 420 } });
       chartRow += 23;
     }
     const mdcChart = drawMdcChart(periods, levels);

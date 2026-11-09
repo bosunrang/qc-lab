@@ -599,6 +599,22 @@ export function QcMultiChart({ series, height = 220, responsiveHeight = false, c
   );
 }
 
+/** Vẽ "Levey-Jennings tổng hợp" ra ảnh PNG (data URL) để chèn vào bản in PDF.
+ * Dùng đúng `drawMulti()` của biểu đồ trên màn hình, vẽ ở độ phân giải gấp
+ * `scale` lần để bản in không nhoè: 1100 × 3 = 3300 điểm ảnh trải trên khoảng
+ * 277 mm bề ngang A4 nằm ngang, tức khoảng 300 DPI, ngưỡng in sắc nét. Bảng
+ * màu cố định nên ảnh luôn nền sáng, kể cả khi ứng dụng đang ở chế độ tối. */
+export function renderQcMultiChartPng(series: QcMultiLevelSeries[], width = 1100, height = 320, scale = 3): string | null {
+  const canvas = document.createElement('canvas');
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawMulti(ctx, width, height, series);
+  return canvas.toDataURL('image/png');
+}
+
 function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number, series: QcMultiLevelSeries[]) {
   const dates = Array.from(new Set(series.flatMap((s) => s.points.map(qcRunKey)))).sort(compareQcRunKey);
   const n = dates.length;

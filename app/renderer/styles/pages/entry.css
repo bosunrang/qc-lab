@@ -1,18 +1,24 @@
 
 
 .entrygrid{
-  display:grid; position:relative; grid-template-columns:auto minmax(0,1fr); gap:var(--space-4); align-items:start;
+  display:grid; position:relative; grid-template-columns:auto minmax(0,1fr); gap:var(--space-4) 0; align-items:start;
 }
 .entrygrid.tree-collapsed{grid-template-columns:minmax(0,1fr);}
-.entrygrid.tree-collapsed>.tree{display:none;}
+.entrygrid.tree-collapsed>.entry-tree-dock{display:none;}
 .entrygrid.tree-collapsed>.entry-tree-expand{display:inline-flex;}
 .entrygrid.tree-collapsed>.entry-main{grid-column:1;min-width:0;}
 .entrygrid.tree-collapsed .qc-sheet-heading{padding-left:56px;}
 
 /* ---- Cây danh mục nội kiểm ---- */
+/* Khung bọc ghim cây khi cuộn trang và đặt thanh kéo độ rộng (`ResizeHandle`)
+   sát mép phải cây; thanh kéo cao đúng bằng cây. Thanh kéo chiếm trọn
+   khoảng trống 16px giữa cây và bảng nhập (lưới không còn khoảng cách cột),
+   nên vạch kéo nằm chính giữa hai khối. */
+.entry-tree-dock{position:sticky; top:112px; align-self:start; display:flex; max-height:calc(100vh - 132px);}
+.entry-tree-dock>.resize-handle{width:var(--space-4);}
 .tree{
-  position:sticky; top:112px; max-height:calc(100vh - 132px); width:max-content; min-width:280px; max-width:min(440px,34vw); padding:0;
-  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; align-self:start;
+  max-height:calc(100vh - 132px); width:max-content; min-width:280px; max-width:min(440px,34vw); padding:0;
+  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
 }
 .entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-1-5) var(--space-2-5) var(--space-1-5) var(--space-3);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);}
 button.entry-tree-toggle,button.entry-tree-expand{width:28px;height:var(--control-h-sm);min-height:var(--control-h-sm);display:flex;align-items:center;justify-content:center;flex:none;padding:0;border:1px solid var(--accent-control-border);border-radius:var(--radius-md);background:var(--accent-control-surface);color:var(--accent-text);cursor:pointer;transition:var(--motion-fast) ease;}
@@ -138,8 +144,11 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 
 .qc-table-card,.tree,.lj-mini{
   border:1px solid var(--surface-border);border-radius:var(--radius-md);
-  box-shadow:var(--panel-shadow);overflow:hidden;background:var(--surface);
+  box-shadow:var(--panel-shadow);background:var(--surface);
 }
+/* Không gộp `.tree` vào đây: cây tự cuộn dọc (`overflow-y:auto` ở đầu tệp),
+   `overflow:hidden` đặt sau sẽ đè mất thanh cuộn khi danh mục dài. */
+.qc-table-card,.lj-mini{overflow:hidden;}
 
 /* Header phụ dùng chung lấy chiều cao từ token để các khối bảng, biểu đồ và
    cây danh mục có cùng nhịp dọc. */

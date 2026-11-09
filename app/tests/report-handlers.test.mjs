@@ -23,6 +23,7 @@ const DEFAULT_FORMS = {
   sigma: { formCode: 'BM-SS-01', version: '1.0', effectiveDate: '' },
   reagent: { formCode: 'BM-HC-01', version: '1.0', effectiveDate: '' },
   review: { formCode: 'BM-XX-01', version: '1.0', effectiveDate: '' },
+  eqa: { formCode: 'BM-NGK-01', version: '1.0', effectiveDate: '' },
 };
 assert.deepEqual(report.getReportTemplateSettings(), DEFAULT_FORMS);
 assert.equal(report.saveReportTemplateSettings({ data: { kind: 'sigma', formCode: 'BM-SS-02', version: '2.0' } }, { ...actor, role: 'staff' }).ok, false);
@@ -131,7 +132,7 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
 
   // Khoảng ngày đảo ngược bị chặn ở nút xuất, kèm giải thích.
   assert.match(page, /const rangeInvalid = !!start && !!end && start > end;/);
-  assert.match(page, /const disabled = !matched\.length \|\| busy \|\| rangeInvalid;/);
+  assert.match(page, /const disabled = !summaries\.length \|\| busy \|\| rangeInvalid;/);
   assert.match(page, /Biểu mẫu báo cáo PDF/);
   assert.match(page, /Mã biểu mẫu/);
   assert.match(page, /Phiên bản/);

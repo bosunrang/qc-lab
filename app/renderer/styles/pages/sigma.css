@@ -5,7 +5,7 @@
 .sg-top-grid>.panel{min-width:0;}
 /* Rule riêng của Sigma nằm trong file này; `pages.css` chỉ giữ phần dùng chung. */
 .sg-control-row>.sg-test-picker{flex:1 1 360px;max-width:420px;}
-.sg-sigma-input-note{width:calc(100% - 32px);margin:var(--space-2-5) var(--space-4) var(--space-4);}.sg-sigma-note-list{display:grid;gap:var(--space-1);min-width:0;}.sg-sigma-note-list p,.sg-sigma-note-list ul{margin:0;}.sg-sigma-note-list ul{display:grid;gap:var(--space-1);padding-left:var(--space-3);}
+.sg-sigma-input-note{width:calc(100% - var(--space-4) * 2);margin:var(--panel-content-gap) var(--space-4) var(--space-4);}.sg-sigma-note-list{display:grid;gap:var(--space-1);min-width:0;}.sg-sigma-note-list p,.sg-sigma-note-list ul{margin:0;}.sg-sigma-note-list ul{display:grid;gap:var(--space-1);padding-left:var(--space-3);}
 .sg-improvement-lead{margin:var(--space-1) 0;}.sg-improvement-target{margin-bottom:var(--space-1);}
 .sg-cell-meta{margin-top:var(--space-1);color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-heading);}
 .sg-data-foot{display:flex;justify-content:flex-start;gap:var(--space-2);flex-wrap:wrap;padding:var(--space-2) var(--space-4);border-top:1px solid var(--border-subtle);}
@@ -15,8 +15,6 @@
 .sigma-page>.panel>h2.panel-title:first-child{color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
 .sg-setup-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2-5);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--panel-header-px);color:var(--text-primary);background:var(--surface-section-header);}
 .sg-setup-heading h2{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
-.sg-setup-search{flex:0 1 280px;min-width:180px;}
-.sg-setup-search input[type="search"]{box-sizing:border-box;width:100%;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-2);font-size:var(--text-sm);}
 /* `.panel` không có padding để dải tiêu đề chạm hai mép. Phần thân của
    "Tình trạng" tự giữ cùng gutter 16px với thẻ
    Sigma bên dưới; nếu không hint và cảnh báo sẽ dính thẳng vào viền panel. */

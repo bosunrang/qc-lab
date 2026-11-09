@@ -18,6 +18,11 @@ import { PrintIcon } from '../../components/PrintIcon';
 import type { QcReviewConclusion } from '../../../shared/qc-api';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+/** Giải thích hiện khi rê chuột lên tiêu đề cột, thay cho đoạn chú thích dưới bảng. */
+const HEADER_HINTS: Record<string, string> = {
+  'Dùng TK': 'Số kết quả dùng thống kê: đã đánh giá Westgard và không thuộc lần chạy bị loại. Mean, SD, CV tính trên các kết quả này.',
+  'Dịch (SD)': 'Dịch (SD) = (Mean − Mean đích) / SD đích.',
+};
 
 export function MonthlyReviewPanel() {
   const { review, reviewLoading, loadReview, signReview } = useReportStore(useShallow((s) => ({ review: s.review, reviewLoading: s.reviewLoading, loadReview: s.loadReview, signReview: s.signReview })));
@@ -85,7 +90,7 @@ export function MonthlyReviewPanel() {
           {shown.open_items && <div className="alert warn" role="status">Việc còn tồn: {shown.open_items}</div>}
           <div className="monthly-review-table-wrap">
             <table className="monthly-review-table">
-              <thead><tr>{REVIEW_HEADERS.map((header) => <th key={header}>{header}</th>)}</tr></thead>
+              <thead><tr>{REVIEW_HEADERS.map((header) => <th key={header} title={HEADER_HINTS[header]}>{header}</th>)}</tr></thead>
               <tbody>
                 {shown.rows.length ? shown.rows.map((row) => (
                   <tr key={`${row.test_id}|${row.level}|${row.lot}`}>{reviewRowCells(row).map((cell, i) => <td key={i} className={i >= 4 ? 'num' : undefined}>{cell}</td>)}</tr>
@@ -93,15 +98,14 @@ export function MonthlyReviewPanel() {
               </tbody>
             </table>
           </div>
-          <p className="hint">Mean, SD, CV tính trên kết quả dùng thống kê. Dịch (SD) = (Mean − Mean đích) / SD đích. Dấu * là Mean/SD đích đổi trong tháng. Tiêu chí đánh giá theo SOP của phòng xét nghiệm.</p>
+          {shown.rows.some((row) => row.target_changed) && <p className="hint">* Mean/SD đích đổi trong tháng.</p>}
           {shown.nce.length > 0 && <p className="hint">Hồ sơ NCE trong tháng: {shown.nce.map((row) => `${row.nce_id} (${row.test_name}, ${nceStatusText(row.status)})`).join('; ')}.</p>}
 
           <div className="monthly-review-sign">
-            <div className={`alert${latest ? ' ok' : ''}`} role="status">
-              {latest
-                ? <>Đã ký: <b>{REVIEW_CONCLUSION_LABELS[latest.conclusion]}</b>{latest.note ? ` — ${latest.note}` : ''} · {latest.reviewer_name} · {dateTimeText(latest.reviewed_at)}{shown.signatures.length > 1 ? ` · ký ${shown.signatures.length} lần` : ''}</>
-                : `Tháng ${monthLabel(ym)} chưa có biên bản xem xét.`}
-            </div>
+            {/* Đã ký: hộp xanh. Chưa ký: dòng chữ thường, thẳng lề với bảng và ô "Kết luận". */}
+            {latest
+              ? <div className="alert ok" role="status">Đã ký: <b>{REVIEW_CONCLUSION_LABELS[latest.conclusion]}</b>{latest.note ? ` — ${latest.note}` : ''} · {latest.reviewer_name} · {dateTimeText(latest.reviewed_at)}{shown.signatures.length > 1 ? ` · ký ${shown.signatures.length} lần` : ''}</div>
+              : <p className="monthly-review-status" role="status">Tháng {monthLabel(ym)} chưa có biên bản xem xét{canSign ? '' : ' (cần quyền cấu hình tiêu chí QC để ký)'}.</p>}
             {canSign ? (
               <div className="monthly-review-sign-form">
                 <div className="field">
@@ -116,7 +120,7 @@ export function MonthlyReviewPanel() {
                 </div>
                 <div className="report-lock-action"><button className="btn teal" disabled={busy || ym > thisMonth} onClick={() => void sign()}>{latest ? 'Ký lại' : 'Ký xem xét'}</button></div>
               </div>
-            ) : <p className="hint">Cần quyền cấu hình tiêu chí QC để ký xem xét.</p>}
+            ) : null}
           </div>
         </>}
       </div>
