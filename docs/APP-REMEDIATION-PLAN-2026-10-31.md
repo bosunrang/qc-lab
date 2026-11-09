@@ -102,7 +102,10 @@ GV2 và GV4 cùng chạm luồng Westgard/nhập điểm với GV1 nên đi sau 
   (2) phòng xét nghiệm thường cấu hình luật trước rồi mới nhập dữ liệu cũ — bộ thẩm
   định làm đúng như vậy và hỏng toàn bộ khi thử mốc theo ngày.
 - Không chặn theo kỳ đã khoá: không lần chạy đã có nào đổi kết luận, nên kỳ đã khoá
-  không bị chạm.
+  không bị chạm. Điều này chỉ đúng khi đổi LUẬT. Đổi DỮ LIỆU (huỷ điểm, nhập lùi
+  ngày) vẫn đổi được kết luận lần chạy khác, nên ngày 09/11/2026 đã thêm cổng
+  riêng: chặn khi chạm kỳ đã khoá, đòi lý do khi đổi trạng thái loại bỏ (N26–N28,
+  `docs/APP-REVIEW-2026-11-09.md`).
 - `evaluateQcSets()` vẫn là nguồn duy nhất, không lưu kết luận: với mỗi phiên bản,
   engine chạy trên chuỗi tới lần chạy cuối của phiên bản đó và chỉ lấy kết luận cho
   lần chạy thuộc phiên bản. Không đổi chữ ký `isOn`/`actionOf` của engine như dự

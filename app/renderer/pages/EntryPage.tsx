@@ -16,8 +16,9 @@ import { canWrite, isAdmin } from '../lib/permissions';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import { confirmDialog } from '../state/dialog-store';
+import { confirmDialog, reasonDialog } from '../state/dialog-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
+import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
 import type { QcChartPoint } from '../components/QcChart';
 import type { QcPointView, TestLevel } from '../../shared/qc-api';
 import { createOperationalCatalog } from './entry/operational';
@@ -265,7 +266,22 @@ export function EntryPage() {
       );
       if (!confirmed) return false;
     }
-    const result = await addPoint({ testId, level: column.level, date, val, runId, lotNo: column.parallel ? column.lot : undefined });
+    const input = { testId, level: column.level, date, val, runId, lotNo: column.parallel ? column.lot : undefined };
+    let result = await addPoint(input);
+    // N27: điểm nhập lùi ngày làm đổi trạng thái loại bỏ của lần chạy đã có —
+    // main đã huỷ phần ghi và nói rõ lần chạy nào; hỏi lý do rồi gửi lại.
+    if (!result.ok && result.error.code === 'retro-reason-required') {
+      const retroReason = await reasonDialog({
+        title: 'Điểm này đổi kết luận lần chạy đã có',
+        message: result.error.message,
+        label: 'Lý do nhập điểm',
+        minLength: RETRO_REASON_MIN,
+        confirmLabel: 'Lưu điểm',
+        placeholder: 'VD: Bổ sung kết quả chạy ngày 05/10 bị sót, đối chiếu sổ máy…',
+      });
+      if (retroReason == null) return false;
+      result = await addPoint({ ...input, retroReason });
+    }
     if (!result.ok) {
       setPointErr(result.error.message);
       setPointFeedback(null);
@@ -275,11 +291,15 @@ export function EntryPage() {
     setVoidMsg(null);
     const rules = result.data.rules.join(', ');
     const lotSuffix = column.parallel ? ` · lô song song ${column.lot}` : '';
+    // Lần chạy khác đổi kết luận (kể cả chỉ Đạt ↔ Cảnh báo) phải hiện ra, không
+    // chỉ nằm trong nhật ký.
+    const retro = result.data.retroChanges.length ? ` Đổi kết luận lần chạy khác: ${describeRunChanges(result.data.retroChanges)}.` : '';
+    const retroRejects = result.data.retroChanges.some(flipsRejection);
     setPointFeedback(result.data.verdict === 'rej'
-      ? { kind: 'rej', message: `⚠ Mức ${column.level}${lotSuffix} vi phạm${rules ? ` — ${rules}` : ''}` }
-      : result.data.verdict === 'warn'
-        ? { kind: 'warn', message: `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}` }
-        : { kind: 'ok', message: `✓ Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.` });
+      ? { kind: 'rej', message: `⚠ Mức ${column.level}${lotSuffix} vi phạm${rules ? ` — ${rules}` : ''}${retro}` }
+      : result.data.verdict === 'warn' || retroRejects
+        ? { kind: 'warn', message: `${result.data.verdict === 'warn' ? `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}.` : `Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.`}${retro}` }
+        : { kind: 'ok', message: `✓ Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.${retro}` });
     return true;
   }, [testId, decimals, addPoint]);
 

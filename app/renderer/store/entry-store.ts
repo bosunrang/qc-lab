@@ -5,7 +5,7 @@
 // gọi `westgard:analyzeLevel` (đã có sẵn từ module Westgard) để lấy z-score/
 // CUSUM cho `<QcChart>`, không tính lại ở renderer.
 import { create } from 'zustand';
-import type { QcPointView, LevelAnalysis, IpcResult, RangeCandidateView, ParallelEntryColumn, PreviousLotSeries, VoidedQcPointView } from '../../shared/qc-api';
+import type { QcPointView, LevelAnalysis, IpcResult, RangeCandidateView, ParallelEntryColumn, PreviousLotSeries, VoidedQcPointView, QcRunConclusionChange } from '../../shared/qc-api';
 
 let rangeRequestSerial = 0;
 let dataRequestSerial = 0;
@@ -21,11 +21,11 @@ interface EntryState {
   rangeError: string | null;
   loadTestData: (testId: string, levels: number[]) => Promise<void>;
   resetTestData: () => void;
-  addPoint: (data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string }) => Promise<IpcResult<QcPointView>>;
+  addPoint: (data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string; retroReason?: string }) => Promise<IpcResult<QcPointView & { retroChanges: QcRunConclusionChange[] }>>;
   setDayNote: (testId: string, date: string, note: string) => Promise<IpcResult<{ note: string; updated: number }>>;
   voidPoint: (
     pointId: string, reason: string, kind: 'analytical' | 'data-entry' | 'other', openNce: boolean,
-  ) => Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }>>;
+  ) => Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] }>>;
   loadRangeCandidate: (testId: string, level: number) => Promise<void>;
   applyLabRange: (testId: string, level: number, reason: string, causeConfirmed?: boolean, bias?: number, mean?: number, sd?: number) => Promise<IpcResult<RangeCandidateView>>;
   revertManufacturerRange: (testId: string, level: number, reason: string) => Promise<IpcResult<RangeCandidateView>>;

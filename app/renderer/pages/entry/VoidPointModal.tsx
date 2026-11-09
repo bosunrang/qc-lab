@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useEntryStore } from '../../store/entry-store';
 import { voidNceChoice, voidReasonMinimum, type VoidKind } from '../../../main/domain/entry-validation';
+import { describeRunChanges, RETRO_REASON_MIN } from '../../../main/domain/run-conclusion-change';
 import { formatQcValue, vnDate } from './shared';
 import type { QcPointView } from '../../../shared/qc-api';
 import { AsyncButton } from '../../components/AsyncButton';
@@ -23,20 +24,28 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   const [voidOpenNce, setVoidOpenNce] = useState(true);
   const [voidReason, setVoidReason] = useState('');
   const [voidErr, setVoidErr] = useState<string | null>(null);
+  // Main báo huỷ điểm này đổi trạng thái loại bỏ của lần chạy KHÁC (N26): từ
+  // đó lý do là bắt buộc, kể cả với loại "Nhập sai dữ liệu".
+  const [retroRequired, setRetroRequired] = useState(false);
   const voidChoice = voidNceChoice(voidKind);
   // Điểm thuộc lần chạy bị loại cần lý do với mọi loại huỷ (N4); main kiểm lại.
   const runRejected = point.verdict === 'rej' || (point.runRejectedBy?.length ?? 0) > 0;
-  const reasonMin = voidReasonMinimum(voidKind, runRejected);
+  const reasonMin = Math.max(voidReasonMinimum(voidKind, runRejected), retroRequired ? RETRO_REASON_MIN : 0);
 
   async function submitVoid() {
     if (voidReason.trim().length < reasonMin) { setVoidErr(`Cần ghi lý do huỷ tối thiểu ${reasonMin} ký tự.`); return; }
     const openNce = voidChoice.forced ? voidChoice.openNce : voidOpenNce;
     const result = await voidPoint(point.id, voidReason.trim(), voidKind, openNce);
-    if (!result.ok) { setVoidErr(result.error.message); return; }
+    if (!result.ok) {
+      if (result.error.code === 'reason-required-retro') setRetroRequired(true);
+      setVoidErr(result.error.message);
+      return;
+    }
     const followup = result.data.nceId
       ? (result.data.reusedAction ? ' Đã giữ liên kết với hồ sơ NCE đang mở.' : ` Đã mở hồ sơ ${result.data.nceId} để tiếp tục điều tra.`)
       : ' Không yêu cầu NCE/QC chạy lại.';
-    onVoided(`Đã huỷ điểm QC ngày ${vnDate(point.date)}. Điểm không còn tham gia tính toán.${followup}`);
+    const retro = result.data.retroChanges.length ? ` Đổi kết luận lần chạy khác: ${describeRunChanges(result.data.retroChanges)}.` : '';
+    onVoided(`Đã huỷ điểm QC ngày ${vnDate(point.date)}. Điểm không còn tham gia tính toán.${followup}${retro}`);
   }
 
   return (

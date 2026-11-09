@@ -33,6 +33,18 @@ import { previousLotsOf } from './previous-lot-cache';
 import { activeEvaluationOf } from './active-evaluation';
 import { operationalTeaResolver } from '../db/operational-tea';
 import { listParallelColumns as listParallelColumnsOf, pointsForLot as pointsForLotOf } from './parallel-columns';
+import { changedRunConclusions, describeRunChanges, flipsRejection, retroChangeError, runConclusions, type QcRunConclusionChange } from '../domain/run-conclusion-change';
+
+/** Phần ghi trong transaction làm đổi kết luận lần chạy khác mà không qua
+ * được cổng (`retroChangeError()`): ném ra để huỷ phần đã ghi, handler bắt
+ * lại và trả đúng lỗi nghiệp vụ. */
+class RetroChangeBlocked extends Error {
+  readonly error: { code: string; message: string };
+  constructor(error: { code: string; message: string }) {
+    super(error.code);
+    this.error = error;
+  }
+}
 
 export interface RangeCandidateView {
   testId: string; level: number; lot: string; source: 'mfg' | 'lab';
@@ -121,7 +133,18 @@ export function createEntryHandlers(db: Db) {
    * ghi đè riêng xét nghiệm, xem `makeIsOnLayered()`) — CÙNG một hàm isOn mà
    * trang Westgard dùng, để verdict không lệch nhau giữa hai trang. */
   function queryPoints(testId: string, level: number): QcPointView[] {
-    const active = activeEvaluation(testId), selected = active.levels.find((item) => item.level === level);
+    return pointViewsOf(activeEvaluation(testId), level);
+  }
+
+  /** Kết luận theo lần chạy của tập đang vận hành. Gọi trước phần ghi và sau
+   * phần ghi (trong transaction, `activeEvaluationOf()` không giữ kết quả
+   * giữa transaction) để biết lần chạy KHÁC nào đổi kết luận (N26–N28). */
+  function runConclusionsOf(active: ReturnType<typeof activeEvaluation>) {
+    return runConclusions(active.levels, active.byPoint);
+  }
+
+  function pointViewsOf(active: ReturnType<typeof activeEvaluation>, level: number): QcPointView[] {
+    const selected = active.levels.find((item) => item.level === level);
     if (!selected) return [];
     // `accepted`/`runRejectedBy` đi kèm verdict NGAY TỪ ĐÂY. Trước đó chỉ
     // `analyzeLevel()` biết một điểm có vào thống kê hay không, nên thẻ Nhập
@@ -300,12 +323,12 @@ export function createEntryHandlers(db: Db) {
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   });
 
-  const addPoint = writeCommand(db, 'addPoint', 'write', (w, input: { data: QcPointInput }): IpcResult<QcPointView> => {
+  const addPoint = writeCommand(db, 'addPoint', 'write', (w, input: { data: QcPointInput }): IpcResult<QcPointView & { retroChanges: QcRunConclusionChange[] }> => {
     const actor = w.actor;
     const knownLevels = (db.prepare('SELECT level FROM test_levels WHERE test_id=?').all(String(input.data.testId || '')) as { level: number }[]).map(r => r.level);
     const result = validateQcPointInput(input.data, knownLevels);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const { testId, level, date, val, runId, lotNo, note, operatorName } = result.data;
+    const { testId, level, date, val, runId, lotNo, note, operatorName, retroReason } = result.data;
     const test = db.prepare('SELECT name, decimal_places FROM tests WHERE id=?').get(testId) as { name: string; decimal_places: number } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể nhập thêm điểm QC.` } };
@@ -354,7 +377,10 @@ export function createEntryHandlers(db: Db) {
     // ngày, nên điểm MỚI thêm phải mang đúng ghi chú đó thay vì để trống.
     const dayNoteRow = db.prepare('SELECT note FROM qc_points WHERE test_id=? AND date=? AND voided=0 AND note<>\'\' LIMIT 1').get(testId, date) as { note: string } | undefined;
     const id = uid();
-    let view: QcPointView | undefined;
+    // Kết luận theo lần chạy TRƯỚC khi ghi (N27). Lô song song được đánh giá
+    // riêng, không đổi kết luận của tập đang vận hành.
+    const runsBefore = parallel ? null : runConclusionsOf(activeEvaluation(testId));
+    let view: (QcPointView & { retroChanges: QcRunConclusionChange[] }) | undefined;
     try {
       view = w.commit((tx) => {
         const savedInitials = (db.prepare('SELECT initials FROM users WHERE id=?').get(actor.userId) as { initials: string } | undefined)?.initials || '';
@@ -362,16 +388,27 @@ export function createEntryHandlers(db: Db) {
         db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,lot,val,value_decimals,qc_mean,qc_sd,note,operator_id,operator_username,operator_name,operator_code)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(id, testId, level, date, runId, targetLot, val, test.decimal_places ?? 2, targetMean, targetSd, note || dayNoteRow?.note || '', actor.userId, actor.username, operatorName || actor.name, operatorCode);
-        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}${datedTarget?.fromHistory ? ` · Mean/SD hiệu lực ngày chạy ${targetMean}/${targetSd}` : ''}`, test.name);
+        // N27: luật nhiều lần chạy nhìn lại lần chạy trước, nên điểm nhập lùi
+        // ngày đổi được kết luận của lần chạy SAU nó đã có. Lần chạy của chính
+        // điểm này bỏ qua: nhập dần từng mức của một lần chạy là bình thường.
+        const active = parallel ? null : activeEvaluation(testId);
+        const retroChanges = runsBefore && active ? changedRunConclusions(runsBefore, runConclusionsOf(active), new Set([qcRunKey({ date, runId })])) : [];
+        const gate = retroChangeError(retroChanges, isPeriodLocked, retroReason, 'Nhập điểm này', 'retro-reason-required');
+        if (gate) throw new RetroChangeBlocked(gate);
+        const retroNote = retroChanges.length
+          ? ` · Đổi kết luận lần chạy khác: ${describeRunChanges(retroChanges)}${retroReason ? ` · Lý do: ${retroReason}` : ''}`
+          : '';
+        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}${datedTarget?.fromHistory ? ` · Mean/SD hiệu lực ngày chạy ${targetMean}/${targetSd}` : ''}${retroNote}`, test.name);
         // Điểm mới chỉ vào đúng `targetLot`: bộ nhớ đệm lô cũ giữ nguyên.
         tx.changed(['qc_points'], [testId], [targetLot]);
-        const pointView = parallel
-          ? listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id)
-          : queryPoints(testId, level).find((point) => point.id === id);
+        const pointView = active
+          ? pointViewsOf(active, level).find((point) => point.id === id)
+          : listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id);
         if (!pointView) throw new Error('point-view-missing');
-        return pointView;
+        return { ...pointView, retroChanges };
       });
     } catch (error) {
+      if (error instanceof RetroChangeBlocked) return { ok: false, error: error.error };
       if (error instanceof Error && error.message === 'point-view-missing') {
         return { ok: false, error: { code: 'point-view-missing', message: 'Không thể dựng kết quả đánh giá nên điểm chưa được lưu.' } };
       }
@@ -382,7 +419,7 @@ export function createEntryHandlers(db: Db) {
 
   /** Huỷ điểm QC. "kind" (nguyên nhân huỷ) quyết định có tự mở/dùng lại hồ
    * sơ NCE hay không (`voidNceChoice()`). */
-  const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }> => {
+  const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] }> => {
     const actor = w.actor;
     const result = validateVoidInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
@@ -395,7 +432,9 @@ export function createEntryHandlers(db: Db) {
     const test = db.prepare('SELECT name, decimal_places FROM tests WHERE id=?').get(point.test_id) as { name: string; decimal_places: number } | undefined;
     // Luật/loại sai số của CHÍNH điểm này — đọc TRƯỚC khi đánh dấu huỷ, vì
     // queryPoints() chỉ tính verdict cho điểm CHƯA huỷ (voided=0).
-    const currentView = queryPoints(point.test_id, point.level).find(p => p.id === pointId);
+    const activeBefore = activeEvaluation(point.test_id);
+    const runsBefore = runConclusionsOf(activeBefore);
+    const currentView = pointViewsOf(activeBefore, point.level).find(p => p.id === pointId);
     const parallelView = listParallelColumns(point.test_id).flatMap((column) => column.points).find((p) => p.id === pointId);
     let view = currentView || parallelView;
     if (!view) {
@@ -432,36 +471,56 @@ export function createEntryHandlers(db: Db) {
       snapshot = { ...taken, points: taken.points.map((p) => p.pointId === pointId && p.verdict === 'none' && view
         ? { ...p, verdict: view.verdict, rules: Array.from(new Set(view.rules)) } : p) };
     }
-    const mutation = w.commit((tx) => {
-      db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=?, void_rejection_json=? WHERE id=?')
-        .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, rejectionJson, pointId);
-      const rejectionNote = runRejected
-        ? ` · Thuộc lần chạy ${point.run_id || '(không mã)'} bị loại${view?.rules.length ? ` (luật ${view.rules.join(', ')})` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
-        : '';
-      tx.audit('Huỷ điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}${rejectionNote}`, test ? test.name : '');
-      let nceId: string | null = null, reusedAction = false, createdAction = false;
-      if (openNce && existingNce) { nceId = existingNce.nce_id; reusedAction = true; }
-      else if (openNce && snapshot) {
-        const id = uid(), now = nowIso(), today = isoLocalDate();
-        nceId = nextNceId(db, today);
-        const label = `Huỷ điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}`;
-        // Người huỷ là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
-        // tự mở không còn lọt khỏi cảnh báo quá hạn (sửa R-11). Có giữ kết quả
-        // hay không thì chưa biết, phải ghi trước khi cho chạy lại.
-        insertNceRecord(db, {
-          id, nceId, source: 'iqc', phase: 'exam', testId: point.test_id, detectedAt: today,
-          description: `${label}. Lý do: ${composedReason}`, correction: `${label}. Lý do: ${composedReason}`, holdResults: null,
-          ownerUserId: actor.userId, dueDate: defaultNceDueDate(today, '', readNceConfig(db)),
-          errorClass: nceErrorClass([{ role: 'trigger', snapshot }]), checklistJson: JSON.stringify(emptyChecklist('iqc')),
-        }, actor, now);
-        insertNceRun(db, id, 'trigger', snapshot, actor, now);
-        tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ huỷ điểm QC`, test ? test.name : '');
-        createdAction = true;
-      }
-      tx.changed(createdAction ? ['qc_points', 'nce_records'] : ['qc_points'], [point.test_id]);
-      return { nceId, reusedAction };
-    });
-    return { ok: true, data: { id: pointId, nceId: mutation.nceId, reusedAction: mutation.reusedAction } };
+    let mutation: { nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] };
+    try {
+      mutation = w.commit((tx) => {
+        db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=?, void_rejection_json=? WHERE id=?')
+          .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, rejectionJson, pointId);
+        // N26/N28: điểm bị huỷ có thể là "bằng chứng" của luật nhiều lần chạy ở
+        // lần chạy SAU (hoặc huỷ nó nối ra chuỗi 4-1s/10x mới). Đổi trạng thái
+        // loại bỏ của lần chạy khác cần lý do như N4 và giữ lại bằng chứng; chạm
+        // kỳ đã khoá thì chặn.
+        const retroChanges = changedRunConclusions(runsBefore, runConclusionsOf(activeEvaluation(point.test_id)), new Set([qcRunKey({ date: point.date, runId: point.run_id })]));
+        const gate = retroChangeError(retroChanges, isPeriodLocked, reason, 'Huỷ điểm này', 'reason-required-retro');
+        if (gate) throw new RetroChangeBlocked(gate);
+        const affectedRuns = retroChanges.filter(flipsRejection);
+        if (affectedRuns.length) {
+          // Biên bản tháng đếm điểm huỷ mang bằng chứng loại bỏ qua cột này.
+          db.prepare('UPDATE qc_points SET void_rejection_json=? WHERE id=?')
+            .run(JSON.stringify({ rules: view?.rules ?? [], rejectedLevels, affectedRuns }), pointId);
+        }
+        const rejectionNote = runRejected
+          ? ` · Thuộc lần chạy ${point.run_id || '(không mã)'} bị loại${view?.rules.length ? ` (luật ${view.rules.join(', ')})` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
+          : '';
+        const retroNote = retroChanges.length ? ` · Đổi kết luận lần chạy khác: ${describeRunChanges(retroChanges)}` : '';
+        tx.audit('Huỷ điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}${rejectionNote}${retroNote}`, test ? test.name : '');
+        let nceId: string | null = null, reusedAction = false, createdAction = false;
+        if (openNce && existingNce) { nceId = existingNce.nce_id; reusedAction = true; }
+        else if (openNce && snapshot) {
+          const id = uid(), now = nowIso(), today = isoLocalDate();
+          nceId = nextNceId(db, today);
+          const label = `Huỷ điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}`;
+          // Người huỷ là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
+          // tự mở không còn lọt khỏi cảnh báo quá hạn (sửa R-11). Có giữ kết quả
+          // hay không thì chưa biết, phải ghi trước khi cho chạy lại.
+          insertNceRecord(db, {
+            id, nceId, source: 'iqc', phase: 'exam', testId: point.test_id, detectedAt: today,
+            description: `${label}. Lý do: ${composedReason}`, correction: `${label}. Lý do: ${composedReason}`, holdResults: null,
+            ownerUserId: actor.userId, dueDate: defaultNceDueDate(today, '', readNceConfig(db)),
+            errorClass: nceErrorClass([{ role: 'trigger', snapshot }]), checklistJson: JSON.stringify(emptyChecklist('iqc')),
+          }, actor, now);
+          insertNceRun(db, id, 'trigger', snapshot, actor, now);
+          tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ huỷ điểm QC`, test ? test.name : '');
+          createdAction = true;
+        }
+        tx.changed(createdAction ? ['qc_points', 'nce_records'] : ['qc_points'], [point.test_id]);
+        return { nceId, reusedAction, retroChanges };
+      });
+    } catch (error) {
+      if (error instanceof RetroChangeBlocked) return { ok: false, error: error.error };
+      throw error;
+    }
+    return { ok: true, data: { id: pointId, ...mutation } };
   });
 
   /** Ghi chú theo ngày (cột "Ghi chú" của bảng nhập QC). Không có bảng riêng;

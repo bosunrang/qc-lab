@@ -12,13 +12,17 @@ export interface ReauthOptions { title?: string; message?: string }
  * lô. Trả `key` của nút được bấm, `null` nếu người dùng huỷ. */
 export interface ChoiceOption { key: string; label: string; variant?: 'teal' | 'ghost' | 'danger'; hint?: string }
 export interface ChoiceOptions { title?: string; message: string; options: ChoiceOption[]; cancelLabel?: string }
+/** Hỏi một lý do bằng chữ trước khi làm tiếp (vd nhập lùi ngày làm đổi kết
+ * luận lần chạy đã có). Trả lý do đã cắt khoảng trắng, `null` nếu huỷ. */
+export interface ReasonOptions { title?: string; message: string; label?: string; minLength: number; confirmLabel?: string; placeholder?: string }
 
 type DialogState =
   | { kind: 'none' }
   | { kind: 'confirm'; opts: ConfirmOptions; resolve: (v: boolean) => void }
   | { kind: 'info'; message: string; opts: InfoOptions; resolve: () => void }
   | { kind: 'reauth'; opts: ReauthOptions; resolve: (v: boolean) => void }
-  | { kind: 'choice'; opts: ChoiceOptions; resolve: (v: string | null) => void };
+  | { kind: 'choice'; opts: ChoiceOptions; resolve: (v: string | null) => void }
+  | { kind: 'reason'; opts: ReasonOptions; resolve: (v: string | null) => void };
 
 interface DialogStoreShape { dialog: DialogState }
 
@@ -57,6 +61,12 @@ export function reauthDialog(opts: ReauthOptions = {}): Promise<boolean> {
 export function choiceDialog(opts: ChoiceOptions): Promise<string | null> {
   return new Promise((resolve) => {
     dialogStore.setState({ dialog: { kind: 'choice', opts, resolve } });
+  });
+}
+
+export function reasonDialog(opts: ReasonOptions): Promise<string | null> {
+  return new Promise((resolve) => {
+    dialogStore.setState({ dialog: { kind: 'reason', opts, resolve } });
   });
 }
 

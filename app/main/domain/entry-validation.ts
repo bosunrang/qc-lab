@@ -20,6 +20,9 @@ export interface QcPointInput {
   lotNo?: unknown;
   note?: unknown;
   operatorName?: unknown;
+  /** Lý do khi điểm làm đổi trạng thái loại bỏ của lần chạy đã có (nhập lùi
+   * ngày, N27). Chỉ main biết có cần hay không — sau khi đánh giá lại chuỗi. */
+  retroReason?: unknown;
 }
 
 export interface PreparedQcPoint {
@@ -31,6 +34,7 @@ export interface PreparedQcPoint {
   lotNo: string;
   note: string;
   operatorName: string;
+  retroReason: string;
 }
 
 export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
@@ -79,7 +83,7 @@ export function validateQcPointInput(input: QcPointInput, knownLevels: readonly 
   const runId = cleanText(input.runId, 120).trim() || `${date}-1`;
   return {
     ok: true,
-    data: { testId, level, date, val, runId, lotNo: cleanText(input.lotNo, 80).trim(), note: cleanText(input.note, 1000).trim(), operatorName: cleanText(input.operatorName, 120).trim() },
+    data: { testId, level, date, val, runId, lotNo: cleanText(input.lotNo, 80).trim(), note: cleanText(input.note, 1000).trim(), operatorName: cleanText(input.operatorName, 120).trim(), retroReason: cleanText(input.retroReason, 1000).trim() },
   };
 }
 

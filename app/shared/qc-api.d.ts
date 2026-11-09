@@ -237,6 +237,15 @@ export interface ActivityArchivePreview {
   csv: string;
 }
 
+/** Một lần chạy ĐÃ CÓ đổi kết luận Westgard vì điểm vừa nhập lùi ngày hoặc
+ * vừa huỷ (luật nhiều lần chạy nhìn lại lần chạy trước) — xem tệp
+ * `main/domain/run-conclusion-change.ts` để biết cách so trước/sau. */
+export interface QcRunConclusionChange {
+  date: string; runId: string;
+  before: 'ok' | 'warn' | 'rej'; after: 'ok' | 'warn' | 'rej';
+  rulesBefore: string[]; rulesAfter: string[];
+}
+
 export interface QcPointView {
   /** Tập thống kê do main đánh giá cho chuỗi lô lịch sử. */
   accepted?: boolean;
@@ -852,12 +861,18 @@ export interface QcApi {
    * toàn sai số hệ thống; đây không phải đường bỏ qua điều kiện lập dải. */
   applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): Promise<IpcResult<RangeCandidateView>>;
   revertManufacturerRange(input: { data: { testId: string; level: number; reason: string } }): Promise<IpcResult<RangeCandidateView>>;
-  addPoint(input: { data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string } }): Promise<IpcResult<QcPointView>>;
+  /** Điểm làm đổi kết luận của lần chạy đã có (nhập lùi ngày): đổi trạng thái
+   * loại bỏ thì cần `retroReason` ≥10 ký tự, thiếu thì trả lỗi
+   * `retro-reason-required`; lần chạy đổi kết luận thuộc kỳ đã khoá thì trả
+   * `retro-locked`. `retroChanges` liệt kê mọi lần chạy khác đã đổi kết luận. */
+  addPoint(input: { data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string; retroReason?: string } }): Promise<IpcResult<QcPointView & { retroChanges: QcRunConclusionChange[] }>>;
   /** `kind` quyết định có tự mở/dùng lại hồ sơ NCE hay không
    * (`voidNceChoice()` ở `main/domain/entry-validation.ts`): 'analytical'
    * luôn mở NCE, 'data-entry' luôn không mở, 'other' để `openNce` tự chọn và
-   * bắt buộc `reason` ≥5 ký tự (2 kind đầu không bắt buộc, chỉ khuyến nghị). */
-  voidPoint(input: { data: { pointId: string; reason: string; kind?: 'analytical' | 'data-entry' | 'other'; openNce?: boolean } }): Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }>>;
+   * bắt buộc `reason` ≥5 ký tự (2 kind đầu không bắt buộc, chỉ khuyến nghị).
+   * Huỷ điểm làm đổi trạng thái loại bỏ của lần chạy khác cũng cần `reason`
+   * ≥10 ký tự (`reason-required-retro`); chạm kỳ đã khoá thì `retro-locked`. */
+  voidPoint(input: { data: { pointId: string; reason: string; kind?: 'analytical' | 'data-entry' | 'other'; openNce?: boolean } }): Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] }>>;
   setDayNote(input: { data: { testId: string; date: string; note: string } }): Promise<IpcResult<{ note: string; updated: number }>>;
   listTestSummaries(): Promise<TestSummary[]>;
   analyzeLevel(testId: string, level: number): Promise<LevelAnalysis>;

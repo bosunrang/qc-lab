@@ -8,7 +8,7 @@
 // công), và dòng "Tài khoản: ..." của hộp xác thực lại mật khẩu.
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useDialogState, closeDialog } from '../state/dialog-store';
+import { useDialogState, closeDialog, type ReasonOptions } from '../state/dialog-store';
 import { useFocusTrap } from './useFocusTrap';
 import { useAuthStore } from '../store/auth-store';
 
@@ -20,7 +20,7 @@ export function DialogHost() {
     if (dialog.kind === 'confirm') dialog.resolve(false);
     else if (dialog.kind === 'info') dialog.resolve();
     else if (dialog.kind === 'reauth') dialog.resolve(false);
-    else if (dialog.kind === 'choice') dialog.resolve(null);
+    else if (dialog.kind === 'choice' || dialog.kind === 'reason') dialog.resolve(null);
     closeDialog();
   }, boxRef);
 
@@ -85,6 +85,17 @@ export function DialogHost() {
     );
   }
 
+  if (dialog.kind === 'reason') {
+    return createPortal(
+      <div className="modal-bg dialog-layer" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) { dialog.resolve(null); close(); } }}>
+        <div className="modal confirm-modal" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
+          <ReasonForm opts={dialog.opts} onResolve={(value) => { dialog.resolve(value); close(); }} />
+        </div>
+      </div>,
+      root,
+    );
+  }
+
   if (dialog.kind === 'info') {
     const { title = '', type = 'warn' } = dialog.opts;
     const glyph = type === 'success' ? '✓' : '!';
@@ -116,6 +127,45 @@ export function DialogHost() {
       </div>
     </div>,
     root,
+  );
+}
+
+function ReasonForm({ opts, onResolve }: { opts: ReasonOptions; onResolve: (value: string | null) => void }) {
+  const { title = '', message, label = 'Lý do', minLength, confirmLabel = 'Lưu', placeholder } = opts;
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  function submit() {
+    const value = reason.trim();
+    if (value.length < minLength) { setError(`Cần ghi lý do tối thiểu ${minLength} ký tự.`); return; }
+    onResolve(value);
+  }
+
+  return (
+    <>
+      <div className="confirm-modal-h">
+        <div />
+        <button type="button" className="modal-close" aria-label="Đóng hộp thoại" onClick={() => onResolve(null)}>✕</button>
+      </div>
+      {title && <h3 className="confirm-modal-title" id="dialog-title">{title}</h3>}
+      <div className="confirm-modal-body">
+        <div className="confirm-modal-icon info" aria-hidden="true">!</div>
+        <div className="confirm-modal-text"><b id={title ? undefined : 'dialog-title'}>{message}</b></div>
+      </div>
+      <div className="reauth-modal-field">
+        <div className="field">
+          <label htmlFor="dialog-reason">{label} (bắt buộc, tối thiểu {minLength} ký tự)</label>
+          <textarea id="dialog-reason" autoFocus rows={3} value={reason} placeholder={placeholder}
+            aria-invalid={error ? true : undefined} aria-describedby={error ? 'dialog-reason-error' : undefined}
+            onChange={(e) => { setReason(e.target.value); if (error) setError(null); }} />
+        </div>
+        {error && <p className="field-error" id="dialog-reason-error" role="alert">{error}</p>}
+      </div>
+      <div className="confirm-modal-actions">
+        <button type="button" className="btn ghost" onClick={() => onResolve(null)}>Huỷ</button>
+        <button type="button" className="btn teal" onClick={submit}>{confirmLabel}</button>
+      </div>
+    </>
   );
 }
 
