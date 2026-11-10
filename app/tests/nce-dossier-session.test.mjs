@@ -115,6 +115,54 @@ test('hồ sơ: lệnh ghi bị từ chối vì điều kiện giữ dữ liệu
   assert.equal(session.getState().busy, false);
 });
 
+test('hồ sơ: lỗi nhập liệu được form nhận thì không lặp thông báo ở đầu hồ sơ', async (t) => {
+  const session = await start(t);
+  let received;
+  assert.equal(await session.getState().run(async () => failure('technical-evidence', 'Thiếu bằng chứng'), {
+    handleValidationError(error) { received = error; return true; },
+  }), false);
+  assert.deepEqual(received, { code: 'technical-evidence', message: 'Thiếu bằng chứng' });
+  assert.equal(session.getState().error, null);
+  assert.deepEqual(session.getState().dossier, view(1));
+  assert.equal(session.getState().busy, false);
+});
+
+test('hồ sơ: form không nhận lỗi thì giữ thông báo chung', async (t) => {
+  const session = await start(t);
+  await session.getState().run(async () => failure('forbidden', 'Không có quyền'), { handleValidationError: () => false });
+  assert.equal(session.getState().error.message, 'Không có quyền');
+  assert.equal(session.getState().error.kind, 'write');
+});
+
+test('hồ sơ: xung đột phiên bản không được chuyển thành lỗi ô nhập', async (t) => {
+  const session = await start(t);
+  let routed = false;
+  await session.getState().run(async () => failure('stale'), { handleValidationError: () => { routed = true; return true; } });
+  assert.equal(routed, false);
+  assert.equal(session.getState().error.stale, true);
+});
+
+test('hồ sơ: lỗi đặt thông báo vào form không biến lệnh đã bị từ chối thành chưa rõ kết quả', async (t) => {
+  const reported = [];
+  const session = await start(t, async () => view(1), { reportError: (error) => reported.push(error) });
+  await session.getState().run(async () => failure('technical-method', 'Thiếu phương pháp'), {
+    handleValidationError() { throw new Error('Không tìm được form'); },
+  });
+  assert.equal(session.getState().error.kind, 'write');
+  assert.equal(session.getState().error.message, 'Thiếu phương pháp');
+  assert.equal(reported.length, 1);
+});
+
+test('hồ sơ: lỗi nội bộ không bị bộ nhận lỗi nhập liệu che mất', async (t) => {
+  const session = await start(t);
+  let routed = false;
+  await session.getState().run(async () => failure('internal-error', 'Mất phản hồi'), {
+    handleValidationError: () => { routed = true; return true; },
+  });
+  assert.equal(routed, false);
+  assert.equal(session.getState().error.kind, 'uncertain');
+});
+
 for (const mode of ['throw', 'internal-error']) {
   test(`hồ sơ: ghi ${mode} giữ dữ liệu và khoá gửi lại đến khi đối chiếu thành công`, async (t) => {
     const session = await start(t);

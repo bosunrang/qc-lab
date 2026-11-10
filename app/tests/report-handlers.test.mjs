@@ -98,34 +98,30 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
   assert.ok(withLot.length, 'phải có dòng để kiểm');
   assert.ok(withLot.every(row => 'lot' in row), 'mỗi dòng báo cáo phải mang số lô');
   // Và KHÔNG kéo theo cột ngoài hợp đồng: hàng này đi thẳng ra tệp xuất.
-  const allowed = new Set(['id', 'test_id', 'level', 'date', 'run_id', 'lot', 'val', 'note', 'operator_name', 'voided', 'void_reason']);
+  const allowed = new Set(['id', 'test_id', 'level', 'date', 'run_id', 'lot', 'val', 'note', 'operator_name', 'voided', 'void_reason', 'target_mean', 'target_sd', 'z', 'verdict', 'rules', 'accepted', 'run_rejected_by']);
   for (const key of Object.keys(withLot[0])) assert.ok(allowed.has(key), `cột ngoài hợp đồng lọt vào báo cáo: ${key}`);
 }
 
-// Xuất CSV phải có BOM UTF-8. Blob `type: text/csv;charset=utf-8` KHÔNG đủ:
-// Excel trên Windows đoán mã hoá theo codepage hệ thống khi mở tệp cục bộ,
-// thiếu BOM thì toàn bộ tiếng Việt trong báo cáo mở ra là ký tự rác.
-// Từ 2026-09-26 mọi trang đi qua `downloadCsv()`; BOM được kiểm bằng hành vi ở
-// `csv-download.test.mjs`, ở đây chỉ còn kiểm Báo cáo dùng đúng hàm đó.
+// Tệp báo cáo dùng tên xét nghiệm, nhãn nghiệp vụ và biểu mẫu kiểm soát chung.
 {
   const { readFileSync } = await import('node:fs');
   const page = readFileSync(new URL('../renderer/pages/ReportPage.tsx', import.meta.url), 'utf8');
-  assert.ok(page.includes("downloadCsv(lines.join('\\n'), `bao-cao-${stamp()}.csv`)"), 'CSV phải xuất qua downloadCsv() để có BOM');
+  const printable = readFileSync(new URL('../renderer/lib/iqc-report.ts', import.meta.url), 'utf8');
   // Tên tệp theo tên xét nghiệm, không phải uid — đây là hồ sơ đem lưu.
   assert.match(page, /selected\?\.testName \|\| 'xet-nghiem'/);
   assert.doesNotMatch(page, /`\$\{selectedId\}-\$\{isoToday\(\)\}`/, 'không đặt tên tệp bằng testId');
 
   // Cột Lô đứng ngay sau Mức trong cả tiêu đề lẫn dòng dữ liệu.
-  assert.match(page, /const POINT_HEADERS = \['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'\];/);
-  assert.match(page, /p\.level, p\.lot \|\| '—', p\.run_id/);
+  assert.match(printable, /const POINT_HEADERS = \['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'\];/);
+  assert.match(printable, /p\.level, p\.lot \|\| '—', p\.run_id/);
 
   // Phụ lục NCE phải nói rõ trạng thái hồ sơ (kể cả đã huỷ — giữ dòng vì nó
   // là dấu vết) bằng nhãn, không in mã máy.
-  assert.match(page, /'Tầng xử lý', 'Hạn xử lý', 'Trạng thái'\]/);
-  assert.match(page, /NCE_STATUS_LABEL\[r\.status\]/, 'nceRow() phải sinh ô trạng thái hồ sơ bằng nhãn');
+  assert.match(printable, /'Tầng xử lý', 'Hạn xử lý', 'Trạng thái'\]/);
+  assert.match(printable, /NCE_STATUS_LABEL\[r\.status\]/, 'nceRow() phải sinh ô trạng thái hồ sơ bằng nhãn');
   // Số ô `nceRow()` sinh ra phải khớp số cột tiêu đề, nếu không bảng lệch cột.
-  const headerCount = (/const NCE_HEADERS = \[([^\]]+)\]/.exec(page)?.[1] || '').split(',').length;
-  const cellCount = (/function nceRow\(r: NceRecordRow\): string\[\] \{[\s\S]*?return \[([\s\S]*?)\];/.exec(page)?.[1] || '')
+  const headerCount = (/const NCE_HEADERS = \[([^\]]+)\]/.exec(printable)?.[1] || '').split(',').length;
+  const cellCount = (/function nceRow\(r: NceRecordRow\): string\[\] \{[\s\S]*?return \[([\s\S]*?)\];/.exec(printable)?.[1] || '')
     .split(/,(?![^[(]*[\])])/).length;
   assert.equal(headerCount, 8);
   assert.equal(cellCount, headerCount, 'số ô nceRow() phải khớp số cột NCE_HEADERS');
@@ -141,8 +137,8 @@ assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cu
   assert.match(page, /saveTemplate\(\{ kind, \.\.\.forms\[kind\] \}\)/);
   // PDF nội kiểm có phần đầu kiểm soát tài liệu, số trang và khu vực ký.
   assert.match(page, /loadPrintIdentity\('iqc'\)/);
-  assert.match(page, /documentHeader\(identity, 'Báo cáo nội kiểm'/);
-  assert.match(page, /\$\{appendix\}\$\{signatureBlock\(\)\}/);
+  assert.match(printable, /documentHeader\(identity, 'Báo cáo nội kiểm'/);
+  assert.match(printable, /\$\{appendix\}\$\{signatureBlock\(\)\}/);
   assert.match(page, /`bao-cao-\$\{stamp\(\)\}\.pdf`, \{ pageNumbers: true \}/);
   const reportCss = readFileSync(new URL('../renderer/styles/pages/report.css', import.meta.url), 'utf8');
   assert.match(reportCss, /\.report-template-fields input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)\{height:var\(--control-h\);min-height:var\(--control-h\);\}/);

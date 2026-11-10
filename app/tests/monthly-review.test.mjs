@@ -71,6 +71,37 @@ test('số liệu tháng theo xét nghiệm × mức × lô, kèm điểm huỷ 
   assert.deepEqual(review.signatures, []);
 });
 
+test('biên bản tháng: xét nghiệm theo thứ tự thêm trong mỗi máy, không theo tên hay ngày nhập QC', () => {
+  const db = openDatabase(':memory:');
+  try {
+    const config = createConfigHandlers(db), report = createReportHandlers(db);
+    const machineB = must(config.saveInstrument({ data: { name: 'Máy B' } }, admin), 'máy B');
+    const machineA = must(config.saveInstrument({ data: { name: 'Máy A' } }, admin), 'máy A');
+    const addTest = (name, instrumentId) => {
+      const t = must(config.saveTest({ data: { name, instrumentId, unit: 'mmol/L' } }, admin), name);
+      makeOperationalQc(db, { testId: t.id, instrumentId, assignments: [{ level: 1 }] });
+      db.prepare('UPDATE test_levels SET mean=5,sd=0.2 WHERE test_id=?').run(t.id);
+      return t;
+    };
+    const first = addTest('Zinc', machineA.id);
+    const otherMachine = addTest('Glucose', machineB.id);
+    const last = addTest('Albumin', machineA.id);
+    const insert = db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd)
+      VALUES (?,?,1,?,'1',5,?,5,0.2)`);
+    for (const [t, date] of [[last, '2026-10-01'], [otherMachine, '2026-10-02'], [first, '2026-10-03']]) {
+      const lot = db.prepare('SELECT ql.lot_no FROM test_levels tl JOIN qc_lots ql ON ql.id=tl.qc_lot_id WHERE tl.test_id=?').get(t.id).lot_no;
+      insert.run(`p-${t.id}`, t.id, date, lot);
+    }
+    const expected = [first.id, last.id, otherMachine.id];
+    assert.deepEqual(report.getQcMonthlyReview('2026-10').rows.map((r) => r.test_id), expected);
+    must(config.saveTest({ id: first.id, data: { name: 'Zinc mới', instrumentId: machineA.id, unit: 'mmol/L' } }, admin), 'đổi tên');
+    const rows = report.getQcMonthlyReview('2026-10').rows;
+    assert.deepEqual(rows.map((r) => r.test_id), expected, 'đổi tên vẫn giữ thứ tự tạo');
+    assert.deepEqual(rows.map((r) => r.instrument_name), ['Máy A', 'Máy A', 'Máy B']);
+    assert.ok(rows.every((r) => r.n === 1 && r.mean === 5), 'giữ nguyên số liệu của từng xét nghiệm');
+  } finally { db.close(); }
+});
+
 test('ký xem xét: cần quyền qc.config, lưu ảnh chụp, ký lại giữ lịch sử, khoá kỳ đọc được', () => {
   const { db, report } = scenario();
   db.prepare("INSERT INTO users(id,username,name,role,pass_hash,active) VALUES ('u2','ktv','KTV','technician','x',1)").run();

@@ -41,6 +41,21 @@ rộng hoặc chỉnh sửa mã nguồn.
   biểu mẫu và thông tin ký duyệt lấy từ phần cài đặt hiện hành.
 - Báo cáo theo kỳ chỉ biểu diễn dữ liệu của kỳ được chọn; báo cáo nhiều kỳ chỉ
   dùng khi người dùng yêu cầu phạm vi tổng hợp.
+- PDF nội kiểm theo khoảng ngày có Levey–Jennings tổng hợp bằng chính hàm vẽ
+  Westgard; mỗi mức/lô là một đường riêng, điểm đã huỷ chỉ giữ ở bảng chi tiết.
+  Main cung cấp Z/kết luận từ các chuỗi đang chạy, song song, lô cũ và nhóm
+  lưu trữ trước khi cắt ngày hiển thị. Bảng chi tiết chia theo mức, tiêu đề
+  mức/cột lặp lại khi sang trang. Trang báo cáo có in/PDF và Excel; Excel giữ
+  cấu trúc dữ liệu từng dòng.
+- Biên bản xem xét QC tháng nhấn vàng các ô Bị loại/Huỷ có số lượng lớn hơn
+  0, không có hàng tổng hợp riêng. Hồ sơ NCE và việc còn tồn nằm trong mục thu/mở dưới
+  bảng, có nhãn nhắc rà soát khi còn việc.
+  Trạng thái ký nằm cùng phần kết luận, không lặp lại thành các dải thông báo.
+  Bảng trên màn hình và bản in cùng đặt Máy trước Xét nghiệm, gộp dọc các
+  ô liền nhau theo máy và định danh xét nghiệm, giữ riêng số liệu từng mức/lô.
+  Các xét nghiệm khác định danh không gộp dù trùng tên.
+  Trong mỗi nhóm máy, xét nghiệm xếp theo thứ tự thêm trong danh mục (cũ
+  trước, mới sau), rồi theo mức/lô; không tự sắp lại theo tên xét nghiệm.
 
 ## 5. Các khu vực nghiệp vụ
 

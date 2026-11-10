@@ -9,7 +9,7 @@ import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 import { hasUserCapability } from '../../../main/domain/capabilities';
 import { REVIEW_CONCLUSIONS, REVIEW_CONCLUSION_LABELS } from '../../../main/domain/monthly-review';
 import { isoLocalDate } from '../../../main/domain/local-date';
-import { buildMonthlyReviewPrintHtml, dateTimeText, monthLabel, nceStatusText, REVIEW_HEADERS, reviewRowCells, totalsText } from '../../lib/monthly-review-print';
+import { buildMonthlyReviewPrintHtml, dateTimeText, monthLabel, nceStatusText, REVIEW_HEADERS, reviewRowCells, reviewRowGroups } from '../../lib/monthly-review-print';
 import { loadPrintIdentity } from '../../lib/print-document';
 import { printHtmlToPdf } from '../../lib/export';
 import { errorDialog } from '../../state/dialog-store';
@@ -44,6 +44,7 @@ export function MonthlyReviewPanel() {
   const years = Array.from({ length: 5 }, (_, i) => Number(thisMonth.slice(0, 4)) - 3 + i);
   const shown = review?.ym === ym ? review : null;
   const latest = shown?.signatures.at(-1);
+  const rowGroups = shown ? reviewRowGroups(shown.rows) : [];
 
   async function sign() {
     setBusy(true);
@@ -86,26 +87,45 @@ export function MonthlyReviewPanel() {
         </div>
 
         {!shown ? <p className="hint" role="status">{reviewLoading ? 'Đang tổng hợp số liệu…' : ''}</p> : <>
-          <p className="monthly-review-totals">{totalsText(shown)}</p>
-          {shown.open_items && <div className="alert warn" role="status">Việc còn tồn: {shown.open_items}</div>}
           <div className="monthly-review-table-wrap">
             <table className="monthly-review-table">
               <thead><tr>{REVIEW_HEADERS.map((header) => <th key={header} title={HEADER_HINTS[header]}>{header}</th>)}</tr></thead>
-              <tbody>
-                {shown.rows.length ? shown.rows.map((row) => (
-                  <tr key={`${row.test_id}|${row.level}|${row.lot}`}>{reviewRowCells(row).map((cell, i) => <td key={i} className={i >= 4 ? 'num' : undefined}>{cell}</td>)}</tr>
-                )) : <tr><td colSpan={REVIEW_HEADERS.length}>Không có kết quả QC trong tháng {monthLabel(ym)}.</td></tr>}
-              </tbody>
+              {rowGroups.length ? rowGroups.map((group, groupIndex) => <tbody key={groupIndex}>
+                {group.map(({ row, machineSpan, testSpan }, rowIndex) => (
+                  <tr key={`${row.test_id}|${row.level}|${row.lot}`}>{reviewRowCells(row).map((cell, i) => {
+                    const span = i === 0 ? machineSpan : i === 1 ? testSpan : undefined;
+                    if (span === 0) return null;
+                    const atTableBottom = groupIndex === rowGroups.length - 1 && rowIndex + (span ?? 1) === group.length;
+                    const needsReview = (i === 6 && row.rejected > 0) || (i === 14 && row.voided > 0);
+                    return <td key={i} rowSpan={span} data-column={i} data-table-bottom={atTableBottom || undefined} className={needsReview ? 'num monthly-review-attention' : i >= 4 ? 'num' : undefined}>{cell}</td>;
+                  })}</tr>
+                ))}
+              </tbody>) : <tbody><tr><td colSpan={REVIEW_HEADERS.length}>Không có kết quả QC trong tháng {monthLabel(ym)}.</td></tr></tbody>}
             </table>
           </div>
           {shown.rows.some((row) => row.target_changed) && <p className="hint">* Mean/SD đích đổi trong tháng.</p>}
-          {shown.nce.length > 0 && <p className="hint">Hồ sơ NCE trong tháng: {shown.nce.map((row) => `${row.nce_id} (${row.test_name}, ${nceStatusText(row.status)})`).join('; ')}.</p>}
-
+          {(shown.nce.length > 0 || shown.open_items) && <details className="monthly-review-followup" key={ym}>
+            <summary>
+              <span>Hồ sơ NCE & việc còn tồn</span>
+              <span className="monthly-review-followup-meta">{shown.totals.nce} hồ sơ{shown.totals.nce_open > 0 ? ` · ${shown.totals.nce_open} chưa đóng` : ''}</span>
+              {shown.open_items && <span className="tag warn">Cần rà soát</span>}
+            </summary>
+            <div className="monthly-review-followup-body">
+              {shown.nce.length > 0 && <ul className="monthly-review-nce-list">
+                {shown.nce.map((row) => <li key={row.nce_id}>
+                  <span>{row.nce_id}</span><span>{row.test_name}</span><span>{nceStatusText(row.status)}</span>
+                </li>)}
+              </ul>}
+            </div>
+          </details>}
           <div className="monthly-review-sign">
-            {/* Đã ký: hộp xanh. Chưa ký: dòng chữ thường, thẳng lề với bảng và ô "Kết luận". */}
-            {latest
-              ? <div className="alert ok" role="status">Đã ký: <b>{REVIEW_CONCLUSION_LABELS[latest.conclusion]}</b>{latest.note ? ` — ${latest.note}` : ''} · {latest.reviewer_name} · {dateTimeText(latest.reviewed_at)}{shown.signatures.length > 1 ? ` · ký ${shown.signatures.length} lần` : ''}</div>
-              : <p className="monthly-review-status" role="status">Tháng {monthLabel(ym)} chưa có biên bản xem xét{canSign ? '' : ' (cần quyền cấu hình tiêu chí QC để ký)'}.</p>}
+            <div className="monthly-review-sign-heading">
+              <h3>Kết luận xem xét</h3>
+              <span className="monthly-review-status" role="status">{latest ? `Đã ký · ${latest.reviewer_name} · ${dateTimeText(latest.reviewed_at)}${shown.signatures.length > 1 ? ` · ${shown.signatures.length} lần ký` : ''}` : `Chưa ký · tháng ${monthLabel(ym)}`}</span>
+            </div>
+            {latest && <p className="monthly-review-signed-conclusion"><b>{REVIEW_CONCLUSION_LABELS[latest.conclusion]}</b>{latest.note ? ` — ${latest.note}` : ''}</p>}
+            {latest && shown.signature_stale && <p className="monthly-review-stale" role="alert"><span className="tag warn">Cần ký lại</span> Số liệu QC tháng đã đổi sau lần ký cuối. Kết luận trên chỉ áp dụng cho số liệu lúc ký.</p>}
+            {!canSign && <p className="monthly-review-status">Cần quyền cấu hình tiêu chí QC để ký xem xét.</p>}
             {canSign ? (
               <div className="monthly-review-sign-form">
                 <div className="field">

@@ -17,6 +17,7 @@ import { computeTechnicalPrefill, type NceTechnicalPrefillView } from '../domain
 import { nceChecklistHints } from '../domain/nce/checklist-hints';
 import { operationalTeaResolver } from './operational-tea';
 import { teaCriterionText } from '../domain/sigma-tea-core';
+import { viDate } from '../domain/local-date';
 
 interface EvalPoint { id: string; date: string; run_id: string; runId: string; level: number; lot: string; val: number; qcMean: number | null; qcSd: number | null }
 
@@ -177,6 +178,35 @@ export function nceQueueRows(db: Db): NceQueueRow[] {
   const runsByRecord = new Map<string, NceRunKey[]>();
   for (const run of runs) runsByRecord.set(run.nce_record_id, [...(runsByRecord.get(run.nce_record_id) ?? []), { date: run.date, runId: run.run_id }]);
   return buildNceQueue(nceRejectedPoints(db), records.map((r) => ({ id: r.id, nceId: r.nce_id, status: r.status, testId: r.test_id, runs: runsByRecord.get(r.id) ?? [] })));
+}
+
+/** Lần chạy bị loại CHƯA thuộc hồ sơ NCE nào — việc chưa được tiếp nhận —
+ * theo khoá xét nghiệm + lần chạy. */
+export function unrecordedRejectedRuns(db: Db): Map<string, NceQueueRow> {
+  return new Map(nceQueueRows(db).filter((row) => !row.record).map((row) => [`${row.testId}\u0001${qcRunKey(row)}`, row]));
+}
+
+/** Thay đổi danh mục làm lần chạy bị loại chưa lập hồ sơ biến khỏi hàng chờ. */
+export class LostRejectedRunsError extends Error {
+  readonly code = 'pending-rejected-runs';
+}
+
+/** R03 (rà soát 10/11/2026): tắt Panel QC, ngừng dùng hay đổi máy của xét
+ * nghiệm đưa xét nghiệm ra khỏi vận hành, nên lần chạy bị loại của nó rời hàng
+ * chờ NCE. Lần chạy đã có hồ sơ được giữ qua snapshot; lần chạy CHƯA có hồ sơ
+ * thì biến mất mà chưa ai tiếp nhận (ISO 15189:2022 7.5). Gọi trong giao dịch,
+ * sau khi ghi: còn lần chạy nào của `before` mất khỏi hàng chờ thì ném lỗi để
+ * huỷ cả lần lưu. Hồ sơ NCE lập từ hàng chờ cần xét nghiệm còn vận hành, nên
+ * phải lập hồ sơ trước rồi mới ngừng. */
+export function assertNoLostRejectedRuns(db: Db, before: ReadonlyMap<string, NceQueueRow>, action: string): void {
+  if (!before.size) return;
+  const after = unrecordedRejectedRuns(db);
+  const lost = [...before].filter(([key]) => !after.has(key)).map(([, row]) => row);
+  if (!lost.length) return;
+  const nameOf = db.prepare("SELECT COALESCE(NULLIF(display_name,''), name) AS name FROM tests WHERE id=?");
+  const shown = lost.slice(0, 5).map((row) => `${(nameOf.get(row.testId) as { name: string } | undefined)?.name ?? row.testId} ${viDate(row.date)} lần ${row.runId || '(không mã)'}`);
+  const more = lost.length > shown.length ? `; … (+${lost.length - shown.length})` : '';
+  throw new LostRejectedRunsError(`${action} sẽ làm ${lost.length} lần chạy bị loại chưa lập hồ sơ NCE rời khỏi hàng chờ (${shown.join('; ')}${more}). Lập hồ sơ NCE cho các lần chạy này trước.`);
 }
 
 const TEA_SOURCE_TEXT: Readonly<Record<string, string>> = { lab: 'hồ sơ TEa của PXN', clia: 'CLIA', eflm: 'EFLM', ricos: 'Ricos' };

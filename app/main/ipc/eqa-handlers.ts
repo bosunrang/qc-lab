@@ -65,6 +65,19 @@ export function createEqaHandlers(db: Db) {
     return byCode ?? rows.find((row) => eqaNormalize(row.name) === eqaNormalize(round.program) && eqaNormalize(row.provider) === eqaNormalize(round.provider));
   }
 
+  /** Khoá thay kết quả trong một kỳ: máy + mẫu (R02 rà soát 10/11/2026). Một
+   * đợt VEQAS gồm nhiều mẫu, mỗi mẫu một tệp PDF (N-16 trong
+   * `docs/EQA-REVIEW-2026-10-28.md`): nhập mẫu khác của cùng máy là bổ sung,
+   * chỉ nhập lại đúng mẫu đã có mới là thay. */
+  const slotKey = (instrumentId: string, sample: unknown) => `${instrumentId}\u0000${eqaNormalize(sample)}`;
+
+  /** Máy + mẫu của các kết quả đang hiện hành trong một kỳ (khoá → nhãn). */
+  function currentSlots(round: RoundRecord): Map<string, string> {
+    const rows = db.prepare(`SELECT DISTINCT t.instrument_id, i.name, e.sample FROM eqa_results e JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id
+      WHERE e.round_id=? AND e.version=?`).all(round.id, round.version) as { instrument_id: string; name: string; sample: string }[];
+    return new Map(rows.map((row) => [slotKey(row.instrument_id, row.sample), row.sample ? `${row.name} (mẫu ${row.sample})` : row.name]));
+  }
+
   /** Máy của các kết quả đang hiện hành trong một kỳ (id → tên). */
   function currentInstruments(round: RoundRecord): Map<string, string> {
     const rows = db.prepare(`SELECT DISTINCT t.instrument_id, i.name FROM eqa_results e JOIN tests t ON t.id=e.test_id JOIN instruments i ON i.id=t.instrument_id
@@ -91,9 +104,9 @@ export function createEqaHandlers(db: Db) {
 
   interface Prepared {
     input: EqaImportInput; check: EqaImportCheck; programId: string | undefined; existing: RoundRecord | undefined;
-    /** Máy đang có kết quả hiện hành trong kỳ (id → tên) và tên các máy mà lần nhập này thay kết quả. */
+    /** Máy đang có kết quả hiện hành trong kỳ (id → tên) và nhãn máy + mẫu mà lần nhập này thay kết quả. */
     present: Map<string, string>; replaces: string[];
-    /** Máy (id) của các dòng trong lần nhập này. */
+    /** Máy + mẫu (`slotKey`) của các dòng trong lần nhập này. */
     incoming: Set<string>;
   }
 
@@ -104,12 +117,18 @@ export function createEqaHandlers(db: Db) {
     const programId = findProgram(objectInput(input.round))?.id;
     const check = checkEqaImport({ round: input.round, rows: input.rows }, { tests, mapping: mappingFor(programId, input, testIds), config: readEqaConfig(db) });
     const existing = findRound(programId, check.round.year, check.round.round);
-    // Một kỳ gom kết quả của nhiều máy (báo cáo PDF: mỗi máy một file). Nhập
-    // máy mới là bổ sung; chỉ kết quả của máy đã có mới bị thay.
-    const present = existing && existing.status === 'open' ? currentInstruments(existing) : new Map<string, string>();
+    // Một kỳ gom kết quả của nhiều máy và nhiều mẫu (báo cáo PDF: mỗi máy, mỗi
+    // mẫu một file). Nhập máy hoặc mẫu mới là bổ sung; chỉ kết quả của đúng
+    // máy + mẫu đã có mới bị thay.
+    const openRound = existing && existing.status === 'open' ? existing : undefined;
+    const present = openRound ? currentInstruments(openRound) : new Map<string, string>();
+    const slots = openRound ? currentSlots(openRound) : new Map<string, string>();
     const instrumentOf = new Map(tests.map((t) => [t.id, t.instrument_id]));
-    const incoming = new Set(check.rows.map((row) => (row.testId ? instrumentOf.get(row.testId) : undefined)).filter((id): id is string => !!id));
-    const replaces = [...present].filter(([id]) => incoming.has(id)).map(([, name]) => name);
+    const incoming = new Set(check.rows.flatMap((row) => {
+      const instrumentId = row.testId ? instrumentOf.get(row.testId) : undefined;
+      return instrumentId ? [slotKey(instrumentId, row.sample)] : [];
+    }));
+    const replaces = [...slots].filter(([key]) => incoming.has(key)).map(([, label]) => label);
     return { input, check, programId, existing, present, replaces, incoming };
   }
 
@@ -177,12 +196,12 @@ export function createEqaHandlers(db: Db) {
       const insert = db.prepare(`INSERT INTO eqa_results(id,round_id,version,test_id,code,instrument_label,sample,unit,result,assigned,sigma_p,z,z_provider,z_official,pct,class,
         provider_check,method,peer_group,peer_json,warnings_json)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-      // Giữ kết quả hiện hành của các máy không có trong lần nhập này.
+      // Giữ kết quả hiện hành của các máy + mẫu không có trong lần nhập này.
       if (existing && prepared.present.size) {
         const previous = db.prepare('SELECT e.*, t.instrument_id FROM eqa_results e JOIN tests t ON t.id=e.test_id WHERE e.round_id=? AND e.version=?')
           .all(existing.id, existing.version) as Record<string, unknown>[];
         for (const old of previous) {
-          if (prepared.incoming.has(String(old.instrument_id))) continue;
+          if (prepared.incoming.has(slotKey(String(old.instrument_id), old.sample))) continue;
           insert.run(uid(), roundId, version, old.test_id, old.code, old.instrument_label, old.sample, old.unit, old.result, old.assigned, old.sigma_p,
             old.z, old.z_provider, old.z_official, old.pct, old.class, old.provider_check, old.method, old.peer_group, old.peer_json, old.warnings_json);
         }
@@ -199,7 +218,7 @@ export function createEqaHandlers(db: Db) {
         replaces: prepared.replaces, reason: replacing ? replaceReason : '',
       }), w.actor.userId, actorName, now);
       const label = `${round.program} · ${round.round}/${round.year}`;
-      tx.audit(kind === 'import' ? 'Nhập kỳ ngoại kiểm' : kind === 'append' ? 'Bổ sung máy vào kỳ ngoại kiểm' : 'Nhập lại kỳ ngoại kiểm',
+      tx.audit(kind === 'import' ? 'Nhập kỳ ngoại kiểm' : kind === 'append' ? 'Bổ sung kết quả vào kỳ ngoại kiểm' : 'Nhập lại kỳ ngoại kiểm',
         `${label} · ${counts.total} kết quả (${counts.ok} ${EQA_CLASS_LABEL.ok.toLowerCase()}, ${counts.warn} cảnh báo, ${counts.rej} không chấp nhận)${existing ? ` · phiên bản ${version}` : ''}${replacing ? `: ${replaceReason}` : ''}`, label);
       tx.changed(EQA_TABLES);
     });

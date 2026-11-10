@@ -30,6 +30,7 @@ import { defaultNceDueDate } from '../domain/nce/config';
 import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 import { previousLotsOf } from './previous-lot-cache';
+import { historicalPointEvaluations } from './historical-evaluation';
 import { activeEvaluationOf } from './active-evaluation';
 import { operationalTeaResolver } from '../db/operational-tea';
 import { listParallelColumns as listParallelColumnsOf, pointsForLot as pointsForLotOf } from './parallel-columns';
@@ -436,22 +437,28 @@ export function createEntryHandlers(db: Db) {
     const runsBefore = runConclusionsOf(activeBefore);
     const currentView = pointViewsOf(activeBefore, point.level).find(p => p.id === pointId);
     const parallelView = listParallelColumns(point.test_id).flatMap((column) => column.points).find((p) => p.id === pointId);
-    let view = currentView || parallelView;
+    let view: { verdict: 'ok' | 'warn' | 'rej'; rules: string[]; runRejectedBy?: number[] } | undefined = currentView || parallelView;
     if (!view) {
-      // Hồ sơ chuyển lô có thể vừa kết thúc nhưng người dùng vẫn huỷ điểm lịch
-      // sử. Khi đó đánh giá riêng đúng lô bằng snapshot đã chốt trên điểm.
+      // N31/R05: điểm lô cũ lấy kết luận THEO LẦN CHẠY của đúng chuỗi lô lịch
+      // sử (cùng nguồn với tab lô cũ, báo cáo và biên bản tháng), để thấy cả
+      // luật liên mức như R4s. Đánh giá riêng một mức bỏ sót các luật đó nên
+      // lách được cổng lý do và mất bằng chứng lần chạy bị loại.
+      const archived = historicalPointEvaluations(db, point.test_id, [point]).get(pointId);
+      if (archived && archived.verdict !== 'none') view = { verdict: archived.verdict, rules: [...archived.rules], runRejectedBy: archived.runRejectedBy ?? [] };
+    }
+    if (!view) {
+      // Không thuộc chuỗi lô lịch sử nào (hồ sơ chuyển lô vừa kết thúc): đánh
+      // giá riêng đúng lô bằng snapshot đã chốt trên điểm.
       const history = pointsForLot(point.test_id, point.level, point.lot);
       const rules = activeEvaluation(point.test_id).rulesAt({ date: point.date, runId: point.run_id });
       const result = westgardByPoint(history, point.qc_mean, point.qc_sd, rules.within, rules.actionOf);
       const index = history.findIndex((item) => item.id === pointId);
-      if (index >= 0) view = { ...history[index], verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
+      if (index >= 0) view = { verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
     }
     // N4: điểm thuộc lần chạy bị loại (chính nó Loại bỏ, hoặc mức khác của lần
     // chạy vi phạm) cần lý do với MỌI loại huỷ, và điểm đã huỷ giữ lại bằng
     // chứng đó — huỷ rồi nhập lại không còn xoá được dấu vết lần chạy bị loại.
-    // Nhánh lô lịch sử phía trên không có kết luận theo lần chạy, chỉ có
-    // kết luận riêng của điểm.
-    const rejectedLevels = view && 'runRejectedBy' in view ? view.runRejectedBy ?? [] : [];
+    const rejectedLevels = view?.runRejectedBy ?? [];
     const runRejected = view?.verdict === 'rej' || rejectedLevels.length > 0;
     if (runRejected) {
       const reasonError = rejectedRunVoidReasonError(reason);

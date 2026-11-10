@@ -4,22 +4,26 @@
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Modal } from '../../components/Modal';
+import { useAsyncAction } from '../../components/AsyncButton';
 import { DateField } from '../../components/DateField';
 import { useNceStore } from '../../store/nce-store';
 import { useManageStore } from '../../store/manage-store';
 import { useAuthStore } from '../../store/auth-store';
 import { todayIso } from '../../lib/format';
+import { withDeadline } from '../../lib/async-deadline';
+import { sendClientError } from '../../lib/unhandled-errors';
 import { NCE_PHASE_LABEL, NCE_SOURCE_LABEL } from '../../../main/domain/nce/labels';
 import type { NceDossierView, NceSource } from '../../../shared/qc-api';
 import { nceRunLabel } from '../../../main/domain/nce/presentation';
 import { Field, OptionSelect, UserSelect } from './shared';
+import { assertDossier } from './dossier-data';
 
 export interface NceCreatePrefill { testId: string; testName: string; date: string; runId: string; summary: string }
 
 const OTHER_SOURCES = Object.fromEntries(Object.entries(NCE_SOURCE_LABEL).filter(([key]) => key !== 'iqc'));
 
 export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCreatePrefill | null; onClose: () => void; onCreated: (dossier: NceDossierView) => void }) {
-  const { users, create } = useNceStore(useShallow((s) => ({ users: s.users, create: s.create })));
+  const { users, create, load } = useNceStore(useShallow((s) => ({ users: s.users, create: s.create, load: s.load })));
   const tests = useManageStore((s) => s.tests);
   const me = useAuthStore((s) => s.user);
   const [source, setSource] = useState<NceSource>(prefill ? 'iqc' : 'instrument');
@@ -33,24 +37,39 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
   const [ownerUserId, setOwnerUserId] = useState(users.some((u) => u.id === me?.id) ? me!.id : '');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
 
-  async function submit() {
+  const { busy: saving, run: submit } = useAsyncAction(async () => {
+    if (uncertain) return;
     if (!hold) { setError('Chọn có dừng/giữ kết quả liên quan hay không.'); return; }
-    setSaving(true); setError('');
-    const result = await create({
-      source, phase: source === 'iqc' ? 'exam' : phase, testId: testId || undefined,
-      trigger: prefill ? { date: prefill.date, runId: prefill.runId } : undefined,
-      description, correction, holdResults: hold === 'yes', detectedAt, ownerUserId, dueDate: dueDate || undefined,
-    });
-    setSaving(false);
-    if (!result.ok) { setError(result.error.message); return; }
-    onCreated(result.data);
-  }
+    setError('');
+    let created: NceDossierView;
+    try {
+      const result = await withDeadline(() => create({
+        source, phase: source === 'iqc' ? 'exam' : phase, testId: testId || undefined,
+        trigger: prefill ? { date: prefill.date, runId: prefill.runId } : undefined,
+        description, correction, holdResults: hold === 'yes', detectedAt, ownerUserId, dueDate: dueDate || undefined,
+      }), 30_000);
+      if (!result.ok) {
+        if (result.error.code === 'internal-error') throw new Error(result.error.message);
+        setError(result.error.message); return;
+      }
+      created = result.data;
+      assertDossier(created);
+    } catch (error) {
+      sendClientError(error);
+      setUncertain(true);
+      setError('Chưa xác nhận được hồ sơ đã được lập hay chưa. Về danh sách để đối chiếu trước khi lập lại; nội dung đang nhập vẫn được giữ trong biểu mẫu này.');
+      // Đây là đọc để đối chiếu một lệnh chưa rõ kết quả, không tự gửi lại lệnh ghi.
+      void load();
+      return;
+    }
+    onCreated(created);
+  });
 
   return (
     <Modal title={prefill ? `Lập hồ sơ NCE — ${prefill.testName}` : 'Lập hồ sơ NCE từ nguồn khác'} size="lg" onClose={onClose} busy={saving}
-      footer={<><button type="button" className="btn ghost" onClick={onClose}>Bỏ qua</button><button type="button" className="btn teal" disabled={saving} onClick={submit}>{saving ? 'Đang lưu…' : 'Lập hồ sơ'}</button></>}>
+      footer={<><button type="button" className="btn ghost" disabled={saving} onClick={onClose}>{uncertain ? 'Về danh sách' : 'Bỏ qua'}</button><button type="button" className="btn teal" disabled={saving || uncertain} onClick={() => void submit()}>{saving ? 'Đang lưu…' : 'Lập hồ sơ'}</button></>}>
       {error && <div className="alert rej" role="alert">{error}</div>}
       {prefill
         ? <div className="alert info">Lần chạy {nceRunLabel(prefill)} bị loại. Mức, lô, luật và kết luận Westgard được chụp tự động từ lần chạy này.</div>

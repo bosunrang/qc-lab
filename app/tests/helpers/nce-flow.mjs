@@ -26,6 +26,25 @@ export function createIqcNce(nce, actor, testId, run, over = {}) {
   } }, actor), 'tạo NCE IQC');
 }
 
+/** Lập hồ sơ IQC cho mọi lần chạy bị loại chưa có hồ sơ — điều kiện để đổi
+ * lô, dừng nhóm lô hay tắt Panel mà không làm mất việc trong hàng chờ (R03 rà
+ * soát 10/11/2026). Dùng cho test mà bước đổi cấu hình không phải trọng tâm. */
+export function receivePendingRejectedRuns(db, actor) {
+  const require = createRequire(import.meta.url);
+  const { createNceHandlers } = require('../../../app-dist/main/ipc/nce-handlers.js');
+  const { nceQueueRows } = require('../../../app-dist/main/db/nce-evaluation.js');
+  ensureUser(db, actor);
+  const nce = createNceHandlers(db);
+  // Đọc lại hàng chờ sau mỗi bước: hồ sơ vừa lập thành hồ sơ đang mở mà các
+  // lần chạy sau của cùng xét nghiệm phải gắn vào (D-01).
+  for (let row = nceQueueRows(db).find((r) => !r.record); row; row = nceQueueRows(db).find((r) => !r.record)) {
+    const run = { date: row.date, runId: row.runId };
+    if (!row.attachTo) { createIqcNce(nce, actor, row.testId, run); continue; }
+    const expectedVersion = db.prepare('SELECT row_version FROM nce_records WHERE id=?').get(row.attachTo.id).row_version;
+    must(nce.attachNceRun({ data: { id: row.attachTo.id, expectedVersion, run } }, actor), 'gắn lần chạy vào hồ sơ đang mở');
+  }
+}
+
 export const validTechnicalAssessment = {
   errorNature: 'random', verificationMethod: 'Đối chiếu vật liệu, máy và nhật ký thao tác',
   correctiveEvidence: 'Đã vệ sinh kim hút và chạy lại đủ các mức QC',

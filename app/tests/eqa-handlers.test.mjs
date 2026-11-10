@@ -173,9 +173,9 @@ test('báo cáo PDF từng máy: nhận chương trình theo mã, bổ sung máy
   assert.deepEqual(appended.decisions.map((d) => d.type), ['append', 'import']);
   assert.equal(eqa.listEqaRounds().length, 1, 'không tạo chương trình/kỳ thứ hai');
 
-  // Nhập lại báo cáo DxC700: chỉ thay máy đó, giữ kết quả AU5800.
+  // Nhập lại báo cáo DxC700: chỉ thay đúng máy + mẫu đó, giữ kết quả AU5800.
   const again = must(eqa.previewEqaImport(pdf()), 'xem trước lần 2');
-  assert.deepEqual([again.existing.replaces, again.existing.needs_reason], [['DxC700'], true]);
+  assert.deepEqual([again.existing.replaces, again.existing.needs_reason], [['DxC700 (mẫu M1)'], true]);
   assert.equal(eqa.importEqaRound(pdf(), admin).error.code, 'replace-reason');
   const replaced = must(eqa.importEqaRound(pdf({ replaceReason: 'Trung tâm gửi lại báo cáo đã sửa', expectedVersion: appended.round.row_version }), admin), 'nhập lại DxC700');
   assert.deepEqual([replaced.round.version, replaced.round.total], [3, 4]);

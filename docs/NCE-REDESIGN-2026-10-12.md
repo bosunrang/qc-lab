@@ -271,6 +271,50 @@ nhiệm vụ) nằm ở `app/main/domain/nce/` để test trực tiếp, không 
 
 ## 10. Lộ trình
 
+### Bổ sung 10/11/2026 — làm lại bước Phê duyệt & lịch sử
+
+- Một panel chung, gồm trạng thái/thao tác quyết định và lịch sử bên dưới.
+  Nút xem toàn bộ bằng chứng nằm trên header; bỏ lời nhắc đứng ngoài khung.
+- Vùng trạng thái có viền trái xanh dương nhẹ, cỡ chữ theo hệ thống. Hiển
+  thị đúng trạng thái chưa đủ điều kiện, sẵn sàng nộp, chờ duyệt, đã đóng
+  hoặc đã huỷ; danh tính và thời điểm lấy từ quyết định đã lưu.
+- Điều kiện thiếu do main trả về nằm ngay dưới vùng nộp duyệt, thu/mở được
+  và từng điều kiện dẫn tới đúng bước cần bổ sung. Yêu cầu trả lại có người
+  ghi, thời điểm và nội dung riêng; phần duyệt giữ ghi chú của từng vòng.
+- Lịch sử trình bày theo trục dọc, giữ nguyên thứ tự và mốc từ main, mở được
+  snapshot QC tại từng mốc. Nhật ký quyết định/chỉnh sửa chi tiết vẫn thu gọn.
+- Huỷ hồ sơ lập nhầm thu gọn riêng, giữ quyền, lý do và xác nhận hiện hành.
+  Tách giao diện bước cuối vào `DossierReview.tsx`, không đổi IPC hay cổng ghi.
+
+### Rà soát 10/11/2026 — dọn mã và quy tắc giao diện NCE
+
+- Gộp CSS điều hướng, bỏ selector từ bố cục cũ, khai báo lặp và các phần
+  ghi đè không còn cần. Bảng giữ cấu trúc `table`, cuộn qua khung bao;
+  giữ căn giữa bảng snapshot, cột ngắn và mật độ theo hệ thiết kế.
+- Nút sửa/huỷ hành động dùng `RowActionButton`; huỷ vẫn cần lý do và giữ
+  lịch sử. Tiêu đề khung/nhóm/nội dung con có cấp rõ ràng, giữ thang chữ
+  16/14/13px và viền nhấn xanh dương hiện hành.
+- Sửa đua phản hồi ở danh sách: chỉ lần tải mới nhất được cập nhật dữ liệu,
+  trạng thái tải và lỗi. Lỗi/đọc cũ không ghi đè kết quả mới.
+- Lập hồ sơ và gắn lần chạy dùng khoá thao tác chung, có hạn chờ và bắt lỗi.
+  Phản hồi thiếu mã/phiên bản hoặc sai hồ sơ không được nhận là thành công;
+  lệnh chưa rõ kết quả không tự gửi lại. Đọc để đối chiếu không gỡ hộp thoại
+  lập hồ sơ đang mở khi danh sách rỗng, tránh mất bản nháp và khoá gửi lại.
+- Tách trạng thái đang gửi lệnh khỏi trạng thái khoá ghi do chưa rõ kết quả:
+  hộp thoại CAPA không đóng trong lúc lưu, nhưng thoát được sau lỗi kết nối
+  để đối chiếu dữ liệu. Nội dung đang nhập được giữ tới khi chủ động bỏ.
+- Khoá dòng bảng QC dùng `pointId`, tránh trùng khi có điểm đã huỷ và điểm
+  nhập lại cùng mức/lô. Bỏ helper không có nơi dùng; tách hàm đọc quyết định
+  và kiểm tra phản hồi dùng chung, không nhận JSON `null`/mảng/giá trị đơn
+  như đối tượng quyết định.
+- Không đổi CSDL, IPC hay các cổng nghiệp vụ. Ngoài NCE chỉ bỏ token class
+  `eqa-inspector-empty` không có CSS và không có nơi tham chiếu để kiểm tra
+  CSS toàn app không bị chặn bởi class thừa sẵn có.
+- Kiểm chứng: 628 test tự động đạt; typecheck, lint, CSS parity và build
+  đạt. 13 ca Electron liên quan NCE/nhập QC/modal đạt; sau chỉnh cấp tiêu
+  đề, chạy lại 4 ca CAPA và dọn lỗi đều đạt. Kiểm tra bảng ở 1647/1000/600px
+  không tràn khung; ảnh Electron dùng để rà lại bố cục và căn cột.
+
 ### Bổ sung 28/10/2026 — rà soát nghiệp vụ khoảng nghi ngờ và đánh giá kỹ thuật
 
 Rà soát đối chiếu ISO 15189:2022 và Westgard phát hiện bốn chỗ chưa chặt; đã
@@ -293,6 +337,119 @@ chụp), `nce-hardening` H11–H12 (rerun muộn hơn phạm vi, luật 6x trên
 Còn chờ PXN: một bộ TEa/Bias/SD cho cả hồ sơ dù nhiều mức, thông báo riêng
 khi ΔSEcrit ≤ 0, EQA được chọn "không liên quan kết quả bệnh nhân", tín hiệu
 vượt ngưỡng chưa là tiêu chí ép CAPA.
+
+### Bổ sung 10/11/2026 — gom Điều tra & CAPA vào một khung
+
+- Phần 6 nằm trong một khung Điều tra & CAPA. Các nhóm nối tiếp bằng đường
+  chia nội bộ; bỏ nền header, đường bao và bóng riêng của từng thẻ con.
+- Tiêu đề khung 16px, tên nhóm 14px, tóm tắt 13px. Giữ cách mở phần cần
+  thao tác và thu gọn phần đã ghi, không thêm tầng điều hướng mới.
+- Giữ chế độ xử lý nhanh/CAPA đầy đủ, bản nháp và toàn bộ điều kiện ghi.
+
+### Bổ sung 10/11/2026 — hiển thị Điều tra & CAPA theo tầng xử lý
+
+- Xử lý nhanh ưu tiên phân tầng, nguy cơ và lý do; điều tra/hành động bổ
+  sung chỉ mở khi cần. Hành động đang mở vẫn được đưa ra để theo dõi; dữ
+  liệu bổ sung cũ có thể mở lại, không bị xoá khi đổi tầng.
+- CAPA đầy đủ dùng các nhóm thu/mở Nguyên nhân → Hành động → Hiệu lực.
+  Sau khi ghi thành công, mở phần cần xử lý tiếp theo theo mục thiếu từ
+  main; phần đã ghi có tóm tắt ngắn và mở lại được để sửa.
+- Không ép thứ tự như một cổng ghi mới. Các nhóm vẫn nằm trong DOM, chuyển
+  nhóm/bước giữ bản nháp; phần đang thao tác không tự thu gọn khi có cập
+  nhật từ cửa sổ khác. Xem toàn bộ hồ sơ vẫn mở đầy đủ cho người rà soát.
+- Giữ quyền, kiểm tra dữ liệu, phiên bản và mọi điều kiện nộp/duyệt hiện hành.
+
+### Bổ sung 10/11/2026 — tinh gọn bước Điều tra & CAPA
+
+- Phân tầng và nguy cơ tóm tắt trong một hàng ba mục, dùng viền xanh dương;
+  căn cứ phân loại, lý do xử lý nhanh và nguyên nhân trình bày theo hàng
+  nhãn–giá trị, bỏ các thẻ nhỏ có màu khác nhau.
+- Các thang nguy cơ nhập theo ba cột trên desktop; ngày đánh giá có độ rộng
+  gọn. Hành động có thống kê tiến độ, trạng thái trống dùng EmptyState chung;
+  giữ đầy đủ thao tác thêm, sửa, hoàn thành và huỷ cùng bằng chứng/lý do.
+- Kế hoạch hiệu lực trình bày theo hàng; ưu tiên kết quả đánh giá gần nhất,
+  các lần trước thu gọn riêng. Hiển thị bằng chứng, nguy cơ còn lại và căn
+  cứ đã lưu của từng lần, không suy lại theo nội dung hiện tại.
+- Giữ thang chữ 16/14/13px, quyền, phiên bản bản nháp và mọi cổng nghiệp vụ.
+
+### Bổ sung 10/11/2026 — thống nhất cỡ chữ trong hồ sơ
+
+- Tiêu đề panel dùng 16px; tiêu đề nhóm và nội dung chính dùng 14px; nhãn,
+  người ghi, thời điểm và chú thích dùng 13px theo token hiện hành.
+- Kết luận trong các thẻ không phóng to bằng tiêu đề panel. Nhãn nhóm
+  trong hồ sơ viết thường theo nội dung, không dùng chữ 11px in hoa; phân
+  cấp bằng độ đậm và màu chữ. Bảng, badge, nút và ô nhập giữ kiểu dùng chung.
+- Áp dụng cho bảy bước và dòng thời gian, không đổi bố cục hay nghiệp vụ.
+
+### Bổ sung 10/11/2026 — chuyển dòng thời gian sang Phê duyệt & lịch sử
+
+- Ghi nhận sự cố chỉ hiện ngày phát hiện, ngày lập và bằng chứng QC gây sự
+  cố (lần khởi đầu, các lần bị loại thêm). Đính chính ngày vẫn thực hiện
+  cạnh mốc phát hiện, giữ phiên bản, lý do và xác nhận hiện hành.
+- Dòng thời gian tổng thể nằm trong Lịch sử hồ sơ ở bước Phê duyệt & lịch
+  sử, gồm cả QC chạy lại và các quyết định/hành động về sau. Bảng snapshot
+  vẫn mở được tại từng mốc; giữ các lần QC đã gắn chưa có mốc tương ứng.
+- Chi tiết quyết định và các lần chỉnh sửa giữ trong mục thu gọn riêng
+  cùng thẻ lịch sử. Bằng chứng QC xác minh vẫn nằm cạnh quyết định cho
+  hoạt động trở lại. Chỉ đổi vị trí trình bày, không đổi dữ liệu hay cổng.
+
+### Bổ sung 10/11/2026 — tinh gọn bước Cho phép hoạt động trở lại
+
+- Chọn QC, xem đánh giá và ghi căn cứ theo một cột. Bỏ các số bước phụ và
+  khung lồng nhau; khi chưa chọn QC không dựng khung kết quả trống.
+- Giữ lời nhắc ngắn về QC xác minh và phạm vi quyết định trong một khung
+  viền xanh dương; trạng thái Đạt/Chưa đạt vẫn thể hiện ở nhãn kết quả.
+- Bảng đánh giá từng mức và các lý do chặn nằm ngay dưới lần QC được chọn;
+  căn cứ, điều kiện còn thiếu và nút xác nhận ở cuối. Giữ dữ liệu nháp khi
+  chuyển bước. Quyết định đã ghi dùng cùng kiểu viền xanh dương với các
+  thẻ thông tin trong hồ sơ, kèm snapshot QC và mốc bắt đầu lại chuỗi.
+- Chỉ đổi trình bày; giữ nguồn preview từ main, danh sách QC đã lọc, quyền,
+  điều kiện chặn, xác nhận trước khi ghi, phiên bản và audit hiện hành.
+
+### Bổ sung 10/11/2026 — tinh gọn bước Ảnh hưởng bệnh nhân
+
+- Phạm vi cần rà soát nằm trên cùng, các mốc bắt đầu/kết thúc và số lần QC
+  trình bày trong một hàng; ngày và mã lần chạy tách dòng để dễ đọc. Giữ
+  khoảng nghi ngờ do main tính và lưu ý về luật nhiều lần chạy/QC rerun.
+- Quyết định nằm dưới phạm vi. Ưu tiên kết luận gần nhất, người ghi, thời
+  điểm, số kết quả và phạm vi đã chụp; lịch sử cũ thu/mở riêng, không thay
+  phạm vi lịch sử bằng khoảng nghi ngờ hiện tại.
+- Biểu mẫu gọn, có lỗi ngay tại ô nhập và giữ bản nháp khi chuyển bước.
+  Không đổi quyền quyết định, số liệu, cổng dữ liệu hoặc audit.
+
+### Bổ sung 10/11/2026 — tinh gọn bước Xác minh kỹ thuật
+
+- Bỏ khung hướng dẫn lớn và viền trang trí. Khi chưa đánh giá, chỉ hiện lời
+  nhắc ngắn và nút Ghi đánh giá ở giữa khung; bỏ cột ngữ cảnh bên phải theo
+  yêu cầu người dùng. Dữ liệu QC điền sẵn vẫn giữ trong biểu mẫu đánh giá.
+- Biểu mẫu chia ba nhóm: bản chất sai số và bằng chứng, đánh giá định lượng,
+  kết luận kỹ thuật. Nguồn số liệu điền sẵn thu/mở được; giữ nguyên mọi giá
+  trị, điều kiện ghi và cách main tính snapshot.
+- Kết quả đã ghi ưu tiên kết luận, người ghi và thời điểm. Phương pháp và
+  bằng chứng trình bày theo hàng; số liệu, công thức và căn cứ định lượng
+  mở xem khi cần. Khi ghi đánh giá mới, tập trung vào bản nháp, không lặp
+  toàn bộ kết quả cũ phía trên. Chuyển bước vẫn giữ bản nháp và phiên bản.
+- Lỗi nhập liệu khi ghi đánh giá kỹ thuật được gắn ngay dưới ô liên quan,
+  đánh dấu ô và cuộn tới vị trí sửa; không lặp ở đầu hồ sơ. Ánh xạ từ mã lỗi
+  main trả về, không sao chép điều kiện nghiệp vụ vào renderer. Lỗi chưa rõ
+  kết quả, xung đột phiên bản và lỗi không gắn được ô vẫn giữ ở mức hồ sơ.
+
+### Bổ sung 10/11/2026 — bố cục Hồ sơ liền mạch
+
+- Theo phương án người dùng chọn, phần Ghi nhận trình bày mô tả và người báo
+  cáo ở đầu; giai đoạn, người phụ trách và hạn trên một hàng thông tin gọn.
+  Xử lý tức thời, kiểm soát kết quả, phạm vi/thông báo và diễn biến bổ sung
+  được đọc theo hàng nhãn–giá trị, thay hai thẻ có chiều cao bằng nhau.
+- Dùng nền trắng, chữ và đường chia trung tính. Đầu sự cố được nhấn bằng nền
+  xám nhạt và một vạch teal mảnh, trạng thái kiểm soát ở bên phải; thông tin
+  phụ trách/hạn được tách nhóm. Nội dung phạm vi còn thiếu giữ lời nhắc từ
+  `missing[]` của main, không tự suy điều kiện nghiệp vụ. Nút Bổ sung chỉ
+  hiện khi được sửa, mở bản nháp và đưa con trỏ thẳng tới ô phạm vi; vẫn cần
+  bấm Lưu theo luồng hiện có.
+- Dòng thời gian và bằng chứng QC mặc định thu gọn; mở ra vẫn xem được các
+  mốc, bảng điểm và thao tác đính chính có căn cứ. Thu gọn không huỷ bản nháp.
+- Chỉ đổi cách trình bày; giữ trường dữ liệu, quyền, cổng, lịch sử và quy
+  trình lưu/đính chính hiện có.
 
 ### Bổ sung 22/10/2026 — tinh gọn phần ghi nhận sự cố
 

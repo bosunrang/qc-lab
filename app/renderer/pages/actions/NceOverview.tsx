@@ -5,6 +5,9 @@ import { useNceStore } from '../../store/nce-store';
 import { useAuthStore } from '../../store/auth-store';
 import { canWrite } from '../../lib/permissions';
 import { EmptyState } from '../../components/EmptyState';
+import { useAsyncAction } from '../../components/AsyncButton';
+import { withDeadline } from '../../lib/async-deadline';
+import { sendClientError } from '../../lib/unhandled-errors';
 import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { nceStatusBadge } from '../../lib/nce-labels';
 import { NCE_SOURCE_LABEL } from '../../../main/domain/nce/labels';
@@ -15,6 +18,7 @@ import { dateText } from './shared';
 import { nceSearchText, NEXT_STEP_TEXT } from './workflow';
 import { QUEUE_PAGE_SIZE, queuePage, queueTestOptions } from './queue-groups';
 import { Pagination, pageBounds } from '../../components/Pagination';
+import { assertDossier } from './dossier-data';
 
 function queueSummary(row: NceQueueRowView): string {
   return row.rejected_levels.map(queueLevelLabel).join('; ');
@@ -43,9 +47,10 @@ function SummaryCard({ tone, urgent = false, label, value, detail, onClick }: {
 }
 
 /** Một lần chạy trong bảng hàng chờ; tên xét nghiệm nằm ở dòng nhóm phía trên. */
-function QueueRow({ row, writable, onOpen, onAttach, onCreate }: {
+function QueueRow({ row, writable, busy, onOpen, onAttach, onCreate }: {
   row: NceQueueRowView;
   writable: boolean;
+  busy: boolean;
   onOpen: (id: string) => void;
   onAttach: (row: NceQueueRowView) => void;
   onCreate: (row: NceQueueRowView) => void;
@@ -66,9 +71,9 @@ function QueueRow({ row, writable, onOpen, onAttach, onCreate }: {
           : attachTo && <div className="nce-sub">Cùng xét nghiệm có hồ sơ {attachTo.nce_id} đang mở.</div>}
       </td>
       <td className="nce-col-action"><div className="nce-queue-actions">
-        {dossier && <button type="button" className="btn ghost sm" onClick={() => onOpen(dossier.id)}>Mở hồ sơ</button>}
-        {!dossier && attachTo && writable && <button type="button" className="btn sm" onClick={() => onAttach(row)}>Gắn vào {attachTo.nce_id}</button>}
-        {!dossier && writable && <button type="button" className={`btn sm${attachTo ? ' ghost' : ''}`} onClick={() => onCreate(row)}>Lập hồ sơ</button>}
+        {dossier && <button type="button" className="btn ghost sm" disabled={busy} onClick={() => onOpen(dossier.id)}>Mở hồ sơ</button>}
+        {!dossier && attachTo && writable && <button type="button" className="btn sm" disabled={busy} onClick={() => onAttach(row)}>Gắn vào {attachTo.nce_id}</button>}
+        {!dossier && writable && <button type="button" className={`btn sm${attachTo ? ' ghost' : ''}`} disabled={busy} onClick={() => onCreate(row)}>Lập hồ sơ</button>}
       </div></td>
     </tr>
   );
@@ -107,15 +112,38 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
     recordsRef.current?.scrollIntoView({ block: 'start' });
   }
 
-  async function attach(row: NceQueueRowView) {
+  const { busy: attaching, run: attach } = useAsyncAction(async (row: NceQueueRowView) => {
     if (!row.attach_to) return;
     if (!(await confirmDialog(`Gắn lần chạy ${nceRunLabel({ date: row.date, runId: row.run_id })} vào hồ sơ ${row.attach_to.nce_id}? QC tiếp tục bị loại sau xử lý tức thời nên hồ sơ sẽ phải xử lý theo CAPA đầy đủ.`, { title: 'Gắn vào hồ sơ đang mở', confirmLabel: 'Gắn vào hồ sơ', cancelLabel: 'Quay lại', danger: false }))) return;
-    const current = await get(row.attach_to.id);
-    if (!current) return;
-    const result = await attachRun({ id: current.record.id, expectedVersion: current.record.row_version, run: { date: row.date, runId: row.run_id } });
-    if (!result.ok) { await errorDialog(result.error.message); return; }
-    onOpen(result.data.record.id);
-  }
+    let current: NceDossierView | null;
+    const targetId = row.attach_to.id;
+    try {
+      current = await withDeadline(() => get(targetId), 30_000);
+      if (current !== null) assertDossier(current, targetId);
+    } catch (error) {
+      sendClientError(error);
+      await errorDialog('Không tải được hồ sơ để gắn lần chạy. Thử lại sau khi kết nối ổn định.');
+      return;
+    }
+    if (!current) { await errorDialog('Hồ sơ không còn tồn tại. Tải lại danh sách để đối chiếu.'); void load(); return; }
+    let attached: NceDossierView;
+    try {
+      const result = await withDeadline(() => attachRun({ id: current.record.id, expectedVersion: current.record.row_version, run: { date: row.date, runId: row.run_id } }), 30_000);
+      if (!result.ok) {
+        if (result.error.code === 'internal-error') throw new Error(result.error.message);
+        await errorDialog(result.error.message); return;
+      }
+      attached = result.data;
+      assertDossier(attached, current.record.id);
+    } catch (error) {
+      sendClientError(error);
+      // Không tự gắn lại khi mất phản hồi; mở hồ sơ để đối chiếu lệnh đã gửi.
+      await errorDialog('Chưa xác nhận được lần chạy đã được gắn hay chưa. Mở hồ sơ để đối chiếu trước khi thao tác lại.');
+      onOpen(current.record.id);
+      return;
+    }
+    onOpen(attached.record.id);
+  });
 
   function createFromRun(row: NceQueueRowView) {
     setCreating({ prefill: { testId: row.test_id, testName: row.test_name, date: row.date, runId: row.run_id, summary: `Lần chạy bị loại: ${queueSummary(row)}.` } });
@@ -123,14 +151,16 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
 
   function created(dossier: NceDossierView) { setCreating(null); onOpen(dossier.record.id); }
 
-  if (loading && !records.length && !queue.length) return <div className="panel"><EmptyState title="Đang tải sự cố và hồ sơ xử lý…" /></div>;
-  if (error && !records.length && !queue.length) return <div className="panel"><EmptyState title="Không tải được danh sách sự cố" action={<button type="button" className="btn" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState></div>;
+  // Tải lại một danh sách đang trống vẫn phải giữ hộp thoại/bản nháp đang mở.
+  const idle = !creating && !attaching;
+  if (idle && loading && !records.length && !queue.length) return <div className="panel"><EmptyState title="Đang tải sự cố và hồ sơ xử lý…" /></div>;
+  if (idle && error && !records.length && !queue.length) return <div className="panel"><EmptyState title="Không tải được danh sách sự cố" action={<button type="button" className="btn" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState></div>;
 
   return (
     <div className="nce-overview">
       <div className="nce-overview-intro">
         <div><h2>Việc cần xử lý</h2><p>Lập hồ sơ cho sự cố mới hoặc tiếp tục công việc đang phụ trách.</p></div>
-        {writable && <button type="button" className="btn" onClick={() => setCreating({ prefill: null })}>+ Lập hồ sơ từ nguồn khác</button>}
+        {writable && <button type="button" className="btn" disabled={attaching} onClick={() => setCreating({ prefill: null })}>+ Lập hồ sơ từ nguồn khác</button>}
       </div>
       {error && <div className="alert rej" role="alert">{error}<button type="button" className="btn ghost sm" onClick={() => void load()}>Thử lại</button></div>}
       <div className="nce-summary" aria-label="Tình hình xử lý sự cố">
@@ -161,7 +191,7 @@ export function NceOverview({ onOpen }: { onOpen: (id: string) => void }) {
                   <tbody key={group.testId}>
                     <tr className="nce-queue-group"><th scope="rowgroup" colSpan={4}>{group.testName} <span className="count">{group.total}</span></th></tr>
                     {group.rows.map((row) => (
-                      <QueueRow key={`${row.test_id}:${row.date}:${row.run_id}`} row={row} writable={writable} onOpen={onOpen} onAttach={(selected) => void attach(selected)} onCreate={createFromRun} />
+                      <QueueRow key={`${row.test_id}:${row.date}:${row.run_id}`} row={row} writable={writable} busy={attaching} onOpen={onOpen} onAttach={(selected) => void attach(selected)} onCreate={createFromRun} />
                     ))}
                   </tbody>
                 ))}

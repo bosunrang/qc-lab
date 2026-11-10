@@ -96,7 +96,7 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
         </div>
       </section>
       {selected ? <EqaResultInspector selection={selected} onOpenRound={onOpen} onOpenTest={() => onOpenTest(selected.testId, { ...scope.context, resultId: selected.resultId, roundId: selected.roundId })} />
-        : <section className="panel eqa-inspector eqa-inspector-empty" aria-label="Chi tiết kết quả">
+    : <section className="panel eqa-inspector" aria-label="Chi tiết kết quả">
           <div className="panel-head"><h2>Chi tiết kết quả</h2></div>
           <div className="eqa-section-body"><EmptyState size="compact" title="Chưa chọn kết quả">Chọn một ô trên bản đồ để xem chi tiết mẫu và nguồn báo cáo.</EmptyState></div>
         </section>}

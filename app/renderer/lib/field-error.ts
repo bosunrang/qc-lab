@@ -85,13 +85,15 @@ export function markInvalidField(control: FieldControl, errorId: string): () => 
   return unmark;
 }
 
-/** Tìm ô theo `name` (form dùng `FormData`) hoặc `data-field` (ô điều khiển
- * bằng state, không có `name`). Bỏ qua ô ẩn và ô bị khoá; ô ngày của
+/** Tìm ô theo `name`, `data-field`, rồi tới `id` cho biểu mẫu dùng state.
+ * Ưu tiên tên ô đã có để không đổi cách chọn của form cũ. Bỏ qua ô ẩn và ô bị khoá; ô ngày của
  * `DateField` mang `name` trên ô `type=date` ẩn nên trả về ô chữ người dùng
  * thật sự gõ. */
 export function findFieldControl(root: ParentNode, field: string): HTMLElement | null {
-  const candidates = [...root.querySelectorAll<HTMLElement>('[name], [data-field]')]
+  const elements = [...root.querySelectorAll<HTMLElement>('[name], [data-field], [id]')];
+  const named = elements
     .filter((el) => el.getAttribute('name') === field || el.getAttribute('data-field') === field);
+  const candidates = [...named, ...elements.filter((el) => el.id === field && !named.includes(el))];
   for (const el of candidates) {
     if (el instanceof HTMLInputElement && el.type === 'hidden') continue;
     if ((el as HTMLInputElement).disabled) continue;

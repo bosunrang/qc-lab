@@ -4,10 +4,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  addIdToken, formError, formErrorFrom, markInvalidField, pickField, removeIdToken,
+  addIdToken, findFieldControl, formError, formErrorFrom, markInvalidField, pickField, removeIdToken,
 } from '../renderer/lib/field-error.ts';
 
 const MAP = { 'missing-name': 'name', 'duplicate-name': 'name', 'missing-dates': ['effectiveDate', 'approvedDate'] };
+
+test('tìm ô bằng id nhưng ưu tiên tên ô đã có và bỏ ô ẩn hoặc bị khoá', () => {
+  const original = globalThis.HTMLInputElement;
+  class Input {
+    constructor(id, attrs = {}) { this.id = id; this.attrs = attrs; this.type = attrs.type || 'text'; this.disabled = !!attrs.disabled; this.classList = { contains: () => false }; }
+    getAttribute(name) { return this.attrs[name] ?? null; }
+  }
+  globalThis.HTMLInputElement = Input;
+  try {
+    const byId = new Input('techTea');
+    const byName = new Input('other', { name: 'techTea' });
+    assert.equal(findFieldControl({ querySelectorAll: () => [byId, byName] }, 'techTea'), byName);
+    assert.equal(findFieldControl({ querySelectorAll: () => [byId] }, 'techTea'), byId);
+    assert.equal(findFieldControl({ querySelectorAll: () => [new Input('techTea', { type: 'hidden' }), new Input('techTea', { disabled: true })] }, 'techTea'), null);
+  } finally {
+    if (original === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = original;
+  }
+});
 
 test('mã lỗi IPC → ô ứng viên; mã không có trong bảng là lỗi chung', () => {
   assert.deepEqual(formErrorFrom({ code: 'duplicate-name', message: 'Trùng tên' }, MAP), { message: 'Trùng tên', fields: ['name'] });

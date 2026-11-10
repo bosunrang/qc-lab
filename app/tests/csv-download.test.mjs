@@ -1,4 +1,4 @@
-// CSV tải về từ mọi trang (Báo cáo, Nhật ký hoạt động, Khắc phục sự cố) đi
+// CSV tải về từ các chức năng nhật ký đi
 // qua MỘT hàm `downloadCsv()` luôn kèm BOM UTF-8 (kế hoạch kiến trúc D.9):
 // Excel trên Windows đoán mã hoá theo codepage hệ thống, thiếu BOM là tiếng
 // Việt thành ký tự rác. Trước 2026-09-26 chỉ Báo cáo có BOM.

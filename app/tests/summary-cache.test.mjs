@@ -13,7 +13,7 @@ const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.
 const { createWestgardHandlers } = require('../../app-dist/main/ipc/westgard-handlers.js');
 const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
 const { writeAudit, notifyChanged } = require('../../app-dist/main/ipc/shared.js');
-import { ensureUser, releaseByVerificationRun } from './helpers/nce-flow.mjs';
+import { ensureUser, receivePendingRejectedRuns, releaseByVerificationRun } from './helpers/nce-flow.mjs';
 
 const actor = { userId: 'u1', username: 'admin', name: 'Quản trị', role: 'admin', clientId: 'test' };
 
@@ -147,11 +147,14 @@ test('mọi thao tác ghi thật: kết quả có bộ nhớ đệm trùng lư�
 
   must(config.removeTest({ id: C.id }, actor), 'xoá xét nghiệm');
   assert.equal(check('xoá xét nghiệm C').length, 2);
+  // Lần chạy bị loại phải có hồ sơ NCE trước khi dừng nhóm lô (R03).
+  receivePendingRejectedRuns(db, actor);
+  check('lập hồ sơ NCE cho lần chạy bị loại còn tồn');
   must(config.stopLotGroup({ id: group.id }, actor), 'dừng nhóm lô');
   const stopped = check('dừng nhóm lô');
   assert.deepEqual(stopped.map((s) => s.levels.length), [0, 0], 'nhóm lô dừng thì không còn mức vận hành');
   notifyChanged(['activity']);
   check('lời báo lạc (chỉ activity)');
-  assert.equal(steps.length, 18, 'chạy đủ mọi bước');
+  assert.equal(steps.length, 19, 'chạy đủ mọi bước');
   db.close();
 });

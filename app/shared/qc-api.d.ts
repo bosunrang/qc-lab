@@ -630,6 +630,9 @@ export interface QcMonthlyReview {
   open_items: string;
   /** Các lần ký, cũ trước; lần cuối là kết luận hiện hành. */
   signatures: QcMonthlyReviewSignature[];
+  /** Đã ký nhưng số liệu tháng đổi sau lần ký cuối: kết luận chỉ áp dụng cho
+   * số liệu lúc ký, cần ký lại trước khi khoá kỳ. */
+  signature_stale: boolean;
 }
 export interface FirebaseSettings {
   labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
@@ -647,6 +650,11 @@ export interface ReportPointRow {
    * kiểm ISO 15189. */
   lot: string;
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
+  /** Cùng nguồn đánh giá với Westgard, tính trước khi cắt khoảng ngày báo cáo.
+   * Điểm đã huỷ/chưa đánh giá có z=null, không được vẽ thành điểm đạt. */
+  target_mean: number | null; target_sd: number | null; z: number | null;
+  verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[];
+  accepted: boolean; run_rejected_by: number[];
 }
 
 // ── Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md) ──────────────────────────────

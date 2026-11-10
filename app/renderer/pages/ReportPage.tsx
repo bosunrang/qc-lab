@@ -15,18 +15,18 @@ import { TestPicker } from '../components/TestPicker';
 import { normalizeSearch, useTestSelection } from '../lib/useTestSelection';
 import { PrintIcon } from '../components/PrintIcon';
 import { Modal } from '../components/Modal';
-import { ERROR_CLASS_LABEL } from '../../main/domain/westgard-rules';
 import { confirmDialog, errorDialog, reauthDialog } from '../state/dialog-store';
 import { showToast } from '../state/toast-store';
-import { downloadCsv, exportTableXlsx, printHtmlToPdf } from '../lib/export';
-import { DOCUMENT_CSS, documentHeader, loadPrintIdentity, signatureBlock, type PrintIdentity } from '../lib/print-document';
+import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
+import { loadPrintIdentity } from '../lib/print-document';
+import { renderQcMultiChartPng } from '../components/QcChart';
+import { buildIqcPrintHtml, iqcChartSeries, POINT_HEADERS, NCE_HEADERS, pointRow, nceRow } from '../lib/iqc-report';
 import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { LoadNotice } from '../components/LoadNotice';
 import type { NceRecordRow, ReportForm, ReportFormKind, ReportPointRow, ReportTemplateSettings, TestSummary } from '../../shared/qc-api';
 import { REPORT_FORM_KINDS, REPORT_FORM_LABELS } from '../../main/domain/report-template-validation';
-import { NCE_SOURCE_LABEL, NCE_STATUS_LABEL, NCE_TIER_LABEL } from '../../main/domain/nce/labels';
 import { AsyncButton } from '../components/AsyncButton';
 import { MonthlyReviewPanel } from './report/MonthlyReviewPanel';
 
@@ -56,60 +56,6 @@ function testSelectLabel(test: TestSummary, all: TestSummary[]): string {
   const lots = [...new Set(test.levels.map((l) => l.lot).filter(Boolean))];
   const sameName = all.filter((t) => normalizeSearch(t.testName) === normalizeSearch(test.testName)).length > 1;
   return `${test.testName}${lots.length ? ' · LOT ' + lots.join('/') : ''}${sameName && test.instrumentName ? ' · ' + test.instrumentName : ''}`;
-}
-
-function esc(s: unknown): string {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function csvCell(value: unknown): string {
-  const text = String(value ?? '');
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-// Số lô đứng ngay sau Mức: hai thứ cùng định danh VẬT LIỆU KIỂM của dòng đó.
-// Thiếu nó, một báo cáo bắc qua lần đổi lô liệt kê điểm của cả hai lô mà
-// không phân biệt được — mà số lô là định danh bắt buộc của vật liệu kiểm
-// trong hồ sơ nội kiểm ISO 15189.
-const POINT_HEADERS = ['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'];
-const NCE_HEADERS = ['Mã NCE', 'Ngày phát hiện', 'Nguồn', 'Mô tả', 'Loại sai số', 'Tầng xử lý', 'Hạn xử lý', 'Trạng thái'];
-
-/** Hồ sơ ĐÃ HUỶ vẫn nằm trong phụ lục (nó là dấu vết, không được lọc đi);
- * cột trạng thái nói rõ điều đó. */
-function pointRow(p: ReportPointRow): (string | number)[] {
-  return [vnDate(p.date), p.level, p.lot || '—', p.run_id, p.val, p.operator_name || '—', p.voided ? `Đã huỷ: ${p.void_reason}` : 'Hợp lệ'];
-}
-function nceRow(r: NceRecordRow): string[] {
-  return [r.nce_id || '—', vnDate(r.detected_at), NCE_SOURCE_LABEL[r.source] || r.source, r.description || '—',
-    ERROR_CLASS_LABEL[r.error_class] ?? ERROR_CLASS_LABEL[''], NCE_TIER_LABEL[r.tier] || '—',
-    r.due_date ? vnDate(r.due_date) : '—', NCE_STATUS_LABEL[r.status] || r.status];
-}
-
-/** Trang in — tĩnh, tự đứng một mình (cửa sổ in ở main process nạp qua
- * `data:` URL, không dùng CSS/JS của renderer). Phụ lục NCE chỉ in khi
- * người dùng tick — đúng nhãn "(Áp dụng cho PDF và Excel)". */
-function buildPrintHtml(identity: PrintIdentity, label: string, from: string, to: string, points: ReportPointRow[], nce: NceRecordRow[] | null): string {
-  const rows = points.map((p) => `<tr${p.voided ? ' class="voided"' : ''}>${pointRow(p).map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
-  const appendix = nce
-    ? `<h2>Phụ lục NCE</h2>${nce.length
-      ? `<table><thead><tr>${NCE_HEADERS.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${nce.map((r) => `<tr>${nceRow(r).map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
-      : '<p class="meta">Không có hồ sơ khắc phục nào trong khoảng ngày này.</p>'}`
-    : '';
-  const range = `Khoảng thời gian: ${from ? vnDate(from) : '(không giới hạn)'} — ${to ? vnDate(to) : '(không giới hạn)'}`;
-  return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo nội kiểm</title>
-  <style>
-    @page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}
-    body{font:10px Arial,sans-serif;color:#183843;margin:0;}
-    h2{font-size:12px;color:#215968;margin:16px 0 6px;break-after:avoid;}
-    p.meta{color:#506674;margin-bottom:16px;}
-    table{width:100%;border-collapse:collapse;} th,td{border:1px solid #c9d9d6;padding:4px 6px;text-align:left;overflow-wrap:anywhere;}
-    th{background:#e9f1f2;print-color-adjust:exact;-webkit-print-color-adjust:exact;} thead{display:table-header-group} tr{break-inside:avoid}
-    tr.voided td{color:#888;text-decoration:line-through;}
-    ${DOCUMENT_CSS}
-  </style></head><body>
-  ${documentHeader(identity, 'Báo cáo nội kiểm', label, [range])}
-  <table><thead><tr>${POINT_HEADERS.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
-  ${appendix}${signatureBlock()}</body></html>`;
 }
 
 export function ReportPage() {
@@ -173,7 +119,21 @@ export function ReportPage() {
   function printReport() {
     return run(async () => {
       const [{ points, nce }, identity] = await Promise.all([collect(), loadPrintIdentity('iqc')]);
-      const error = await printHtmlToPdf(buildPrintHtml(identity, selected ? testSelectLabel(selected, summaries) : selectedId, start, end, points, nce), `bao-cao-${stamp()}.pdf`, { pageNumbers: true });
+      // Cùng hàm vẽ với Westgard; mỗi khung tối đa bốn chuỗi để chú giải rõ
+      // khi khoảng báo cáo bắc qua nhiều lần đổi lô.
+      const series = iqcChartSeries(points, start, end);
+      const charts: string[] = [];
+      await document.fonts.ready;
+      for (let i = 0; i < series.length; i += 4) {
+        const png = renderQcMultiChartPng(series.slice(i, i + 4));
+        if (!png) throw new Error('Không dựng được biểu đồ Levey-Jennings cho báo cáo.');
+        charts.push(png);
+      }
+      // Số lô lấy từ từng dòng/đường biểu đồ của kỳ báo cáo, không gắn nhãn
+      // lô đang vận hành lên dữ liệu lịch sử của lô khác.
+      const label = selected ? [selected.testName, selected.instrumentName].filter(Boolean).join(' · ') : selectedId;
+      const html = buildIqcPrintHtml({ identity, label, from: start, to: end, points, nce, charts });
+      const error = await printHtmlToPdf(html, `bao-cao-${stamp()}.pdf`, { pageNumbers: true });
       if (error) await errorDialog(error);
     });
   }
@@ -190,17 +150,6 @@ export function ReportPage() {
       }
       const error = await exportTableXlsx(selected?.testName || 'Báo cáo', POINT_HEADERS, rows, `bao-cao-${stamp()}.xlsx`);
       if (error) await errorDialog(error);
-    });
-  }
-
-  function exportCsv() {
-    return run(async () => {
-      const { points, nce } = await collect();
-      const lines = [POINT_HEADERS.map(csvCell).join(','), ...points.map((p) => pointRow(p).map(csvCell).join(','))];
-      if (nce) {
-        lines.push('', 'PHỤ LỤC NCE', NCE_HEADERS.map(csvCell).join(','), ...nce.map((r) => nceRow(r).map(csvCell).join(',')));
-      }
-      downloadCsv(lines.join('\n'), `bao-cao-${stamp()}.csv`);
     });
   }
 
@@ -256,9 +205,8 @@ export function ReportPage() {
                 </label>
               </div>
               <div className="report-actions">
-                <button className="btn teal" disabled={disabled} onClick={printReport}><PrintIcon />Tạo báo cáo &amp; In</button>
+                <button className="btn teal" disabled={disabled} onClick={printReport}><PrintIcon />In PDF</button>
                 <button className="btn ghost" disabled={disabled} onClick={exportXlsx}>Xuất Excel</button>
-                <button className="btn ghost" disabled={disabled} onClick={exportCsv}>Xuất CSV</button>
               </div>
             </div>
           </div>

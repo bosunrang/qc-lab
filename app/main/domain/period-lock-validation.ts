@@ -17,9 +17,13 @@ export function ymOfDate(date: string): string {
 export interface LockPeriodInput { ym?: unknown; note?: unknown; acknowledge?: unknown }
 export interface PreparedLockPeriod { ym: string; note: string; acknowledge: boolean }
 
-export function validateLockPeriod(input: LockPeriodInput): ValidationResult<PreparedLockPeriod> {
+/** `today` (YYYY-MM-DD theo giờ máy): kỳ chưa tới không có dữ liệu để xem xét,
+ * khoá trước chỉ chặn việc nhập QC khi kỳ đó diễn ra — cùng mốc với cổng ký
+ * biên bản tháng (`validateReviewSignature`). */
+export function validateLockPeriod(input: LockPeriodInput, today: string): ValidationResult<PreparedLockPeriod> {
   const ym = cleanText(input.ym, 7).trim();
   if (!isValidYm(ym)) return { ok: false, code: 'invalid-period', message: 'Kỳ phải có định dạng YYYY-MM.' };
+  if (ym > today.slice(0, 7)) return { ok: false, code: 'future-period', message: 'Không khoá kỳ chưa tới.' };
   const note = cleanText(input.note, 500).trim();
   return { ok: true, data: { ym, note, acknowledge: input.acknowledge === true } };
 }

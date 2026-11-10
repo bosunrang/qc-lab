@@ -55,6 +55,27 @@ export function summarizeReviewGroup(points: readonly ReviewPoint[]): ReviewGrou
   };
 }
 
+/** Các trường của một dòng biên bản mà chữ ký xác nhận. */
+interface FingerprintRow {
+  test_id?: unknown; level?: unknown; lot?: unknown; n?: unknown; accepted?: unknown; rejected?: unknown; unevaluated?: unknown;
+  mean?: unknown; sd?: unknown; target_mean?: unknown; target_sd?: unknown; voided?: unknown; voided_rejected?: unknown;
+}
+
+/** Dấu vân tay số liệu QC mà một lần ký xác nhận (ISO 15189:2022 7.3.7.2,
+ * 8.4): dùng để biết số liệu tháng có đổi sau lần ký cuối hay không. Chỉ gồm
+ * số liệu QC theo xét nghiệm/mức/lô và số lần chạy bị loại. Không gồm tên xét
+ * nghiệm hay máy (đổi tên không đổi số liệu), cũng không gồm hồ sơ NCE và việc
+ * còn tồn (đóng hồ sơ là việc tiếp theo của kết luận, cổng khoá kỳ kiểm riêng).
+ * Số thực làm tròn 12 chữ số để tính lại cùng dữ liệu luôn ra cùng chuỗi. */
+export function reviewDataFingerprint(summary: { rows?: readonly FingerprintRow[]; totals?: { rejected_runs?: unknown } } | null | undefined): string {
+  const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? Number(value.toPrecision(12)) : null);
+  const rows = (summary?.rows ?? []).map((row) => [
+    String(row.test_id ?? ''), num(row.level), String(row.lot ?? ''), num(row.n), num(row.accepted), num(row.rejected), num(row.unevaluated),
+    num(row.mean), num(row.sd), num(row.target_mean), num(row.target_sd), num(row.voided), num(row.voided_rejected),
+  ]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return JSON.stringify({ rows, rejectedRuns: num(summary?.totals?.rejected_runs) });
+}
+
 export const REVIEW_CONCLUSIONS = ['ok', 'monitor', 'action'] as const;
 export type ReviewConclusion = typeof REVIEW_CONCLUSIONS[number];
 export const REVIEW_CONCLUSION_LABELS: Record<ReviewConclusion, string> = {

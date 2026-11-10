@@ -13,21 +13,29 @@ export interface PeriodOpenItems {
   openNceIds: string[];
   /** Kỳ chưa có biên bản xem xét QC tháng được ký (GV4 mục 2). */
   reviewMissing: boolean;
+  /** Đã ký nhưng số liệu tháng đổi sau lần ký cuối: chữ ký không còn áp dụng
+   * cho số liệu hiện tại, phải ký lại. */
+  reviewStale: boolean;
 }
+
+/** Trạng thái biên bản tháng: chưa ký, đã ký nhưng số liệu đổi sau đó, hoặc
+ * lần ký cuối khớp số liệu hiện tại. */
+export type PeriodReviewState = 'missing' | 'stale' | 'current';
 
 const inPeriod = (date: string, ym: string) => date.slice(0, 7) === ym;
 
-export function periodOpenItems(ym: string, queue: readonly NceQueueRow[], openRecords: readonly PeriodOpenRecord[], reviewed = true): PeriodOpenItems {
+export function periodOpenItems(ym: string, queue: readonly NceQueueRow[], openRecords: readonly PeriodOpenRecord[], review: PeriodReviewState = 'current'): PeriodOpenItems {
   return {
     unreviewedRuns: queue.filter((row) => !row.record && inPeriod(row.date, ym)).map((row) => ({ testId: row.testId, date: row.date, runId: row.runId })),
     openNceIds: openRecords
       .filter((record) => (record.runDates.length ? record.runDates.some((date) => inPeriod(date, ym)) : inPeriod(record.detectedAt, ym)))
       .map((record) => record.nceId).sort(),
-    reviewMissing: !reviewed,
+    reviewMissing: review === 'missing',
+    reviewStale: review === 'stale',
   };
 }
 
-export const hasPeriodOpenItems = (items: PeriodOpenItems) => items.unreviewedRuns.length > 0 || items.openNceIds.length > 0 || items.reviewMissing;
+export const hasPeriodOpenItems = (items: PeriodOpenItems) => items.unreviewedRuns.length > 0 || items.openNceIds.length > 0 || items.reviewMissing || items.reviewStale;
 
 const LIST_LIMIT = 5;
 const listText = (items: readonly string[]) => items.slice(0, LIST_LIMIT).join('; ') + (items.length > LIST_LIMIT ? `; … (+${items.length - LIST_LIMIT})` : '');
@@ -40,5 +48,6 @@ export function periodOpenItemsText(items: PeriodOpenItems, testName: (testId: s
   }
   if (items.openNceIds.length) parts.push(`${items.openNceIds.length} hồ sơ NCE chưa đóng (${listText(items.openNceIds)})`);
   if (items.reviewMissing) parts.push('chưa có biên bản xem xét QC tháng');
+  if (items.reviewStale) parts.push('số liệu QC tháng đã đổi sau lần ký biên bản cuối, cần ký lại');
   return parts.join('; ');
 }

@@ -1,6 +1,6 @@
 // Phần dùng chung của trang Khắc phục sự cố: khung panel từng bước, ô chọn
 // người, bảng snapshot lần chạy và hook nạp/ghi một hồ sơ.
-import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useNceStore } from '../../store/nce-store';
@@ -8,10 +8,9 @@ import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 import { vnDate } from '../../lib/format';
 import { formatAuditDateTimeVN } from '../../../main/domain/audit-format';
 import type { NceRunRow, NceUserOption } from '../../../shared/qc-api';
-import { nceRunLabel } from '../../../main/domain/nce/presentation';
 import { createDossierSession } from './dossier-session';
 import { sendClientError } from '../../lib/unhandled-errors';
-export type { DossierWrite } from './dossier-session';
+export type { DossierWrite, DossierWriteOptions } from './dossier-session';
 
 export const dateText = (iso: string) => vnDate(iso, '—');
 export const timeText = (iso: string) => (iso ? formatAuditDateTimeVN(iso) : '—');
@@ -21,14 +20,21 @@ export function holdText(value: 0 | 1 | null): string {
 }
 
 /** Một phần của hồ sơ; số bước chỉ xuất hiện ở thanh điều hướng quy trình. */
-export function Section({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
+export interface SectionDisclosure { expanded: boolean; summary: string; onToggle: () => void; onInteract: () => void }
+
+export function Section({ title, actions, children, disclosure, headingLevel = 2 }: { title: string; actions?: ReactNode; children: ReactNode; disclosure?: SectionDisclosure; headingLevel?: 2 | 3 }) {
+  const bodyId = useId();
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   return (
-    <section className="panel" aria-label={title}>
+    <section className={`panel${disclosure ? ' nce-capa-group' : ''}`} aria-label={title} onFocusCapture={() => { if (disclosure?.expanded) disclosure.onInteract(); }}>
       <div className="panel-head">
-        <h2>{title}</h2>
-        {actions ? <div className="nce-section-actions">{actions}</div> : null}
+        <Heading>{disclosure ? <button type="button" className="nce-capa-toggle" aria-expanded={disclosure.expanded} aria-controls={bodyId} onClick={disclosure.onToggle}>
+          <span><span>{title}</span><small>{disclosure.summary}</small></span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+        </button> : title}</Heading>
+        {actions && (!disclosure || disclosure.expanded) ? <div className="nce-section-actions">{actions}</div> : null}
       </div>
-      <div className="nce-section-body">{children}</div>
+      <div className="nce-section-body" id={bodyId} hidden={disclosure ? !disclosure.expanded : undefined}>{children}</div>
     </section>
   );
 }
@@ -42,8 +48,11 @@ export function Facts({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
+export const InlineFieldErrorContext = createContext<{ field: string; id: string; message: string } | null>(null);
+
 export function Field({ label, htmlFor, children, wide = false }: { label: string; htmlFor?: string; children: ReactNode; wide?: boolean }) {
-  return <div className={`field${wide ? ' nce-field-wide' : ''}`}><label htmlFor={htmlFor}>{label}</label>{children}</div>;
+  const error = useContext(InlineFieldErrorContext);
+  return <div className={`field${wide ? ' nce-field-wide' : ''}`}><label htmlFor={htmlFor}>{label}</label>{children}{error && error.field === htmlFor && <p className="field-error" id={error.id} role="alert">{error.message}</p>}</div>;
 }
 
 export function UserSelect({ id, value, users, onChange, disabled }: { id: string; value: string; users: readonly NceUserOption[]; onChange: (value: string) => void; disabled?: boolean }) {
@@ -78,7 +87,7 @@ const VERDICT: Record<string, { label: string; tone: string }> = {
   ok: { label: 'Đạt', tone: 'ok' }, warn: { label: 'Cảnh báo', tone: 'warn' }, rej: { label: 'Loại', tone: 'rej' }, none: { label: 'Chưa đánh giá', tone: 'none' },
 };
 
-export interface SnapshotPoint { level: number; lot: string; val: number; z: number | null; verdict: string; rules: readonly string[]; voided: boolean }
+export interface SnapshotPoint { pointId?: string; level: number; lot: string; val: number; z: number | null; verdict: string; rules: readonly string[]; voided: boolean }
 
 /** Bảng các mức của một lần chạy (snapshot do main chụp, hoặc kết quả đánh giá thử). */
 export function SnapshotTable({ points }: { points: readonly SnapshotPoint[] }) {
@@ -86,10 +95,10 @@ export function SnapshotTable({ points }: { points: readonly SnapshotPoint[] }) 
   return (
     <table className="nce-table nce-snapshot-table">
       <thead><tr><th scope="col">Mức</th><th scope="col">Lô</th><th scope="col">Giá trị</th><th scope="col">z</th><th scope="col">Kết luận</th><th scope="col">Luật</th></tr></thead>
-      <tbody>{points.map((p) => {
+      <tbody>{points.map((p, index) => {
         const verdict = p.voided ? { label: 'Đã huỷ', tone: 'none' } : VERDICT[p.verdict] ?? VERDICT.none;
         return (
-          <tr key={`${p.level}-${p.lot}`}>
+          <tr key={p.pointId || `${p.level}-${p.lot}-${index}`}>
             <td>M{p.level}</td><td>{p.lot || '—'}</td><td>{p.val}</td><td>{p.z == null ? '—' : p.z.toFixed(2)}</td>
             <td><span className={`tag ${verdict.tone}`}>{verdict.label}</span></td><td>{p.rules.length ? p.rules.join(', ') : '—'}</td>
           </tr>
@@ -108,8 +117,6 @@ export function runPoints(run: NceRunRow): SnapshotPoint[] {
 
 export const RUN_ROLE_LABEL: Record<NceRunRow['role'], string> = { trigger: 'Lần chạy khởi đầu', repeat_reject: 'Bị loại thêm', rerun: 'Lần chạy rerun / xác minh' };
 
-export function runRowLabel(run: NceRunRow): string { return nceRunLabel({ date: run.date, runId: run.run_id }); }
-
 /** Nạp một hồ sơ và gửi lệnh ghi kèm `row_version` đang xem. Ghi thành công
  * thì dùng ngay hồ sơ main trả về; lệch phiên bản (`stale`) thì báo và cho
  * tải lại thay vì ghi đè thay đổi của người khác. */
@@ -123,5 +130,7 @@ export function useDossier(id: string) {
   }, [session]);
   useStoreInvalidation(['nce_records'], undefined, () => session.getState().invalidate());
   const reload = useCallback(() => session.getState().reload(true), [session]);
-  return { ...current, busy: current.busy || current.error?.kind === 'uncertain', reload };
+  // Khoá ghi khi chưa rõ kết quả, nhưng chỉ khoá đóng hộp thoại lúc thực sự
+  // đang chờ lệnh. Sau lỗi kết nối, người dùng còn đường ra để đối chiếu.
+  return { ...current, pending: current.busy, busy: current.busy || current.error?.kind === 'uncertain', reload };
 }

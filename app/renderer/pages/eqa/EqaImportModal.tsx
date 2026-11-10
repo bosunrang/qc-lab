@@ -72,7 +72,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
     } finally { setParsing(false); }
   }
 
-  // Mỗi file một máy, năm hợp lệ; trong cùng một đợt các máy không trùng nhau.
+  // Mỗi file một máy, năm hợp lệ; trong cùng một đợt không có hai file cùng máy, cùng mẫu.
   const yearOf = (i: number) => Number(yearFor[i] ?? '');
   const yearValid = reports.every((_, i) => Number.isInteger(yearOf(i)) && yearOf(i) >= 2000 && yearOf(i) <= 2100);
   const chosen = reports.map((_, i) => instrumentFor[i] ?? '');
@@ -88,7 +88,11 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
     };
   });
   const groups = groupEqaSources(named);
-  const duplicateInstrument = groups.some((g) => g.indices.some((i, k) => chosen[i] && g.indices.findIndex((j) => chosen[j] === chosen[i]) !== k));
+  // Một đợt VEQAS phát hành mỗi mẫu một tệp, nên hai tệp cùng máy là hợp lệ
+  // khi khác mẫu; chỉ chặn khi cùng máy lại trùng mẫu (một kết quả hai nguồn).
+  const samplesOf = (i: number) => new Set(reports[i].rows.map((row) => String(row.sample ?? '').trim().toLowerCase()));
+  const duplicateInstrument = groups.some((g) => g.indices.some((i, k) => chosen[i] && g.indices.some((j, m) => m > k && chosen[j] === chosen[i]
+    && [...samplesOf(i)].some((sample) => samplesOf(j).has(sample)))));
   const ready = reports.length > 0 && yearValid && chosen.every(Boolean) && !duplicateInstrument;
 
   function startReview() {
@@ -163,7 +167,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
                 </tbody>
               </table>
             </div>
-            {duplicateInstrument && <div className="alert warn">Hai file của cùng một đợt đang chọn cùng một máy. Mỗi báo cáo PDF là kết quả của một máy.</div>}
+            {duplicateInstrument && <div className="alert warn">Hai file của cùng một đợt đang chọn cùng một máy cho cùng một mẫu. Mỗi báo cáo PDF là kết quả của một máy, một mẫu.</div>}
             {readErrors.length > 0 && <div className="alert rej eqa-pre" role="alert">{readErrors.join('\n')}</div>}
           </>
         )}
@@ -260,7 +264,7 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
                 <div className="alert warn">
                   {preview.existing.status === 'cancelled'
                     ? `Đợt này đã có trong app nhưng đã huỷ. Nhập lại sẽ mở lại đợt với phiên bản ${preview.existing.version + 1}.`
-                    : `Đợt này đã có kết quả của ${preview.existing.replaces.join(', ')}. Nhập lại thay kết quả của máy đó bằng phiên bản ${preview.existing.version + 1}; phiên bản cũ vẫn được giữ trong CSDL.`}
+                    : `Đợt này đã có kết quả của ${preview.existing.replaces.join(', ')}. Nhập lại thay kết quả của đúng máy và mẫu đó bằng phiên bản ${preview.existing.version + 1}; phiên bản cũ vẫn được giữ trong CSDL.`}
                 </div>
               ) : (
                 <div className="alert info">Đợt này đã có trong app (đang có: {preview.existing.instruments.join(', ') || 'chưa có máy nào'}). Lần nhập này bổ sung máy mới, kết quả của các máy đã có giữ nguyên.</div>

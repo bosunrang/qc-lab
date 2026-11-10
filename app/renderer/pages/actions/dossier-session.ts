@@ -1,9 +1,15 @@
 // Phiên làm việc của một hồ sơ: tuần tự hoá ghi, bỏ phản hồi đọc cũ và giữ
 // nguyên lỗi/bản nháp cho tới khi người dùng chủ động đối chiếu dữ liệu mới.
 import { createStore } from 'zustand/vanilla';
+import { withDeadline } from '../../lib/async-deadline';
 import type { IpcResult, NceDossierView, NceWriteBase } from '../../../shared/qc-api';
+import { assertDossier } from './dossier-data';
 
 export type DossierWrite = (base: NceWriteBase) => Promise<IpcResult<NceDossierView>>;
+export interface DossierWriteOptions {
+  /** Trả true khi biểu mẫu đã gắn lỗi nhập liệu vào đúng ô; lỗi khác vẫn hiện chung. */
+  handleValidationError?: (error: { code: string; message: string }) => boolean;
+}
 export interface DossierError { message: string; stale: boolean; kind: 'load' | 'write' | 'uncertain' }
 
 interface DossierSession {
@@ -15,33 +21,11 @@ interface DossierSession {
   dispose: () => void;
   reload: (acknowledgeError?: boolean) => Promise<boolean>;
   invalidate: () => void;
-  run: (write: DossierWrite) => Promise<boolean>;
+  run: (write: DossierWrite, options?: DossierWriteOptions) => Promise<boolean>;
   clearError: () => void;
 }
 
-/** Giới hạn thời gian chờ ở giao diện, không huỷ/khẳng định kết quả giao dịch
- * phía máy chính. Promise về muộn vẫn được bắt, nhưng không cập nhật state. */
-function withDeadline<T>(work: () => Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Hết thời gian chờ phản hồi từ máy chính.')), timeoutMs);
-    try { Promise.resolve(work()).then(resolve, reject).finally(() => clearTimeout(timer)); }
-    catch (error) { clearTimeout(timer); reject(error); }
-  });
-}
-
 const messageOf = (error: unknown) => error instanceof Error ? error.message : typeof error === 'string' ? error : 'Không nhận được phản hồi hợp lệ.';
-
-/** Máy trạm có thể nhận envelope lỗi HTTP thay cho dòng đọc khi phiên hết
- * hạn. Không đưa envelope đó vào state như một hồ sơ hợp lệ. */
-function assertDossier(value: unknown, id: string): asserts value is NceDossierView {
-  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  if (input.ok === false) {
-    const error = input.error && typeof input.error === 'object' ? input.error as Record<string, unknown> : {};
-    throw new Error(typeof error.message === 'string' ? error.message : 'Máy chính từ chối đọc hồ sơ.');
-  }
-  const record = input.record && typeof input.record === 'object' ? input.record as Record<string, unknown> : {};
-  if (record.id !== id || !Number.isInteger(record.row_version) || Number(record.row_version) < 1) throw new Error('Dữ liệu hồ sơ nhận được không hợp lệ.');
-}
 
 export function createDossierSession(
   id: string,
@@ -97,7 +81,7 @@ export function createDossierSession(
       if (state().busy) { pendingReload = true; return; }
       void state().reload();
     },
-    async run(write) {
+    async run(write, options) {
       const current = state();
       // Khoá ngay trong cùng nhịp xử lý, không đợi React vẽ lại nút disabled.
       if (!active || !current.dossier || current.busy || current.error?.kind === 'uncertain') return false;
@@ -109,6 +93,14 @@ export function createDossierSession(
         if (!active || startedIn !== lifecycle) return false;
         if (result.ok) { assertDossier(result.data, id); set({ dossier: result.data, error: null }); return true; }
         if (result.error.code === 'internal-error') throw new Error(result.error.message);
+        // Lệnh đã bị từ chối rõ ràng: cho biểu mẫu đặt lỗi ngay cạnh ô nhập.
+        // Xung đột phiên bản luôn giữ ở mức hồ sơ để người dùng đối chiếu.
+        let handled = false;
+        if (result.error.code !== 'stale' && options?.handleValidationError) {
+          try { handled = options.handleValidationError(result.error); }
+          catch (error) { report(error); }
+        }
+        if (handled) { set({ error: null }); return false; }
         set({ error: { message: result.error.message, stale: result.error.code === 'stale', kind: 'write' } });
         return false;
       } catch (error) {

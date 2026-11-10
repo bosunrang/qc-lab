@@ -108,7 +108,7 @@ test('mọi cổng ghi chỉ lưu mã SE/RE/rỗng', t => {
 });
 
 test('các chỗ hiển thị đọc mã ra nhãn, không in giá trị thô', () => {
-  const report = readFileSync(new URL('../renderer/pages/ReportPage.tsx', import.meta.url), 'utf8');
+  const report = readFileSync(new URL('../renderer/lib/iqc-report.ts', import.meta.url), 'utf8');
   const westgard = readFileSync(new URL('../main/ipc/westgard-handlers.ts', import.meta.url), 'utf8');
   assert.match(report, /ERROR_CLASS_LABEL\[r\.error_class\]/);
   // Bảng điểm Westgard: tín hiệu CUSUM phải cùng bộ từ vựng với luật thường,

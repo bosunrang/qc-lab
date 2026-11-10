@@ -176,7 +176,9 @@ test('NCE: tìm không dấu, chuyển bước giữ bản nháp và chặn ghi 
 
     // Modal sửa hành động cũng phải giữ phiên bản tại lúc mở bản nháp.
     await stage(/Điều tra & CAPA/);
+    await page.getByRole('button', { name: 'Ghi thêm điều tra / hành động', exact: true }).click();
     const actions = page.getByRole('region', { name: 'Hành động khắc phục và phòng ngừa' });
+    if (await actions.locator('.nce-capa-toggle').getAttribute('aria-expanded') !== 'true') await actions.locator('.nce-capa-toggle').click();
     await actions.getByRole('button', { name: 'Thêm hành động' }).click();
     let dialog = page.getByRole('dialog');
     await dialog.locator('#actDesc').fill('Hành động khắc phục ban đầu cần thực hiện');
@@ -225,6 +227,8 @@ test('NCE: modal hoàn thành và huỷ không xác nhận hành động đã đ
     await records.locator('tbody tr', { hasText: created.record.nce_id }).getByRole('button', { name: 'Mở hồ sơ' }).click();
     await page.getByRole('navigation', { name: 'Các bước xử lý hồ sơ' }).getByRole('button', { name: /Điều tra & CAPA/ }).click();
     const actions = page.getByRole('region', { name: 'Hành động khắc phục và phòng ngừa' });
+
+    if (await actions.locator('.nce-capa-toggle').getAttribute('aria-expanded') !== 'true') await actions.locator('.nce-capa-toggle').click();
 
     for (const mode of ['complete', 'cancel']) {
       const original = mode === 'complete' ? 'Hành động kiểm tra modal hoàn thành' : 'Hành động kiểm tra modal huỷ bỏ';

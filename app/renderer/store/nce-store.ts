@@ -36,6 +36,8 @@ interface NceState {
   cancel: (data: Input<'cancelNce'>) => Promise<Write>;
 }
 
+let loadSequence = 0;
+
 export const useNceStore = create<NceState>((set) => ({
   records: [],
   queue: [],
@@ -43,12 +45,14 @@ export const useNceStore = create<NceState>((set) => ({
   loading: true,
   error: null,
   load: async () => {
+    const request = ++loadSequence;
     set({ loading: true, error: null });
     try {
       const [records, queue, users] = await Promise.all([window.qcApi.listNce(), window.qcApi.listNceQueue(), window.qcApi.listNceUsers()]);
-      set({ records, queue, users, loading: false });
+      // Chỉ nhận lần tải mới nhất; phản hồi cũ không được làm lùi danh sách.
+      if (request === loadSequence) set({ records, queue, users, loading: false });
     } catch (error) {
-      set({ loading: false, error: error instanceof Error ? error.message : 'Không tải được danh sách sự cố.' });
+      if (request === loadSequence) set({ loading: false, error: error instanceof Error ? error.message : 'Không tải được danh sách sự cố.' });
     }
   },
   get: (id) => window.qcApi.getNce(id),

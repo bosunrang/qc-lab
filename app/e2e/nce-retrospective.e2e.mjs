@@ -55,7 +55,7 @@ test('NCE hồi cứu: đính chính có lịch sử, giải thích QC bị lọ
     const oldOption = release.locator('#relRun option', { hasText: /lần 2 ·/ });
     await oldOption.waitFor({ state: 'attached' });
     await release.locator('#relRun').selectOption(await oldOption.getAttribute('value'));
-    await release.locator('.alert.ok', { hasText: 'Lần chạy đạt' }).waitFor();
+    await release.locator('.nce-release-result', { hasText: 'Lần chạy đạt' }).waitFor();
     assert.equal(await release.getByRole('button', { name: 'Cho phép hoạt động trở lại', exact: true }).isDisabled(), true, 'checklist và ảnh hưởng chưa đủ');
     await page.evaluate(async ({ testId, date }) => {
       for (const [level, val] of [[1, 5], [2, 15]]) {
@@ -66,7 +66,7 @@ test('NCE hồi cứu: đính chính có lịch sử, giải thích QC bị lọ
     const live = release.locator('#relRun option', { hasText: '3-live' });
     await live.waitFor({ state: 'attached' });
     await release.locator('#relRun').selectOption(await live.getAttribute('value'));
-    await release.locator('.alert.ok', { hasText: 'Lần chạy đạt' }).waitFor();
+    await release.locator('.nce-release-result', { hasText: 'Lần chạy đạt' }).waitFor();
     // Huỷ một điểm ở cửa sổ khác: preview đang chọn phải tự đánh giá lại.
     await page.evaluate(async (testId) => {
       const point = (await window.qcApi.queryPoints(testId, 2)).find((p) => p.run_id === '3-live');
@@ -79,7 +79,9 @@ test('NCE hồi cứu: đính chính có lịch sử, giải thích QC bị lọ
     await page.screenshot({ path: path.join(userDataDir, 'nce-retrospective.png'), fullPage: true });
     console.log(`Ảnh kiểm tra: ${path.join(userDataDir, 'nce-retrospective.png')}`);
     await stage(/Phê duyệt & lịch sử/);
-    await page.getByRole('region', { name: 'Lịch sử hồ sơ' }).getByText(/Nhập nhầm ngày lập; đối chiếu nhật ký QC thực tế/).waitFor();
+    const history = page.getByRole('region', { name: 'Lịch sử hồ sơ' });
+    await history.locator('.nce-history-disclosure > summary').click();
+    await history.getByText(/Nhập nhầm ngày lập; đối chiếu nhật ký QC thực tế/).waitFor();
     assert.deepEqual(errors, []);
   } finally { await app.close(); }
 });

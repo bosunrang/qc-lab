@@ -7,10 +7,10 @@ import { useNceStore } from '../../store/nce-store';
 import { EmptyState } from '../../components/EmptyState';
 import { nceStatusBadge } from '../../lib/nce-labels';
 import { NCE_SOURCE_LABEL, NCE_TIER_LABEL } from '../../../main/domain/nce/labels';
-import { nceHistory } from '../../../main/domain/nce/presentation';
-import { IdentitySection, InvestigationSection, QuickCheckSection, TierRiskSection } from './DossierContent';
-import { EffectivenessSection, PatientImpactSection, ReleaseSection, ReviewSection, TechnicalAssessmentSection } from './DossierDecisions';
-import { ActionsSection } from './DossierActions';
+import { IdentitySection, QuickCheckSection } from './DossierContent';
+import { PatientImpactSection, ReleaseSection, TechnicalAssessmentSection } from './DossierDecisions';
+import { CapaWorkflow } from './CapaWorkflow';
+import { ReviewSection } from './DossierReview';
 import { dateText, Facts, holdText, Section, timeText, useDossier } from './shared';
 import { confirmDialog } from '../../state/dialog-store';
 import { nextStage, NCE_STAGES, stageForMissing, type NceStage } from './workflow';
@@ -35,7 +35,7 @@ function LegacySection({ json }: { json: string }) {
 
 export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) {
   const users = useNceStore(useShallow((s) => s.users));
-  const { dossier, error, busy, loading, reload, run, clearError } = useDossier(id);
+  const { dossier, error, busy, pending, loading, reload, run, clearError } = useDossier(id);
   const [selectedStage, setSelectedStage] = useState<NceStage | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [editorEpoch, setEditorEpoch] = useState(0);
@@ -55,8 +55,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
   }
   const { record, missing } = dossier;
   const badge = nceStatusBadge(record);
-  const props = { dossier, users, busy, run, error, onIdentity: () => openStage('identity') };
-  const history = nceHistory(dossier);
+  const props = { dossier, users, busy, pending, run, error, onIdentity: () => openStage('identity') };
   const terminal = record.status === 'closed' || record.status === 'cancelled';
   const currentStage = nextStage(record, missing);
   const activeStage = selectedStage ?? currentStage;
@@ -138,12 +137,10 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
           <div className="nce-stage" hidden={!showAll && activeStage !== 'technical'}><TechnicalAssessmentSection {...props} /></div>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'impact'}><PatientImpactSection {...props} /></div>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'release'}><ReleaseSection {...props} /></div>
-          <div className="nce-stage" hidden={!showAll && activeStage !== 'capa'}><TierRiskSection {...props} /><InvestigationSection {...props} /><ActionsSection {...props} /><EffectivenessSection {...props} /><div className="nce-stage-footer"><button type="button" className="btn ghost" onClick={() => openStage('review')}>Đến bước phê duyệt →</button></div></div>
+          <div className="nce-stage" hidden={!showAll && activeStage !== 'capa'}><CapaWorkflow {...props} showAll={showAll} /><div className="nce-stage-footer"><button type="button" className="btn ghost" onClick={() => openStage('review')}>Đến bước phê duyệt →</button></div></div>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'review'}>
-            {!showAll && <div className="nce-review-reminder"><p className="nce-note">Rà soát thông tin, quyết định và bằng chứng trước khi nộp hoặc duyệt hồ sơ.</p><button type="button" className="btn ghost sm" onClick={() => setShowAll(true)}>Xem toàn bộ bằng chứng</button></div>}
-            <ReviewSection {...props} />
+            <ReviewSection {...props} onViewEvidence={!showAll ? () => setShowAll(true) : undefined} onMissing={(item) => openStage(stageForMissing(item))} />
             {record.protocol_version < 4 && <LegacySection json={record.legacy_json} />}
-            <Section title="Lịch sử hồ sơ">{history.length ? <ol className="nce-history">{history.map((item, index) => <li key={`${item.at}-${index}`}><b>{item.title}</b><span>{item.detail}</span><small>{item.actor} · {timeText(item.at)}</small></li>)}</ol> : <p className="hint-inline">Chưa có quyết định hay lần sửa nào.</p>}</Section>
           </div>
         </div>
       </div>
