@@ -10,6 +10,7 @@ import { ncePatientImpactCoverageMissing, ncePatientImpactMissing, type NceSuspe
 import { nceTechnicalAssessmentMissing } from './technical-assessment';
 import { latestActionDoneDate, nceEffectivenessBasis } from './actions';
 import type { NceRerunResult } from './rerun';
+import { NCE_DRAFT_BLANK } from './containment-draft';
 
 // ---------------------------------------------------------------- 5.1 Tạo
 
@@ -83,7 +84,7 @@ export function validateNceReleaseInput(raw: unknown, source: NceSource): NceVal
  * bao phủ đúng khoảng đó (`undefined` chỉ dùng trong test thuần không có dữ
  * liệu QC). Không đòi hành động khắc phục đã xong (D-02, sửa R-01). */
 export function nceReleaseMissing(
-  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'occurredNote' | 'checklist'>,
+  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'checklist'>,
   rerun: NceRerunResult | null,
   suspect?: NceSuspectWindow | null,
 ): NceMissing[] {
@@ -94,7 +95,9 @@ export function nceReleaseMissing(
   if (dossier.source === 'iqc') {
     if (dossier.holdResults === false) missing.push({ code: 'hold-iqc', message: 'Nội kiểm ngoài kiểm soát phải dừng/giữ kết quả liên quan cho đến khi đánh giá xong.' });
     if (textLength(dossier.containmentNote) < 10) missing.push({ code: 'containment', message: 'Ghi phạm vi kết quả đã giữ, thiết bị/khu vực bị ảnh hưởng và người đã được thông báo.' });
-    if (textLength(dossier.occurredNote) < 10) missing.push({ code: 'occurred', message: 'Ghi diễn biến và các mốc thời gian xử lý sự cố.' });
+    else if (dossier.containmentNote.includes(NCE_DRAFT_BLANK)) missing.push({ code: 'containment-blank', message: `Bổ sung các chỗ ${NCE_DRAFT_BLANK} trong phạm vi kiểm soát và thông báo (giữ kết quả từ lúc nào, đã báo cho ai).` });
+    // Diễn biến/mốc thời gian: app tự dựng từ dữ liệu đã lưu (domain/nce/timeline.ts,
+    // quyết định 10/11/2026), ô ghi thêm là tuỳ chọn nên không còn là cổng.
     if (!dossier.runs.some((run) => run.role === 'trigger')) missing.push({ code: 'no-trigger', message: 'Hồ sơ nội kiểm chưa gắn lần chạy bị loại.' });
     missing.push(...nceTechnicalAssessmentMissing(dossier));
     if (!rerun) missing.push({ code: 'missing-rerun', message: 'Chưa chốt bằng chứng QC rerun bằng quyết định cho hoạt động trở lại.' });

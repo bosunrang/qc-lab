@@ -485,6 +485,39 @@ export interface NceDossierView {
   can: { edit: boolean; release: boolean; patient_impact: boolean; submit: boolean; approve: boolean; return: boolean; cancel: boolean; review_effectiveness: boolean };
   /** Lý do người đang xem không được duyệt (không độc lập…); rỗng nếu được. */
   approve_block: string;
+  /** Số liệu gợi ý để điền sẵn form "Xác minh kỹ thuật IQC" (chỉ hồ sơ IQC có
+   * lần khởi đầu, chưa nộp duyệt) — xem `main/domain/nce/technical-prefill.ts`. */
+  technical_prefill: NceTechnicalPrefillView | null;
+  /** Lời nhắc theo mục checklist từ dữ liệu sẵn có (lô QC hết hạn, mới đổi
+   * lô…), khoá là mã mục — xem `main/domain/nce/checklist-hints.ts`. */
+  checklist_hints: Record<string, string>;
+  /** Mốc thời gian dựng từ dữ liệu đã lưu (`main/domain/nce/timeline.ts`),
+   * thay việc gõ lại diễn biến; `occurred_note` chỉ để ghi thêm. */
+  timeline: NceTimelineEntryView[];
+  /** Bản nháp phạm vi kiểm soát từ dữ liệu app biết, chừa `[cần ghi]` cho
+   * phần người làm phải ghi; rỗng khi không có (hồ sơ không phải IQC…). */
+  containment_draft: string;
+}
+
+export interface NceTimelineEntryView {
+  /** `YYYY-MM-DD` khi `dateOnly`, ngược lại là ISO đầy đủ. */
+  at: string; dateOnly: boolean; label: string; detail: string;
+  /** Lần chạy QC gắn với mốc (bị loại, chạy lại); `null` nếu không có. */
+  run: NceRunKeyView | null;
+}
+
+/** Gợi ý số liệu xác minh kỹ thuật, đơn vị % so với Mean đích. */
+export interface NceTechnicalPrefillView {
+  /** Mức và lô dùng để tính: mức bị loại có |z| lớn nhất trong lần khởi đầu. */
+  level: number; lot: string; unit: string;
+  tea: number | null; teaSource: string;
+  stableBias: number | null; incidentBias: number | null;
+  sd: number | null; sdSource: string;
+  observedDispersion: number | null; sampleCount: number | null;
+  /** Số điểm sự cố đã dùng (từ lần đầu chuỗi vi phạm tới lần khởi đầu). */
+  incidentCount: number;
+  /** Lưu ý khi thiếu dữ liệu (ít điểm ổn định, chưa có TEa…). */
+  notes: string[];
 }
 
 export interface NceQueueRowView {

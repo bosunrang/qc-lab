@@ -61,8 +61,10 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await workflow.getByRole('button', { name: /Ghi nhận sự cố/ }).click();
     const identity = section(page, 'Ghi nhận và xử lý tức thời');
     assert.equal(await identity.locator('.nce-identity-card').count(), 2);
-    assert.equal(await identity.locator('.nce-identity-status > div').count(), 4);
-    const initialRun = identity.locator('details.nce-run').first();
+    assert.equal(await identity.locator('.nce-identity-status > div').count(), 3, 'kiểm soát kết quả nằm trong thẻ xử lý');
+    assert.equal(await identity.getByText('Mốc hồ sơ', { exact: true }).count(), 0, 'mốc chỉ hiện ở dòng thời gian');
+    // Bảng điểm của lần chạy bị loại mở ngay trên dòng đó của dòng thời gian.
+    const initialRun = identity.getByRole('region', { name: 'Dòng thời gian hồ sơ' }).locator('li.has-run details.nce-run', { hasText: 'Lần chạy QC bị loại' });
     await initialRun.waitFor();
     assert.equal(await initialRun.getAttribute('open'), null, 'bằng chứng QC mặc định thu gọn');
     assert.match(await initialRun.locator('summary').innerText(), /1 đạt/);
@@ -81,9 +83,18 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await initialRun.locator('summary').click();
     await identity.screenshot({ path: path.join(userDataDir, 'nce-identity-compact.png') });
     console.log(`Ảnh ghi nhận sự cố tinh gọn: ${path.join(userDataDir, 'nce-identity-compact.png')}`);
+    // Mốc thời gian do phần mềm tự dựng; phạm vi kiểm soát điền sẵn phần đã
+    // biết, người làm chỉ bổ sung chỗ [cần ghi]. Ô ghi thêm diễn biến để trống.
+    const timeline = identity.getByRole('region', { name: 'Dòng thời gian hồ sơ' });
+    await timeline.getByText('Lần chạy QC bị loại', { exact: true }).waitFor();
+    await timeline.getByText('Lập hồ sơ', { exact: true }).waitFor();
     await identity.getByRole('button', { name: 'Sửa' }).click();
-    await identity.locator('#idContainment').fill('Đã giữ kết quả của xét nghiệm và thông báo phụ trách ca lúc 08:15.');
-    await identity.locator('#idOccurred').fill('08:00 phát hiện, 08:15 dừng trả kết quả, 09:00 hoàn tất xử lý.');
+    await identity.getByRole('button', { name: 'Điền sẵn từ dữ liệu' }).click();
+    const containment = identity.locator('#idContainment');
+    assert.match(await containment.inputValue(), /^Xét nghiệm .+lô QC: M1 .+\nKhoảng nghi ngờ: /);
+    await identity.locator('.nce-field-assist.is-warning', { hasText: '[cần ghi]' }).waitFor();
+    await containment.fill((await containment.inputValue()).replace('[cần ghi]', '08:15 hôm nay').replace('[cần ghi]', 'phụ trách ca lúc 08:15'));
+    assert.equal(await identity.locator('.nce-field-assist.is-warning').count(), 0);
     await identity.getByRole('button', { name: 'Lưu' }).click();
     await identity.getByRole('button', { name: 'Sửa' }).waitFor();
 
@@ -91,8 +102,15 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await page.getByRole('navigation', { name: 'Các bước xử lý hồ sơ' }).getByRole('button', { name: /Kiểm tra nhanh/ }).click();
     const investigation = section(page, 'Kiểm tra nhanh các yếu tố thường gặp');
     await investigation.getByRole('button', { name: 'Sửa' }).click();
-    const checks = investigation.locator('select[aria-label^="Kết quả"]');
-    for (let i = 0; i < await checks.count(); i++) await checks.nth(i).selectOption('ok');
+    // Danh sách gọn: mỗi mục là nhóm ba nút; mục có lời nhắc từ dữ liệu không
+    // được đánh dấu hàng loạt nên chọn "Đạt" riêng cho mục còn trống.
+    const checks = investigation.locator('[role=group][aria-label^="Kết quả:"]');
+    assert.ok(await checks.count() > 0, 'có mục kiểm tra nhanh');
+    const allOk = investigation.getByRole('button', { name: /là Đạt$/ });
+    if (await allOk.count()) await allOk.click();
+    for (let i = 0; i < await checks.count(); i++) {
+      if (!(await checks.nth(i).locator('[aria-pressed="true"]').count())) await checks.nth(i).getByRole('button', { name: 'Đạt', exact: true }).click();
+    }
     await investigation.getByRole('button', { name: 'Lưu' }).click();
     await investigation.getByRole('button', { name: 'Sửa' }).waitFor();
 
@@ -101,7 +119,13 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await page.getByRole('navigation', { name: 'Các bước xử lý hồ sơ' }).getByRole('button', { name: /Xác minh kỹ thuật/ }).click();
     const technical = section(page, 'Xác minh kỹ thuật IQC');
     await technical.getByRole('button', { name: 'Ghi đánh giá' }).click();
+    // Mở form là số liệu định lượng đã điền sẵn từ dữ liệu QC (đơn vị %, TEa,
+    // Bias, SD…); ca này là sai số ngẫu nhiên nên chuyển sang không áp dụng.
+    await technical.locator('.nce-technical-prefill').waitFor();
+    assert.equal(await technical.locator('#techUnit').inputValue(), '%');
+    assert.notEqual(await technical.locator('#techSd').inputValue(), '', 'SD đã điền sẵn');
     await technical.locator('#techNature').selectOption('random');
+    await technical.locator('#techMode').selectOption('not_applicable');
     await technical.locator('#techMethod').fill('Đối chiếu vật liệu, máy và nhật ký thao tác của ca chạy.');
     await technical.locator('#techEvidence').fill('Đã thay lọ QC, vệ sinh kim hút và chạy lại đủ hai mức.');
     await technical.locator('#techMetricReason').fill('Sai số ngẫu nhiên, không đủ nhóm dữ liệu độc lập để ước lượng Bias tin cậy.');
@@ -128,6 +152,7 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await option.waitFor({ state: 'attached' });
     await release.locator('#relRun').selectOption(await option.getAttribute('value'));
     await release.locator('.alert.ok', { hasText: 'Lần chạy đạt khi đánh giá trong giai đoạn mới' }).waitFor();
+    assert.equal(await release.locator('.nce-rerun-excluded').count(), 0, 'đã có lần QC chọn được thì không liệt kê các lần bị lọc');
     await release.locator('#relReason').fill('QC chạy lại đạt cả hai mức sau khi thay lọ.');
     await release.getByRole('button', { name: 'Cho phép hoạt động trở lại' }).click();
     await page.locator('.modal[role=dialog]', { hasText: 'luật Westgard nhiều lần chạy và CUSUM bắt đầu chuỗi mới' }).getByRole('button', { name: 'Cho phép' }).click();

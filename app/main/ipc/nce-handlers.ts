@@ -33,7 +33,9 @@ import {
   columnsOfPatch, editableOf, insertNceDecision, insertNceRecord, insertNceRevision, insertNceRun, listNceRows, loadNce,
   readNceConfig, recordOfRun, updateNceRecord, type NceLoaded,
 } from '../db/nce-repository';
-import { nceLatestRun, nceOperationalLevels, nceQueueRows, nceRunOutcomes, nceRunSnapshot, nceSuspectChain } from '../db/nce-evaluation';
+import { nceLatestRun, nceOperationalLevels, nceQueueRows, nceRunOutcomes, nceRunSnapshot, nceSuspectChain, nceTechnicalPrefill, nceChecklistHintsOf, nceRunVoids, nceTestScope } from '../db/nce-evaluation';
+import { nceTimeline, type NceTimelineEntry } from '../domain/nce/timeline';
+import { nceContainmentDraft } from '../domain/nce/containment-draft';
 import { type Actor, type IpcResult, nowIso } from './shared';
 import { writeCommand, type WriteSteps, type WriteTx } from './write-command';
 
@@ -96,7 +98,52 @@ export function createNceHandlers(db: Db) {
         review_effectiveness: row.status === 'released' && canWriteNce(who).ok,
       },
       approve_block: approval && !approval.ok ? approval.message : '',
+      // Gợi ý số liệu chỉ cần khi còn ghi được đánh giá kỹ thuật (hồ sơ IQC
+      // chưa nộp duyệt); chỉ đọc, không đổi cổng nào.
+      technical_prefill: editable && dossier.source === 'iqc' && dossier.testId && suspect
+        ? technicalPrefillOf(dossier, suspect.onset) : null,
+      checklist_hints: editable ? checklistHintsOf(dossier) : {},
+      timeline: timelineOf(loaded, suspect),
+      containment_draft: editable && dossier.source === 'iqc' ? containmentDraftOf(dossier, suspect) : '',
     };
+  }
+
+  /** Dòng thời gian dựng từ dữ liệu đã lưu, thay việc gõ lại các mốc. */
+  function timelineOf(loaded: NceLoaded, suspect: NceSuspectWindow | null): NceTimelineEntry[] {
+    const { row, dossier } = loaded;
+    const trigger = dossier.runs.find((run) => run.role === 'trigger')?.snapshot ?? null;
+    const rerun = dossier.runs.find((run) => run.role === 'rerun')?.snapshot ?? null;
+    return nceTimeline({
+      detectedAt: row.detected_at, createdAt: row.created_at, reportedBy: row.reported_by_name,
+      onset: suspect?.onset ?? null, onsetRules: suspect?.onsetRules ?? [],
+      trigger: trigger && { date: trigger.date, runId: trigger.runId },
+      repeats: dossier.runs.filter((run) => run.role === 'repeat_reject').map((run) => ({ date: run.snapshot.date, runId: run.snapshot.runId })),
+      voids: trigger && dossier.testId ? nceRunVoids(db, dossier.testId, trigger) : [],
+      rerun: rerun && { date: rerun.date, runId: rerun.runId },
+      decisions: loaded.decisions.map((d) => ({ type: d.type, at: d.decided_at, actor: d.actor_name })),
+      actionsDone: loaded.actions.filter((a) => a.status === 'done').map((a) => ({ description: a.description, at: a.done_at, by: a.done_by_name })),
+    });
+  }
+
+  function containmentDraftOf(dossier: NceDossier, suspect: NceSuspectWindow | null): string {
+    const trigger = dossier.runs.find((run) => run.role === 'trigger')?.snapshot;
+    if (!trigger || !dossier.testId) return '';
+    const lots = new Map<number, string>();
+    for (const point of trigger.points) if (!lots.has(point.level)) lots.set(point.level, point.lot);
+    return nceContainmentDraft({
+      ...nceTestScope(db, dossier.testId), lots: [...lots].map(([level, lot]) => ({ level, lot })),
+      lastAccepted: suspect?.lastAccepted ?? null, onset: suspect?.onset ?? null, trigger: { date: trigger.date, runId: trigger.runId },
+    });
+  }
+
+  function checklistHintsOf(dossier: NceDossier): Record<string, string> {
+    const trigger = dossier.runs.find((run) => run.role === 'trigger')?.snapshot;
+    return trigger && dossier.testId ? nceChecklistHintsOf(db, dossier.testId, trigger) : {};
+  }
+
+  function technicalPrefillOf(dossier: NceDossier, onset: NceRunKey) {
+    const trigger = dossier.runs.find((run) => run.role === 'trigger')?.snapshot;
+    return trigger && dossier.testId ? nceTechnicalPrefill(db, dossier.testId, trigger, onset) : null;
   }
 
   function getNce(id: unknown, actor: Actor): NceDossierView | null {

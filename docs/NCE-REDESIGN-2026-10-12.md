@@ -610,6 +610,16 @@ CAPA dài hạn và đánh giá hiệu lực.
   người được thông báo và diễn biến theo mốc thời gian trước khi cho hoạt động
   trở lại. Không chấp nhận lựa chọn “không giữ kết quả” cho IQC ngoài kiểm
   soát.
+  - **Sửa đổi 10/11/2026 (người dùng đồng ý):** diễn biến theo mốc thời gian
+    do app tự dựng từ dữ liệu đã lưu (`domain/nce/timeline.ts`: lần chạy bị
+    loại, huỷ điểm, phát hiện, lập hồ sơ, chạy lại, các quyết định, hành động
+    đã xong) và hiện ở bước Ghi nhận; ISO 15189 yêu cầu hồ sơ có mốc, không
+    yêu cầu gõ lại mốc app đã ghi. Ô `occurred_note` thành “Ghi thêm về diễn
+    biến (tuỳ chọn)” và bỏ khỏi cổng. Phạm vi kiểm soát/thông báo vẫn bắt
+    buộc; nút “Điền sẵn từ dữ liệu” (`domain/nce/containment-draft.ts`) điền
+    xét nghiệm, máy, lô, khoảng nghi ngờ và chừa `[cần ghi]` cho thời điểm giữ
+    kết quả và người được báo — còn `[cần ghi]` thì cổng `containment-blank`
+    chặn.
 - Checklist IQC bổ sung điều kiện môi trường: nhiệt độ phòng, điện và nước cấp.
 - Sau kiểm tra nhanh có quyết định append-only `technical_assessment`: bản chất
   sai số, phương pháp xác minh, xử lý và bằng chứng, kết luận kỹ thuật. Sai số

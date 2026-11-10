@@ -301,38 +301,32 @@ test('NCE: kiểm tra nhanh phủ đủ khung, lưu bằng chứng và không tr
     await page.getByRole('region', { name: 'Danh sách hồ sơ NCE' }).locator('tbody tr', { hasText: created.record.nce_id }).getByRole('button', { name: 'Mở hồ sơ' }).click();
     await page.getByRole('navigation', { name: 'Các bước xử lý hồ sơ' }).getByRole('button', { name: /Kiểm tra nhanh/ }).click();
     const checks = page.getByRole('region', { name: 'Kiểm tra nhanh các yếu tố thường gặp' });
-    const grid = checks.locator('.nce-checklist-grid');
-    assert.equal(await grid.locator('.nce-checklist-card').count(), 7, 'IQC có sáu nhóm kiểm tra cũ và điều kiện môi trường');
+    const list = checks.locator('.nce-checklist-list');
+    assert.equal(await list.locator('.nce-checklist-row').count(), 7, 'IQC có sáu nhóm kiểm tra cũ và điều kiện môi trường');
     await checks.locator('.nce-checklist-summary', { hasText: '0/7 mục đã đánh giá' }).waitFor();
-    assert.equal(await grid.locator('.tag', { hasText: 'Chưa đánh giá' }).count(), 7);
-    assert.equal(await grid.getByText('Chưa có ghi chú', { exact: true }).count(), 0, 'không lặp ghi chú trống trên các thẻ');
+    assert.equal(await list.locator('.tag', { hasText: 'Chưa đánh giá' }).count(), 7, 'trạng thái có nhãn chữ, không chỉ màu');
+    assert.equal(await list.getByText('Chưa có ghi chú', { exact: true }).count(), 0, 'không lặp ghi chú trống trên các dòng');
     assert.equal(await checks.getByText('Hướng dẫn rà soát', { exact: true }).count(), 0, 'không đưa khối hướng dẫn dài trở lại checklist');
 
-    // Đo cả chế độ đọc và sửa bằng hình học thật: lưới luôn phủ đủ khung,
-    // chia hai cột trên desktop và nội dung dài không tràn khỏi thẻ.
+    // Danh sách gọn (đánh giá giao diện 09/11/2026): mỗi mục một dòng, luôn
+    // phủ đủ khung và nội dung dài xuống dòng, không tràn ngang.
     async function assertFullWidth(mode) {
       for (const width of [1647, 1366, 1265, 1110, 1000]) {
         await page.setViewportSize({ width, height: 900 });
         const geometry = await checks.evaluate((panel) => {
-          const grid = panel.querySelector('.nce-checklist-grid');
-          const cards = [...grid.querySelectorAll('.nce-checklist-card')];
-          const gridBox = grid.getBoundingClientRect();
-          const parentStyle = getComputedStyle(grid.parentElement);
+          const list = panel.querySelector('.nce-checklist-list');
+          const rows = [...list.querySelectorAll('.nce-checklist-row')];
+          const parentStyle = getComputedStyle(list.parentElement);
           return {
-            gridWidth: gridBox.width,
-            contentWidth: grid.parentElement.clientWidth - parseFloat(parentStyle.paddingLeft) - parseFloat(parentStyle.paddingRight),
-            columns: getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
-            rowTops: [...new Set(cards.map((card) => Math.round(card.getBoundingClientRect().top)))],
-            gridOverflow: grid.scrollWidth - grid.clientWidth,
-            cardOverflow: cards.map((card) => card.scrollWidth - card.clientWidth),
-            controlOverflow: [...grid.querySelectorAll('textarea, select')].map((control) => control.scrollWidth - control.clientWidth),
+            listWidth: list.getBoundingClientRect().width,
+            contentWidth: list.parentElement.clientWidth - parseFloat(parentStyle.paddingLeft) - parseFloat(parentStyle.paddingRight),
+            rowOverflow: rows.map((row) => row.scrollWidth - row.clientWidth),
+            controlOverflow: [...list.querySelectorAll('textarea, [role=group]')].map((control) => control.getBoundingClientRect().right - list.getBoundingClientRect().right),
           };
         });
         const context = `${mode} tại ${width}px: ${JSON.stringify(geometry)}`;
-        assert.ok(geometry.gridWidth >= geometry.contentWidth * 0.99 && geometry.gridWidth <= geometry.contentWidth + 1, `lưới phủ đủ chiều rộng khung — ${context}`);
-        assert.equal(geometry.columns, 2, `desktop giữ hai cột để giảm chiều dài — ${context}`);
-        assert.equal(geometry.rowTops.length, 4, `bảy thẻ xếp thành bốn hàng — ${context}`);
-        assert.ok(geometry.gridOverflow <= 1 && geometry.cardOverflow.every((overflow) => overflow <= 1) && geometry.controlOverflow.every((overflow) => overflow <= 1), `nội dung dài xuống dòng, không tràn ngang — ${context}`);
+        assert.ok(geometry.listWidth >= geometry.contentWidth * 0.99 && geometry.listWidth <= geometry.contentWidth + 1, `danh sách phủ đủ chiều rộng khung — ${context}`);
+        assert.ok(geometry.rowOverflow.every((overflow) => overflow <= 1) && geometry.controlOverflow.every((overflow) => overflow <= 1), `nội dung dài xuống dòng, không tràn ngang — ${context}`);
       }
     }
     await assertFullWidth('chưa đánh giá');
@@ -340,11 +334,20 @@ test('NCE: kiểm tra nhanh phủ đủ khung, lưu bằng chứng và không tr
     await checks.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(userDataDir, 'nce-quick-check-initial.png'), fullPage: true });
     await checks.getByRole('button', { name: 'Sửa', exact: true }).click();
-    const results = checks.locator('select[aria-label^="Kết quả:"]');
+    const results = checks.locator('[role=group][aria-label^="Kết quả:"]');
     const evidence = checks.locator('textarea[aria-label^="Bằng chứng:"]');
     assert.equal(await results.count(), 7);
-    assert.equal(await evidence.count(), 7, 'mọi bằng chứng được nhập bằng ô nhiều dòng');
-    for (let index = 0; index < 7; index++) await results.nth(index).selectOption(index === 0 ? 'abnormal' : index === 1 ? 'na' : 'ok');
+    assert.equal(await evidence.count(), 0, 'ô bằng chứng chỉ hiện khi Bất thường / Không áp dụng');
+    await results.nth(0).getByRole('button', { name: 'Bất thường', exact: true }).click();
+    await results.nth(1).getByRole('button', { name: 'Không áp dụng', exact: true }).click();
+    assert.equal(await evidence.count(), 2, 'chọn Bất thường / Không áp dụng thì hiện ô bằng chứng');
+    // "Đánh dấu … là Đạt" chỉ chạm mục chưa đánh giá và không có lời nhắc từ
+    // dữ liệu; mục có lời nhắc (lô QC mới dùng hôm nay) người dùng tự chọn.
+    await checks.getByRole('button', { name: /là Đạt$/ }).click();
+    for (let index = 0; index < 7; index++) {
+      if (!(await results.nth(index).locator('[aria-pressed="true"]').count())) await results.nth(index).getByRole('button', { name: 'Đạt', exact: true }).click();
+    }
+    assert.equal(await results.nth(0).getByRole('button', { name: 'Bất thường', exact: true }).getAttribute('aria-pressed'), 'true', 'đánh dấu hàng loạt không ghi đè mục đã chọn');
     await checks.getByRole('button', { name: 'Lưu', exact: true }).click();
     await checks.getByRole('button', { name: 'Sửa', exact: true }).waitFor();
     let stored = await page.evaluate((id) => window.qcApi.getNce(id), created.record.id);
@@ -363,8 +366,8 @@ test('NCE: kiểm tra nhanh phủ đủ khung, lưu bằng chứng và không tr
     await checks.getByRole('button', { name: 'Lưu', exact: true }).click();
     await checks.getByRole('button', { name: 'Sửa', exact: true }).waitFor();
     await checks.locator('.nce-checklist-summary', { hasText: '7/7 mục đã đánh giá' }).waitFor();
-    await grid.getByText(abnormalNote, { exact: true }).waitFor();
-    await grid.getByText(naNote, { exact: true }).waitFor();
+    await list.getByText(abnormalNote, { exact: true }).waitFor();
+    await list.getByText(naNote, { exact: true }).waitFor();
     stored = await page.evaluate((id) => window.qcApi.getNce(id), created.record.id);
     const saved = JSON.parse(stored.record.checklist_json);
     assert.deepEqual(saved.qcMaterial, { status: 'abnormal', note: abnormalNote });

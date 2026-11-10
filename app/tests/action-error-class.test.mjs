@@ -80,6 +80,12 @@ test('mọi cổng ghi chỉ lưu mã SE/RE/rỗng', t => {
   const voided = entry.voidPoint({ data: { pointId: point.data.id, kind: 'analytical', reason: 'Bọt khí trong cuvette', openNce: true } }, actor);
   assert.equal(voided.ok, true, JSON.stringify(voided));
   assert.equal(db.prepare('SELECT error_class FROM nce_records WHERE nce_id=?').get(voided.data.nceId).error_class, 'RE');
+  // Mô tả sự kiện ghi điều đã xảy ra, xử lý tức thời ghi việc đã làm: không lặp nhau.
+  const opened = db.prepare('SELECT description, correction FROM nce_records WHERE nce_id=?').get(voided.data.nceId);
+  assert.match(opened.description, /^QC mức 1, lần chạy 2026-09-02-1 ngày 02\/09\/2026 cho giá trị 107\.00; lần chạy bị loại theo luật 1-3s/);
+  assert.match(opened.description, /Lý do huỷ: .*Bọt khí trong cuvette\.$/);
+  assert.match(opened.correction, /^Đã huỷ điểm QC mức 1 \(giá trị 107\.00\) khỏi thống kê và đánh dấu lần chạy 2026-09-02-1 ngày 02\/09\/2026 phải chạy lại QC\.$/);
+  assert.notEqual(opened.description, opened.correction);
 
   // 2. Hoàn dải nhà sản xuất không tạo hồ sơ NCE (D-12), nên không có dòng
   // nào mang nhãn "Hoàn dải QC" trong cột loại sai số.

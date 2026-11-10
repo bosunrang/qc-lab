@@ -499,13 +499,21 @@ export function createEntryHandlers(db: Db) {
         else if (openNce && snapshot) {
           const id = uid(), now = nowIso(), today = isoLocalDate();
           nceId = nextNceId(db, today);
-          const label = `Huỷ điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}`;
+          // "Mô tả sự kiện" ghi điều đã xảy ra, "Xử lý tức thời" ghi việc đã
+          // làm — hai trường không lặp cùng một câu (đánh giá giao diện 10/11/2026).
+          const valueText = point.val.toFixed(test?.decimal_places ?? 2);
+          const runText = `lần chạy ${point.run_id || '(không mã)'} ngày ${viDate(point.date)}`;
+          const ruleText = runRejected
+            ? `; lần chạy bị loại${view?.rules.length ? ` theo luật ${view.rules.join(', ')}` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
+            : '';
+          const description = `QC mức ${point.level}, ${runText} cho giá trị ${valueText}${ruleText}. Lý do huỷ: ${composedReason.replace(/[.\s]+$/, '')}.`;
+          const correction = `Đã huỷ điểm QC mức ${point.level} (giá trị ${valueText}) khỏi thống kê và đánh dấu ${runText} phải chạy lại QC.`;
           // Người huỷ là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
           // tự mở không còn lọt khỏi cảnh báo quá hạn (sửa R-11). Có giữ kết quả
           // hay không thì chưa biết, phải ghi trước khi cho chạy lại.
           insertNceRecord(db, {
             id, nceId, source: 'iqc', phase: 'exam', testId: point.test_id, detectedAt: today,
-            description: `${label}. Lý do: ${composedReason}`, correction: `${label}. Lý do: ${composedReason}`, holdResults: null,
+            description, correction, holdResults: null,
             ownerUserId: actor.userId, dueDate: defaultNceDueDate(today, '', readNceConfig(db)),
             errorClass: nceErrorClass([{ role: 'trigger', snapshot }]), checklistJson: JSON.stringify(emptyChecklist('iqc')),
           }, actor, now);

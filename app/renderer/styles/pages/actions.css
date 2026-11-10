@@ -35,6 +35,10 @@
 .nce-field-wide{grid-column:1 / -1;}
 .nce-subform{padding-top:var(--space-4);border-top:1px solid var(--surface-divider);}
 .nce-form-actions{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:wrap;}
+/* Hộp thoại lập hồ sơ: khung thông báo/hướng dẫn đứng trên lưới trường cách
+   một nhịp trường; khối ghi chú ngày phát hiện xếp dọc có khoảng cách. */
+.modal-b>*+.nce-form-grid{margin-top:var(--field-gap);}
+.nce-create-detected{display:grid;justify-items:start;gap:var(--space-2);}
 .nce-radio-row{display:flex;gap:var(--space-5);flex-wrap:wrap;}
 .nce-radio-row label,.nce-check{display:inline-flex;align-items:center;gap:var(--space-2);margin:0;font-weight:var(--weight-medium);}
 .nce-cancel{padding-top:var(--space-4);border-top:1px solid var(--surface-divider);}
@@ -54,56 +58,60 @@
 .nce-identity-support p{margin:0;color:var(--text-secondary);font-size:var(--text-sm);line-height:var(--leading-body);white-space:pre-line;overflow-wrap:anywhere;}
 .nce-identity-card footer{display:flex;align-items:center;gap:var(--space-1-5);flex-wrap:wrap;margin-top:auto;color:var(--text-secondary);font-size:var(--text-xs);}
 .nce-identity-card footer b{color:var(--text-primary);font-weight:var(--weight-semibold);}
+.nce-identity-hold{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-1-5);}
+.nce-identity-hold>span:first-child{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
 .nce-identity-empty{color:var(--text-tertiary);font-weight:var(--weight-normal);}
-.nce-identity-status{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
+.nce-identity-status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
 .nce-identity-status>div{display:grid;align-content:center;gap:var(--space-1-5);min-width:0;padding:var(--space-3) var(--space-4);}
 .nce-identity-status>div+div{border-left:1px solid var(--surface-divider);}
 .nce-identity-status dt{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
 .nce-identity-status dd{margin:0;color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);overflow-wrap:anywhere;}
-.nce-run{border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
-.nce-run>summary{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);color:var(--text-primary);cursor:pointer;list-style:none;}
+.nce-timeline{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface);}
+.nce-timeline-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-2) var(--space-3);}
+.nce-timeline .nce-eyebrow{margin:0;}
+.nce-timeline ol{display:grid;gap:0;margin:0;padding:0;list-style:none;}
+.nce-timeline li{display:grid;grid-template-columns:8.5rem minmax(0,1fr);align-items:center;gap:var(--space-3);min-height:var(--control-h-sm);padding:var(--space-1-5) 0;font-size:var(--text-sm);line-height:var(--leading-snug);}
+.nce-timeline li+li{border-top:1px solid var(--surface-divider);}
+.nce-timeline li.has-run{display:block;padding:0;}
+.nce-timeline time{color:var(--text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.nce-timeline-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-2);min-width:0;}
+.nce-timeline b{color:var(--text-primary);font-weight:var(--weight-semibold);}
+.nce-timeline small{color:var(--text-secondary);font-size:var(--text-sm);overflow-wrap:anywhere;}
+.nce-field-assist{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);margin:var(--space-1-5) 0 0;color:var(--text-secondary);font-size:var(--text-xs);}
+.nce-field-assist.is-warning{color:var(--warning-text);}
+.nce-run>summary{display:grid;grid-template-columns:8.5rem minmax(0,1fr) auto auto;align-items:center;gap:var(--space-3);padding:var(--space-1-5) 0;color:var(--text-primary);font-size:var(--text-sm);line-height:var(--leading-snug);cursor:pointer;list-style:none;}
 .nce-run>summary::-webkit-details-marker{display:none;}
 .nce-run>summary::marker{content:'';}
-.nce-run-summary-content{display:flex;align-items:center;justify-content:space-between;flex:1;gap:var(--space-4);min-width:0;}
-.nce-run-summary-content>span:first-child{display:grid;gap:var(--space-1);}
-.nce-run-summary-content b{font-size:var(--text-sm);font-weight:var(--weight-semibold);}
-.nce-run-summary-content small{color:var(--text-tertiary);font-size:var(--text-xs);}
 .nce-run-counts{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:wrap;}
 .nce-run-chevron{display:grid;place-items:center;flex:none;width:var(--control-h-sm);height:var(--control-h-sm);border:1px solid var(--surface-border);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-secondary);transition:background var(--motion-fast) ease,border-color var(--motion-fast) ease,color var(--motion-fast) ease;}
 .nce-run-chevron svg{width:var(--icon-sm);height:var(--icon-sm);transition:transform var(--motion-fast) ease;}
 .nce-run>summary:hover .nce-run-chevron{border-color:var(--accent-border);background:var(--accent-surface);color:var(--text-accent);}
 .nce-run[open]>summary .nce-run-chevron svg{transform:rotate(180deg);}
-.nce-run-body{padding:0 var(--space-4) var(--space-4);overflow-x:auto;}
+.nce-run-body{padding:0 0 var(--space-3);overflow-x:auto;}
 .nce-run-body>.nce-table{width:100%;}
 .nce-snapshot-table th,.nce-snapshot-table td{text-align:center;vertical-align:middle;}
 
-/* Checklist dùng thẻ hai cột để ưu tiên tên, trạng thái và chỉ hiện bằng
-   chứng khi có nội dung; tránh lặp các ô trống như một bảng văn bản dài. */
-.nce-checklist-summary{display:flex;align-items:center;gap:var(--space-4);padding:var(--space-3) var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface-subtle);}
-.nce-checklist-total{margin-top:var(--space-1);color:var(--text-primary);font-size:var(--text-base);font-weight:var(--weight-semibold);}
-.nce-checklist-summary progress{flex:1;min-width:0;height:var(--space-1-5);max-width:240px;overflow:hidden;border:0;border-radius:var(--radius-full);background:var(--surface-sunken);color:var(--accent);accent-color:var(--accent);}
-.nce-checklist-summary progress::-webkit-progress-bar{background:var(--surface-sunken);border-radius:var(--radius-full);}
-.nce-checklist-summary progress::-webkit-progress-value{background:var(--accent);border-radius:var(--radius-full);}
-.nce-checklist-summary progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius-full);}
-.nce-checklist-counts{display:flex;justify-content:flex-end;gap:var(--space-2);flex-wrap:wrap;margin-left:auto;}
-.nce-checklist-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3);margin:0;padding:0;list-style:none;}
-.nce-checklist-card{display:grid;align-content:start;gap:var(--space-3);min-width:0;padding:var(--space-4);border:1px solid var(--surface-divider);border-left-width:3px;border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
-.nce-checklist-card.is-empty{border-left-color:var(--neutral-accent);}
-.nce-checklist-card.is-ok{border-left-color:var(--success-accent);}
-.nce-checklist-card.is-abnormal{border-left-color:var(--danger-accent);}
-.nce-checklist-card.is-na{border-left-color:var(--warning-accent);}
-.nce-checklist-card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:var(--space-3);}
-.nce-checklist-item{display:flex;align-items:flex-start;gap:var(--space-3);}
-.nce-checklist-number{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:var(--control-h-sm);height:var(--control-h-sm);border:1px solid var(--surface-divider);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
-.nce-checklist-title{display:block;color:var(--text-primary);font-weight:var(--weight-semibold);line-height:var(--leading-snug);}
-.nce-checklist-detail{display:block;margin-top:var(--space-1);color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-body);}
-.nce-checklist-card select{width:auto;max-width:100%;font-size:var(--text-sm);}
-.nce-checklist-card .tag{max-width:100%;white-space:normal;}
-.nce-checklist-note{display:grid;gap:var(--space-1-5);padding-top:var(--space-3);border-top:1px solid var(--surface-divider);}
-.nce-checklist-note>span{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
-.nce-checklist-note textarea{display:block;width:100%;min-width:0;max-width:100%;font-size:var(--text-sm);resize:vertical;}
+/* Kiểm tra nhanh là danh sách gọn (đánh giá giao diện 09/11/2026): mỗi mục một
+   dòng gồm tên, mô tả phụ, lời nhắc từ dữ liệu và ba nút kết quả; ô bằng chứng
+   chỉ hiện khi cần. Trạng thái có nhãn chữ, không chỉ phân biệt bằng màu. */
+.nce-checklist-summary{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2) var(--space-3);margin:0 0 var(--space-3);}
+.nce-checklist-total{margin:0;color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
+.nce-checklist-all-ok{margin-left:auto;}
+.nce-checklist-list{margin:0;padding:0;list-style:none;border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface);}
+.nce-checklist-row{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-left:3px solid transparent;}
+.nce-checklist-row+.nce-checklist-row{border-top:1px solid var(--surface-divider);}
+.nce-checklist-row.is-abnormal{border-left-color:var(--danger-accent);}
+.nce-checklist-row.is-na{border-left-color:var(--warning-accent);}
+.nce-checklist-row-main{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-2) var(--space-4);}
+.nce-checklist-text{display:grid;gap:var(--space-0-5);min-width:0;flex:1 1 260px;}
+.nce-checklist-title{color:var(--text-primary);font-weight:var(--weight-semibold);line-height:var(--leading-snug);}
+.nce-checklist-detail{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-body);}
+.nce-checklist-hint{color:var(--warning-text);font-size:var(--text-xs);font-weight:var(--weight-semibold);line-height:var(--leading-body);}
+.nce-checklist-choice{flex:none;}
+.nce-checklist-row .tag{flex:none;}
+.nce-checklist-note-input{display:block;width:100%;min-width:0;max-width:100%;font-size:var(--text-sm);resize:vertical;}
 .nce-checklist-evidence{margin:0;color:var(--text-secondary);font-size:var(--text-sm);white-space:pre-wrap;overflow-wrap:anywhere;line-height:var(--leading-body);}
-.nce-checklist-required{margin:0;padding-top:var(--space-3);border-top:1px solid var(--surface-divider);color:var(--danger-text);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
+.nce-checklist-required{margin:0;color:var(--danger-text);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
 .nce-impact-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);}
 .nce-technical-intro{display:flex;align-items:stretch;justify-content:space-between;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface-subtle);}
 .nce-technical-intro h3,.nce-technical-inputs-head h3,.nce-technical-mean-form h3,.nce-technical-record-head h3{margin:var(--space-1) 0 0;color:var(--text-primary);font-size:var(--title-sub);font-weight:var(--title-sub-weight);}
@@ -129,6 +137,8 @@
 .nce-technical-empty{margin-top:var(--space-4);padding:var(--space-4);border:1px dashed var(--surface-border);border-radius:var(--radius-md);color:var(--text-secondary);font-size:var(--text-sm);text-align:center;}
 .nce-technical-empty p{margin:0;}
 .nce-technical-inputs,.nce-technical-mean-form,.nce-technical-mean{display:grid;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface-subtle);}
+/* Ghi chú số liệu điền sẵn từ dữ liệu QC ở form xác minh kỹ thuật. */
+.nce-technical-prefill{display:grid;gap:var(--space-1);margin:0;}
 .nce-technical-mean{border-left:3px solid var(--warning-accent);}
 .nce-technical-mean p,.nce-technical-mean small{margin:0;color:var(--text-secondary);font-size:var(--text-sm);line-height:var(--leading-body);}
 .nce-impact-scope,.nce-impact-decisions{display:grid;align-content:start;gap:var(--space-3);min-width:0;padding:var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface-subtle);}
@@ -186,10 +196,9 @@
 .nce-release-evidence-table{overflow-x:auto;}
 .nce-release-evidence-table>.nce-snapshot-table{display:table;width:100%;min-width:100%;border:0;border-radius:0;table-layout:fixed;}
 .nce-release-evidence-table>.nce-snapshot-table th,.nce-release-evidence-table>.nce-snapshot-table td{width:auto;}
-.nce-rerun-excluded{grid-column:1 / -1;margin:0;padding:var(--space-3) var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface-subtle);}
-.nce-rerun-excluded summary{color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
-.nce-rerun-excluded>.nce-table{margin-top:var(--space-3);}
-.nce-rerun-excluded>.nce-note{margin-top:var(--space-3);}
+.nce-rerun-excluded{grid-column:1 / -1;display:grid;gap:var(--space-2);margin:0;}
+.nce-rerun-excluded p{margin:0;}
+.nce-rerun-excluded .btn{margin-left:var(--space-2);}
 .nce-release-decision .nce-form-actions{padding-top:var(--space-3);border-top:1px solid var(--surface-divider);}
 .nce-capa-tier-view,.nce-capa-cause-view,.nce-effectiveness-plan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3);}
 .nce-capa-summary-card{display:grid;align-content:start;gap:var(--space-2);min-width:0;padding:var(--space-4);border:1px solid var(--surface-divider);border-left-width:3px;border-radius:var(--radius-md);background:var(--surface);}
@@ -324,25 +333,19 @@
   .nce-technical-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}
   .nce-technical-metrics>div:nth-child(3){border-left:0;border-top:1px solid var(--surface-divider);}
   .nce-technical-metrics>div:nth-child(4){border-top:1px solid var(--surface-divider);}
-  .nce-identity-status{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .nce-identity-status>div:nth-child(3){border-left:0;border-top:1px solid var(--surface-divider);}
-  .nce-identity-status>div:nth-child(4){border-top:1px solid var(--surface-divider);}
   .nce-col-text{min-width:0;}
   .nce-summary,.nce-dossier-meta{grid-template-columns:repeat(2,minmax(0,1fr));}
   .nce-workflow-nav .nce-steps{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .nce-checklist-summary{flex-wrap:wrap;}
-  .nce-checklist-summary progress{max-width:none;}
 }
 @media (max-width:600px){
-  .nce-checklist-summary progress{flex-basis:100%;order:1;}
-  .nce-checklist-grid{grid-template-columns:1fr;}
   .nce-impact-window{grid-template-columns:1fr;}
   .nce-impact-window>div+div{border-top:1px solid var(--surface-divider);border-left:0;}
-  .nce-checklist-card-head{grid-template-columns:1fr;}
-  .nce-checklist-card select{width:100%;}
   .nce-identity-status{grid-template-columns:1fr;}
-  .nce-identity-status>div+div,.nce-identity-status>div:nth-child(3){border-left:0;border-top:1px solid var(--surface-divider);}
-  .nce-run-summary-content{align-items:flex-start;flex-direction:column;}
+  .nce-timeline li{grid-template-columns:1fr;gap:var(--space-0-5);}
+  .nce-run>summary{grid-template-columns:minmax(0,1fr) auto;}
+  .nce-run>summary>time,.nce-run>summary>.nce-timeline-text,.nce-run>summary>.nce-run-counts{grid-column:1;}
+  .nce-run>summary>.nce-run-chevron{grid-column:2;grid-row:1 / span 3;}
+  .nce-identity-status>div+div{border-left:0;border-top:1px solid var(--surface-divider);}
   .nce-run-counts{justify-content:flex-start;}
   .nce-release-intro{display:grid;}
   .nce-technical-intro{display:grid;}
@@ -351,8 +354,5 @@
   .nce-technical-metrics>div+div,.nce-technical-metrics>div:nth-child(3){border-top:1px solid var(--surface-divider);border-left:0;}
   .nce-release-boundary{padding-top:var(--space-3);padding-left:0;border-top:3px solid var(--warning-accent);border-left:0;}
 }
-.nce-date-correction{display:grid;gap:var(--space-3);padding:var(--space-3) var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface-subtle);}
-.nce-date-correction-summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;}
-.nce-date-correction-dates{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin-top:var(--space-1);color:var(--text-secondary);font-size:var(--text-sm);}
-.nce-date-correction-dates b{color:var(--text-primary);font-weight:var(--weight-semibold);}
+.nce-date-correction{display:grid;gap:var(--space-3);padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-subtle);}
 .nce-release-prerequisites { display:block; }

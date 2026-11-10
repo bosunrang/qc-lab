@@ -54,6 +54,26 @@ export function TechnicalAssessmentSection(props: SectionProps) {
     setForm((current) => current ? { ...current, [key]: value } : current);
   }
 
+  // Số liệu main tính sẵn từ dữ liệu QC (đơn vị %, TEa vận hành, Bias, SD…):
+  // điền vào form khi mở, người dùng xem lại và sửa nếu cần (đánh giá giao
+  // diện 09/11/2026). Bản chất sai số gợi ý theo loại sai số của lần khởi đầu.
+  const prefill = props.dossier.technical_prefill;
+  const [prefilled, setPrefilled] = useState(false);
+  function startForm() {
+    setDraftVersion(record.row_version);
+    const base: NceTechnicalAssessmentInput = { ...EMPTY_TECHNICAL, meanResetDecision: requiresMeanReview ? 'not_allowed' : 'not_applicable' };
+    const errorNature = record.error_class === 'SE' ? 'systematic' : record.error_class === 'RE' ? 'random' : base.errorNature;
+    if (!prefill) { setPrefilled(false); setForm({ ...base, errorNature }); return; }
+    setPrefilled(true);
+    setForm({
+      ...base, errorNature, metricMode: 'calculated',
+      unit: prefill.unit, tea: prefill.tea, teaSource: prefill.teaSource,
+      stableBias: prefill.stableBias, incidentBias: prefill.incidentBias,
+      sd: prefill.sd, sdSource: prefill.sdSource,
+      observedDispersion: prefill.observedDispersion, sampleCount: prefill.sampleCount,
+    });
+  }
+
   async function save() {
     if (!form) return;
     if (await props.run((base) => saveAssessment({ ...base, expectedVersion: draftVersion, assessment: form }))) setForm(null);
@@ -64,7 +84,7 @@ export function TechnicalAssessmentSection(props: SectionProps) {
   }
 
   return (
-    <Section title="Xác minh kỹ thuật IQC" actions={can.edit && !form ? <button type="button" className="btn ghost sm" onClick={() => { setDraftVersion(record.row_version); setForm({ ...EMPTY_TECHNICAL, meanResetDecision: requiresMeanReview ? 'not_allowed' : 'not_applicable' }); }}>{latest ? 'Ghi đánh giá mới' : 'Ghi đánh giá'}</button> : null}>
+    <Section title="Xác minh kỹ thuật IQC" actions={can.edit && !form ? <button type="button" className="btn ghost sm" onClick={startForm}>{latest ? 'Ghi đánh giá mới' : 'Ghi đánh giá'}</button> : null}>
       <div className="nce-technical-intro">
         <div><p className="nce-eyebrow">Sau kiểm tra nhanh</p><h3>Xác nhận bản chất sai số và hiệu quả xử lý</h3><p>Đối chiếu nhật ký, hiệu chuẩn, vật liệu và dữ liệu QC. Các ngưỡng chỉ hỗ trợ rà soát, không thay quyết định lâm sàng.</p></div>
         <div className="nce-technical-rule"><b>Trình tự</b><span>Xác minh nguyên nhân → xử lý → đánh giá số liệu → kết luận kỹ thuật</span></div>
@@ -101,6 +121,11 @@ export function TechnicalAssessmentSection(props: SectionProps) {
 
         {form.metricMode === 'calculated' ? <div className="nce-technical-inputs">
           <div className="nce-technical-inputs-head"><div><p className="nce-eyebrow">Dữ liệu định lượng</p><h3>Dùng cùng đơn vị và ghi rõ nguồn</h3></div><span className="pill">Không dùng một điểm rerun đơn lẻ làm Bias</span></div>
+          {prefilled && prefill && <div className="alert info nce-technical-prefill" role="note">
+            <b>Số liệu điền sẵn từ dữ liệu QC của mức {prefill.level}, lô {prefill.lot}</b>
+            <span>Đơn vị % so với Mean đích. Bias ổn định và SD tính từ {prefill.sampleCount ?? 0} điểm được chấp nhận trước sự cố; Bias lúc sự cố từ {prefill.incidentCount} điểm của chuỗi vi phạm. Kiểm tra lại và sửa nếu cần trước khi ghi.</span>
+            {prefill.notes.map((note) => <span key={note}>{note}</span>)}
+          </div>}
           <div className="nce-form-grid">
             <Field label="Đơn vị chung" htmlFor="techUnit"><input id="techUnit" value={form.unit} onChange={(event) => set('unit', event.target.value)} /></Field>
             <Field label="TEa / APS" htmlFor="techTea"><input id="techTea" type="number" step="any" value={form.tea ?? ''} onChange={(event) => set('tea', metricNumber(event.target.value))} /></Field>
@@ -244,6 +269,13 @@ export function PatientImpactSection(props: SectionProps) {
 // --------------------------------------- 3. Cho phép hoạt động trở lại
 
 interface ReleasePayload { reason: string; notApplicable: boolean; rerun: { date: string; runId: string } | null; lotChangeNote: string; verificationWarnings?: { code: string; message: string }[] }
+
+/** Đếm số lần chạy theo từng lý do bị loại khỏi danh sách rerun. */
+function reasonCounts(choices: readonly { exclusionReasons: string[] }[]): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const choice of choices) for (const reason of choice.exclusionReasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  return [...counts];
+}
 
 function useRerunOptions(testId: string | null, failures: { date: string; runId: string }[], notBefore: string, enabled: boolean) {
   const [choices, setChoices] = useState<NceRunChoice[]>([]);
@@ -404,12 +436,15 @@ export function ReleaseSection(props: SectionProps) {
               </div>
             )}
           </div>
-          {excluded.length > 0 && <details className="nce-rerun-excluded" open={!options.length}>
-                <summary>{excluded.length} lần QC không được chọn — xem lý do</summary>
-                <table className="nce-table"><thead><tr><th>Lần chạy</th><th>Lý do không được chọn</th></tr></thead><tbody>{excluded.slice(0, 20).map((o) => <tr key={o.key}><td>{o.label}</td><td>{o.exclusionReasons.join('; ')}</td></tr>)}</tbody></table>
-                {excluded.length > 20 && <p className="nce-note">Hiển thị 20 lần không được chọn gần nhất.</p>}
-                {excluded.some((o) => o.date < record.detected_at) && <p className="nce-note">Nếu nhập nhầm ngày phát hiện, đính chính có căn cứ ở bước Ghi nhận sự cố. Nếu thực sự mới phát hiện, không dùng QC trước ngày đó làm bằng chứng sau phát hiện.{props.onIdentity && <button type="button" className="btn ghost sm" onClick={props.onIdentity}>Đến phần ghi nhận</button>}</p>}
-              </details>}
+          {/* Chỉ giải thích khi không còn lần nào chọn được, và gom theo lý do
+              thay vì liệt kê từng lần chạy (danh sách sẽ dài dần theo thời gian). */}
+          {!candidates.loading && !options.length && excluded.length > 0 && (
+            <div className="alert info nce-rerun-excluded" role="status">
+              <p>Chưa có lần QC phù hợp. {excluded.length} lần QC hiện có không dùng được vì:</p>
+              <ul className="nce-list">{reasonCounts(excluded).map(([reason, count]) => <li key={reason}>{reason}: {count} lần</li>)}</ul>
+              {excluded.some((o) => o.date < record.detected_at) && <p>Nếu nhập nhầm ngày phát hiện, đính chính có căn cứ ở bước Ghi nhận sự cố.{props.onIdentity && <button type="button" className="btn ghost sm" onClick={props.onIdentity}>Đến phần ghi nhận</button>}</p>}
+            </div>
+          )}
           {preview && preview.lot_changed_levels.length > 0 && (
             <Field label="Giải thích dùng lô QC khác lần chạy khởi đầu" htmlFor="relLot" wide><input id="relLot" value={lotChangeNote} onChange={(e) => { setDraftVersion((v) => v ?? record.row_version); setLotChangeNote(e.target.value); }} /></Field>
           )}
