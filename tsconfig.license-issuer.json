@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"], "types": ["node", "vite/client"], "allowJs": true,
+    "checkJs": true, "noEmit": true, "strict": true, "skipLibCheck": true
+  },
+  "include": ["app/license-issuer/*.cjs", "app/license-issuer/*.tsx", "app/shared/qc-api.d.ts"]
+}

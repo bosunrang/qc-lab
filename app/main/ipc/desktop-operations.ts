@@ -10,7 +10,7 @@ import type { createAuthHandlers } from './auth-handlers';
 import type { BackupHandlers } from './backup-handlers';
 import type { createFirebaseHandlers } from './firebase-handlers';
 import type { ExportTableInput } from './export-handlers';
-import type { HostApiName, OperationTable } from './operations';
+import type { HostApiName, OperationTable, SoftwareApiName } from './operations';
 import { logEvent } from '../logging/log-sink';
 import { buildLogBundle } from '../logging/log-bundle';
 
@@ -52,7 +52,7 @@ export function desktopActor(user: PublicUser, clientId = 'app-desktop'): Actor 
   return { userId: user.id, username: user.username, name: user.name, role: user.role, clientId };
 }
 
-export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): OperationTable<HostApiName> {
+export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): OperationTable<Exclude<HostApiName, SoftwareApiName>> {
   const { db, auth, backup, firebase } = h;
   const { session } = host;
   // Tệp được chọn để phục hồi giữ ở đây sau bước kiểm tra, nên bước phục hồi

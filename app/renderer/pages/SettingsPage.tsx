@@ -9,7 +9,7 @@ import { showToast } from '../state/toast-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
+import type { LisQueueRecord } from '../../shared/qc-api';
 import { NceConfigPanel } from './settings/NceConfigPanel';
 import { auditSizeWarning } from '../../main/domain/audit-filter';
 import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
@@ -90,6 +90,7 @@ export function SettingsPage() {
   const [lisUrl, setLisUrl] = useState('');
   const [lisToken, setLisToken] = useState('');
   const [lisErr, setLisErr] = useState<string | null>(null);
+  const [lisUrlErr, setLisUrlErr] = useState<string | null>(null);
   const [lisQueueOpen, setLisQueueOpen] = useState(false);
   const [fbCode, setFbCode] = useState('khoaXN');
   const [fbEmail, setFbEmail] = useState('');
@@ -245,9 +246,13 @@ export function SettingsPage() {
 
   // Lưu cấu hình LIS Gateway (xem main/ipc/lis-handlers.ts).
   async function saveLisSettings() {
-    setLisErr(null);
+    setLisErr(null); setLisUrlErr(null);
     const result = await saveLis({ enabled: lisEnabled, url: lisUrl, token: lisToken });
-    if (!result.ok) { setLisErr(result.error.message); return; }
+    if (!result.ok) {
+      if (result.error.code === 'invalid-url') setLisUrlErr(result.error.message);
+      else await errorDialog(result.error.message, { title: 'Chưa lưu được cấu hình LIS' });
+      return;
+    }
     showToast('Đã lưu cấu hình LIS Gateway.');
   }
 
@@ -293,7 +298,7 @@ export function SettingsPage() {
 
 
   async function openLisQueue() {
-    if (!lisEnabled) { setLisErr('Bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.'); return; }
+    if (!lisEnabled) { await infoDialog('Bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.', { title: 'LIS Gateway đang tắt' }); return; }
     setLisErr(null);
     const result = await pullLisQueue();
     if (!result.ok) { setLisErr(result.error.message); return; }
@@ -476,7 +481,7 @@ export function SettingsPage() {
           <h2 className="panel-title">LIS Gateway (thử nghiệm)</h2>
           <div className="lis-gateway-body">
             <div className="lis-gateway-grid">
-              <div className="field"><label htmlFor="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value={lisUrl} onChange={(e) => setLisUrl(e.target.value)} placeholder="http://127.0.0.1:8787" /></div>
+              <div className="field"><label htmlFor="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value={lisUrl} aria-invalid={!!lisUrlErr || undefined} aria-describedby={lisUrlErr ? 'lis-url-error' : undefined} onChange={(e) => { setLisUrl(e.target.value); setLisUrlErr(null); }} placeholder="http://127.0.0.1:8787" />{lisUrlErr && <p id="lis-url-error" className="field-error" role="alert">{lisUrlErr}</p>}</div>
               <div className="field"><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Dán token in ra khi chạy npm run lis:gateway" /></div>
               <label className="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" checked={lisEnabled} onChange={(e) => setLisEnabled(e.target.checked)} /><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label>
             </div>

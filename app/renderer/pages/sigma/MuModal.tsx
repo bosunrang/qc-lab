@@ -4,6 +4,7 @@ import { Modal } from '../../components/Modal';
 import { uncertaintyBudget } from '../../../main/domain/sigma-metrics';
 import type { SigmaLevelResult } from '../../../shared/qc-api';
 import { AsyncButton } from '../../components/AsyncButton';
+import { errorDialog } from '../../state/dialog-store';
 
 export function MuModal({ level, onClose, onSubmit }: {
   level: SigmaLevelResult; onClose: () => void;
@@ -12,18 +13,16 @@ export function MuModal({ level, onClose, onSubmit }: {
   const [uCref, setUCref] = useState(level.uCref != null ? String(level.uCref) : '');
   const [uCal, setUCal] = useState(level.uCal != null ? String(level.uCal) : '');
   const [includeBias, setIncludeBias] = useState(level.muBiasMode ? level.muBiasMode !== 'exclude' : level.mu?.includeBias !== false);
-  const [err, setErr] = useState<string | null>(null);
   const preview = uncertaintyBudget({ cv: level.cv, bias: level.biasEqa, uCref, uCal, includeBias, tea: level.tea, target: level.targetMean });
 
   async function submit() {
     const result = await onSubmit(uCref === '' ? undefined : Number(uCref), uCal === '' ? undefined : Number(uCal), includeBias ? 'include' : 'exclude');
-    if (!result.ok) setErr(result.error?.message || 'Lỗi không xác định.');
+    if (!result.ok) await errorDialog(result.error?.message || 'Lỗi không xác định.', { title: 'Không thể áp dụng ngân sách MU' });
   }
 
   return (
     <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} size="lg" className="sg-mu-modal"
       footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Áp dụng ngân sách MU</AsyncButton></>}>
-      {err && <p className="field-error" role="alert">{err}</p>}
       <table className="sg-mu-detail-table">
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>
         <tbody>
@@ -47,7 +46,7 @@ export function MuModal({ level, onClose, onSubmit }: {
       {preview && (
         <p className="sg-mu-preview">
           {preview.complete ? 'Dự tính' : 'Tạm tính chưa đầy đủ'}: u_c = {preview.uc.toFixed(3)}% · U (k=2) = {preview.U.toFixed(3)}%
-          {!preview.complete && <span className="field-error sg-mu-incomplete">Thiếu: {preview.missing.join(', ')} — không dùng để kết luận đạt TEa.</span>}
+          {!preview.complete && <span className="sg-mu-incomplete">Thiếu: {preview.missing.join(', ')} — không dùng để kết luận đạt TEa.</span>}
         </p>
       )}
     </Modal>

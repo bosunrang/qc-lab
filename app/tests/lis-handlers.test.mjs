@@ -19,14 +19,15 @@ const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'a
 const viewer = { ...actor, role: 'viewer' };
 
 const instrument = config.saveInstrument({ data: { name: 'May LIS' } }, actor).data;
-const test = config.saveTest({ data: { name: 'Glucose LIS', instrumentId: instrument.id } }, actor).data;
-makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
+const test = config.saveTest({ data: { name: 'Glucose LIS', instrumentId: instrument.id, unit: 'mmol/L' } }, actor).data;
+const operational = makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
+const currentLot = db.prepare('SELECT lot_no FROM qc_lots WHERE id=?').get(operational.lotIds[0]).lot_no;
 
 function fakeRecord(messageId, dateIso) {
   return {
     id: 'qcr_' + messageId, receivedAt: '2026-08-01T00:00:00.000Z', status: 'pending',
-    message: { messageId, analyzerId: 'AU480', testCode: 'GLU', qcLevel: '1', value: 101, measuredAt: dateIso, runId: 'r1', operator: 'ktv1' },
-    resolved: { ok: true, code: 'RESOLVED', qclabTestId: test.id, level: 1, lot: '', displayName: 'Glucose' },
+    message: { messageId, analyzerId: 'AU480', testCode: 'GLU', qcLevel: '1', value: 101, unit: 'mmol/L', measuredAt: dateIso, runId: 'r1', operator: 'ktv1' },
+    resolved: { ok: true, code: 'RESOLVED', qclabTestId: test.id, level: 1, lot: currentLot, displayName: 'Glucose' },
   };
 }
 
@@ -63,7 +64,7 @@ globalThis.fetch = async (url, opts) => {
   return { ok: false, status: 404, json: async () => ({}) };
 };
 
-const pulled = await lis.pullQueue();
+const pulled = await lis.pullQueue(actor);
 assert.equal(pulled.ok, true, JSON.stringify(pulled));
 assert.equal(pulled.data.pending.length, 1);
 assert.equal(pulled.data.unresolved.length, 1);
@@ -102,7 +103,8 @@ assert.equal(decideBody.status, 'imported');
 fetchCalls.length = 0;
 queue = [];
 const notPending = await lis.importResult({ data: { record: fakeRecord('m3', '2026-08-06T02:00:00Z') } }, actor);
-assert.equal(notPending.error.code, 'not-pending', 'bản ghi không còn trong hàng chờ: không nhận trùng');
+assert.equal(notPending.ok, true, 'bản tin đã nhận trả lại đúng điểm, kể cả đã rời hàng chờ');
+assert.equal(notPending.data.pointId, imported.data.pointId);
 assert.equal(decideCalls().length, 0);
 assert.equal(db.prepare('SELECT COUNT(*) AS n FROM qc_points').get().n, 1);
 
@@ -121,7 +123,7 @@ const importedButDecideFailed = await lis.importResult({ data: { record: fakeRec
 decideFails = false;
 assert.equal(importedButDecideFailed.ok, true, 'diem da ghi thi KHONG duoc bao that bai toan bo');
 assert.ok(importedButDecideFailed.data.pointId);
-assert.ok(/chưa báo được về Gateway/.test(importedButDecideFailed.data.gatewayWarning));
+assert.ok(/chưa xác nhận được với Gateway/.test(importedButDecideFailed.data.gatewayWarning));
 const point5 = db.prepare('SELECT * FROM qc_points WHERE id=?').get(importedButDecideFailed.data.pointId);
 assert.ok(point5, 'diem QC van duoc ghi that, khong bi xoa/rollback');
 

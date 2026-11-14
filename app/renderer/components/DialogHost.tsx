@@ -1,6 +1,6 @@
 // Mount 1 lần, cố định (portal vào #dialogRoot) — render confirm/info/
-// reauth theo dialog-store.ts. Đặt trong AppShell, ngoài <Outlet/>, nên tồn
-// tại xuyên suốt vòng đời app, không unmount khi chuyển trang.
+// reauth theo dialog-store.ts. Đặt ở `main.tsx`, bên ngoài lớp giấy phép và
+// router, nên dùng được trên toàn app kể cả trước đăng nhập/kích hoạt.
 //
 // **2026-09-03**: viết lại theo cấu trúc `.confirm-modal` — bản trước chỉ
 // dùng khung modal trơn (`.modal-h`/`.modal-b`), thiếu kicker đỏ "Thao tác
@@ -158,8 +158,8 @@ function ReasonForm({ opts, onResolve }: { opts: ReasonOptions; onResolve: (valu
           <textarea id="dialog-reason" autoFocus rows={3} value={reason} placeholder={placeholder}
             aria-invalid={error ? true : undefined} aria-describedby={error ? 'dialog-reason-error' : undefined}
             onChange={(e) => { setReason(e.target.value); if (error) setError(null); }} />
+          {error && <p className="field-error" id="dialog-reason-error" role="alert">{error}</p>}
         </div>
-        {error && <p className="field-error" id="dialog-reason-error" role="alert">{error}</p>}
       </div>
       <div className="confirm-modal-actions">
         <button type="button" className="btn ghost" onClick={() => onResolve(null)}>Huỷ</button>
@@ -216,10 +216,11 @@ function ReauthForm({ title, message, onResolve }: { title: string; message?: st
           <label htmlFor="reauth-password">Mật khẩu hiện tại</label>
           <input
             ref={inputRef} id="reauth-password" name="current-password" type="password" autoComplete="current-password" autoFocus value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={error ? true : undefined} aria-describedby={error ? 'reauth-password-error' : undefined}
+            onChange={(e) => { setPassword(e.target.value); if (error) setError(null); }}
           />
+          {error && <p className="field-error" id="reauth-password-error" role="alert">{error}</p>}
         </div>
-        {error && <p className="field-error" role="alert">{error}</p>}
       </form>
       <div className="confirm-modal-actions">
         <button type="button" className="btn ghost" onClick={() => onResolve(false)}>Huỷ</button>

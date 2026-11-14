@@ -19,10 +19,12 @@ import { canUserAccessPage, pageById } from '../domain/page-roles';
 const PUBLIC_CHANNELS: ReadonlySet<string> = new Set([
   'auth:hasAnyUsers', 'auth:currentUser', 'auth:bootstrapAdmin', 'auth:login', 'auth:logout',
   'settings:getLoginBrand', 'log:clientError',
+  'software:getLicenseStatus', 'software:activate',
 ]);
 
 /** Thêm vào các kênh công khai khi tài khoản đang phải đổi mật khẩu. */
 const PASSWORD_CHANGE_CHANNELS: ReadonlySet<string> = new Set(['auth:changeOwnPassword']);
+const UNACTIVATED_CHANNELS = new Set(['auth:hasAnyUsers', 'auth:currentUser', 'auth:logout', 'settings:getLoginBrand', 'log:clientError', 'software:getLicenseStatus', 'software:activate']);
 
 /** Kênh → các trang được dùng nó (chỉ cần vào được một trang). Kênh không có
  * ở đây và không thuộc nhóm theo tiền tố bên dưới thì chỉ cần đăng nhập: đó
@@ -45,6 +47,7 @@ const CHANNEL_PAGES: Readonly<Record<string, readonly string[]>> = {
   'firebase:connect': ['settings'], 'firebase:sync': ['settings'], 'firebase:disconnect': ['settings'],
   'backup:export': ['settings'], 'backup:chooseFile': ['settings'], 'backup:import': ['settings'], 'backup:resetAll': ['settings'],
   'log:openFolder': ['settings'], 'log:exportBundle': ['settings'],
+  'software:checkUpdate': ['settings'], 'software:downloadUpdate': ['settings'], 'software:installUpdate': ['settings'],
 };
 
 /** Cả nhóm kênh thuộc một trang. `config:list*` đọc danh mục cho mọi trang
@@ -71,10 +74,11 @@ function pagePermsOf(value: string | null): string[] | null {
   try { const parsed: unknown = JSON.parse(value); return Array.isArray(parsed) ? parsed.map(String) : null; } catch { return null; }
 }
 
-export function createAccessGate(db: Db): AccessGate {
+export function createAccessGate(db: Db, licenseAllowed: () => boolean = () => true): AccessGate {
   const read = db.prepare('SELECT id, username, name, role, page_perms_json, active, must_change_password FROM users WHERE id=?');
   return {
     guard(channel: string, ctx: CallContext): CallContext {
+      if (!licenseAllowed() && !UNACTIVATED_CHANNELS.has(channel)) throw new AccessError('activation-required', 'Máy chủ QC Lab cần được kích hoạt trước khi sử dụng.');
       if (PUBLIC_CHANNELS.has(channel)) return ctx;
       const actor = ctx.actor();
       const row = read.get(actor.userId) as AccessRow | undefined;

@@ -5,6 +5,9 @@
 import type { NceDecisionRow, NceDossierView, NceRecordRow, NceRevisionRow, NceRunKeyView, QcPointView } from '../../../shared/qc-api';
 import { compareQcRunKey, qcRunKey } from '../sort-order';
 import { NCE_DECISION_LABEL, NCE_EFFECTIVENESS_RESULT_LABEL, NCE_PATIENT_OUTCOME_LABEL } from './labels';
+import { runLabel as nceRunLabel } from './format';
+
+export { nceRunLabel };
 
 export type NceListFilter = 'active' | 'mine' | 'approve' | 'overdue' | 'closed' | 'all';
 
@@ -38,13 +41,6 @@ export interface NceRunOption extends NceRunKeyView {
 }
 
 export interface NceRunChoice extends NceRunOption { exclusionReasons: string[] }
-
-/** "12/10/2026 · lần 3". */
-export function nceRunLabel(run: { date: string; runId: string }): string {
-  const [y, m, d] = run.date.split('-');
-  const day = y && m && d ? `${d}/${m}/${y}` : run.date;
-  return run.runId ? `${day} · lần ${run.runId}` : day;
-}
 
 /** Lần chạy có thể làm rerun/xác minh: từ ngày phát hiện và sau lần hỏng
  * muộn nhất của hồ sơ, mới nhất lên trước. Main vẫn

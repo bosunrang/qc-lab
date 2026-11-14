@@ -3,7 +3,7 @@
 import { useEffect, useId, type RefObject } from 'react';
 import { controlValue, findFieldControl, markInvalidField, pickField, type FormError } from './field-error';
 
-/** Trả id cho dòng lỗi của form (`<p id={errorId} className="field-error">`).
+/** Trả id cho lời nhắc lỗi (`FormErrorMessage` hoặc thông báo dưới ô đã có).
  * Mỗi lỗi mới có ô ứng viên thì ô đó được đánh dấu `aria-invalid`, nối với
  * dòng lỗi qua `aria-describedby` và nhận focus; lỗi đổi hoặc mất thì gỡ dấu
  * cũ, người dùng sửa ô thì tự gỡ. `rootRef` là form (hoặc khối) chứa các ô. */

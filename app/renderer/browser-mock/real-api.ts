@@ -17,6 +17,7 @@
 // và PDF có đường thay thế thuần trình duyệt ở `lib/browser-export.ts`, để xem và
 // xuất báo cáo ngay trên cổng 5174.
 import { openPreviewDatabase } from './sqlite-loader';
+import { previewLicense, previewUpdate } from '../lib/software-preview';
 import { setBrowserDbSizeSource } from '../../main/ipc/db-file-size-browser';
 import { type Actor, setBroadcastWindow, writeAudit } from '../../main/ipc/shared';
 import { createConfigHandlers } from '../../main/ipc/config-handlers';
@@ -138,6 +139,14 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   } catch { /* không có sessionStorage: coi như chưa đăng nhập */ }
 
   const api = {
+    getLicenseStatus: async () => ({ ...previewLicense }),
+    // Cần định danh Windows và bộ cài Electron thật; tab trình duyệt không
+    // được nhận mã kích hoạt hoặc tự tải/chạy một bộ cài hệ điều hành.
+    activateSoftware: async () => notAvailable(),
+    getSoftwareUpdateStatus: async () => ({ ...previewUpdate }),
+    checkSoftwareUpdate: async () => notAvailable(),
+    downloadSoftwareUpdate: async () => notAvailable(),
+    installSoftwareUpdate: async () => notAvailable(),
     currentUser: async () => (sessionActor ? auth.getUser(sessionActor.userId) : null),
     bootstrapAdmin: async (input) => {
       const result = await auth.bootstrapAdmin(input);

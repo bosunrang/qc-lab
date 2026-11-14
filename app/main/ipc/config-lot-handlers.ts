@@ -167,7 +167,11 @@ export function createLotConfigHandlers(db: Db) {
       // không đổi điểm, hoặc ngược lại) là trạng thái không thể tự phục hồi.
       const renaming = !!before?.lot_no && before.lot_no !== lotNo;
       let renamed = 0;
-      w.commit((tx) => {
+      const regrouping = !!groupId && groupId !== before?.group_id;
+      const commitLot = <R>(work: (tx: WriteTx) => R): IpcResult<R> => regrouping
+        ? commitKeepingRejectedRuns(db, w, 'Chuyển lô QC sang nhóm này', work)
+        : { ok: true, data: w.commit(work) };
+      const saved = commitLot((tx) => {
         // KHÔNG gửi `groupId` nghĩa là "giữ nguyên nhóm", không phải "gỡ khỏi
         // nhóm" — cùng ngữ nghĩa `prepareLabProfile(existing)` dùng cho logo.
         // Form "Sửa lô QC" không có ô chọn nhóm (membership do modal Nhóm lô
@@ -188,6 +192,7 @@ export function createLotConfigHandlers(db: Db) {
             : `Cập nhật lô "${lotNo}" mức ${level}`, lotNo);
         tx.changed(renaming ? ['qc_lots', 'qc_points'] : ['qc_lots']);
       });
+      if (!saved.ok) return saved;
       return { ok: true, data: db.prepare('SELECT * FROM qc_lots WHERE id=?').get(id) };
     }
     const newId = cleanId(uid());
@@ -227,7 +232,7 @@ export function createLotConfigHandlers(db: Db) {
 
   const saveLotGroup = writeCommand(db, 'saveLotGroup', 'admin', (w, input: { id?: string; data: LotGroupInput }): IpcResult<LotGroup> => {
     const id = input.id || '';
-    const lotRows = db.prepare('SELECT id, lot_no FROM qc_lots').all() as { id: string; lot_no: string }[];
+    const lotRows = db.prepare('SELECT id, lot_no, group_id FROM qc_lots').all() as { id: string; lot_no: string; group_id: string | null }[];
     const lotNoById = new Map(lotRows.map(row => [row.id, row.lot_no]));
     const requestedLotIds = Array.isArray(input.data.lotIds)
       ? [...new Set(input.data.lotIds.map(cleanId).filter(Boolean))]
@@ -274,10 +279,11 @@ export function createLotConfigHandlers(db: Db) {
       tx.audit(id ? 'Sửa nhóm lô QC' : 'Thêm nhóm lô QC', `Nhóm "${name}" (${validLotIds.length} lô)`, name);
       tx.changed(['lot_groups', 'qc_lots']);
     };
-    // Tắt nhóm hoặc gỡ lô khỏi nhóm đang chạy có thể đưa lô ra khỏi vận hành:
-    // giữ hàng chờ NCE (R03). Nhóm mới chưa chạy nên không phải đọc hàng chờ.
+    // Nhóm mới cũng có thể lấy lô từ nhóm đang vận hành. Cần kiểm cả việc
+    // tạo nhóm và chuyển liên kết; từ chối thì hoàn nguyên cả hai phần.
+    const mayChangeOperation = !!id || lotRows.some((lot) => validLotIdSet.has(lot.id) && lot.group_id && lot.group_id !== groupId);
     try {
-      const saved = id ? commitKeepingRejectedRuns(db, w, 'Lưu nhóm lô này', saveGroup) : { ok: true as const, data: w.commit(saveGroup) };
+      const saved = mayChangeOperation ? commitKeepingRejectedRuns(db, w, 'Lưu nhóm lô này', saveGroup) : { ok: true as const, data: w.commit(saveGroup) };
       if (!saved.ok) return saved;
     } catch (e) {
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu nhóm lô QC thất bại.' } };

@@ -65,8 +65,7 @@
 .eqa-round-bar{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4);}
 .eqa-round-title{display:flex;align-items:center;gap:var(--space-2-5);flex:1;min-width:0;flex-wrap:wrap;}
 .eqa-round-title h2{margin:0;font-size:var(--title-panel);font-weight:var(--title-panel-weight);color:var(--text-primary);overflow-wrap:anywhere;}
-.eqa-series-scope{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
-.eqa-series-scope{min-width:0;}
+.eqa-series-scope{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;min-width:0;}
 /* Tên chương trình thường dài (vd. MONTHLY CLINICAL CHEMISTRY): đủ rộng để
    không bị chevron đè, vẫn co lại khi hàng tiêu đề chật. */
 .eqa-series-scope select{width:auto;min-width:150px;max-width:min(440px,100%);}

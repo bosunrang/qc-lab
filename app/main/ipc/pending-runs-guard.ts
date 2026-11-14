@@ -14,8 +14,12 @@ export function commitKeepingRejectedRuns<R>(db: Db, w: WriteSteps, action: stri
   const before = unrecordedRejectedRuns(db);
   try {
     return { ok: true, data: w.commit((tx) => {
-      const value = work(tx);
+      // Nhật ký còn phát tín hiệu đổi dữ liệu và hẹn sao lưu đám mây. Chỉ
+      // ghi sau khi cổng chấp nhận để lần lưu bị huỷ không phát tín hiệu giả.
+      const audits: Parameters<WriteTx['audit']>[] = [];
+      const value = work({ ...tx, audit: (...args) => { audits.push(args); } });
       assertNoLostRejectedRuns(db, before, action);
+      for (const args of audits) tx.audit(...args);
       return value;
     }) };
   } catch (error) {

@@ -10,9 +10,9 @@ import { hasPeriodOpenItems, periodOpenItems, periodOpenItemsText, type PeriodRe
 import { isValidYm } from '../domain/period-lock-validation';
 import { REVIEW_CONCLUSION_LABELS, reviewDataFingerprint, summarizeReviewGroup, validateReviewSignature, type ReviewPoint, type ReviewPointStatus } from '../domain/monthly-review';
 import { isoLocalDate } from '../domain/local-date';
-import { acceptedRunPoints, pointTarget, rejectedLevelsByRun } from '../domain/westgard-engine';
-import { qcRunKey } from '../domain/sort-order';
+import { acceptedRunPoints } from '../domain/westgard-engine';
 import { activeEvaluationOf } from './active-evaluation';
+import { pointEvaluationsOf } from './point-evaluations';
 import { historicalPointEvaluations } from './historical-evaluation';
 import { listParallelColumns } from './parallel-columns';
 import { REPORT_FORM_LABELS, parseReportTemplates, validateReportTemplate, type ReportTemplateInput } from '../domain/report-template-validation';
@@ -20,14 +20,13 @@ import { type IpcResult, nowIso, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 // Kiểu hàng báo cáo lấy từ HỢP ĐỒNG dùng chung thay vì khai lại ở đây — bản
 // trước có hai khai báo song song cùng tên và bản ở đây thiếu cột `lot`.
-import type { ArchivedBlock, QcMonthlyReview, QcMonthlyReviewRow, QcMonthlyReviewSignature, ReportPointRow, ReportTemplateSettings } from '../../shared/qc-api';
+import type { QcMonthlyReview, QcMonthlyReviewRow, QcMonthlyReviewSignature, ReportPointRow, ReportTemplateSettings } from '../../shared/qc-api';
 
 export type { ReportPointRow, ReportTemplateSettings };
 
 export interface PeriodLockRow { id: string; ym: string; locked_at: string; locked_by: string; note: string }
 
 const REPORT_TEMPLATE_META_KEY = 'reportTemplateSettings';
-type ReportEvaluation = Pick<ReportPointRow, 'target_mean' | 'target_sd' | 'z' | 'verdict' | 'rules' | 'accepted' | 'run_rejected_by'>;
 
 
 
@@ -112,7 +111,11 @@ export function createReportHandlers(db: Db) {
       if (!out.has(point.id)) out.set(point.id, point.verdict === 'none' ? 'unevaluated' : point.accepted ? 'accepted' : 'rejected');
     };
     if (!covered()) for (const column of listParallelColumns(db, testId)) column.points.forEach(fromView);
-    if (!covered()) historicalPointEvaluations(db, testId, rows.filter((row) => !out.has(row.id))).forEach(fromView);
+    if (!covered()) for (const point of historicalPointEvaluations(db, testId, rows).values()) {
+      // Có mức đã đổi lô: ghi đè cả mức còn dùng để giữ kết luận của toàn bộ
+      // lần chạy cũ, thay vì trộn hai ngữ cảnh đánh giá thiếu mức với nhau.
+      out.set(point.id, point.verdict === 'none' ? 'unevaluated' : point.accepted ? 'accepted' : 'rejected');
+    }
     return out;
   }
 
@@ -255,52 +258,8 @@ export function createReportHandlers(db: Db) {
    * Trả cả điểm ĐÃ HUỶ kèm `void_reason` — báo cáo là hồ sơ, dấu vết huỷ phải
    * còn trong đó, không lọc đi.
    *
-   * KHÔNG tính verdict Westgard: đánh giá luật cần cả tập mức cùng lần chạy
-   * và thuộc trang Phân tích Westgard (trang đó có bản xuất riêng, kèm cột
-   * "Lần chạy bị loại"/"Dùng thống kê"). Quyết định này ghi ở `docs/APP-PLAN.md`
-   * mục 3.8. */
-  /** Giữ ngữ cảnh đầy đủ của chuỗi Westgard rồi mới chọn điểm trong báo cáo.
-   * Không đánh giá lại chuỗi đã cắt ngày, không lấy Mean/SD lô hiện tại áp
-   * cho lô cũ. Các nguồn đúng như Nhập QC và hai tab Phân tích Westgard. */
-  function reportEvaluations(testId: string, rows: readonly Pick<ReportPointRow, 'id' | 'level' | 'lot'>[]): Map<string, ReportEvaluation> {
-    const out = new Map<string, ReportEvaluation>();
-    const needed = new Set(rows.map((point) => point.id));
-    if (!needed.size) return out;
-    const covered = () => [...needed].every((id) => out.has(id));
-    const active = activeEvaluationOf(db, testId);
-    const accepted = acceptedRunPoints(active.byPoint);
-    const rejectedBy = rejectedLevelsByRun(active.levels, active.byPoint);
-    for (const level of active.levels) for (const point of level.pts) {
-      if (!needed.has(point.id)) continue;
-      const flag = active.byPoint.get(point);
-      if (!flag || level.mean === null || level.sd === null) continue;
-      const target = pointTarget(point, level.mean, level.sd);
-      out.set(point.id, {
-        target_mean: target.mean, target_sd: target.sd, z: Number.isFinite(flag.z) ? flag.z : null,
-        verdict: flag.level, rules: [...flag.rules], accepted: accepted.has(point),
-        run_rejected_by: rejectedBy.get(qcRunKey(point)) || [],
-      });
-    }
-    if (!covered()) for (const column of listParallelColumns(db, testId)) for (const point of column.points) {
-      if (!needed.has(point.id) || out.has(point.id)) continue;
-      const target = pointTarget({ val: point.val, qcMean: point.qc_mean, qcSd: point.qc_sd }, column.mean, column.sd);
-      out.set(point.id, {
-        target_mean: target.mean, target_sd: target.sd, z: Number.isFinite(target.z) ? target.z : null,
-        verdict: point.verdict, rules: [...point.rules], accepted: point.accepted === true,
-        run_rejected_by: point.runRejectedBy || [],
-      });
-    }
-    if (!covered()) {
-      for (const [id, point] of historicalPointEvaluations(db, testId, rows.filter((row) => !out.has(row.id)))) {
-        out.set(id, {
-          target_mean: point.targetMean, target_sd: point.targetSd, z: Number.isFinite(point.z) ? point.z : null,
-          verdict: point.verdict, rules: [...point.rules], accepted: point.accepted,
-          run_rejected_by: point.runRejectedBy || [],
-        });
-      }
-    }
-    return out;
-  }
+   * Kết luận lấy từ chuỗi đánh giá đầy đủ dùng chung với tab Lịch sử dữ liệu,
+   * rồi mới giới hạn khoảng ngày hiển thị, để không mất luật nhiều lần chạy. */
 
   function queryReport(input: { testId?: unknown; from?: unknown; to?: unknown }): ReportPointRow[] {
     const testId = String(input.testId || '');
@@ -316,7 +275,7 @@ export function createReportHandlers(db: Db) {
     if (to) { sql += ' AND date<=?'; params.push(to); }
     sql += ' ORDER BY date, level, run_id';
     const rows = db.prepare(sql).all(...params) as unknown as Omit<ReportPointRow, 'z' | 'verdict' | 'rules' | 'accepted' | 'run_rejected_by'>[];
-    const evaluation = reportEvaluations(testId, rows.filter((point) => !point.voided));
+    const evaluation = pointEvaluationsOf(db, testId, rows.filter((point) => !point.voided));
     return rows.map<ReportPointRow>((point) => ({ ...point, z: null, verdict: 'none', rules: [], accepted: false, run_rejected_by: [],
       ...(!point.voided ? evaluation.get(point.id) : undefined) }));
   }

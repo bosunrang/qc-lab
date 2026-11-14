@@ -17,7 +17,7 @@ function localYmd(iso) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 const record = {
-  message: { messageId: 'm1', analyzerId: 'AU480', testCode: 'GLU', qcLevel: '1', value: 101, measuredAt: '2026-08-01T23:05:00Z', runId: 'r1', operator: 'ktv1' },
+  message: { messageId: 'm1', analyzerId: 'AU480', testCode: 'GLU', qcLevel: '1', value: 101, unit: 'mmol/L', measuredAt: '2026-08-01T23:05:00Z', runId: 'r1', operator: 'ktv1' },
   resolved: { ok: true, code: 'RESOLVED', qclabTestId: 't1', level: 1, lot: 'L1', displayName: 'Glucose' },
 };
 const input = resultToPointInput(record);
@@ -27,6 +27,8 @@ assert.equal(input.level, 1);
 assert.equal(input.val, 101);
 assert.equal(input.runId, 'r1');
 assert.equal(input.operatorName, 'ktv1');
+assert.equal(input.lotNo, 'L1');
+assert.equal(input.unit, 'mmol/L');
 
 assert.equal(resultToPointInput({ message: { measuredAt: 'khong-phai-ngay' }, resolved: { ok: true, qclabTestId: 't1', level: 1 } }), null);
 

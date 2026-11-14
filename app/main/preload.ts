@@ -1,9 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { QcApi } from '../shared/qc-api';
+import type { QcApi, SigmaTeaMode } from '../shared/qc-api';
 
 // Ranh giới an ninh duy nhất giữa renderer và main: chỉ lộ ra các operation
 // nghiệp vụ đặt tên rõ ràng — renderer KHÔNG có cách nào gửi SQL tự do.
 const api = {
+  getLicenseStatus: () => ipcRenderer.invoke('software:getLicenseStatus'),
+  activateSoftware: (input: unknown) => ipcRenderer.invoke('software:activate', input),
+  getSoftwareUpdateStatus: () => ipcRenderer.invoke('software:getUpdateStatus'),
+  checkSoftwareUpdate: () => ipcRenderer.invoke('software:checkUpdate'),
+  downloadSoftwareUpdate: () => ipcRenderer.invoke('software:downloadUpdate'),
+  installSoftwareUpdate: () => ipcRenderer.invoke('software:installUpdate'),
   hasAnyUsers: () => ipcRenderer.invoke('auth:hasAnyUsers'),
   currentUser: () => ipcRenderer.invoke('auth:currentUser'),
   bootstrapAdmin: (input: unknown) => ipcRenderer.invoke('auth:bootstrapAdmin', input),
@@ -78,7 +84,7 @@ const api = {
   listArchivedBlocks: (testId: string, groupId: string) => ipcRenderer.invoke('westgard:listArchivedBlocks', testId, groupId),
   listArchivedGroupTests: (groupId: string) => ipcRenderer.invoke('westgard:listArchivedGroupTests', groupId),
   listPreviousLotBlocks: (testId: string) => ipcRenderer.invoke('westgard:listPreviousLotBlocks', testId),
-  listSigmaPeriods: (testId: string) => ipcRenderer.invoke('sigma:listPeriods', testId),
+  listSigmaPeriods: (testId: string, teaMode?: SigmaTeaMode) => ipcRenderer.invoke('sigma:listPeriods', testId, teaMode),
   listSigmaCohorts: (testId: string, period: string, levels: number[]) => ipcRenderer.invoke('sigma:listCohorts', testId, period, levels),
   saveSigmaTeaConfig: (input: unknown) => ipcRenderer.invoke('sigma:saveTeaConfig', input),
   saveSigmaPeriod: (input: unknown) => ipcRenderer.invoke('sigma:savePeriod', input),

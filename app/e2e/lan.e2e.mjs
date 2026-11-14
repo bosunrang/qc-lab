@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { TECH, bootstrapAndLogin, enterValue, launchApp, login, openPage, seedOperationalTest, todayIn, watchErrors } from './helpers.mjs';
+import { ADMIN, TECH, bootstrapAndLogin, enterValue, launchApp, login, openPage, seedOperationalTest, todayIn, watchErrors } from './helpers.mjs';
 
 test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao tác quản trị', { timeout: 180_000 }, async () => {
   const { app, page, errors, port, userDataDir } = await launchApp();
@@ -105,6 +105,38 @@ test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao t
     assert.equal(denied.error.code, 'unknown-operation');
     const instruments = await page.evaluate(() => window.qcApi.listInstruments());
     assert.deepEqual(instruments.map((i) => i.name), ['Máy E2E'], 'máy chính không nhận thao tác quản trị từ LAN');
+
+    // Quản trị viên trên LAN vẫn bị chặn lưu cấu hình. Lỗi phải nổi trên form
+    // đang cuộn xuống cuối, không nằm khuất ở đầu và không làm mất dữ liệu nháp.
+    await station.getByRole('button', { name: 'Đăng xuất' }).first().click();
+    await login(station, ADMIN);
+    await openPage(station, 'Cấu hình chung');
+    await station.locator('.config-shell-tabs').getByRole('button', { name: /Danh mục xét nghiệm/ }).click();
+    await station.getByRole('button', { name: 'Sửa Glucose E2E trên Máy E2E', exact: true }).click();
+    const testModal = station.locator('.modal[role=dialog]', { hasText: 'Sửa xét nghiệm' });
+    await testModal.waitFor();
+    await testModal.locator('[name=unit]').fill('mmol/L nháp');
+    const scrollTop = await testModal.locator('.modal-b').evaluate((body) => { body.scrollTop = body.scrollHeight; return body.scrollTop; });
+    assert.ok(scrollTop > 0, 'biểu mẫu đã cuộn xuống dưới');
+    await testModal.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+    const failure = station.getByRole('alertdialog');
+    await failure.waitFor();
+    assert.match(await failure.innerText(), /Thao tác không được mở qua mạng nội bộ/);
+    assert.equal(await testModal.locator('.field-error, [aria-invalid=true]').count(), 0, 'lỗi quyền không đánh dấu sai ô nhập');
+    assert.ok(await failure.evaluate((box) => { const r = box.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), 'hộp thoại nằm trọn trong màn hình');
+    await failure.getByRole('button', { name: 'Đã hiểu' }).click();
+    await failure.waitFor({ state: 'detached' });
+    assert.equal(await testModal.isVisible(), true);
+    assert.equal(await testModal.locator('[name=unit]').inputValue(), 'mmol/L nháp');
+    assert.ok(await testModal.locator('.modal-b').evaluate((body) => body.scrollTop > 0), 'đóng thông báo giữ vị trí đang cuộn');
+    await testModal.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+    await failure.waitFor();
+    assert.equal(await station.getByRole('alertdialog').count(), 1, 'thử lại không chồng thông báo');
+    await station.keyboard.press('Escape');
+    await failure.waitFor({ state: 'detached' });
+    assert.equal(await testModal.isVisible(), true, 'Esc chỉ đóng thông báo lỗi');
+    const unchanged = await page.evaluate(async (id) => (await window.qcApi.listTests()).find((item) => item.id === id), seeded.testId);
+    assert.equal(unchanged.unit, 'mmol/L', 'máy chủ không nhận thay đổi bị chặn');
 
     // Ngay trên máy chính, KTV cũng không đổi được luật chung: chỉ quản trị viên.
     await page.getByRole('button', { name: 'Đăng xuất' }).first().click();

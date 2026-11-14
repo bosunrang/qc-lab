@@ -6,8 +6,10 @@ import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { EmptyState } from '../../components/EmptyState';
 import { RowActionButton } from '../../components/RowActionButton';
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 import { useNceStore } from '../../store/nce-store';
 import { todayIso } from '../../lib/format';
+import { useFormError } from '../../lib/useFormError';
 import type { NceActionRow } from '../../../shared/qc-api';
 import { NCE_ACTION_KIND_LABEL } from '../../../main/domain/nce/labels';
 import type { SectionProps } from './DossierContent';
@@ -18,6 +20,9 @@ interface ActionDraft { kind: string; description: string; ownerUserId: string; 
 const STATUS: Record<NceActionRow['status'], { label: string; tone: string }> = {
   open: { label: 'Chưa xong', tone: 'warn' }, done: { label: 'Hoàn thành', tone: 'ok' }, cancelled: { label: 'Đã huỷ', tone: 'none' },
 };
+const ACTION_FIELDS = { 'invalid-kind': 'actKind', 'missing-description': 'actDesc', 'missing-owner': 'actOwner', 'invalid-due-date': 'actDue', 'due-before-detected': 'actDue' } as const;
+const COMPLETION_FIELDS = { 'invalid-done-date': 'actDone', 'invalid-done-order': 'actDone', 'missing-evidence': 'actEvidence' } as const;
+const CANCEL_FIELDS = { 'missing-reason': 'actCancel' } as const;
 
 export function ActionsSection(props: SectionProps) {
   const { actions, can } = props.dossier;
@@ -25,22 +30,25 @@ export function ActionsSection(props: SectionProps) {
   const [editing, setEditing] = useState<{ id: string | null; version: number; draft: ActionDraft } | null>(null);
   const [completing, setCompleting] = useState<{ id: string; version: number; description: string; doneAt: string; evidence: string } | null>(null);
   const [cancelling, setCancelling] = useState<{ id: string; version: number; description: string; reason: string } | null>(null);
-  const startAction = () => setEditing({ id: null, version: props.dossier.record.row_version, draft: { kind: 'corrective', description: '', ownerUserId: '', dueDate: '' } });
+  const editError = useFormError(ACTION_FIELDS);
+  const completeError = useFormError(COMPLETION_FIELDS);
+  const cancelError = useFormError(CANCEL_FIELDS);
+  const startAction = () => { editError.clear(); setEditing({ id: null, version: props.dossier.record.row_version, draft: { kind: 'corrective', description: '', ownerUserId: '', dueDate: '' } }); };
 
   async function saveDraft() {
     if (!editing) return;
     const ok = editing.id
-      ? await props.run((base) => store.updateAction({ ...base, expectedVersion: editing.version, actionId: editing.id!, action: editing.draft }))
-      : await props.run((base) => store.addAction({ ...base, expectedVersion: editing.version, action: editing.draft }));
+      ? await props.run((base) => store.updateAction({ ...base, expectedVersion: editing.version, actionId: editing.id!, action: editing.draft }), { handleValidationError: editError.handle })
+      : await props.run((base) => store.addAction({ ...base, expectedVersion: editing.version, action: editing.draft }), { handleValidationError: editError.handle });
     if (ok) { setEditing(null); props.onSaved?.(); }
   }
   async function complete() {
     if (!completing) return;
-    if (await props.run((base) => store.completeAction({ ...base, expectedVersion: completing.version, actionId: completing.id, doneAt: completing.doneAt, evidence: completing.evidence }))) { setCompleting(null); props.onSaved?.(); }
+    if (await props.run((base) => store.completeAction({ ...base, expectedVersion: completing.version, actionId: completing.id, doneAt: completing.doneAt, evidence: completing.evidence }), { handleValidationError: completeError.handle })) { setCompleting(null); props.onSaved?.(); }
   }
   async function cancelAction() {
     if (!cancelling) return;
-    if (await props.run((base) => store.cancelAction({ ...base, expectedVersion: cancelling.version, actionId: cancelling.id, reason: cancelling.reason }))) { setCancelling(null); props.onSaved?.(); }
+    if (await props.run((base) => store.cancelAction({ ...base, expectedVersion: cancelling.version, actionId: cancelling.id, reason: cancelling.reason }), { handleValidationError: cancelError.handle })) { setCancelling(null); props.onSaved?.(); }
   }
 
   return (
@@ -61,9 +69,9 @@ export function ActionsSection(props: SectionProps) {
               <td><span className={`tag ${STATUS[action.status].tone}`}>{STATUS[action.status].label}</span>{action.status === 'done' && <div className="nce-sub">{dateText(action.done_at)} · {action.done_by_name}</div>}</td>
               <td className="nce-col-action">{can.edit && action.status === 'open' && (
                 <div className="nce-row-actions">
-                  <button type="button" className="btn sm" disabled={props.busy} onClick={() => setCompleting({ id: action.id, version: props.dossier.record.row_version, description: action.description, doneAt: todayIso(), evidence: '' })}>Hoàn thành</button>
-                  <RowActionButton kind="edit" label="Sửa" disabled={props.busy} onClick={() => setEditing({ id: action.id, version: props.dossier.record.row_version, draft: { kind: action.kind, description: action.description, ownerUserId: action.owner_user_id, dueDate: action.due_date } })} />
-                  <RowActionButton kind="delete" label="Huỷ" disabled={props.busy} onClick={() => setCancelling({ id: action.id, version: props.dossier.record.row_version, description: action.description, reason: '' })} />
+                  <button type="button" className="btn sm" disabled={props.busy} onClick={() => { completeError.clear(); setCompleting({ id: action.id, version: props.dossier.record.row_version, description: action.description, doneAt: todayIso(), evidence: '' }); }}>Hoàn thành</button>
+                  <RowActionButton kind="edit" label="Sửa" disabled={props.busy} onClick={() => { editError.clear(); setEditing({ id: action.id, version: props.dossier.record.row_version, draft: { kind: action.kind, description: action.description, ownerUserId: action.owner_user_id, dueDate: action.due_date } }); }} />
+                  <RowActionButton kind="delete" label="Huỷ" disabled={props.busy} onClick={() => { cancelError.clear(); setCancelling({ id: action.id, version: props.dossier.record.row_version, description: action.description, reason: '' }); }} />
                 </div>
               )}</td>
             </tr>
@@ -74,12 +82,13 @@ export function ActionsSection(props: SectionProps) {
       {editing && (
         <Modal busy={props.pending} title={editing.id ? 'Sửa hành động' : 'Thêm hành động'} onClose={() => setEditing(null)}
           footer={<><button type="button" className="btn ghost" disabled={props.pending} onClick={() => setEditing(null)}>Bỏ qua</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void saveDraft()}>Lưu</button></>}>
-          {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
-          <div className="nce-form-grid">
-            <Field label="Loại hành động" htmlFor="actKind" wide><OptionSelect id="actKind" value={editing.draft.kind} options={NCE_ACTION_KIND_LABEL} onChange={(v) => setEditing({ ...editing, draft: { ...editing.draft, kind: v } })} /></Field>
-            <Field label="Nội dung hành động" htmlFor="actDesc" wide><textarea id="actDesc" rows={3} value={editing.draft.description} onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, description: e.target.value } })} /></Field>
-            <Field label="Người chịu trách nhiệm" htmlFor="actOwner"><UserSelect id="actOwner" value={editing.draft.ownerUserId} users={props.users} onChange={(v) => setEditing({ ...editing, draft: { ...editing.draft, ownerUserId: v } })} /></Field>
-            <DateField label="Hạn hoàn thành" id="actDue" value={editing.draft.dueDate} onChange={(v) => setEditing({ ...editing, draft: { ...editing.draft, dueDate: v } })} />
+          {props.error?.kind === 'uncertain' && <div className="alert rej" role="alert">{props.error.message}</div>}
+          <div className="nce-form-grid" ref={editError.rootRef}>
+            <FormErrorMessage rootRef={editError.rootRef} error={editError.error} id={editError.errorId} />
+            <Field label="Loại hành động" htmlFor="actKind" wide><OptionSelect id="actKind" value={editing.draft.kind} options={NCE_ACTION_KIND_LABEL} onChange={(v) => { editError.clear(); setEditing({ ...editing, draft: { ...editing.draft, kind: v } }); }} /></Field>
+            <Field label="Nội dung hành động" htmlFor="actDesc" wide><textarea id="actDesc" rows={3} value={editing.draft.description} onChange={(e) => { editError.clear(); setEditing({ ...editing, draft: { ...editing.draft, description: e.target.value } }); }} /></Field>
+            <Field label="Người chịu trách nhiệm" htmlFor="actOwner"><UserSelect id="actOwner" value={editing.draft.ownerUserId} users={props.users} onChange={(v) => { editError.clear(); setEditing({ ...editing, draft: { ...editing.draft, ownerUserId: v } }); }} /></Field>
+            <DateField label="Hạn hoàn thành" id="actDue" value={editing.draft.dueDate} onChange={(v) => { editError.clear(); setEditing({ ...editing, draft: { ...editing.draft, dueDate: v } }); }} />
           </div>
         </Modal>
       )}
@@ -87,11 +96,12 @@ export function ActionsSection(props: SectionProps) {
         <Modal busy={props.pending} title="Hoàn thành hành động" onClose={() => setCompleting(null)}
           footer={<><button type="button" className="btn ghost" disabled={props.pending} onClick={() => setCompleting(null)}>Bỏ qua</button><button type="button" className="btn teal" disabled={props.busy} onClick={() => void complete()}>Xác nhận hoàn thành</button></>}>
           <p className="nce-note">Hành động đang xác nhận: {completing.description}</p>
-          {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
+          {props.error?.kind === 'uncertain' && <div className="alert rej" role="alert">{props.error.message}</div>}
           {completing.version !== props.dossier.record.row_version && <p className="nce-editor-warning" role="alert">Hồ sơ đã được cập nhật ở nơi khác. Đóng hộp thoại và rà soát nội dung mới trước khi xác nhận.</p>}
-          <div className="nce-form-grid">
-            <DateField label="Ngày hoàn thành" id="actDone" value={completing.doneAt} onChange={(v) => setCompleting({ ...completing, doneAt: v })} />
-            <Field label="Bằng chứng (mã phiếu, tài liệu, kết quả…)" htmlFor="actEvidence" wide><textarea id="actEvidence" rows={3} value={completing.evidence} onChange={(e) => setCompleting({ ...completing, evidence: e.target.value })} /></Field>
+          <div className="nce-form-grid" ref={completeError.rootRef}>
+            <FormErrorMessage rootRef={completeError.rootRef} error={completeError.error} id={completeError.errorId} />
+            <DateField label="Ngày hoàn thành" id="actDone" value={completing.doneAt} onChange={(v) => { completeError.clear(); setCompleting({ ...completing, doneAt: v }); }} />
+            <Field label="Bằng chứng (mã phiếu, tài liệu, kết quả…)" htmlFor="actEvidence" wide><textarea id="actEvidence" rows={3} value={completing.evidence} onChange={(e) => { completeError.clear(); setCompleting({ ...completing, evidence: e.target.value }); }} /></Field>
           </div>
         </Modal>
       )}
@@ -99,9 +109,12 @@ export function ActionsSection(props: SectionProps) {
         <Modal busy={props.pending} title="Huỷ hành động" size="sm" onClose={() => setCancelling(null)}
           footer={<><button type="button" className="btn ghost" disabled={props.pending} onClick={() => setCancelling(null)}>Quay lại</button><button type="button" className="btn danger" disabled={props.busy} onClick={() => void cancelAction()}>Huỷ hành động</button></>}>
           <p className="nce-note">Hành động đang xác nhận: {cancelling.description}</p>
-          {props.error && <div className="alert rej" role="alert">{props.error.message}</div>}
+          {props.error?.kind === 'uncertain' && <div className="alert rej" role="alert">{props.error.message}</div>}
           {cancelling.version !== props.dossier.record.row_version && <p className="nce-editor-warning" role="alert">Hồ sơ đã được cập nhật ở nơi khác. Đóng hộp thoại và rà soát nội dung mới trước khi xác nhận.</p>}
-          <Field label="Lý do huỷ" htmlFor="actCancel"><textarea id="actCancel" rows={3} value={cancelling.reason} onChange={(e) => setCancelling({ ...cancelling, reason: e.target.value })} /></Field>
+          <div ref={cancelError.rootRef}>
+            <FormErrorMessage rootRef={cancelError.rootRef} error={cancelError.error} id={cancelError.errorId} />
+            <Field label="Lý do huỷ" htmlFor="actCancel"><textarea id="actCancel" rows={3} value={cancelling.reason} onChange={(e) => { cancelError.clear(); setCancelling({ ...cancelling, reason: e.target.value }); }} /></Field>
+          </div>
         </Modal>
       )}
     </Section>

@@ -6,6 +6,7 @@ import type { TestSummary, NceRecordRow, Test, QcLot } from '../../shared/qc-api
 
 export type DashboardFilterStatus = 'all' | 'missing' | DashboardStatus;
 export interface OverdueAction extends NceRecordRow { testName: string; overdueDays: number; overdueLabel: string; owner: string }
+let loadRevision = 0;
 
 interface DashboardState {
   testSummaries: TestSummary[];
@@ -35,10 +36,14 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   // Bắt lỗi tại đây: `loading` khởi tạo `true`, nên nếu một lệnh IPC lỗi mà
   // không hạ cờ này thì Tổng quan treo mãi ở màn hình "Đang chuẩn bị dữ liệu".
   load: async () => {
+    const revision = ++loadRevision;
+    // Thông báo đổi dữ liệu có thể đến liên tiếp; chỉ lượt mới nhất được
+    // thay dữ liệu hoặc lỗi để phản hồi chậm không đưa Tổng quan về bản cũ.
+    const commit = (partial: Partial<DashboardState>) => { if (revision === loadRevision) set(partial); };
     try {
-      await loadDashboard(set);
+      await loadDashboard(commit);
     } catch (error) {
-      set({ loading: false, error: error instanceof Error && error.message ? error.message : 'Không rõ nguyên nhân.' });
+      commit({ loading: false, error: error instanceof Error && error.message ? error.message : 'Không rõ nguyên nhân.' });
     }
   },
 }));

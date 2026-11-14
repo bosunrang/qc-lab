@@ -1,0 +1,36 @@
+/* Bản in A4 độc lập với CSS màn hình; lặp tiêu đề bảng và giữ biểu đồ nguyên khối. */
+@page{size:A4;margin:12mm 12mm 16mm}
+*{box-sizing:border-box}
+body{font:11px/1.4 Arial,sans-serif;color:#183843;margin:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+h2{font-size:14px;color:#215968;border-bottom:1px solid #9ebdc3;padding:5px 0;margin:14px 0 8px;break-after:avoid}
+h4{font-size:11px;background:#e9f1f2;padding:6px;margin:10px 0 0;break-after:avoid}
+p{margin:6px 0}
+.rc-print-info{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin:0 0 12px}
+.rc-print-info>div{break-inside:avoid;min-width:0;overflow-wrap:anywhere}
+dt{font-size:10px;color:#526975}dd{margin:1px 0 0;font-weight:bold;white-space:pre-wrap}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{border:1px solid #c9d9d6;padding:4px 6px;text-align:center;overflow-wrap:anywhere}
+th{background:#e9f1f2}thead{display:table-header-group}tr{break-inside:avoid}
+.rc-print-pairs{table-layout:fixed}.rc-print-pairs th:first-child{width:8%}
+.rc-print-note,.empty-notice-text{color:#526975;font-size:10px}
+.has-result .rc-stats-panel,.has-result .rc-chart-panel{break-before:page}
+.rc-stat-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;break-inside:avoid}
+.stat-card{border:1px solid #c9d9d6;padding:8px}.stat-label,.stat-sub{font-size:10px;color:#526975}
+.stat-value{font-size:19px;font-weight:bold;color:#215968}.stat-value.danger{color:#a43a33}
+.rc-stat-columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.rc-stat-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;border-bottom:1px solid #dde6e7;padding:5px 0;break-inside:avoid}
+.rc-stat-row b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.rc-crit-item{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;border-bottom:1px solid #dde6e7;padding:6px 0;break-inside:avoid}
+.rc-crit-status{align-self:start;text-align:center;padding:2px 4px;font-size:10px;font-weight:bold;border:1px solid #c9d9d6}
+.rc-crit-status.ok{color:#22634f;background:#edf7f2}.rc-crit-status.rej{color:#a43a33;background:#fbeeed}.rc-crit-status.warn{color:#805b12;background:#fff6dc}
+.rc-crit-text{font-weight:bold}.rc-crit-text>div{font-size:10px;font-weight:normal;color:#526975;margin-top:2px}
+.rc-verdict{margin-top:10px;padding:9px;border:1px solid #9ebdc3;break-inside:avoid}
+.rc-verdict-icon{display:none}.rc-verdict-title{font-weight:bold}.rc-verdict-desc{margin-top:4px}
+.rc-chart-box{border:1px solid #c9d9d6;margin-top:12px;padding:10px;break-inside:avoid}
+.rc-chart-box h3{font-size:12px;color:#215968;margin:0 0 3px}.rc-chart-box p{font-size:10px;color:#526975}
+.rc-chart-svg{display:block;width:100%;height:auto;font-family:Arial,sans-serif}
+.rc-chart-tick{font-size:10px;font-weight:500}.rc-chart-axis-label{font-size:11px;font-weight:bold}
+.rc-chart-legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:10px;margin-top:4px}
+.rc-chart-legend i{display:inline-block;width:16px;height:3px;margin-right:4px;vertical-align:middle}
+.reg{background:#31869b}.ideal{background:#667b89}.bias{background:#a36f15}.limit{background:#a43a33}
+.empty-notice{padding:5px 0 10px}.empty-notice-title{font-weight:bold}

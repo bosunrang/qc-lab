@@ -27,11 +27,12 @@ import { nceRunSnapshot } from '../db/nce-evaluation';
 import { nceErrorClass } from '../domain/nce/tier';
 import { emptyChecklist } from '../domain/nce/update';
 import { defaultNceDueDate } from '../domain/nce/config';
-import { type Actor, type IpcResult, nowIso, requireQcConfig } from './shared';
-import { writeCommand } from './write-command';
+import { type IpcResult, nowIso, requireQcConfig } from './shared';
+import { writeCommand, type WriteTx } from './write-command';
 import { previousLotsOf } from './previous-lot-cache';
 import { historicalPointEvaluations } from './historical-evaluation';
 import { activeEvaluationOf } from './active-evaluation';
+import { pointEvaluationsOf } from './point-evaluations';
 import { operationalTeaResolver } from '../db/operational-tea';
 import { listParallelColumns as listParallelColumnsOf, pointsForLot as pointsForLotOf } from './parallel-columns';
 import { changedRunConclusions, describeRunChanges, flipsRejection, retroChangeError, runConclusions, type QcRunConclusionChange } from '../domain/run-conclusion-change';
@@ -57,7 +58,11 @@ export interface RangeCandidateView {
 }
 
 
-export function createEntryHandlers(db: Db) {
+export function createEntryHandlers(db: Db, options: {
+  /** Tác vụ nội bộ ghi dấu vết nguồn trong chính transaction của điểm QC.
+   * Không nhận callback này qua IPC hoặc dữ liệu từ renderer. */
+  onPointAdded?: (pointId: string, tx: WriteTx) => void;
+} = {}) {
 
 
   /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
@@ -173,18 +178,18 @@ export function createEntryHandlers(db: Db) {
    * vận hành. Trang Lịch sử dữ liệu cần nguồn này để điểm của lô cũ vẫn
    * còn nhìn thấy sau khi chấp nhận chuyển tiếp lô.
    *
-   * KHÔNG kèm kết luận Westgard, và đó là chủ đích — xem `HistoryQcPointView`.
-   * Bản trước trả một trường `verdict` tính bằng ngưỡng z thuần (|z|<=2 →
-   * 'ok', <=3 → 'warn', còn lại 'rej'), trùng tên và trùng kiểu với verdict
-   * THẬT của `queryPoints()` nhưng mang nghĩa khác hẳn. Không nơi nào đọc nó
-   * — `HistoryTab` tự tính lại từ `qc_mean`/`qc_sd` và dán nhãn rõ "Phân loại
-   * theo Z-score, không phải kết luận Westgard" — nên nó chỉ nằm chờ người
-   * sửa sau nhặt nhầm. Đánh giá Westgard thật đòi cả tập mức cùng lần chạy,
-   * không thể suy từ một điểm lẻ, nên endpoint này không dựng nó. */
+   * Kết luận lấy từ cùng nguồn với báo cáo: ghép đủ các mức của lần chạy,
+   * giữ ngữ cảnh lô cũ/song song/lưu trữ trước khi chia bảng theo mức/lô. */
   function listHistoryPoints(testId: string): HistoryQcPointView[] {
-    return db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,qc_mean,qc_sd,note,
+    const rows = db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,qc_mean,qc_sd,note,
         operator_name,operator_username,operator_code,voided,void_reason
-      FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id`).all(testId) as unknown as HistoryQcPointView[];
+      FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id`).all(testId) as unknown as Omit<HistoryQcPointView, 'verdict' | 'rules' | 'accepted' | 'run_rejected_by'>[];
+    const evaluations = pointEvaluationsOf(db, testId, rows);
+    return rows.map((point) => {
+      const result = evaluations.get(point.id);
+      return { ...point, verdict: result?.verdict ?? 'none', rules: result?.rules ?? [],
+        accepted: result?.accepted ?? false, run_rejected_by: result?.run_rejected_by ?? [] };
+    });
   }
 
   /** Danh sách audit điểm đã huỷ dùng riêng cho khối tra cứu. Tách endpoint
@@ -406,6 +411,7 @@ export function createEntryHandlers(db: Db) {
           ? pointViewsOf(active, level).find((point) => point.id === id)
           : listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id);
         if (!pointView) throw new Error('point-view-missing');
+        options.onPointAdded?.(id, tx);
         return { ...pointView, retroChanges };
       });
     } catch (error) {
@@ -438,11 +444,12 @@ export function createEntryHandlers(db: Db) {
     const currentView = pointViewsOf(activeBefore, point.level).find(p => p.id === pointId);
     const parallelView = listParallelColumns(point.test_id).flatMap((column) => column.points).find((p) => p.id === pointId);
     let view: { verdict: 'ok' | 'warn' | 'rej'; rules: string[]; runRejectedBy?: number[] } | undefined = currentView || parallelView;
-    if (!view) {
+    {
       // N31/R05: điểm lô cũ lấy kết luận THEO LẦN CHẠY của đúng chuỗi lô lịch
       // sử (cùng nguồn với tab lô cũ, báo cáo và biên bản tháng), để thấy cả
       // luật liên mức như R4s. Đánh giá riêng một mức bỏ sót các luật đó nên
-      // lách được cổng lý do và mất bằng chứng lần chạy bị loại.
+      // lách được cổng lý do và mất bằng chứng lần chạy bị loại. Cũng kiểm
+      // mức còn gán hiện hành nếu mức khác của lần chạy đã đổi lô.
       const archived = historicalPointEvaluations(db, point.test_id, [point]).get(pointId);
       if (archived && archived.verdict !== 'none') view = { verdict: archived.verdict, rules: [...archived.rules], runRejectedBy: archived.runRejectedBy ?? [] };
     }

@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { DateField } from '../../components/DateField';
 import { EmptyState } from '../../components/EmptyState';
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 import { controlValue, findFieldControl, formErrorFrom, pickField, type FieldErrorMap, type FormError } from '../../lib/field-error';
 import { useInvalidField } from '../../lib/useInvalidField';
+import { useFormError } from '../../lib/useFormError';
 import { useNceStore } from '../../store/nce-store';
 import { confirmDialog } from '../../state/dialog-store';
 import { todayIso } from '../../lib/format';
@@ -407,6 +409,7 @@ export function ReleaseSection(props: SectionProps) {
   const [previewError, setPreviewError] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [draftVersion, setDraftVersion] = useState<number | null>(null);
+  const releaseError = useFormError({ 'missing-rerun': 'relRun', 'invalid-rerun': 'relRun', 'missing-reason': 'relReason', 'rerun-lot-change': 'relLot' });
   const chosen = options.find((o) => o.key === runKey) ?? null;
   const iqc = record.source === 'iqc';
   const prerequisites = props.dossier.missing.filter((item) => !item.code.includes('rerun'));
@@ -430,7 +433,7 @@ export function ReleaseSection(props: SectionProps) {
   async function submit() {
     const target = chosen ? `Từ lần chạy ${chosen.label}, luật Westgard nhiều lần chạy và CUSUM bắt đầu chuỗi mới; ` : '';
     if (!(await confirmDialog(`${target}hồ sơ sẽ không huỷ được nữa. Cho phép hoạt động trở lại?`, { title: 'Cho phép hoạt động trở lại', confirmLabel: 'Cho phép', cancelLabel: 'Quay lại' }))) return;
-    await props.run((base) => release({ ...base, expectedVersion: draftVersion ?? record.row_version, release: { reason, rerun: chosen ? { date: chosen.date, runId: chosen.runId } : null, lotChangeNote, notApplicable: !chosen && notApplicable } }));
+    await props.run((base) => release({ ...base, expectedVersion: draftVersion ?? record.row_version, release: { reason, rerun: chosen ? { date: chosen.date, runId: chosen.runId } : null, lotChangeNote, notApplicable: !chosen && notApplicable } }), { handleValidationError: releaseError.handle });
   }
 
   if (decision) {
@@ -470,12 +473,13 @@ export function ReleaseSection(props: SectionProps) {
         <p>Quyết định này không đồng nghĩa cho trả các kết quả cũ đang giữ hoặc đóng hồ sơ CAPA.</p>
       </div>
       {!can.release ? <p className="hint-inline">Bạn cần được cấp quyền cho phép hoạt động trở lại. Liên hệ quản trị viên để cấp quyền.</p> : (
-        <div className="nce-release-flow">
+        <div className="nce-release-flow" ref={releaseError.rootRef}>
+          <FormErrorMessage rootRef={releaseError.rootRef} error={releaseError.error} id={releaseError.errorId} />
           {record.test_id && (
             <div className="nce-release-choice">
               <div className="nce-release-selector">
                 <Field label={iqc ? 'Lần chạy QC xác minh (rerun)' : 'Lần chạy QC xác minh (nếu có)'} htmlFor="relRun">
-                  <select id="relRun" disabled={candidates.loading} value={chosen ? runKey : ''} onChange={(e) => { setDraftVersion((v) => v ?? record.row_version); setPreview(null); setRunKey(e.target.value); }}>
+                  <select id="relRun" disabled={candidates.loading} value={chosen ? runKey : ''} onChange={(e) => { releaseError.clear(); setDraftVersion((v) => v ?? record.row_version); setPreview(null); setRunKey(e.target.value); }}>
                     <option value="">{candidates.loading ? '— Đang tải các lần QC —' : options.length ? '— Chọn lần QC để đánh giá —' : '— Chưa có lần QC phù hợp để chọn —'}</option>
                     {options.map((o) => <option key={o.key} value={o.key}>{o.label} · {o.levels.map((l) => `M${l}`).join(', ')}</option>)}
                   </select>
@@ -515,14 +519,14 @@ export function ReleaseSection(props: SectionProps) {
             </div>
           )}
           {preview && preview.lot_changed_levels.length > 0 && (
-            <Field label="Giải thích dùng lô QC khác lần chạy khởi đầu" htmlFor="relLot" wide><input id="relLot" value={lotChangeNote} onChange={(e) => { setDraftVersion((v) => v ?? record.row_version); setLotChangeNote(e.target.value); }} /></Field>
+            <Field label="Giải thích dùng lô QC khác lần chạy khởi đầu" htmlFor="relLot" wide><input id="relLot" value={lotChangeNote} onChange={(e) => { releaseError.clear(); setDraftVersion((v) => v ?? record.row_version); setLotChangeNote(e.target.value); }} /></Field>
           )}
           {!iqc && !chosen && (
             <label className="nce-check nce-field-wide"><input type="checkbox" checked={notApplicable} onChange={(e) => setNotApplicable(e.target.checked)} /> Không phải dừng dịch vụ (ghi lý do ở dưới)</label>
           )}
           <div className="nce-release-decision">
             <h3>Xác nhận cho phép hoạt động trở lại</h3>
-            <Field label="Căn cứ cho phép hoạt động trở lại" htmlFor="relReason"><textarea id="relReason" rows={2} value={reason} onChange={(e) => { setDraftVersion((v) => v ?? record.row_version); setReason(e.target.value); }} /></Field>
+            <Field label="Căn cứ cho phép hoạt động trở lại" htmlFor="relReason"><textarea id="relReason" rows={2} value={reason} onChange={(e) => { releaseError.clear(); setDraftVersion((v) => v ?? record.row_version); setReason(e.target.value); }} /></Field>
             {!!prerequisites.length && <div className="alert warn nce-release-prerequisites"><p>Trước khi cho hoạt động trở lại, cần hoàn tất:</p><ul className="nce-list">{prerequisites.map((item) => <li key={item.code}>{item.message}</li>)}</ul></div>}
             <div className="nce-form-actions">
               <button type="button" className="btn" disabled={props.busy || candidates.loading || previewLoading || !!prerequisites.length || reason.trim().length < (iqc ? 5 : 10) || (iqc && !chosen) || (!!chosen && (preview?.ok !== true || preview.impact_problems.length > 0))} onClick={() => void submit()}>Cho phép hoạt động trở lại</button>
@@ -558,22 +562,28 @@ export function EffectivenessSection(props: SectionProps) {
   const { record, decisions, can } = props.dossier;
   const reviewStore = useNceStore((s) => s.reviewEffectiveness);
   const reviews = decisions.filter((d) => d.type === 'effectiveness');
-  const editor = useEditor(props, () => ({ effectivenessCriteria: record.effectiveness_criteria, effectivenessReviewDue: record.effectiveness_review_due }));
+  const editor = useEditor(props, () => ({ effectivenessCriteria: record.effectiveness_criteria, effectivenessReviewDue: record.effectiveness_review_due }), { 'invalid-review-due': 'effDue' });
   const [form, setForm] = useState<ReviewPayload | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
+  const reviewError = useFormError({
+    'invalid-result': 'revResult', 'invalid-review-date': 'revDate', 'review-before-action': 'revDate',
+    'missing-evidence': 'revEvidence', 'missing-residual': ['revS', 'revP', 'revL', 'revB'],
+    'residual-above-initial': ['revS', 'revP'],
+  });
   const d = editor.draft;
   async function save() {
     if (!form) return;
-    if (await props.run((base) => reviewStore({ ...base, expectedVersion: draftVersion, review: form }))) { setForm(null); props.onSaved?.(); }
+    if (await props.run((base) => reviewStore({ ...base, expectedVersion: draftVersion, review: form }), { handleValidationError: reviewError.handle })) { setForm(null); props.onSaved?.(); }
   }
   const reviewAction = can.review_effectiveness && !form
-    ? <button type="button" className="btn ghost sm" onClick={() => { setDraftVersion(record.row_version); setForm({ result: '', reviewedAt: todayIso(), evidence: '', residualSeverity: 0, residualProbability: 0, residualLevel: '', residualBasis: '' }); }}>Ghi đánh giá hiệu lực</button>
+    ? <button type="button" className="btn ghost sm" onClick={() => { reviewError.clear(); setDraftVersion(record.row_version); setForm({ result: '', reviewedAt: todayIso(), evidence: '', residualSeverity: 0, residualProbability: 0, residualLevel: '', residualBasis: '' }); }}>Ghi đánh giá hiệu lực</button>
     : null;
   return (
     <Section title="Đánh giá hiệu lực và nguy cơ còn lại" actions={<>{editor.actions(can.edit)}{reviews.length > 0 && reviewAction}</>} disclosure={props.disclosure} headingLevel={props.headingLevel}>
       {props.dossier.missing.some((item) => item.code === 'effectiveness-basis-changed') && <div className="alert warn">Đánh giá cũ vẫn lưu trong lịch sử nhưng không còn khớp nội dung hiện tại. Rà soát tiêu chí, nguy cơ, hành động rồi ghi đánh giá mới.</div>}
       {d ? (
-        <div className="nce-capa-form">
+        <div className="nce-capa-form" ref={editor.formRoot}>
+          <FormErrorMessage rootRef={editor.formRoot} error={editor.fieldError} id={editor.errorId} />
           <Field label="Tiêu chí đánh giá hiệu lực (đặt trước khi đánh giá)" htmlFor="effCrit" wide><textarea id="effCrit" rows={2} value={d.effectivenessCriteria} onChange={(e) => editor.set('effectivenessCriteria', e.target.value)} /></Field>
           <DateField label="Ngày dự kiến đánh giá" id="effDue" value={d.effectivenessReviewDue} onChange={(v) => editor.set('effectivenessReviewDue', v)} />
         </div>
@@ -591,7 +601,8 @@ export function EffectivenessSection(props: SectionProps) {
         </details>}
       </> : <EmptyState size="compact" title="Chưa đánh giá hiệu lực" action={reviewAction}>Ghi bằng chứng theo tiêu chí đã đặt và kết luận hiệu quả của hành động.</EmptyState>)}
       {form && (
-        <div className="nce-capa-form nce-subform">
+        <div className="nce-capa-form nce-subform" ref={reviewError.rootRef}>
+          <FormErrorMessage rootRef={reviewError.rootRef} error={reviewError.error} id={reviewError.errorId} />
           <h4>Ghi đánh giá hiệu lực</h4>
           {draftVersion !== record.row_version && <p className="nce-editor-warning">Hồ sơ đã được cập nhật ở nơi khác</p>}
           <div className="nce-form-grid">

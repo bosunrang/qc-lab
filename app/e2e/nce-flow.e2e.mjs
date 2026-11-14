@@ -46,6 +46,12 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     const queueRow = page.locator(`tr.nce-queue-item[aria-label^="Sự cố ${seeded.testName} "]`).first();
     await queueRow.getByRole('button', { name: 'Lập hồ sơ' }).click();
     const modal = page.locator('.modal[role=dialog]', { hasText: 'Lập hồ sơ NCE' });
+    await modal.getByRole('button', { name: 'Lập hồ sơ' }).click();
+    const holdControl = modal.locator('input[name=nceHold]').first();
+    const holdError = holdControl.locator('xpath=ancestor::div[contains(@class,"field")]').getByRole('alert');
+    await holdError.waitFor();
+    assert.match(await holdError.innerText(), /Chọn có dừng\/giữ kết quả/);
+    assert.equal(await modal.locator(':scope > .modal-b > .alert.rej').count(), 0, 'lỗi lập hồ sơ nằm tại trường cần sửa');
     await modal.locator('#nceCorrection').fill('Dừng trả kết quả mức 2, chạy lại QC với lọ mới.');
     await modal.getByLabel('Có, đã dừng/giữ').check();
     await modal.getByRole('button', { name: 'Lập hồ sơ' }).click();
@@ -98,6 +104,22 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     const containment = identity.locator('#idContainment');
     await containment.waitFor();
     assert.equal(await containment.evaluate((element) => element === document.activeElement), true, 'nút bổ sung đưa con trỏ tới đúng mục thiếu');
+    // Lỗi nhập liệu của bước ghi nhận phải nằm ngay dưới ô sai, không tạo
+    // thanh đỏ ở đầu hồ sơ như trước.
+    const description = identity.locator('#idDesc');
+    const savedDescription = await description.inputValue();
+    await description.fill('');
+    await identity.getByRole('button', { name: 'Lưu' }).click();
+    const descriptionError = description.locator('..').getByRole('alert');
+    await descriptionError.waitFor();
+    assert.match(await descriptionError.innerText(), /Mô tả sự kiện ít nhất 10 ký tự/);
+    assert.equal(await description.getAttribute('aria-invalid'), 'true');
+    assert.equal(await description.getAttribute('aria-describedby'), await descriptionError.getAttribute('id'));
+    assert.equal(await page.locator('.nce-dossier-error').count(), 0, 'không đẩy lỗi ô nhập lên thanh đầu hồ sơ');
+    assert.equal(await description.evaluate((element) => element === document.activeElement), true, 'focus về ô mô tả cần sửa');
+    await identity.screenshot({ path: 'dist/nce-inline-field-error-preview.png' });
+    await description.fill(savedDescription);
+    await descriptionError.waitFor({ state: 'detached' });
     await identity.getByRole('button', { name: 'Điền sẵn từ dữ liệu' }).click();
     assert.match(await containment.inputValue(), /^Xét nghiệm .+lô QC: M1 .+\nKhoảng nghi ngờ: /);
     await identity.locator('.nce-field-assist.is-warning', { hasText: '[cần ghi]' }).waitFor();
@@ -298,6 +320,13 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await reviewWorkspace.screenshot({ path: path.join(userDataDir, 'nce-review-incomplete.png') });
     for (const width of [1000, 600]) {
       await page.setViewportSize({ width, height: 900 });
+      // Thu sidebar có transition khi đổi viewport. Chờ xong mới đo để
+      // không nhầm phần tràn tạm thời giữa chuyển động thành lỗi bố cục.
+      await page.locator('.app-shell').evaluate(async (element) => {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => {})));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      });
       const overflow = await reviewWorkspace.evaluate((element) => element.scrollWidth - element.clientWidth);
       assert.ok(overflow <= 1, `bước phê duyệt không tràn khung ở ${width}px: ${overflow}`);
     }

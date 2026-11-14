@@ -45,7 +45,7 @@ export const useSigmaStore = create<SigmaState>((set, get) => ({
     else set({ testId, loading: !!testId, error: '', periods: [] });
     if (!testId) return;
     try {
-      const periods = await window.qcApi.listSigmaPeriods(testId);
+      const periods = await window.qcApi.listSigmaPeriods(testId, 'operational');
       if (revision === requestRevision) set({ periods: periods.filter(period => period.testId === testId), loading: false });
     } catch {
       if (revision === requestRevision) set({ periods: [], loading: false, error: 'Không tải được dữ liệu Sigma. Vui lòng thử lại.' });

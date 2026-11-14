@@ -24,7 +24,7 @@
 .sg-setup-heading + .hint{margin:var(--panel-content-gap) var(--space-4) 0;}
 /* Hàng nhận diện chỉ đọc: xét nghiệm được chọn từ danh mục QC, sau đó hiện
    ngay đơn vị và máy tương ứng để không phải lặp thêm một ô tên xét nghiệm. */
-.sg-setup-heading + .sg-control-row{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);align-items:end;margin:var(--panel-content-gap) var(--space-4) 0;}
+.sg-setup-heading + .sg-control-row{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);align-items:start;margin:var(--panel-content-gap) var(--space-4) 0;}
 .sg-setup-heading + .sg-control-row>.sg-test-picker{grid-column:1;max-width:none;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-unit-field{grid-column:2;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-instrument-field{grid-column:3;min-width:0;}
@@ -55,8 +55,8 @@
 .sg-period-history-item.is-selected{border-color:var(--accent-border);border-left:3px solid var(--accent);background:var(--accent-surface);color:var(--text-accent);}.sg-period-history-item.is-selected span{color:var(--text-accent);}
 .sg-period-history-empty{align-self:center;margin:0;color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
 .sg-period-workbench{min-width:0;}.sg-period-workbench-foot{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);padding-top:var(--space-2-5);}.sg-period-workbench-foot .row-action{align-self:center;}
-.sg-level-matrix-wrap{max-width:100%;margin:0;overflow-x:auto;overflow-y:hidden;border:1px solid var(--surface-border);border-radius:var(--table-radius);}.sg-level-matrix{min-width:650px;}
-.sg-level-matrix-head,.sg-level-row{display:grid;grid-template-columns:110px minmax(175px,1.05fr) minmax(188px,1.15fr) minmax(130px,.8fr);}
+.sg-level-matrix-wrap{max-width:100%;margin:0;overflow-x:auto;overflow-y:hidden;border:1px solid var(--surface-border);border-radius:var(--table-radius);}.sg-level-matrix{min-width:700px;}
+.sg-level-matrix-head,.sg-level-row{display:grid;grid-template-columns:200px minmax(175px,1.05fr) minmax(188px,1.15fr) minmax(130px,.8fr);}
 .sg-level-matrix-head{min-height:var(--table-header-h);background:var(--table-head-bg);color:var(--table-head-ink);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-tracking);}.sg-level-matrix-head span{display:flex;align-items:center;justify-content:center;padding:0 var(--table-cell-px-compact);text-align:center;}.sg-level-matrix-head span:not(:first-child){border-left:1px solid var(--table-head-border);}
 .sg-level-row{min-height:96px;border-top:1px solid var(--surface-divider);background:var(--surface);}.sg-level-row:hover{background:var(--surface-subtle);}.sg-level-row>div{min-width:0;padding:var(--space-3) var(--table-cell-px-compact);}.sg-level-row>div:not(:first-child){border-left:1px solid var(--surface-divider);}
 .sg-level-identity,.sg-level-cell{display:grid;align-content:center;justify-items:center;gap:var(--space-1);text-align:center;}.sg-level-identity b{color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-level-identity span,.sg-level-source,.sg-level-sigma span{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-heading);}
@@ -189,7 +189,7 @@
 .sg-mu-bias-toggle{display:flex;gap:var(--space-1-5);align-items:center;margin-bottom:var(--space-2-5);}
 .sg-mu-help{display:block;width:100%;margin:var(--space-1) 0 var(--space-2-5);}.sg-mu-help summary{cursor:pointer;font-weight:var(--weight-semibold);}.sg-mu-help p{margin:var(--space-2) 0 0;}
 .sg-mu-preview{margin-top:var(--space-2-5);}
-.sg-mu-incomplete{display:block;}
+.sg-mu-incomplete{display:block;color:var(--danger-text);font-size:var(--text-xs);font-weight:var(--weight-medium);margin-top:var(--space-1-5);}
 .sg-mu-modal .sg-setup-fields{grid-template-columns:minmax(240px,360px) 220px;justify-content:start;margin:var(--space-2) 0 0;}
 
 

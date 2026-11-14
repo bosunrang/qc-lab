@@ -1,22 +1,15 @@
-import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
 import { ChangePasswordForm } from '../components/ChangePasswordForm';
 import { AuthBrand } from './LoginPage';
-import type { LoginBrand } from '../../shared/qc-api';
+import { useLoginBrand } from '../lib/useLoginBrand';
 
 // Màn bắt buộc đổi mật khẩu (GV5): tài khoản do admin tạo hoặc vừa được đặt
 // lại mật khẩu (`must_change_password`). Main chặn mọi thao tác khác của tài
 // khoản này cho tới khi đổi xong, nên app hiện màn này thay cho khung chính.
 export function ChangePasswordPage() {
   const { user, refreshUser, logout } = useAuthStore(useShallow((s) => ({ user: s.user, refreshUser: s.refreshUser, logout: s.logout })));
-  const [brand, setBrand] = useState<LoginBrand | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void window.qcApi.getLoginBrand().then((value) => { if (!cancelled) setBrand(value); }).catch(() => { /* Dùng nhận diện mặc định. */ });
-    return () => { cancelled = true; };
-  }, []);
+  const brand = useLoginBrand();
 
   return (
     <div className="auth-overlay">

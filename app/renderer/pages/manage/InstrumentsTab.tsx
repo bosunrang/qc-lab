@@ -1,3 +1,4 @@
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Tab "InstrumentsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useEffect, useRef, useState } from 'react';
@@ -5,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, errorDialog } from '../../state/dialog-store';
+import { reportFormError, confirmDialog, errorDialog } from '../../state/dialog-store';
 import { EmptyState, FieldRow } from './shared';
 import type { Instrument } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
@@ -40,7 +41,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
     };
     const id = editing !== 'new' && editing ? editing.id : undefined;
     const result = await saveInstrument(id, data);
-    if (!result.ok) { setErr(formErrorFrom(result.error, INSTRUMENT_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, INSTRUMENT_FIELD_ERRORS), setErr); return; }
     setEditing(null);
   }
   const saving = useAsyncAction(submit);
@@ -86,7 +87,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm máy xét nghiệm' : 'Sửa máy xét nghiệm'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Huỷ</button><button className="btn teal" type="submit" form="instrument-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm máy xét nghiệm' : 'Lưu thay đổi'}</button></>}>
             <form id="instrument-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
+              <FormErrorMessage rootRef={formRef} error={err} id={errorId} />
               <FieldRow>
                 <div className="field"><label htmlFor="instrument-name">Tên hiển thị</label><input id="instrument-name" name="name" placeholder="VD: AU5800-01" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
                 <div className="field"><label htmlFor="instrument-section">Khoa / Khu vực</label><input id="instrument-section" name="section" placeholder="Hoá sinh" defaultValue={editing !== 'new' ? editing.section : ''} /></div>

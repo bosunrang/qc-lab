@@ -41,6 +41,22 @@ test('CSDL từ phiên bản mới hơn app: từ chối mở', () => {
   assert.throws(() => applySchema(db), /phiên bản QC Lab mới hơn/);
 });
 
+test('schema 11 thêm nguồn TEa vận hành riêng và giữ nguyên lựa chọn/giá trị cũ', () => {
+  const db = openDatabase(':memory:');
+  try {
+    db.prepare("INSERT INTO instruments(id,name) VALUES ('tea-machine','Máy')").run();
+    db.prepare("INSERT INTO tests(id,name,instrument_id,tea_source,tea) VALUES ('tea-test','Sodium','tea-machine','ricos',0.73)").run();
+    db.exec('ALTER TABLE tests DROP COLUMN operational_tea_source');
+    db.prepare("UPDATE app_meta SET value='11' WHERE key='schemaVersion'").run();
+    applySchema(db);
+    const read = () => db.prepare("SELECT tea_source,tea,operational_tea_source FROM tests WHERE id='tea-test'").get();
+    assert.deepEqual({ ...read() }, { tea_source: 'ricos', tea: 0.73, operational_tea_source: '' });
+    db.prepare("UPDATE tests SET operational_tea_source='clia' WHERE id='tea-test'").run();
+    applySchema(db);
+    assert.equal(read().operational_tea_source, 'clia');
+  } finally { db.close(); }
+});
+
 test('phục hồi dữ liệu cũ: cột thiếu nhận mặc định, dữ liệu được chuẩn hoá ngay', () => {
   const source = openDatabase(':memory:');
   source.prepare("INSERT INTO users(id,username,name,initials,role,pass_hash,active,must_change_password) VALUES ('u1','ktv','KTV','K','technician','x',1,0)").run();

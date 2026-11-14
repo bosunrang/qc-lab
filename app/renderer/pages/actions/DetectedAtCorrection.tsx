@@ -2,7 +2,9 @@
 // cạnh mốc ngày phát hiện ở phần Ghi nhận sự cố, form mở ngay dưới.
 import { useState, type ReactNode } from 'react';
 import { DateField } from '../../components/DateField';
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 import { useNceStore } from '../../store/nce-store';
+import { useFormError } from '../../lib/useFormError';
 import { confirmDialog } from '../../state/dialog-store';
 import { dateText, Field } from './shared';
 import type { SectionProps } from './DossierContent';
@@ -11,15 +13,17 @@ export function useDetectedAtCorrection(props: SectionProps): { button: ReactNod
   const { record, can } = props.dossier;
   const update = useNceStore((s) => s.update);
   const [draft, setDraft] = useState<{ detectedAt: string; reason: string; version: number } | null>(null);
+  const fieldError = useFormError({ 'invalid-detected': 'nceCorrectDetected', 'missing-date-correction-reason': 'nceCorrectReason', 'detected-before-run': 'nceCorrectDetected', 'detected-after-related-date': 'nceCorrectDetected' });
   async function save() {
     if (!draft) return;
     if (!(await confirmDialog(`Đính chính ngày phát hiện từ ${dateText(record.detected_at)} thành ${dateText(draft.detectedAt)}? Chỉ ghi ngày thực tế có căn cứ, không lùi ngày để nhận QC cũ. Ngày lập hồ sơ, ngày QC và thời điểm quyết định không đổi.`, { title: 'Đính chính ngày phát hiện', confirmLabel: 'Lưu đính chính', cancelLabel: 'Quay lại', danger: false }))) return;
-    if (await props.run((base) => update({ ...base, expectedVersion: draft.version, patch: {}, detectedAtCorrection: { detectedAt: draft.detectedAt, reason: draft.reason } }))) setDraft(null);
+    if (await props.run((base) => update({ ...base, expectedVersion: draft.version, patch: {}, detectedAtCorrection: { detectedAt: draft.detectedAt, reason: draft.reason } }), { handleValidationError: fieldError.handle })) setDraft(null);
   }
   const button = !draft && can.release
-    ? <button type="button" className="btn ghost sm" disabled={props.busy} onClick={() => setDraft({ detectedAt: record.detected_at, reason: '', version: record.row_version })}>Đính chính ngày phát hiện</button>
+    ? <button type="button" className="btn ghost sm" disabled={props.busy} onClick={() => { fieldError.clear(); setDraft({ detectedAt: record.detected_at, reason: '', version: record.row_version }); }}>Đính chính ngày phát hiện</button>
     : null;
-  const form = draft && can.release ? <div className="nce-date-correction">
+  const form = draft && can.release ? <div className="nce-date-correction" ref={fieldError.rootRef}>
+    <FormErrorMessage rootRef={fieldError.rootRef} error={fieldError.error} id={fieldError.errorId} />
     <div className="nce-form-grid">
       <DateField label="Ngày phát hiện thực tế" id="nceCorrectDetected" value={draft.detectedAt} onChange={(detectedAt) => setDraft({ ...draft, detectedAt })} />
       <Field label="Lý do và căn cứ đính chính" htmlFor="nceCorrectReason" wide><textarea id="nceCorrectReason" rows={2} value={draft.reason} placeholder="Ví dụ: nhập nhầm ngày lập hồ sơ thay cho ngày phát hiện; đối chiếu nhật ký số…" onChange={(e) => setDraft({ ...draft, reason: e.target.value })} /></Field>

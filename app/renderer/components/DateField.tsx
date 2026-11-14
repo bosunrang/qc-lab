@@ -33,8 +33,9 @@ export function parseDateInput(value: unknown): string {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export function DateField({ label, value, onChange, defaultValue, name, id, disabled, className = '' }: {
+export function DateField({ label, value, onChange, defaultValue, name, id, disabled, invalid, describedBy, className = '' }: {
   label?: string; id?: string; name?: string; disabled?: boolean; className?: string;
+  invalid?: boolean; describedBy?: string;
   value?: string; onChange?: (value: string) => void; defaultValue?: string;
 }) {
   // Không truyền `id` thì tự sinh: có `label` mà ô không có id thì bấm nhãn
@@ -70,7 +71,7 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   const box = (
     <span className={`datebox ${className}`.trim()}>
       <input ref={textRef} id={inputId} className="date-text" inputMode="numeric" placeholder="dd/mm/yyyy"
-        disabled={disabled} aria-label={label} defaultValue={formatDateDisplay(iso)}
+        disabled={disabled} aria-label={label} aria-invalid={invalid || undefined} aria-describedby={describedBy} defaultValue={formatDateDisplay(iso)}
         key={isControlled ? iso : undefined}
         onBlur={(e) => commit(parseDateInput(e.target.value))}
         onKeyDown={(e) => {

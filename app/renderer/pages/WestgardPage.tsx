@@ -224,13 +224,10 @@ export function WestgardPage() {
                 keywordsOf={(s) => s.levels.map((lv) => lv.lot).filter(Boolean).join(' ')}
                 id="wgTestSelect" label="Chọn xét nghiệm" countId="wgTestCount" />
               {chartMode === 'lj' && (
-                <div>
-                  <label>&nbsp;</label>
                   <div className="wg-export-actions">
                     <button className="btn teal" disabled={!analysisReady || noOperationalLevels} title="Xuất bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={exportXlsx}><DownloadIcon />Xuất Excel</button>
                     <button className="btn teal" disabled={!analysisReady || noOperationalLevels} title="In bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={printPdf}><PrintIcon />In PDF</button>
                   </div>
-                </div>
               )}
             </div>
 

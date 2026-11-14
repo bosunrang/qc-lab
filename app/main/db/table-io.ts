@@ -3,7 +3,8 @@ import type { Db } from './sqlite-like';
 import { applySchema, seedInitialRows } from './schema';
 import { withTransaction } from './transaction';
 import { quoteIdent, quoteIdents } from './sql-ident';
-import { auditEntryHash, verifyAuditChain, type AuditEntry } from '../domain/audit-chain';
+import { auditEntryHash, verifyAuditChain } from '../domain/audit-chain';
+import { rowToAuditEntry } from './audit-row';
 
 export function listTableNames(db: Db): string[] {
   return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[])
@@ -128,6 +129,7 @@ export function qcPointsLostByRestore(db: Db, source: RestoreSource): number {
  * đây, còn mở trong bản sao lưu) cũng tính là mất. Bảng danh mục/cấu hình
  * không nằm ở đây: chúng đổi qua các màn hình cấu hình, có nhật ký riêng. */
 const PROTECTED_RECORD_TABLES: readonly { table: string; label: string; version?: string }[] = [
+  { table: 'lis_imports', label: 'dấu vết nhận bản tin LIS' },
   { table: 'nce_records', label: 'hồ sơ NCE', version: 'row_version' },
   { table: 'nce_runs', label: 'lần chạy gắn hồ sơ NCE' },
   { table: 'nce_actions', label: 'hành động khắc phục' },
@@ -231,7 +233,7 @@ function appendPreviousActivity(db: Db, brokenId: string | null): number {
   const insert = db.prepare(`INSERT INTO main.activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   for (const row of rows) {
-    const entry = auditEntryOf(row);
+    const entry = rowToAuditEntry(row);
     entry.seq = ++seq;
     const untrusted = brokenSeq != null && !(Number(row.seq) < brokenSeq);
     // Dòng chưa từng có hash (dữ liệu rất cũ) giữ nguyên, như `relinkAuditChain`.
@@ -246,14 +248,6 @@ function appendPreviousActivity(db: Db, brokenId: string | null): number {
   return rows.length;
 }
 
-function auditEntryOf(row: Record<string, unknown>): AuditEntry {
-  return {
-    id: String(row.id ?? ''), seq: Number(row.seq ?? 0), ts: String(row.ts ?? ''), user: String(row.user ?? ''), username: String(row.username ?? ''),
-    userId: String(row.user_id ?? ''), role: String(row.role ?? ''), type: String(row.type ?? ''), detail: String(row.detail ?? ''),
-    target: String(row.target ?? ''), clientId: String(row.client_id ?? ''), prevHash: String(row.prev_hash ?? ''), hash: String(row.hash ?? ''),
-  };
-}
-
 /** Nhật ký cần kiểm: bảng sống `main.activity` hoặc bản chụp của máy này
  * trước phục hồi. Câu SQL viết sẵn, không ghép tên bảng. */
 const AUDIT_ROWS_SQL = {
@@ -264,7 +258,7 @@ const AUDIT_ROWS_SQL = {
 /** Dòng đầu tiên làm chuỗi hash hỏng (đọc theo `seq`), tính từ `anchor`;
  * `null` nếu nguyên vẹn. */
 function firstBrokenAuditRow(db: Db, which: keyof typeof AUDIT_ROWS_SQL, anchor: string): { id: string; seq: number } | null {
-  const rows = (db.prepare(AUDIT_ROWS_SQL[which]).all() as Record<string, unknown>[]).map(auditEntryOf);
+  const rows = (db.prepare(AUDIT_ROWS_SQL[which]).all() as Record<string, unknown>[]).map(rowToAuditEntry);
   const result = verifyAuditChain(rows, anchor);
   if (result.ok) return null;
   const broken = rows[result.brokenIndex];

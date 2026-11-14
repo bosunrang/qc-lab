@@ -1,3 +1,4 @@
+import { FormErrorMessage } from '../components/FormErrorMessage';
 // Người dùng: trang quản lý tài khoản có ba điểm cấu trúc chính:
 //   1. Form "Thêm người dùng" nằm ngang phía trên danh sách. Thông tin tài
 //      khoản và các màn hình truy cập dùng chung một panel, không lồng thẻ.
@@ -15,7 +16,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { RowActionButton } from '../components/RowActionButton';
-import { confirmDialog, infoDialog, errorDialog } from '../state/dialog-store';
+import { reportFormError, confirmDialog, infoDialog, errorDialog } from '../state/dialog-store';
 import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/permissions';
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
@@ -102,12 +103,11 @@ function CreatePanel() {
   async function submit() {
     const pagePerms = [...selected];
     if (!pagePerms.length) {
-      await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.');
       setErr(formError('Cần chọn ít nhất một thẻ được phép dùng.', 'pagePerms'));
       return;
     }
     const result = await create({ username: username.trim().toLowerCase(), name, initials: initialsFromName(name), role, password, pagePerms });
-    if (!result.ok) { await errorDialog(result.error.message); setErr(formErrorFrom(result.error, USER_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, USER_FIELD_ERRORS), setErr); return; }
     setErr(null);
     setUsername(''); setName(''); setPassword('');
     setSelected(new Set(rolePageIds(role)));
@@ -116,7 +116,7 @@ function CreatePanel() {
   return (
     <div className="panel users-create-panel" ref={panelRef}>
       <h2 className="panel-title">Thêm người dùng</h2>
-      {err && <span id={errorId} hidden>{err.message}</span>}
+      <FormErrorMessage rootRef={panelRef} error={err} id={errorId} />
       <div className="user-create-layout">
         <section className="user-create-section" aria-labelledby="userAccountTitle">
           <h3 id="userAccountTitle">Thông tin tài khoản</h3>
@@ -298,14 +298,14 @@ function ResetPasswordModal({ user, onClose }: { user: PublicUser; onClose: () =
 
   async function submit() {
     const result = await resetPassword(user.id, password);
-    if (!result.ok) { setErr(formErrorFrom(result.error, USER_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, USER_FIELD_ERRORS), setErr); return; }
     setDone(true);
   }
 
   return (
     <Modal title={`Đặt lại mật khẩu — ${user.username}`} onClose={onClose}
       footer={done ? <button className="btn teal" onClick={onClose}>Đóng</button> : <><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Đặt lại</AsyncButton></>}>
-      {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
+      <FormErrorMessage rootRef={fieldRef} error={err} id={errorId} />
       {done ? <p>Đã đặt lại mật khẩu — người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp.</p> : (
         <div className="field" ref={fieldRef}><label htmlFor="resetUserPassword">Mật khẩu mới (≥8 ký tự)</label><input id="resetUserPassword" data-field="password" autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }} /></div>

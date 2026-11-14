@@ -1,3 +1,4 @@
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Tab "PanelsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useMemo, useRef, useState } from 'react';
@@ -5,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, infoDialog, errorDialog } from '../../state/dialog-store';
+import { reportFormError, confirmDialog, infoDialog, errorDialog } from '../../state/dialog-store';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
@@ -72,7 +73,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
     const data = { name: String(fd.get('name') || ''), instrumentId, active: fd.get('active') === 'on', testIds: Array.from(checked) };
     const id = editing !== 'new' && editing ? editing.id : undefined;
     const result = await savePanel(id, data);
-    if (!result.ok) { setErr(formErrorFrom(result.error, PANEL_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, PANEL_FIELD_ERRORS), setErr); return; }
     setEditing(null);
   }
 
@@ -114,7 +115,7 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
           <Modal busy={saving.busy} title={editing === 'new' ? 'Thêm Panel QC' : 'Sửa Panel QC'} onClose={() => setEditing(null)} size="lg" className="rcfg-modal"
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Huỷ</button><button className="btn teal" type="submit" form="panel-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : editing === 'new' ? 'Thêm Panel QC' : 'Lưu thay đổi'}</button></>}>
             <form id="panel-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
+              <FormErrorMessage rootRef={formRef} error={err} id={errorId} />
               <div className="grid2 panel-qc-main-grid">
                 <div className="field"><label htmlFor="panel-name">Tên Panel QC</label><input id="panel-name" name="name" placeholder="VD: Sinh hoá AU5800" defaultValue={editing !== 'new' ? editing.name : ''} autoFocus /></div>
                 <div className="field">

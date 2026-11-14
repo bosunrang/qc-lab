@@ -12,7 +12,7 @@ import { PatientImpactSection, ReleaseSection, TechnicalAssessmentSection } from
 import { CapaWorkflow } from './CapaWorkflow';
 import { ReviewSection } from './DossierReview';
 import { dateText, Facts, holdText, Section, timeText, useDossier } from './shared';
-import { confirmDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { nextStage, NCE_STAGES, stageForMissing, type NceStage } from './workflow';
 
 function LegacySection({ json }: { json: string }) {
@@ -48,6 +48,16 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
     setSelectedStage(null);
     setShowAll(status === 'pending_approval' || status === 'closed' || status === 'cancelled');
   }, [status]);
+
+  // Lỗi ghi không gắn được với ô là lỗi thao tác: dùng hộp thoại chung thay
+  // vì một thanh đỏ nằm xa biểu mẫu. Lỗi tải, stale và chưa rõ kết quả vẫn
+  // giữ ở cấp hồ sơ vì cần tải lại/đối chiếu.
+  useEffect(() => {
+    if (error?.kind !== 'write' || error.stale) return;
+    let active = true;
+    void errorDialog(error.message, { title: 'Chưa lưu được' }).then(() => { if (active) clearError(); });
+    return () => { active = false; };
+  }, [error, clearError]);
 
   if (dossier === undefined) return <div className="panel"><EmptyState size="compact" title={error ? 'Không tải được hồ sơ' : 'Đang tải hồ sơ…'} action={error && <button type="button" className="btn ghost" disabled={loading} onClick={() => void reload()}>{loading ? 'Đang thử lại…' : 'Thử lại'}</button>}>{error?.message}</EmptyState></div>;
   if (dossier === null) {
@@ -101,7 +111,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
         </div>
       </div>
 
-      {error && <div className="alert rej nce-dossier-error" role="alert"><div>{error.message}{error.stale && <p className="nce-note">Bản nháp chưa được lưu. Tải dữ liệu mới để xem thay đổi của người khác.</p>}</div>{error.stale || error.kind === 'uncertain' ? <button type="button" className="btn ghost sm" disabled={loading} onClick={() => void reloadDrafts()}>Tải dữ liệu mới</button> : error.kind === 'load' ? <button type="button" className="btn ghost sm" disabled={loading} onClick={() => void reload()}>Thử lại</button> : <button type="button" className="btn ghost sm" onClick={clearError}>Đóng</button>}</div>}
+      {error && (error.kind !== 'write' || error.stale) && <div className="alert rej nce-dossier-error" role="alert"><div>{error.message}{error.stale && <p className="nce-note">Bản nháp chưa được lưu. Tải dữ liệu mới để xem thay đổi của người khác.</p>}</div>{error.stale || error.kind === 'uncertain' ? <button type="button" className="btn ghost sm" disabled={loading} onClick={() => void reloadDrafts()}>Tải dữ liệu mới</button> : <button type="button" className="btn ghost sm" disabled={loading} onClick={() => void reload()}>Thử lại</button>}</div>}
 
       <div className="nce-workspace" ref={workspace}>
         <nav className="nce-workflow-nav" aria-label="Các bước xử lý hồ sơ">

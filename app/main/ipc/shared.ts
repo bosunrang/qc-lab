@@ -3,13 +3,14 @@
 // (`store:changed` — thông báo làm mới theo phạm vi cho renderer). Các handler
 // nghiệp vụ dùng chung phần này để tránh lặp lại cùng một cách khai báo.
 import type { Db } from '../db/sqlite-like';
-// `{id: unknown, ...}` nên renderer nhận `unknown` cho mọi trường.
-import type { ActivityEntry } from '../../shared/qc-api';
 import { uid } from '../domain/text-utils';
 import { auditEntryHash } from '../domain/audit-chain';
 import { canWriteRole, isAdminRole } from '../domain/page-roles';
 import { hasUserCapability, parseUserCapabilities, QC_CONFIG_DENIED_MESSAGE } from '../domain/capabilities';
 import { withTransaction } from '../db/transaction';
+import { rowToAuditEntry } from '../db/audit-row';
+
+export { rowToAuditEntry };
 
 export interface Actor { userId: string; username: string; name: string; role: string; clientId: string }
 
@@ -121,20 +122,6 @@ export function requireQcConfig(db: Db): (actor: Actor) => PermissionDenied | nu
     const row = db.prepare('SELECT capabilities_json FROM users WHERE id=? AND active<>0').get(actor.userId) as { capabilities_json: string } | undefined;
     if (hasUserCapability({ role: actor.role, capabilities: parseUserCapabilities(row?.capabilities_json) }, 'qc.config')) return null;
     return { ok: false, error: { code: 'forbidden-qc-config', message: QC_CONFIG_DENIED_MESSAGE } };
-  };
-}
-
-/** SQLite trả cột snake_case (`prev_hash`, `user_id`...) — chuyển về camelCase
- * đúng shape `AuditEntry` mà audit-chain.ts (hash/verify/relink) mong đợi.
- * Đây là ranh giới DUY NHẤT cần ánh xạ; mọi nơi khác đọc activity qua hàm
- * này, không tự SELECT * rồi dùng thẳng. */
-export function rowToAuditEntry(row: Record<string, unknown>): ActivityEntry {
-  return {
-    id: String(row.id ?? ''), seq: Number(row.seq ?? 0), ts: String(row.ts ?? ''),
-    user: String(row.user ?? ''), username: String(row.username ?? ''),
-    userId: String(row.user_id ?? ''), role: String(row.role ?? ''), type: String(row.type ?? ''),
-    detail: String(row.detail ?? ''), target: String(row.target ?? ''),
-    clientId: String(row.client_id ?? ''), prevHash: String(row.prev_hash ?? ''), hash: String(row.hash ?? ''),
   };
 }
 

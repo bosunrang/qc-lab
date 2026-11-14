@@ -26,7 +26,7 @@ import { buildSigmaComparisonPrintHtml, buildSigmaPeriodPrintHtml } from '../lib
 import { loadPrintIdentity } from '../lib/print-document';
 import { confirmDialog, errorDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
-import { resolveSigmaTea, sigmaHasLabTea, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
+import { resolveSigmaTea, sigmaOperationalTeaSource, sigmaLabLevelTeas, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
 import { governingSigmaLevel } from '../lib/sigma-workflow';
 import { AddSigmaPeriodModal } from './sigma/AddSigmaPeriodModal';
 import { BiasModal } from './sigma/BiasModal';
@@ -59,7 +59,7 @@ export function SigmaPage() {
   const [muModal, setMuModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [cohortModal, setCohortModal] = useState<{ period: SigmaPeriodView; cohorts: SigmaCohortView[] } | null>(null);
   const [addPeriodOpen, setAddPeriodOpen] = useState(false);
-  const [teaSource, setTeaSource] = useState('lab');
+  const [teaSaving, setTeaSaving] = useState(false);
   useEffect(() => { setBiasModal(null); setMuModal(null); setCohortModal(null); setAddPeriodOpen(false); }, [testId]);
   const navigate = useNavigate();
 
@@ -81,6 +81,9 @@ export function SigmaPage() {
 
   const sigmaTests = tests;
   const test = tests.find((t) => t.id === testId);
+  // Cả hai màn hình đọc cùng nguồn đã lưu; không giữ lựa chọn so sánh riêng.
+  const savedTeaSource = useMemo(() => test ? sigmaOperationalTeaSource(test, teaRefs) : '', [test, teaRefs]);
+  const teaSource = savedTeaSource || 'lab';
   const sourceTargetMean = (levelsByTestId[testId] || []).find((level) => Number.isFinite(level.mean) && level.mean !== 0)?.mean;
   const teaResolution = useMemo(
     () => test ? resolveSigmaTea(test, teaRefs, teaSource as SigmaTeaSource, sourceTargetMean) : null,
@@ -100,26 +103,16 @@ export function SigmaPage() {
   const testOptions = useMemo(() => sigmaTests.map((item): SearchSelectOption => ({
     value: item.id, label: sigmaTestLabel(item), keywords: [item.unit, item.section].filter(Boolean).join(' '),
   })), [sigmaTests, instruments]); // eslint-disable-line react-hooks/exhaustive-deps -- `sigmaTestLabel` chỉ đọc `instruments`
-  // Có hồ sơ TEa của PXN thì mở trang ở nguồn PXN — cùng TEa vận hành mà cổng
-  // lập dải và ngoại kiểm dùng (`resolveOperationalTea()`). Đổi sang nguồn
-  // khác vẫn được để so sánh; `tea_source` đã lưu chỉ là nguồn dự phòng khi
-  // chưa có hồ sơ PXN, nên không kéo trang về nguồn cũ (vd Ricos do gợi ý
-  // danh mục tự điền trước 2026-11-03).
-  const hasLabTea = useMemo(() => !!test && sigmaHasLabTea(test, teaRefs), [test, teaRefs]);
-  const savedTeaSource = hasLabTea ? '' : test?.tea_source || '';
-  useEffect(() => {
-    if (!hasLabTea && savedTeaSource && TEA_SOURCES.some((source) => source.value === savedTeaSource)) setTeaSource(savedTeaSource);
-    else setTeaSource('lab');
-  }, [test?.id, hasLabTea, savedTeaSource]);
   // Chỉ xét hồ sơ TEa PXN khớp ĐÚNG xét nghiệm đang xem, không phải cả bảng.
   const labTeaByLevel = useMemo(() => test ? sigmaLabLevelTeas(test, teaRefs) : [], [test, teaRefs]);
   const teaSourceValueText = (source: string): string => {
-    if (!test) return 'chưa có';
+    if (!test) return 'Chưa có';
     if (source === 'lab' && labTeaByLevel.length) {
       const common = teaCriterionText(resolveSigmaTea(test, teaRefs, 'lab', sourceTargetMean));
       return `theo mức QC (${labTeaByLevel.map((item) => `M${item.level} ${item.tea.toFixed(2)}%`).join(' · ')}; mức khác: ${common})`;
     }
-    return teaCriterionText(resolveSigmaTea(test, teaRefs, source as SigmaTeaSource, sourceTargetMean));
+    const text = teaCriterionText(resolveSigmaTea(test, teaRefs, source as SigmaTeaSource, sourceTargetMean));
+    return /^chưa /i.test(text) ? 'Chưa có' : text;
   };
   // Câu nhắc của nguồn CLIA phải nói rõ TEa% được giải RIÊNG tại Mean của
   // từng mức QC — nếu in một con số % chung cho cả xét nghiệm thì người đọc
@@ -130,10 +123,9 @@ export function SigmaPage() {
   const teaMissingHint = teaResolution?.value == null && !(teaSource === 'lab' && labTeaByLevel.length)
     ? ' Chưa có TEa thì KHÔNG tính được Sigma dù đã nhập đủ CV và Bias. Cách xử lý: đổi “Nguồn TEa” sang CLIA/Ricos/EFLM (xét nghiệm phải được gán analyte trong Bảng TEa tham chiếu), hoặc tạo hồ sơ TEa chuẩn hoá của phòng xét nghiệm ở Cấu hình chung → Bảng TEa tham chiếu.'
     : '';
-  const teaCompareHint = hasLabTea && teaSource !== 'lab' ? ' Đang so sánh: TEa vận hành của xét nghiệm là TEa PXN.' : '';
   const teaHint = teaSource === 'clia'
-    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}${teaCompareHint}`
-    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}${teaCompareHint}`;
+    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`
+    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`;
   const configuredTea = teaResolution?.value ?? null;
   const configuredTeaSource = teaSource;
   const targetMeanForLevel = (levelNumber: number) => (levelsByTestId[testId] || []).find((level) => level.level === levelNumber)?.mean ?? null;
@@ -142,22 +134,24 @@ export function SigmaPage() {
   };
 
   async function saveTeaConfig(patch: { source?: string; tea?: string; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }) {
-    if (!test) return;
-    const nextSource = (patch.source ?? teaSource) as SigmaTeaSource;
-    const resolved = resolveSigmaTea(test, teaRefs, nextSource, sourceTargetMean);
-    const result = await saveTeaConfigStore({
-      testId: test.id, source: nextSource,
-      // EFLM do người dùng nhập; catalog/hồ sơ Lab không được tái dùng số
-      // TEa của nguồn khác khi đổi nguồn.
-      tea: patch.tea === undefined ? (nextSource === 'eflm' ? undefined : (resolved.value ?? 0)) : (patch.tea === '' ? 0 : Number(patch.tea)),
-      eflmAnalyte: patch.eflmAnalyte ?? test.eflm_analyte,
-      eflmAps: patch.eflmAps ?? test.eflm_aps,
-      eflmLookupDate: patch.eflmLookupDate ?? test.eflm_lookup_date,
-      eflmRef: patch.eflmRef ?? test.eflm_ref,
-    });
-    if (!result.ok) { await errorDialog(result.error.message); return; }
-    if (patch.source && currentTest.current === test.id) setTeaSource(patch.source);
-    await loadTests();
+    if (!test || teaSaving) return;
+    setTeaSaving(true);
+    try {
+      const nextSource = (patch.source ?? teaSource) as SigmaTeaSource;
+      const resolved = resolveSigmaTea(test, teaRefs, nextSource, sourceTargetMean);
+      const result = await saveTeaConfigStore({
+        testId: test.id, source: nextSource,
+        // EFLM do người dùng nhập; catalog/hồ sơ Lab không được tái dùng số
+        // TEa của nguồn khác khi đổi nguồn.
+        tea: patch.tea === undefined ? (nextSource === 'eflm' ? undefined : (resolved.value ?? 0)) : (patch.tea === '' ? 0 : Number(patch.tea)),
+        eflmAnalyte: patch.eflmAnalyte ?? test.eflm_analyte,
+        eflmAps: patch.eflmAps ?? test.eflm_aps,
+        eflmLookupDate: patch.eflmLookupDate ?? test.eflm_lookup_date,
+        eflmRef: patch.eflmRef ?? test.eflm_ref,
+      });
+      if (!result.ok) { await errorDialog(result.error.message); return; }
+      await loadTests();
+    } finally { setTeaSaving(false); }
   }
 
   // Chỉ mức thuộc thiết kế QC ĐANG VẬN HÀNH mới được tạo dòng trong kỳ Sigma:
@@ -205,8 +199,9 @@ export function SigmaPage() {
     if (period.testId !== currentTest.current || useSigmaStore.getState().loading) return Promise.resolve({ ok: false as const, error: { code: 'stale-sigma-view', message: 'Xét nghiệm hoặc dữ liệu đang xem đã thay đổi. Vui lòng tải lại kỳ trước khi lưu.' } });
     // Nếu mã nguồn TEa đã lưu không còn hợp lệ, dùng nguồn cấu hình hiện hành
     // để tiếp tục sửa kỳ. Snapshot TEa hợp lệ của kỳ vẫn được giữ nguyên.
-    const teaSource = isKnownTeaSource(period.teaSource) ? period.teaSource : configuredTeaSource;
-    return savePeriod(period.testId, period.period, period.tea ?? undefined, teaSource, levels);
+    const saved = period.savedTea ?? { tea: period.tea, source: period.teaSource };
+    const teaSource = isKnownTeaSource(saved.source) ? saved.source : configuredTeaSource;
+    return savePeriod(period.testId, period.period, saved.tea ?? undefined, teaSource, levels);
   }
 
   function periodTeaText(period: SigmaPeriodView): string {
@@ -244,8 +239,7 @@ export function SigmaPage() {
       testName: test.name,
       unit: test.unit,
       instrumentName,
-      // Nguồn TEa là của KỲ đang in (chụp lúc lưu kỳ), không phải lựa chọn
-      // hiện tại của xét nghiệm: số TEa trong bảng là ảnh chụp cùng kỳ.
+      // In đúng nguồn và các kết quả đang xem, đã tính ở main process.
       teaSource: TEA_SOURCES.find((source) => source.value === (period.teaSource || teaSource))?.label || period.teaSource || teaSource,
       teaCriterion: teaSourceValueText(period.teaSource || teaSource),
       period,
@@ -359,14 +353,14 @@ export function SigmaPage() {
           </div>
           <div className="sg-setup-fields sg-analysis-fields">
             <div className="field sg-tea-source">
-              <label htmlFor="sg-tea-source">Nguồn TEa {writable && !teaEditable && <span className="hint" title={QC_CONFIG_DENIED_MESSAGE}>(cần quyền cấu hình tiêu chí QC)</span>}</label>
-              <select id="sg-tea-source" aria-label="Nguồn TEa" disabled={!teaEditable} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
-                {TEA_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label} · {teaSourceValueText(s.value)}</option>)}
+              <label htmlFor="sg-tea-source">Nguồn TEa vận hành {writable && !teaEditable && <span className="hint" title={QC_CONFIG_DENIED_MESSAGE}>(cần quyền cấu hình tiêu chí QC)</span>}</label>
+              <select id="sg-tea-source" aria-label="Nguồn TEa vận hành" disabled={!teaEditable || teaSaving} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
+                {TEA_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
             <div className="field sg-tea-input">
               <label htmlFor="sg-tea-value">{teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'}</label>
-              <input id="sg-tea-value" key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !teaEditable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Nhập TEa%' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
+              <input id="sg-tea-value" key={`tea-${test?.id || 'none'}-${teaSource}-${test?.eflm_tea ?? ''}`} type={teaSource === 'eflm' ? 'number' : 'text'} step="any" aria-label={teaSource === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu'} defaultValue={teaSource === 'eflm' ? (test?.eflm_tea != null ? String(test.eflm_tea) : '') : teaSourceValueText(teaSource)} disabled={teaSource !== 'eflm' || !teaEditable} readOnly={teaSource !== 'eflm'} placeholder={teaSource === 'eflm' ? 'Chưa có' : undefined} onBlur={(e) => { if (teaSource === 'eflm' && e.currentTarget.value !== String(test?.eflm_tea ?? '')) saveTeaConfig({ tea: e.currentTarget.value }); }} />
             </div>
           </div>
           {teaSource === 'eflm' && test && <div className="sg-eflm-box">
@@ -378,6 +372,7 @@ export function SigmaPage() {
           <div className="alert info sg-sigma-input-note">
             <div className="sg-sigma-note-list">
               <p>{teaHint}</p>
+              <p>Kết quả, biểu đồ và báo cáo được tính theo nguồn TEa vận hành đang chọn, dùng CV/Bias của từng kỳ.</p>
               <ul>
                 <li>Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>.</li>
                 <li>Nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu; dữ liệu IQC không được dùng để tính Bias.</li>
@@ -434,8 +429,15 @@ export function SigmaPage() {
                     const zone = sigmaZone(lv.sigma?.sigma);
                     const cvSource = lv.cvSource === 'iqc-cohort' ? `Lô ${lv.sourceLot || '—'} · n=${lv.cohortN ?? 0}` : 'Nhập tay';
                     const biasSource = lv.eqaRounds.length ? `${lv.eqaRounds.length} vòng EQA · RMS` : 'Nhập tay';
+                    const conversion = lv.teaConversion;
+                    const mean = conversion ? conversion.targetMean : lv.targetMean;
+                    const meanText = mean != null ? `${mean.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${conversion?.unit || test?.unit || ''}`.trim() : 'Chưa lưu Mean';
                     return <div className="sg-level-row" role="row" key={lv.level}>
-                      <div className="sg-level-identity" role="cell"><b>Mức {lv.level}</b><span>TEa {lv.tea != null ? `${lv.tea.toFixed(2)}%` : 'chưa có'}</span></div>
+                      <div className="sg-level-identity" role="cell">
+                        <b>Mức {lv.level}</b>
+                        <span>{conversion ? 'TEa% quy đổi' : 'TEa%'}: {lv.tea != null ? `${lv.tea.toFixed(2)}%` : 'Chưa có'}</span>
+                        {(conversion || displayPeriod.teaSource === 'clia') && <span>{conversion ? 'Mean quy đổi' : 'Mean mục tiêu'}: {meanText}</span>}
+                      </div>
                       <div className="sg-level-cell" role="cell">
                         <div className="sg-level-input-row"><input key={`cv-${displayPeriod.id}-${lv.level}-${lv.cv ?? ''}`} className="sg-number" type="number" step="0.01" defaultValue={editablePercent(lv.cv)} placeholder="CV%" disabled={!writable} aria-label={`CV IQC mức ${lv.level}`} onBlur={async (e) => {
                           const input = e.currentTarget;

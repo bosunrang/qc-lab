@@ -59,7 +59,9 @@ test('SG01: actual Add period sends an enum for each TEa source, with per-level 
 });
 
 test('SG01b: sửa kỳ dùng nguồn TEa hiện hành nếu mã snapshot không hợp lệ', async () => {
-  const teaSources = section(page, 'const TEA_SOURCES', 'function formatDpmo');
+  const teaLibrary = readFileSync(new URL('../renderer/lib/sigma-tea.ts', import.meta.url), 'utf8');
+  const teaSources = section(teaLibrary, 'export const TEA_SOURCES', 'export type ResolvedSigmaTea')
+    + section(page, 'export function isKnownTeaSource', '/** DPMO');
   const saveOwned = section(page, '  function saveOwnedPeriod(', '  function periodTeaText(');
   let payload;
   const save = evaluate(teaSources + saveOwned + '\nsaveOwnedPeriod', {
@@ -72,6 +74,9 @@ test('SG01b: sửa kỳ dùng nguồn TEa hiện hành nếu mã snapshot không
   assert.equal(payload[3], 'eflm', 'mã nguồn cũ không được gửi qua ranh giới IPC');
   await save({ testId: 'A', period: '2026-08', tea: 5, teaSource: 'clia' }, []);
   assert.equal(payload[3], 'clia', 'snapshot nguồn hợp lệ phải được giữ nguyên');
+  await save({ testId: 'A', period: '2026-08', tea: null, teaSource: 'clia', savedTea: { tea: 0.73, source: 'ricos' } }, []);
+  assert.equal(payload[2], 0.73, 'sửa CV/Bias trong màn tính hiện hành giữ TEa gốc');
+  assert.equal(payload[3], 'ricos', 'nguồn hiện hành không bị ghi đè vào nguồn lịch sử');
 });
 
 test('SG01c: nạp CV theo lô xác nhận rà soát bằng hộp trung tâm và ghi audit', () => {

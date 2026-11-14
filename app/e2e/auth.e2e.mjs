@@ -18,7 +18,10 @@ test('khởi tạo quản trị, đăng nhập, đăng xuất', { timeout: 120_0
     await page.fill('#login-username', ADMIN.username);
     await page.fill('#login-password', 'sai-mat-khau');
     await page.getByRole('button', { name: 'Đăng nhập' }).click();
-    await page.locator('.auth-err[role=alert]').waitFor();
+    const passwordError = page.locator('.field:has(#login-password) > .field-error[role=alert]');
+    await passwordError.waitFor();
+    assert.equal(await page.locator('#login-password').getAttribute('aria-invalid'), 'true', 'sai mật khẩu đánh dấu đúng ô');
+    assert.equal(await page.locator('.auth-form > .auth-err').count(), 0, 'không gom lỗi mật khẩu ở đầu biểu mẫu');
     assert.equal(await page.getByRole('navigation', { name: 'Điều hướng chính' }).count(), 0, 'sai mật khẩu không vào được app');
 
     await login(page, ADMIN);

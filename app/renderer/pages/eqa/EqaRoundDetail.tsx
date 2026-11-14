@@ -9,6 +9,7 @@ import { canWrite } from '../../lib/permissions';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from '../../components/EmptyState';
 import { Modal } from '../../components/Modal';
+import { errorDialog } from '../../state/dialog-store';
 import type { EqaResultRow, EqaRoundView } from '../../../shared/qc-api';
 import { EQA_PEER_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EqaImportModal } from './EqaImportModal';
@@ -291,16 +292,15 @@ function CancelRoundModal({ view, onClose }: { view: EqaRoundView; onClose: () =
   const cancel = useEqaStore((s) => s.cancel);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   async function submit() {
-    setBusy(true); setError('');
+    setBusy(true);
     try {
       const result = await cancel(view.round.id, view.round.row_version, reason);
       setBusy(false);
-      if (result.ok) onClose(); else setError(result.error.message);
+      if (result.ok) onClose(); else await errorDialog(result.error.message, { title: 'Chưa huỷ được kỳ ngoại kiểm' });
     } catch (e) {
       setBusy(false);
-      setError(e instanceof Error ? e.message : 'Không huỷ được kỳ ngoại kiểm.');
+      await errorDialog(e instanceof Error ? e.message : 'Không huỷ được kỳ ngoại kiểm.', { title: 'Chưa huỷ được kỳ ngoại kiểm' });
     }
   }
   return (
@@ -311,7 +311,6 @@ function CancelRoundModal({ view, onClose }: { view: EqaRoundView; onClose: () =
         <label htmlFor="eqaCancelReason">Lý do huỷ (ít nhất 10 ký tự)</label>
         <textarea id="eqaCancelReason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
-      {error && <div className="alert rej" role="alert">{error}</div>}
     </Modal>
   );
 }

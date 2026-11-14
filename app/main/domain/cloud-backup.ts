@@ -6,9 +6,9 @@ type TableData = Record<string, Rows | undefined>;
 
 /** Khoá `app_meta` thuộc riêng từng máy, không rời máy và không bị bản đám mây
  * ghi đè: kết nối/trạng thái Firebase của máy này, và cấu hình LIS Gateway
- * (máy nối LIS, kèm token truy cập LIS). */
+ * (máy nối LIS, kèm token truy cập LIS) và giấy phép gắn với mã máy. */
 export const MACHINE_LOCAL_META_KEYS: readonly string[] = [
-  'firebaseConfig', 'firebaseEmail', 'firebaseLabCode', 'firebaseLastStatus', 'lisGatewaySettings',
+  'firebaseConfig', 'firebaseEmail', 'firebaseLabCode', 'firebaseLastStatus', 'lisGatewaySettings', 'softwareLicense',
 ];
 
 /** Dữ liệu đưa lên đám mây: bỏ các khoá riêng của máy (token LIS, kết nối

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
-const { applySchema } = require('../../app-dist/main/db/schema.js');
+const { applySchema, SCHEMA_VERSION } = require('../../app-dist/main/db/schema.js');
 
 function legacyDb() {
   const db = openDatabase(':memory:');
@@ -43,7 +43,7 @@ const count = (db, table) => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).ge
 test('ca 18: chuyển hồ sơ cũ, không bịa dữ liệu, chạy lại không tạo trùng', () => {
   const db = legacyDb();
   applySchema(db);
-  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '11');
+  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, String(SCHEMA_VERSION));
   const rows = Object.fromEntries(db.prepare('SELECT * FROM nce_records').all().map((r) => [r.id, r]));
   assert.deepEqual(Object.keys(rows).sort(), ['a1', 'a2', 'a3', 'a5'], 'hồ sơ đổi dải không chuyển (D-12)');
 

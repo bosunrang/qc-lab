@@ -47,6 +47,8 @@ export interface Test {
   tea: number;
   section: string;
   tea_source: string;
+  /** Nguồn TEa vận hành chung của danh mục và Sigma; rỗng giữ cách phân giải của cấu hình cũ. */
+  operational_tea_source: string;
   tea_ref_key: string;
   eflm_analyte: string;
   eflm_aps: string;
@@ -186,7 +188,7 @@ export interface InstrumentDraft {
 export interface TestDraft {
   name?: string; instrumentId?: string; unit?: string; decimalPlaces?: number; tea?: number; section?: string;
   instrumentIds?: string[]; assignmentIds?: string[]; analyteId?: string; preserveExistingAssignments?: boolean;
-  teaSource?: string; teaRefKey?: string; method?: string; reagent?: string;
+  teaSource?: string; operationalTeaSource?: string; teaRefKey?: string; method?: string; reagent?: string;
   cusumOn?: boolean; cusumK?: number; cusumH?: number; active?: boolean;
 }
 export interface TestLevelDraft {
@@ -317,20 +319,16 @@ export interface LevelAnalysis {
   cusumOn: boolean;
 }
 
-/** Điểm QC thô cho tab "Lịch sử dữ liệu": MỌI lô của xét nghiệm, KHÔNG kèm
- * kết luận Westgard.
- *
- * Cố ý KHÔNG dùng lại `QcPointView`: trang đó đọc lại Mean/SD đã chốt của
- * từng điểm rồi tự xếp theo dải Z (`Trong ±2s` / `Ngoài ±2s` / `Ngoài ±3s`),
- * và ghi rõ trên giao diện rằng đây không phải kết luận Westgard. Bản trước
- * vẫn trả một trường `verdict` cùng tên, cùng kiểu với verdict thật nhưng
- * tính bằng ngưỡng z thuần — không ai đọc, chỉ nằm đó chờ người sửa sau
- * tưởng nó là kết luận Westgard rồi đem đi dùng. */
+/** Điểm chưa huỷ của MỌI lô trong lịch sử xét nghiệm. Kết luận do main đánh
+ * giá bằng đầy đủ chuỗi/lần chạy, cùng nguồn với báo cáo nội kiểm; không
+ * phân loại đạt/loại chỉ từ Z của một điểm. */
 export interface HistoryQcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
   lot: string; qc_mean: number | null; qc_sd: number | null;
   note: string; operator_name: string; operator_username: string; operator_code: string;
   voided: 0 | 1; void_reason: string;
+  verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[];
+  accepted: boolean; run_rejected_by: number[];
 }
 
 export interface VoidedQcPointView {
@@ -391,6 +389,8 @@ export interface SigmaLevelResult {
   cohortReviewAt?: string;
   cohortStale?: boolean;
   teaCriterion?: string;
+  /** Mean và đơn vị thực dùng khi quy đổi CLIA. null ở Mean nghĩa là kỳ cũ chưa lưu căn cứ này. */
+  teaConversion?: { targetMean: number | null; unit: string };
   level: number; /** TEa% ĐÃ GIẢI để tính Sigma/MU — có thể đến từ snapshot của mức, từ nguồn TEa của kỳ, từ TEa cấp kỳ, hoặc bậc dự phòng. Dùng để HIỂN THỊ, không phải để ghi lại. */ tea: number | null;
   /** TEa% THẬT SỰ đã chốt trong `lv_json` của mức; `null` = kỳ chưa từng chụp
    * và đang được giải lại mỗi lần đọc. Khi lưu lại kỳ phải gửi trường NÀY chứ
@@ -409,7 +409,12 @@ export interface SigmaLevelResult {
     risk: string; plan: string;
   } | null;
 }
-export interface SigmaPeriodView { id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[] }
+export type SigmaTeaMode = 'stored' | 'operational';
+export interface SigmaPeriodView {
+  id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[];
+  /** Bản gốc để lưu CV/Bias mà không ghi đè TEa lịch sử bằng kết quả đang tính theo nguồn vận hành. */
+  savedTea?: { tea: number | null; source: string };
+}
 export interface SigmaCohortView {
   fingerprint?: string;
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
@@ -792,7 +797,26 @@ export interface EqaRoundView {
   config: { z_warn: number; z_reject: number };
 }
 
+export interface SoftwareLicenseStatus {
+  state: 'development' | 'required' | 'active' | 'expired' | 'invalid' | 'unavailable';
+  runtime: 'desktop' | 'development' | 'browser-preview' | 'lan';
+  machine_code: string; license_id: string; licensed_to: string; issued_at: string; expires_at: string | null;
+  message: string;
+}
+
+export interface SoftwareUpdateStatus {
+  phase: 'unsupported' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error';
+  current_version: string; available_version: string; release_notes: string; checked_at: string;
+  percent: number; transferred: number; total: number; message: string;
+}
+
 export interface QcApi {
+  getLicenseStatus(): Promise<SoftwareLicenseStatus>;
+  activateSoftware(input: { data: { activationCode: string } }): Promise<IpcResult<SoftwareLicenseStatus>>;
+  getSoftwareUpdateStatus(): Promise<SoftwareUpdateStatus>;
+  checkSoftwareUpdate(): Promise<IpcResult<SoftwareUpdateStatus>>;
+  downloadSoftwareUpdate(): Promise<IpcResult<SoftwareUpdateStatus>>;
+  installSoftwareUpdate(): Promise<IpcResult<SoftwareUpdateStatus>>;
   hasAnyUsers(): Promise<boolean>;
   currentUser(): Promise<PublicUser | null>;
   bootstrapAdmin(input: { data: { username: string; name: string; password: string } }): Promise<IpcResult<PublicUser>>;
@@ -926,7 +950,7 @@ export interface QcApi {
   /** Chuỗi lô cũ của từng mức đang vận hành — công tắc "Xem lô cũ" trên trang
    * Phân tích Westgard. Cùng hình dạng `ArchivedBlock` với tab nhóm lô đã dừng. */
   listPreviousLotBlocks(testId: string): Promise<ArchivedBlock[]>;
-  listSigmaPeriods(testId: string): Promise<SigmaPeriodView[]>;
+  listSigmaPeriods(testId: string, teaMode?: SigmaTeaMode): Promise<SigmaPeriodView[]>;
   listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
   saveSigmaTeaConfig(input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }): Promise<IpcResult<Test>>;
   saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
@@ -1048,8 +1072,25 @@ export interface QcApi {
   onStoreChanged(callback: (payload: { tables: string[]; testIds: string[] }) => void): () => void;
 }
 
+/** Công cụ cấp mã riêng của bên phát hành; không lộ qua qcApi của khách hàng. */
+export interface LicenseIssuerInput { machineCode: string; licensedTo: string; expiresOn: string | null }
+export interface LicenseIssuerLicense {
+  activation_code: string; license_id: string; licensed_to: string;
+  machine_code: string; issued_at: string; expires_at: string | null;
+}
+export interface LicenseIssuerStatus { key_path: string; key_ready: boolean; key_message: string }
+export interface LicenseIssuerApi {
+  status(): Promise<LicenseIssuerStatus>;
+  chooseKey(): Promise<IpcResult<LicenseIssuerStatus | null>>;
+  issue(input: LicenseIssuerInput): Promise<IpcResult<LicenseIssuerLicense>>;
+  copy(): Promise<IpcResult<null>>;
+  save(): Promise<IpcResult<{ path: string } | null>>;
+  discard(): Promise<void>;
+}
+
 declare global {
   interface Window {
     qcApi: QcApi;
+    licenseIssuer?: LicenseIssuerApi;
   }
 }

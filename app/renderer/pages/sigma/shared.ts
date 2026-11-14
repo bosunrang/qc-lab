@@ -2,19 +2,11 @@
 // ngày 2026-09-26 (kế hoạch kiến trúc D.7), giữ nguyên thứ tự khai báo.
 import { vnDate as formatVnDate } from '../../lib/format';
 import type { SigmaCohortView, SigmaLevelResult } from '../../../shared/qc-api';
-import type { SigmaTeaSource } from '../../lib/sigma-tea';
+import { TEA_SOURCES, type SigmaTeaSource } from '../../lib/sigma-tea';
+export { TEA_SOURCES } from '../../lib/sigma-tea';
 
 /** Dải năm cho bộ lọc và hộp thêm kỳ: năm nay ± 5. */
 export const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
-
-/** Nguồn TEa được hỗ trợ. Cấu hình được chụp vào kỳ Sigma khi tạo để lịch sử
- * không bị thay đổi ngầm. */
-export const TEA_SOURCES: ReadonlyArray<{ value: SigmaTeaSource; label: string }> = [
-  { value: 'lab', label: 'TEa chuẩn hoá của phòng xét nghiệm' },
-  { value: 'eflm', label: 'EFLM - nhập từ database' },
-  { value: 'clia', label: 'CLIA PT (CMS-3355-F)' },
-  { value: 'ricos', label: 'Ricos / Westgard biological variation' },
-];
 
 export function isKnownTeaSource(value: string): value is SigmaTeaSource {
   return TEA_SOURCES.some((source) => source.value === value);

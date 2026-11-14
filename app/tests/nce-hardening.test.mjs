@@ -8,7 +8,7 @@ import { ensureUser, must, recordTechnicalAssessment, releaseWith } from './help
 import { dossier } from './helpers/nce-fixture.mjs';
 const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
-const { applySchema } = require('../../app-dist/main/db/schema.js');
+const { applySchema, SCHEMA_VERSION } = require('../../app-dist/main/db/schema.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
 const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
@@ -254,7 +254,7 @@ test('NCE-H09: lưu phạm vi và diễn biến có lịch sử, migration schem
   const stored = nce.getNce(view.record.id, admin);
   assert.equal(stored.record.description, view.record.description);
   assert.equal(stored.record.containment_note, '');
-  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, '11');
+  assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get().value, String(SCHEMA_VERSION));
 });
 
 test('NCE-H10: cảnh báo mức vận hành thiếu không bị trình bày như đã đủ mức theo SOP', () => {

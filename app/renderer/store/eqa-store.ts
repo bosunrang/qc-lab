@@ -34,6 +34,7 @@ interface EqaState {
   removeSchedule: (id: string) => Promise<IpcResult<{ id: string }>>;
 }
 
+let loadRevision = 0;
 export const useEqaStore = create<EqaState>((set) => ({
   rounds: [],
   schedule: [],
@@ -47,13 +48,18 @@ export const useEqaStore = create<EqaState>((set) => ({
   loaded: false,
   error: '',
   load: async () => {
+    const revision = ++loadRevision;
     set({ loading: true, error: '' });
     try {
       const [rounds, schedule, programs] = await Promise.all([
         window.qcApi.listEqaRounds(), window.qcApi.listEqaSchedule(), window.qcApi.listEqaPrograms(),
       ]);
+      // Lượt tải cũ không được thay dữ liệu hoặc hạ cờ của lượt đang chờ.
+      if (revision !== loadRevision) return;
       set({ rounds, schedule, programs, loading: false, loaded: true });
-    } catch (error) { set({ loading: false, loaded: true, error: error instanceof Error ? error.message : 'Không tải được danh sách đợt ngoại kiểm.' }); }
+    } catch (error) {
+      if (revision === loadRevision) set({ loading: false, loaded: true, error: error instanceof Error ? error.message : 'Không tải được danh sách đợt ngoại kiểm.' });
+    }
   },
   get: (id) => window.qcApi.getEqaRound(id),
   series: (testId) => window.qcApi.getEqaSeries(testId),

@@ -58,7 +58,7 @@ test('bảng màu Clinical Precision giữ đúng các neo nhận diện', () =>
     '--teal-300': '#97c8c6',
     '--teal-100': '#e2f1f0',
     '--gray-900': '#172b35',   // mực chữ + nền tối chung
-    '--navy-950': '#14242e',   // nền sidebar navy đặc
+    '--navy-950': '#14242e',   // neo navy cơ sở
     '--gray-200': '#dce5e9',   // đường kẻ
     '--canvas': '#f5f7f9',     // nền trang
     '--red-600': '#9f3030',
@@ -540,9 +540,13 @@ test('chỉ có một vòng focus dùng chung', () => {
     for (const m of source.matchAll(/([^{}]*:focus[a-z-]*[^{}]*)\{([^}]*)\}/g)) {
       const sel = m[1].trim();
       const body = m[2];
-      // Ngoại lệ DUY NHẤT: ô nhập bên trong .datebox cố ý không vẽ vòng, vì
+      // Ô nhập bên trong .datebox cố ý không vẽ vòng, vì
       // chính khung .datebox nhận vòng focus — nếu không sẽ có hai vòng lồng.
       if (sel.includes('.datebox input.date-text')) continue;
+      // Chuột mở select có thể khiến Chromium tự gán :focus-visible cho
+      // option. Chỉ ngoại lệ đúng phạm vi chuột này; bàn phím giữ vòng chung
+      // và được kiểm tra qua thao tác thật trong select-focus.e2e.mjs.
+      if (sel === ':root[data-select-focus="pointer"] :is(select,option):focus-visible') continue;
       if (/outline\s*:\s*(?:none|0)\b/.test(body)) offenders.push(`${relative(ROOT, file)}: ${sel} tắt outline`);
       if (/outline\s*:\s*\d/.test(body)) offenders.push(`${relative(ROOT, file)}: ${sel} tự đặt độ dày/màu vòng`);
       if (/box-shadow\s*:\s*0 0 0/.test(body)) offenders.push(`${relative(ROOT, file)}: ${sel} tự vẽ vòng bằng box-shadow`);

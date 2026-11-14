@@ -9,6 +9,7 @@ import { describeRunChanges, RETRO_REASON_MIN } from '../../../main/domain/run-c
 import { formatQcValue, vnDate } from './shared';
 import type { QcPointView } from '../../../shared/qc-api';
 import { AsyncButton } from '../../components/AsyncButton';
+import { errorDialog } from '../../state/dialog-store';
 
 export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   point: QcPointView;
@@ -37,8 +38,8 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
     const openNce = voidChoice.forced ? voidChoice.openNce : voidOpenNce;
     const result = await voidPoint(point.id, voidReason.trim(), voidKind, openNce);
     if (!result.ok) {
-      if (result.error.code === 'reason-required-retro') setRetroRequired(true);
-      setVoidErr(result.error.message);
+      if (result.error.code === 'reason-required-retro') { setRetroRequired(true); setVoidErr(result.error.message); }
+      else await errorDialog(result.error.message, { title: 'Chưa huỷ được điểm QC' });
       return;
     }
     const followup = result.data.nceId
@@ -72,9 +73,9 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
       </div>
       <div className="field">
         <label htmlFor="voidReasonInput">{reasonMin ? `Lý do huỷ (bắt buộc, tối thiểu ${reasonMin} ký tự)` : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>
-        <textarea id="voidReasonInput" autoFocus value={voidReason} onChange={(e) => setVoidReason(e.target.value)} rows={3}
+        <textarea id="voidReasonInput" autoFocus value={voidReason} aria-invalid={!!voidErr || undefined} aria-describedby={voidErr ? 'void-reason-error' : undefined} onChange={(e) => { setVoidReason(e.target.value); setVoidErr(null); }} rows={3}
           placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." />
-        {voidErr && <p className="field-error" role="alert">{voidErr}</p>}
+        {voidErr && <p id="void-reason-error" className="field-error" role="alert">{voidErr}</p>}
       </div>
     </Modal>
   );

@@ -4,6 +4,8 @@
     "lib": ["es2022"],
     "module": "commonjs",
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noEmitOnError": true,
     "rootDir": "app/main",
     "outDir": "app-dist/main",

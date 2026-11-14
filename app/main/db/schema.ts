@@ -12,7 +12,21 @@ import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 import { eqaRoundNumber } from '../domain/eqa/evaluation';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 13;
+
+const LIS_IMPORTS_SQL = `
+CREATE TABLE IF NOT EXISTS lis_imports (
+  id TEXT PRIMARY KEY,
+  gateway_origin TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  point_id TEXT NOT NULL REFERENCES qc_points(id) ON DELETE CASCADE,
+  record_json TEXT NOT NULL,
+  imported_at TEXT NOT NULL,
+  imported_by TEXT NOT NULL,
+  acknowledged_at TEXT NOT NULL DEFAULT '',
+  UNIQUE(gateway_origin, message_id)
+);
+`;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -150,6 +164,7 @@ CREATE TABLE IF NOT EXISTS tests (
   reagent TEXT NOT NULL DEFAULT '',
   tea REAL NOT NULL DEFAULT 0,
   tea_source TEXT NOT NULL DEFAULT '',
+  operational_tea_source TEXT NOT NULL DEFAULT '',
   tea_ref_key TEXT NOT NULL DEFAULT '',
   eflm_analyte TEXT NOT NULL DEFAULT '',
   eflm_aps TEXT NOT NULL DEFAULT 'desirable',
@@ -241,6 +256,8 @@ CREATE INDEX IF NOT EXISTS idx_qc_points_lot_active ON qc_points(test_id, level,
 -- thiếu chỉ mục này phải đọc mọi điểm của xét nghiệm rồi sắp lại, ~20 ms trên
 -- bộ 5 năm (2026-11-03).
 CREATE INDEX IF NOT EXISTS idx_qc_points_voided ON qc_points(test_id, date, run_id) WHERE voided = 1;
+
+${LIS_IMPORTS_SQL}
 
 CREATE TABLE IF NOT EXISTS sigma_data (
   id TEXT PRIMARY KEY,
@@ -833,6 +850,16 @@ const MIGRATIONS: Migration[] = [
     // kỳ đã lẫn nhiều sample giữ nguyên để không đoán lại lịch sử phiên bản.
     name: 'Ngoại kiểm RIQAS: mỗi sample là một đợt',
     up(db) { splitRiqasCycleRounds(db); },
+  },
+  {
+    version: 12,
+    name: 'Nguồn TEa vận hành được chọn riêng cho xét nghiệm',
+    up(db) { addColumnIfMissing(db, 'tests', 'operational_tea_source', "TEXT NOT NULL DEFAULT ''"); },
+  },
+  {
+    version: 13,
+    name: 'Dấu vết nhận bản tin LIS và trạng thái xác nhận Gateway',
+    up(db) { db.exec(LIS_IMPORTS_SQL); },
   },
 ];
 

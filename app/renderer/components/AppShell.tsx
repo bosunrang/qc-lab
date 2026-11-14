@@ -14,10 +14,10 @@ import { PageErrorBoundary } from './ErrorBoundary';
 import { useAuthStore } from '../store/auth-store';
 import { useSettingsStore } from '../store/settings-store';
 import { canUserAccessPage, pageById, type PageDef } from '../lib/permissions';
-import { DialogHost } from './DialogHost';
 import { ToastHost } from './ToastHost';
 import { DatePickerPopup } from './DatePickerPopup';
 import { NavIcon } from './NavIcon';
+import { SoftwareLicenseFooter } from './SoftwareLicenseExpiry';
 
 // Cấu trúc nhóm điều hướng; nhãn/route/vai trò đọc từ PAGE_DEFS, không khai lại.
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
@@ -122,6 +122,7 @@ export function AppShell() {
               <span>{RUNTIME_LABEL}</span>
             </div>
           </div>
+          <SoftwareLicenseFooter compact={iconOnly} />
         </div>
       </aside>
       <main ref={mainRef} tabIndex={-1}>
@@ -131,7 +132,6 @@ export function AppShell() {
           <Outlet />
         </PageErrorBoundary>
       </main>
-      <DialogHost />
       <ToastHost />
       <DatePickerPopup />
     </div>

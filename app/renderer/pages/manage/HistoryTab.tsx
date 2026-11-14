@@ -10,11 +10,21 @@ import { vnDate } from '../../lib/format';
 import { EmptyState } from './shared';
 import { observedStats } from '../../../main/domain/observed-stats';
 import { pointTarget } from '../../../main/domain/westgard-engine';
+import { compareQcPointOrder } from '../../../main/domain/sort-order';
+import { historyQcConclusion } from '../../lib/history-qc-conclusion';
+import { SUMMARY_TABLES } from '../../lib/useCatalog';
+import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 
 /** Số điểm mỗi trang trong hộp thoại chi tiết lô. Một lô chạy 2 lần/ngày
  * trong 6 tháng có khoảng 360 điểm mỗi mức; vẽ hết một lần làm hộp thoại mở
  * chậm và khó dò (kế hoạch kiến trúc D.11). */
 const HISTORY_POINT_PAGE = 100;
+const QC_CONCLUSION_FILTERS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'ok', label: 'Đạt' },
+  { value: 'warn', label: 'Cảnh báo' },
+  { value: 'rej', label: 'Loại' },
+] as const;
 
 type HistoryEntry = {
   at?: string; mean: number | null; sd: number | null; qcLotId: string | null;
@@ -32,6 +42,7 @@ type HistoryRow = {
   low: number | null;
   high: number | null;
   period: string;
+  from: string;
   to: string;
   source: 'lab' | 'mfg';
   current: boolean;
@@ -83,11 +94,15 @@ function testSearchValues(test: Test, levels: TestLevel[], lots: QcLot[], instru
 export function HistoryTab() {
   const { tests, instruments, lots, lotGroups, levelsByTestId, loadLevels, loadHistoryPoints } = useManageStore(useShallow((s) => ({ tests: s.tests, instruments: s.instruments, lots: s.lots, lotGroups: s.lotGroups, levelsByTestId: s.levelsByTestId, loadLevels: s.loadLevels, loadHistoryPoints: s.loadHistoryPoints })));
   const [testId, setTestId] = useState('');
+  const [levelFilter, setLevelFilter] = useState<number | null>(null);
   const [points, setPoints] = useState<HistoryQcPointView[]>([]);
   const [detail, setDetail] = useState<HistoryRow | null>(null);
   const [detailPage, setDetailPage] = useState(1);
-  // Mở một lô khác thì về trang đầu của lô đó.
-  useEffect(() => { setDetailPage(1); }, [detail?.key]);
+  const [conclusionFilter, setConclusionFilter] = useState<typeof QC_CONCLUSION_FILTERS[number]['value']>('all');
+  const [historyVersion, setHistoryVersion] = useState(0);
+  useStoreInvalidation(SUMMARY_TABLES, testId || undefined, () => setHistoryVersion((version) => version + 1));
+  // Mở một lô khác thì hiện tất cả điểm từ trang đầu của lô đó.
+  useEffect(() => { setDetailPage(1); setConclusionFilter('all'); }, [detail?.key]);
 
   useEffect(() => { if (!testId && tests.length) setTestId(tests[0].id); }, [testId, tests]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
@@ -105,11 +120,11 @@ export function HistoryTab() {
     let alive = true;
     if (!testId) { setPoints([]); return () => { alive = false; }; }
     (async () => {
-      await loadHistoryPoints(testId);
-      if (alive) setPoints(useManageStore.getState().historyPointsByTestId[testId] || []);
+      const loaded = await loadHistoryPoints(testId);
+      if (alive) setPoints(loaded);
     })();
     return () => { alive = false; };
-  }, [testId, loadHistoryPoints]);
+  }, [testId, loadHistoryPoints, historyVersion]);
 
   const groupLabel = (lotId: string | null | undefined) => {
     if (!lotId) return 'Chưa thuộc nhóm';
@@ -118,7 +133,6 @@ export function HistoryTab() {
   };
 
   const rows = useMemo<HistoryRow[]>(() => levels.flatMap((level) => {
-    const k = level.range_k && level.range_k > 0 ? level.range_k : 2;
     const build = (entry: HistoryEntry, current: boolean, from: string, to: string, index: number): HistoryRow => {
       const lot = lots.find((item) => item.id === entry.qcLotId);
 
@@ -135,6 +149,7 @@ export function HistoryTab() {
         low: entry.low ?? null,
         high: entry.high ?? null,
         period: periodLabel(from, to),
+        from,
         to,
         source: entry.source || (level.applied === 'lab' ? 'lab' : 'mfg'),
         current,
@@ -159,7 +174,9 @@ export function HistoryTab() {
         return build(entry, false, from, to, index);
       })
       .filter((row) => !currentRow.some((now) => now.mean === row.mean && now.sd === row.sd && now.lotId === row.lotId));
-    return [...currentRow, ...past];
+    // Giữ lô đang dùng đầu mỗi mức; các mốc cũ xếp theo ngày bắt đầu hiệu lực
+    // giảm dần. Khi trùng/thiếu ngày, mốc ghi sau trong lịch sử đứng trước.
+    return [...currentRow, ...past.reverse().sort((a, b) => b.from.localeCompare(a.from))];
   }), [levels, lots, lotGroups]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ô chọn tìm được theo tên xét nghiệm, máy, chuyên khoa, mức và số lô QC
@@ -168,6 +185,10 @@ export function HistoryTab() {
     const machine = instruments.find((item) => item.id === test.instrument_id)?.name || 'Máy không còn tồn tại';
     return { value: test.id, label: `${test.name} — ${machine}`, keywords: testSearchValues(test, levelsByTestId[test.id] || [], lots, machine).join(' ') };
   }), [tests, instruments, levelsByTestId, lots]);
+
+  const historyLevels = [...new Set(rows.map((row) => row.level))].sort((a, b) => a - b);
+  const activeLevel = levelFilter != null && historyLevels.includes(levelFilter) ? levelFilter : null;
+  const visibleRows = activeLevel == null ? rows : rows.filter((row) => row.level === activeLevel);
 
   const pointsOf = (row: HistoryRow) => points.filter((point) =>
     point.level === row.level && (row.lotNo ? (point.lot || '') === row.lotNo : true));
@@ -180,13 +201,17 @@ export function HistoryTab() {
       <div className="panel target-matrix-panel has-popover">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD.</EmptyState> : <>
         <div className="target-selector history-selector">
-          <div className="field"><label htmlFor="history-test">Xét nghiệm / Máy</label><SearchSelect id="history-test" value={testId} options={testOptions} onChange={setTestId} ariaLabel="Xét nghiệm / Máy" placeholder="Tìm theo xét nghiệm, máy hoặc số lô…" /></div>
+          <div className="field history-test-field"><label htmlFor="history-test">Xét nghiệm / Máy</label><SearchSelect id="history-test" value={testId} options={testOptions} onChange={(id) => { setTestId(id); setLevelFilter(null); }} ariaLabel="Xét nghiệm / Máy" placeholder="Tìm theo xét nghiệm, máy hoặc số lô…" /></div>
+          <div className="dayseg history-level-filter" role="group" aria-label="Lọc theo mức QC">
+            <button type="button" className={activeLevel == null ? 'on' : ''} aria-pressed={activeLevel == null} onClick={() => setLevelFilter(null)}>Tất cả</button>
+            {historyLevels.map((level) => <button type="button" key={level} className={activeLevel === level ? 'on' : ''} aria-pressed={activeLevel === level} onClick={() => setLevelFilter(level)}>Mức {level}</button>)}
+          </div>
         </div>
         <div className="rcfg-list">
           {rows.length ? (
             <table className="history-table">
               <thead><tr><th>Mức</th><th>Lô QC / Nhóm lô</th><th className="num">Mean</th><th className="num">Giới hạn dưới</th><th className="num">Giới hạn trên</th><th className="num">SD</th><th>Hiệu lực</th><th>Nguồn</th><th className="num">Điểm QC</th><th></th></tr></thead>
-              <tbody>{rows.map((row) => (
+              <tbody>{visibleRows.map((row) => (
                 <tr key={row.key}>
                   <td><span className="pill">M{row.level}</span></td>
                   <td><b>{row.lotNo || '—'}</b><div className="hint">{row.group}</div></td>
@@ -207,7 +232,10 @@ export function HistoryTab() {
       {detail && (() => {
         const historyEntries = rows.filter((row) => row.level === detail.level && row.lotId === detail.lotId);
         const detailPoints = pointsOf(detail);
-        const detailPageCount = Math.max(1, Math.ceil(detailPoints.length / HISTORY_POINT_PAGE));
+        // Lọc theo đúng nhãn đang hiển thị, kể cả điểm bị loại do mức khác;
+        // không lọc chuỗi đầu vào đánh giá Westgard hoặc số liệu tích luỹ.
+        const filteredPoints = detailPoints.filter((point) => conclusionFilter === 'all' || historyQcConclusion(point).tone === conclusionFilter);
+        const detailPageCount = Math.max(1, Math.ceil(filteredPoints.length / HISTORY_POINT_PAGE));
         const detailPageClamped = Math.min(Math.max(1, detailPage), detailPageCount);
         return (
           <Modal
@@ -236,11 +264,16 @@ export function HistoryTab() {
                 })}</tbody>
               </table>
             ) : <EmptyState title="Chưa có mốc Mean/SD">Không tìm thấy lịch sử Mean/SD cho lô này.</EmptyState>}
-            <h4 className="flow-panel space-after-section">Điểm QC đã nhập ({detailPoints.length})</h4>
-            {detailPoints.length ? (<>
+            <div className="history-points-toolbar flow-panel space-after-section">
+              <h4>Điểm QC đã nhập ({filteredPoints.length}{conclusionFilter !== 'all' ? `/${detailPoints.length}` : ''})</h4>
+              <div className="dayseg history-status-filter" role="group" aria-label="Lọc kết luận QC">
+                {QC_CONCLUSION_FILTERS.map((filter) => <button type="button" key={filter.value} className={conclusionFilter === filter.value ? 'on' : ''} aria-pressed={conclusionFilter === filter.value} onClick={() => { setConclusionFilter(filter.value); setDetailPage(1); }}>{filter.label}</button>)}
+              </div>
+            </div>
+            {filteredPoints.length ? (<>
               <table className="history-detail-table hist-points-table">
-                <thead><tr><th>Ngày</th><th>Lần chạy</th><th className="num">Giá trị</th><th className="num">Z</th><th className="num">Mean lúc nhập</th><th className="num">SD lúc nhập</th><th>Phân loại Z-score</th><th>Người thực hiện</th></tr></thead>
-                <tbody>{detailPoints.slice().sort((a, b) => a.date.localeCompare(b.date) || String(a.run_id).localeCompare(String(b.run_id), 'vi', { numeric: true }))
+                <thead><tr><th>Ngày</th><th>Lần chạy</th><th className="num">Giá trị</th><th className="num">Z</th><th className="num">Mean lúc nhập</th><th className="num">SD lúc nhập</th><th>Kết luận QC</th><th>Người thực hiện</th></tr></thead>
+                <tbody>{filteredPoints.slice().sort((a, b) => compareQcPointOrder(b, a))
                   .slice((detailPageClamped - 1) * HISTORY_POINT_PAGE, detailPageClamped * HISTORY_POINT_PAGE).map((point) => {
                   // Cùng quy tắc với kết luận Westgard: Mean/SD chốt lúc nhập chỉ
                   // dùng khi có đủ cả cặp. Trước đây lấy `qc_mean` và `qc_sd`
@@ -249,10 +282,7 @@ export function HistoryTab() {
                   const z = target.z;
                   const mean = target.key ? target.mean : null;
                   const sd = target.key ? target.sd : null;
-                  const abs = Math.abs(z);
-                  // Nhãn đọc nhanh theo dải Z, không phải verdict Westgard
-                  // (chuỗi/luật liên mức chỉ có ở trang Phân tích Westgard).
-                  const verdict = !Number.isFinite(z) ? '—' : abs > 3 ? 'Ngoài ±3s' : abs > 2 ? 'Ngoài ±2s' : 'Trong ±2s';
+                  const conclusion = historyQcConclusion(point);
                   return (
                     <tr key={point.id}>
                       <td>{vnDate(point.date)}</td>
@@ -261,14 +291,16 @@ export function HistoryTab() {
                       <td className="num">{Number.isFinite(z) ? `${z >= 0 ? '+' : ''}${z.toFixed(2)}s` : '—'}</td>
                       <td className="num">{mean != null ? fmt(mean, decimals) : '—'}</td>
                       <td className="num">{sd ? fmt(sd, decimals) : '—'}</td>
-                      <td><span title="Phân loại theo Z-score, không phải kết luận Westgard" className={`tag ${verdict === 'Ngoài ±3s' ? 'rej' : verdict === 'Ngoài ±2s' ? 'warn' : 'ok'}`}>{verdict}</span></td>
+                      <td><span title={conclusion.title} className={`tag ${conclusion.tone}`}>{conclusion.label}</span>
+                        {conclusion.details.map((reason) => <div className="hint" key={reason}>{reason}</div>)}
+                      </td>
                       <td>{point.operator_username || point.operator_name || '—'}</td>
                     </tr>
                   );
                 })}</tbody>
               </table>
-              <Pagination page={detailPageClamped} pageCount={detailPageCount} {...pageBounds(detailPageClamped, HISTORY_POINT_PAGE, detailPoints.length)} total={detailPoints.length} unit="điểm" label="Phân trang điểm QC" onPageChange={setDetailPage} />
-            </>) : <EmptyState title="Chưa có điểm QC">Không có điểm QC nào khớp với lô/mức này.</EmptyState>}
+              <Pagination page={detailPageClamped} pageCount={detailPageCount} {...pageBounds(detailPageClamped, HISTORY_POINT_PAGE, filteredPoints.length)} total={filteredPoints.length} unit="điểm" label="Phân trang điểm QC" onPageChange={setDetailPage} />
+            </>) : detailPoints.length ? <EmptyState title="Không có điểm QC phù hợp">Không có điểm QC mang kết luận đã chọn trong lô/mức này.</EmptyState> : <EmptyState title="Chưa có điểm QC">Không có điểm QC nào khớp với lô/mức này.</EmptyState>}
           </Modal>
         );
       })()}

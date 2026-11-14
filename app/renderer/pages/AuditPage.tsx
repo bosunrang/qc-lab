@@ -20,7 +20,7 @@ import { AsyncButton } from '../components/AsyncButton';
 const AUTO_VERIFY_MAX = 5000;
 
 export function AuditPage() {
-  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow, archive } = useAuditStore(useShallow((s) => ({ result: s.result, error: s.error, query: s.query, from: s.from, to: s.to, pageSize: s.pageSize, load: s.load, setQuery: s.setQuery, setRange: s.setRange, setPage: s.setPage, setPageSize: s.setPageSize, clearFilters: s.clearFilters, exportCsv: s.exportCsv, verifyChainNow: s.verifyChainNow, archive: s.archive })));
+  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow } = useAuditStore(useShallow((s) => ({ result: s.result, error: s.error, query: s.query, from: s.from, to: s.to, pageSize: s.pageSize, load: s.load, setQuery: s.setQuery, setRange: s.setRange, setPage: s.setPage, setPageSize: s.setPageSize, clearFilters: s.clearFilters, exportCsv: s.exportCsv, verifyChainNow: s.verifyChainNow })));
   const [archiving, setArchiving] = useState(false);
   const [chain, setChain] = useState<ChainVerifyView | null>(null);
   const chainEpoch = useRef(0);
@@ -72,7 +72,7 @@ export function AuditPage() {
   return (
     <div>
       <PageHeader title="Nhật ký hoạt động" subtitle="Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem" />
-      {error && <div className="panel"><p className="field-error audit-page-error">{error}</p></div>}
+      {error && <div className="alert rej audit-page-error" role="alert">{error}</div>}
       <div className="panel audit-tools-panel">
         <div className="panel-head audit-tools-head"><h2>Công cụ</h2></div>
         <div className="audit-tools-body">
@@ -169,11 +169,10 @@ function AuditIntegrityStatus({
 function ArchiveModal({ onClose }: { onClose: () => void }) {
   const { archive, previewArchive } = useAuditStore(useShallow((s) => ({ archive: s.archive, previewArchive: s.previewArchive })));
   const [months, setMonths] = useState<'12' | '24' | '36'>('24');
-  const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
     const preview = await previewArchive(Number(months) as 12 | 24 | 36);
-    if (!preview.ok) { setErr(preview.error.message); return; }
+    if (!preview.ok) { await errorDialog(preview.error.message, { title: 'Chưa lưu trữ được nhật ký' }); return; }
     if (!preview.data.removedCount) {
       await infoDialog('Không có dòng nhật ký nào cũ hơn mốc đã chọn.');
       onClose();
@@ -191,7 +190,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     try {
       downloadCsv(preview.data.csv, `luu-tru-nhat-ky-${preview.data.cutoffIso.slice(0, 10)}.csv`);
     } catch {
-      setErr('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.');
+      await errorDialog('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.', { title: 'Chưa tạo được tệp lưu trữ' });
       return;
     }
     const downloaded = await confirmDialog(
@@ -200,7 +199,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     );
     if (!downloaded) return;
     const result = await archive(Number(months) as 12 | 24 | 36);
-    if (!result.ok) { setErr(result.error.message); return; }
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu trữ được nhật ký' }); return; }
     showToast(result.data.removedCount > 0 ? `Đã lưu trữ ${result.data.removedCount} dòng cũ hơn ${months} tháng.` : 'Không có dòng nào cũ hơn mốc đã chọn.');
     onClose();
   }
@@ -208,7 +207,6 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Lưu trữ nhật ký cũ" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
-      {err && <p className="field-error" role="alert">{err}</p>}
       <p className="audit-archive-copy">Xuất CSV phần sẽ lưu trữ, kèm PrevHash/Hash để đối chiếu chuỗi. Chỉ xoá sau khi bạn xác thực lại và xác nhận đã kiểm tra tệp.</p>
       <div className="field">
         <label htmlFor="audit-archive-months">Giữ lại dữ liệu trong</label>

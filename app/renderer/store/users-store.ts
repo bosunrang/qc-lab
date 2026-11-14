@@ -17,7 +17,7 @@ interface UsersState {
   setNceCapabilities: (id: string, capabilities: string[]) => Promise<IpcResult<PublicUser>>;
 }
 
-export const useUsersStore = create<UsersState>((set, get) => ({
+export const useUsersStore = create<UsersState>((set) => ({
   users: [],
 
   load: async () => {

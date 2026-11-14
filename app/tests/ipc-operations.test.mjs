@@ -28,6 +28,9 @@ const {
   createBusinessOperations, createLanInvoker, registerIpcOperations, sessionContext, bindOperations,
 } = require('../../app-dist/main/ipc/operations.js');
 const { createDesktopOperations } = require('../../app-dist/main/ipc/desktop-operations.js');
+const { createSoftwareOperations } = require('../../app-dist/main/ipc/software-operations.js');
+const { createLicenseService } = require('../../app-dist/main/licensing/license-service.js');
+const { createUpdateService } = require('../../app-dist/main/updates/update-service.js');
 
 const admin = { userId: 'u-admin', username: 'admin', name: 'Quan tri', role: 'admin', clientId: 'test' };
 const tech = { userId: 'u-tech', username: 'ktv', name: 'Ky thuat vien', role: 'technician', clientId: 'test' };
@@ -60,7 +63,10 @@ function setup({ backup, pickOpen = async () => null } = {}) {
     logDir: 'C:/qclab/logs',
     openFolder: async () => '',
   });
-  const tables = [business, desktop];
+  const software = createSoftwareOperations(db,
+    createLicenseService(db, { required: false, machineCode: '', publicKey: '' }),
+    createUpdateService(null, { currentVersion: '1.0.9', changed() {}, async prepareInstall() {}, beforeInstall() {} }), session);
+  const tables = [business, desktop, software];
   return { db, auth, business, desktop, tables, session, printed, lan: createLanInvoker(tables) };
 }
 
@@ -107,7 +113,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 155);
+  assert.equal(handlers.size, 161);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -129,9 +135,9 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
     'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
     'attachNceRun', 'backupStatus', 'cancelEqaRound', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
     'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaInstrumentGrid', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
-    'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
+    'getLicenseStatus', 'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
     // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
-    'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
+    'getReportTemplateSettings', 'getSoftwareUpdateStatus', 'getStorageInfo', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
     'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAttention', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
     'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
     'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
@@ -169,6 +175,7 @@ test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và t�
     'htmlToPdf', 'printHtmlToPdf', 'print:htmlToPdf', 'export', 'exportBackup', 'backup:export',
     'chooseFile', 'import', 'listActivity', 'resetOperationalData', 'backup:resetAll', 'config:listTests', 'constructor', '__proto__', 'toString', '',
     'reportClientError', 'openLogFolder', 'log:clientError', 'log:openFolder', 'exportLogBundle', 'log:exportBundle',
+    'activateSoftware', 'checkSoftwareUpdate', 'downloadSoftwareUpdate', 'installSoftwareUpdate',
   ]) {
     const result = await lan(method, [{ data: { username: 'admin', password: 'admin12345' } }], viewer);
     assert.equal(result?.error?.code, 'unknown-operation', `LAN phải chặn "${method}"`);

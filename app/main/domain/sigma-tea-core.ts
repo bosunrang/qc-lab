@@ -12,6 +12,7 @@ export type TeaTestCore = {
    * Thiếu cổng này, mọi xét nghiệm có `tea` (kể cả TEa gõ tay cho nguồn khác)
    * đều hiện thành "TEa EFLM đã truy vết". */
   tea_source?: string; eflm_analyte?: string; eflm_ref?: string; eflm_lookup_date?: string;
+  operational_tea_source?: string;
   eflm_tea?: number | null;
 };
 /** Tiêu chí CLIA đã phân giải, dạng có cấu trúc — để lớp trình bày in được
@@ -181,15 +182,31 @@ export function teaCriterionText(resolved: Pick<ResolvedTeaCore, 'value' | 'crit
 }
 
 const KNOWN_SOURCES: readonly SigmaTeaSourceCore[] = ['lab', 'eflm', 'clia', 'ricos'];
+/** Chỉ các nguồn được chọn rõ ở danh mục mới thay cách phân giải cũ. */
+function explicitOperationalSource(test: TeaTestCore): SigmaTeaSourceCore | null {
+  const source = String(test.operational_tea_source || '').trim().toLowerCase();
+  return KNOWN_SOURCES.includes(source as SigmaTeaSourceCore) ? source as SigmaTeaSourceCore : null;
+}
+
+/** Nguồn mặc định khi mở Sigma hoặc tạo kỳ chưa có snapshot TEa. */
+export function operationalTeaSource(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): SigmaTeaSourceCore | '' {
+  const explicit = explicitOperationalSource(test);
+  if (explicit) return explicit;
+  if (hasLabTea(test, refs, catalogRows)) return 'lab';
+  const legacy = String(test.tea_source || '').trim().toLowerCase() as SigmaTeaSourceCore;
+  return KNOWN_SOURCES.includes(legacy) ? legacy : '';
+}
 export const MISSING_LAB_TEA_NOTE = 'Chưa có TEa của PXN: khai ở Cấu hình chung → Bảng TEa tham chiếu.';
 export type OperationalTeaCore<T extends TeaCatalogCore = TeaCatalogCore> = ResolvedTeaCore<T> & {
-  /** Nguồn thực sự cho ra `value`; `null` khi không nguồn nào có TEa. */
+  /** Nguồn đã chọn hoặc nguồn được phân giải; `null` khi chưa xác định nguồn. */
   source: SigmaTeaSourceCore | null;
 };
 
 /** TEa VẬN HÀNH của một xét nghiệm — căn cứ của cổng Bias khi lập dải, cột
  * "Trong TEa" của ngoại kiểm và mục TEa ở danh mục xét nghiệm. Phòng xét
- * nghiệm tự xác định yêu cầu chất lượng (ISO 15189:2022 7.3.7), nên thứ tự là:
+ * nghiệm tự xác định yêu cầu chất lượng (ISO 15189:2022 7.3.7). Nguồn được
+ * chọn rõ ở danh mục (`operational_tea_source`) được dùng trực tiếp, không
+ * đổi nguồn khi thiếu giá trị. Với cấu hình cũ chưa chọn riêng, thứ tự là:
  *
  * 1. Hồ sơ TEa của PXN (Bảng TEa tham chiếu): TEa riêng của mức nếu truyền
  *    `level` và mức đó có khai, không thì TEa chung.
@@ -201,6 +218,12 @@ export type OperationalTeaCore<T extends TeaCatalogCore = TeaCatalogCore> = Reso
  * `targetMean` là nồng độ để quy đổi giới hạn tuyệt đối CLIA sang %: Mean của
  * mức QC, hoặc giá trị ấn định của mẫu ngoại kiểm. */
 export function resolveOperationalTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], targetMean?: number | null, level?: number | null): OperationalTeaCore<T> {
+  const explicit = explicitOperationalSource(test);
+  if (explicit) {
+    const resolved = resolveTea(test, refs, catalogRows, explicit, targetMean, level);
+    // Nguồn đã chọn thiếu dữ liệu thì báo thiếu, không âm thầm đổi sang nguồn khác.
+    return { ...resolved, source: explicit, note: resolved.note || (resolved.value == null ? `Chưa có TEa cho nguồn ${SOURCE_SHORT_LABEL[explicit]} đã chọn.` : null) };
+  }
   const lab = resolveTea(test, refs, catalogRows, 'lab', targetMean, level);
   if (lab.value != null) return { ...lab, source: 'lab' };
   const chosen = String(test.tea_source || '').trim().toLowerCase() as SigmaTeaSourceCore;
@@ -219,6 +242,11 @@ const pct = (value: number) => `${Number(value.toFixed(2))}%`;
  * sơ PXN, hoặc tiêu chí của nguồn dự phòng (CLIA tuyệt đối in nguyên
  * "±4 mmol/L" vì chưa có nồng độ để quy đổi). */
 export function operationalTeaSummary(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): { text: string; source: SigmaTeaSourceCore | null; sourceLabel: string } {
+  const explicit = explicitOperationalSource(test);
+  if (explicit && explicit !== 'lab') {
+    const resolved = resolveTea(test, refs, catalogRows, explicit);
+    return { text: resolved.value != null || resolved.criterionDetail ? teaCriterionText(resolved) : 'Chưa có TEa', source: explicit, sourceLabel: SOURCE_SHORT_LABEL[explicit] };
+  }
   const general = resolveTea(test, refs, catalogRows, 'lab').value;
   const levels = labLevelTeas(test, refs, catalogRows);
   if (general != null || levels.length) {
@@ -228,6 +256,7 @@ export function operationalTeaSummary(test: TeaTestCore, refs: readonly TeaRefCo
     ];
     return { text: parts.join(' · '), source: 'lab', sourceLabel: SOURCE_SHORT_LABEL.lab };
   }
+  if (explicit === 'lab') return { text: 'Chưa có TEa của PXN', source: 'lab', sourceLabel: SOURCE_SHORT_LABEL.lab };
   const chosen = String(test.tea_source || '').trim().toLowerCase() as SigmaTeaSourceCore;
   if (chosen !== 'lab' && KNOWN_SOURCES.includes(chosen)) {
     const resolved = resolveTea(test, refs, catalogRows, chosen);

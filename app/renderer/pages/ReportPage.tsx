@@ -25,7 +25,7 @@ import { vnDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { LoadNotice } from '../components/LoadNotice';
-import type { NceRecordRow, ReportForm, ReportFormKind, ReportPointRow, ReportTemplateSettings, TestSummary } from '../../shared/qc-api';
+import type { ReportForm, ReportFormKind, ReportTemplateSettings, TestSummary } from '../../shared/qc-api';
 import { REPORT_FORM_KINDS, REPORT_FORM_LABELS } from '../../main/domain/report-template-validation';
 import { AsyncButton } from '../components/AsyncButton';
 import { MonthlyReviewPanel } from './report/MonthlyReviewPanel';
@@ -194,9 +194,10 @@ export function ReportPage() {
               <TestPicker items={summaries} selectedId={selectedId} onSelect={selection.select} idOf={(t) => t.testId} labelOf={(t) => testSelectLabel(t, summaries)}
                 id="rTest" label="Xét nghiệm" countId="reportTestCount" />
               <div className="field"><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
-              <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
+              <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} invalid={rangeInvalid} describedBy={rangeInvalid ? 'report-range-error' : undefined} />
+                {rangeInvalid && <p id="report-range-error" className="field-error" role="alert">Từ ngày ({vnDate(start)}) đang sau Đến ngày ({vnDate(end)}). Hãy đổi lại khoảng ngày.</p>}
+              </div>
             </div>
-            {rangeInvalid && <div className="alert rej report-range-error" role="alert">Từ ngày ({vnDate(start)}) đang sau Đến ngày ({vnDate(end)}) — báo cáo sẽ không có dòng nào. Hãy đổi lại khoảng ngày.</div>}
             <div className="report-export-bar">
               <div className="report-export-options">
                 <label className="report-nce-option">
@@ -307,11 +308,11 @@ function UnlockModal({ ym, onClose, onDone }: { ym: string; onClose: () => void;
   return (
     <Modal title={`Mở khoá kỳ ${monthVN(ym)}`} onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submit}>Xác nhận mở khoá</AsyncButton></>}>
-      {err && <p className="field-error" role="alert">{err}</p>}
       <div className="hint">Mở khoá kỳ {monthVN(ym)} sẽ cho phép sửa/huỷ lại điểm QC của kỳ này ở mọi xét nghiệm. Lý do được ghi vào nhật ký hoạt động.</div>
       <div className="field">
         <label htmlFor="unlockReasonInput">Lý do mở khoá</label>
-        <textarea id="unlockReasonInput" autoFocus rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+        <textarea id="unlockReasonInput" autoFocus rows={3} value={note} aria-invalid={!!err || undefined} aria-describedby={err ? 'unlock-reason-error' : undefined} onChange={(e) => { setNote(e.target.value); setErr(null); }} />
+        {err && <p id="unlock-reason-error" className="field-error" role="alert">{err}</p>}
       </div>
     </Modal>
   );

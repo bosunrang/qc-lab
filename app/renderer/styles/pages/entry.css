@@ -49,11 +49,10 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .tnode .caret svg{display:block;width:var(--icon-xs);height:var(--icon-xs);}
 .tnode:hover .caret{border-color:var(--accent-border-hover);background:var(--surface-subtle);color:var(--accent-text);}
 /* Trạng thái trong cây là `.tag` chuẩn; ở đây chỉ canh phải trong hàng. */
-.tree .tnode .tag{justify-self:end;margin-left:var(--space-1-5);}
+.tree .tnode .tag{justify-self:end;margin-left:var(--space-1-5);white-space:nowrap;}
 /* Cây có trần độ rộng (xem `.tree`): tên dài (máy, nhóm lô, xét nghiệm) xuống
    dòng trong cột giữa thay vì tràn đè lên nhãn trạng thái; nhãn giữ một dòng. */
 .tree .tnode{white-space:normal;line-height:var(--leading-heading);}
-.tree .tnode .tag{white-space:nowrap;}
 
 /* ---- Bảng nhập QC (worksheet theo lịch tháng) ---- */
 .qc-sheet-panel{border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
@@ -96,8 +95,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-sheet td:first-child,.qc-sheet th:first-child{position:sticky;left:0;z-index:var(--z-sticky);background:inherit;box-shadow:none;font-weight:var(--weight-bold);color:var(--text-button);white-space:nowrap;text-align:center;}
 .qc-sheet td:first-child b{margin-top:var(--space-0-5);color:var(--accent-text);font-size:var(--text-2xs);font-weight:var(--weight-bold);}
 .qc-sheet td:last-child,.qc-sheet th:last-child{border-right:none;}
-.qc-sheet tbody tr{height:var(--table-row-h-input);}
-.qc-sheet tbody tr{background:var(--surface);}
+.qc-sheet tbody tr{height:var(--table-row-h-input);background:var(--surface);}
 .qc-sheet tbody tr:hover{background:var(--surface-subtle);}
 .qc-sheet tbody tr.today{background:var(--accent-surface-tint);}
 .qc-sheet tbody tr.today td{border-top:1px solid var(--accent-border-soft);border-bottom:1px solid var(--accent-border-soft);}
@@ -347,6 +345,6 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .range-apply-choice{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-2-5) var(--space-3);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}.range-apply-choice>span{font-weight:var(--weight-semibold);}.range-apply-choice .dayseg{flex:none;}.range-apply-choice .dayseg button{min-height:var(--control-h-sm);font-weight:var(--weight-semibold);}
 .range-workflow-modal .field>span>b{color:var(--danger-text);}
 .range-manual-fields{display:grid;grid-template-columns:1fr 1fr;gap:var(--field-gap);padding:var(--space-3);margin-bottom:var(--space-3);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
-.range-safety-gate{display:grid;gap:var(--space-2);margin:var(--space-3) 0;}.range-safety-gate>label:not(.field){display:flex;align-items:center;gap:var(--space-2);}
+.range-safety-gate{display:grid;gap:var(--space-2);margin:var(--space-3) 0;}.range-safety-gate>label:not(.field),.range-safety-gate>[data-field-container]>label{display:flex;align-items:center;gap:var(--space-2);}
 @media (max-width:640px){.range-workflow-table{min-width:680px;}.range-workflow-table-wrap{overflow-x:auto;}.range-apply-choice{align-items:flex-start;flex-direction:column;}.range-manual-fields{grid-template-columns:1fr;}.range-band-note{align-items:flex-start;flex-direction:column;}.range-band-action{align-self:flex-end;}}
 

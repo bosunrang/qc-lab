@@ -19,12 +19,13 @@ export function loadTeaRefs(db: Db): (TeaRefCore & { id: string })[] {
  * cột truy vết EFLM: cổng `hasTrace` của `resolveTea()` đọc chúng, thiếu thì
  * mọi xét nghiệm có `tea` đều được coi là "TEa EFLM đã truy vết". */
 export function loadTeaTest(db: Db, testId: string): TeaTestCore | null {
-  const test = db.prepare('SELECT name,tea_ref_key,unit,tea,tea_source,eflm_tea,eflm_analyte,eflm_ref,eflm_lookup_date FROM tests WHERE id=?').get(testId) as
-    { name: string; tea_ref_key: string; unit: string; tea: number | null; tea_source: string; eflm_tea: number | null; eflm_analyte: string; eflm_ref: string; eflm_lookup_date: string } | undefined;
+  const test = db.prepare('SELECT name,tea_ref_key,unit,tea,tea_source,operational_tea_source,eflm_tea,eflm_analyte,eflm_ref,eflm_lookup_date FROM tests WHERE id=?').get(testId) as
+    { name: string; tea_ref_key: string; unit: string; tea: number | null; tea_source: string; operational_tea_source: string; eflm_tea: number | null; eflm_analyte: string; eflm_ref: string; eflm_lookup_date: string } | undefined;
   if (!test) return null;
   return {
     name: test.name || '', tea_ref_key: test.tea_ref_key || '', unit: test.unit || '', tea: Number(test.tea) || 0,
     eflm_tea: test.eflm_tea,
+    operational_tea_source: test.operational_tea_source || '',
     tea_source: test.tea_source || '', eflm_analyte: test.eflm_analyte || '', eflm_ref: test.eflm_ref || '', eflm_lookup_date: test.eflm_lookup_date || '',
   };
 }

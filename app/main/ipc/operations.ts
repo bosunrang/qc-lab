@@ -61,7 +61,8 @@ export type OperationTable<N extends ApiName> = { [K in N]: Operation<K> };
 /** Thao tác cần tài nguyên riêng của từng môi trường chạy (phiên đăng nhập,
  * hộp thoại tệp, cửa sổ in, Firebase, backup trên đĩa). Electron khai ở
  * `desktop-operations.ts`, bản xem trước tự cài ở `real-api.ts`. */
-export type HostApiName =
+export type SoftwareApiName = 'getLicenseStatus' | 'activateSoftware' | 'getSoftwareUpdateStatus' | 'checkSoftwareUpdate' | 'downloadSoftwareUpdate' | 'installSoftwareUpdate';
+export type HostApiName = SoftwareApiName
   | 'currentUser' | 'bootstrapAdmin' | 'login' | 'logout'
   | 'getFirebaseSettings' | 'connectFirebase' | 'syncFirebase' | 'disconnectFirebase'
   | 'exportTableXlsx' | 'printHtmlToPdf'
@@ -95,7 +96,7 @@ export class NotSignedInError extends Error {
  * thao tác, hoặc tài khoản phải đổi mật khẩu trước. Lỗi dự kiến nên không ghi
  * log lỗi như lỗi lập trình. */
 export class AccessError extends Error {
-  constructor(readonly code: 'forbidden' | 'password-change-required', message: string) { super(message); }
+  constructor(readonly code: 'forbidden' | 'password-change-required' | 'activation-required', message: string) { super(message); }
 }
 
 /** Cổng quyền chạy trước MỌI thao tác (GV5): đọc lại tài khoản từ CSDL, chặn
@@ -126,6 +127,7 @@ export function sessionContext(current: () => Actor | null): CallContext {
 
 type DataApiName = { [K in ApiName]: Result<K> extends { ok: boolean } ? never : K }[ApiName];
 const DATA_API_NAMES = [
+  'getLicenseStatus', 'getSoftwareUpdateStatus',
   'hasAnyUsers', 'currentUser', 'listInstruments', 'listTests', 'listTestLevels', 'listPlannedTargets',
   'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
@@ -252,7 +254,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     listArchivedGroupTests: { channel: 'westgard:listArchivedGroupTests', lan: true, run: (_ctx, groupId) => westgard.listArchivedGroupTests(groupId) },
     listPreviousLotBlocks: { channel: 'westgard:listPreviousLotBlocks', lan: true, run: (_ctx, testId) => westgard.listPreviousLotBlocks(testId) },
 
-    listSigmaPeriods: { channel: 'sigma:listPeriods', lan: true, run: (_ctx, testId) => sigma.listPeriods(testId) },
+    listSigmaPeriods: { channel: 'sigma:listPeriods', lan: true, run: (_ctx, testId, teaMode) => sigma.listPeriods(testId, teaMode) },
     listSigmaCohorts: { channel: 'sigma:listCohorts', lan: true, run: (_ctx, testId, period, levels) => sigma.listCohorts(testId, period, levels) },
     saveSigmaTeaConfig: { channel: 'sigma:saveTeaConfig', lan: true, run: (ctx, input) => sigma.saveTeaConfig(input, ctx.actor()) },
     saveSigmaPeriod: { channel: 'sigma:savePeriod', lan: true, run: (ctx, input) => sigma.savePeriod(input, ctx.actor()) },
@@ -324,7 +326,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
 
     getLisSettings: { channel: 'lis:getSettings', lan: true, run: (ctx) => lis.getSettings(ctx.actor()) },
     saveLisSettings: { channel: 'lis:saveSettings', lan: false, run: (ctx, input) => lis.saveSettings(input, ctx.actor()) },
-    pullLisQueue: { channel: 'lis:pullQueue', lan: true, run: () => lis.pullQueue() },
+    pullLisQueue: { channel: 'lis:pullQueue', lan: true, run: (ctx) => lis.pullQueue(ctx.actor()) },
     importLisResult: { channel: 'lis:importResult', lan: true, run: (ctx, input) => lis.importResult(input, ctx.actor()) },
     rejectLisResult: { channel: 'lis:rejectResult', lan: true, run: (ctx, input) => lis.rejectResult(input, ctx.actor()) },
   };

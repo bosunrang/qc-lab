@@ -5,6 +5,9 @@ import { createLanHttpApi } from './lan/http-api';
 import { PageErrorBoundary } from './components/ErrorBoundary';
 import { installUnhandledErrorReporting } from './lib/unhandled-errors';
 import { setLanStation } from './lib/runtime';
+import { SoftwareLicenseBoundary } from './components/SoftwareLicense';
+import { DialogHost } from './components/DialogHost';
+import { installSelectFocusHandling } from './lib/select-focus';
 
 // Chỉ cài khi không chạy trong Electron thật, ví dụ `vite dev` mở qua
 // localhost. Ở Electron, hàm này trả `false` ngay lập tức (không nạp WASM,
@@ -26,9 +29,17 @@ async function start(): Promise<void> {
   if (!rootEl) return;
   if (installed) rootEl.textContent = '';
   installUnhandledErrorReporting();
+  installSelectFocusHandling();
   // Lớp chặn ngoài cùng cho lỗi ở màn hình đăng nhập hoặc khung app; lỗi của
   // từng trang đã có lớp riêng trong `AppShell`.
-  createRoot(rootEl).render(<PageErrorBoundary><AppRouter /></PageErrorBoundary>);
+  createRoot(rootEl).render(
+    <PageErrorBoundary>
+      <SoftwareLicenseBoundary><AppRouter /></SoftwareLicenseBoundary>
+      {/* Hộp thoại hệ thống phải tồn tại cả trước đăng nhập và ở màn hình
+          kích hoạt, không chỉ sau khi AppShell đã được dựng. */}
+      <DialogHost />
+    </PageErrorBoundary>,
+  );
 }
 
 // Chỉ hiện khi thật sự phải chờ nạp WASM (chế độ xem trước); trong Electron

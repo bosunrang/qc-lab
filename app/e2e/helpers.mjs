@@ -33,10 +33,10 @@ export function watchErrors(page) {
   return errors;
 }
 
-export async function launchApp() {
+export async function launchApp(options = {}) {
   const userDataDir = mkdtempSync(path.join(os.tmpdir(), 'qclab-e2e-'));
   const port = await freePort();
-  const env = { ...process.env, QCLAB_USER_DATA_DIR: userDataDir, QCLAB_LAN_PORT: String(port) };
+  const env = { ...process.env, ...options.env, QCLAB_USER_DATA_DIR: userDataDir, QCLAB_LAN_PORT: String(port) };
   // Bản build phải nạp tệp trong `app-dist/renderer`, không trỏ sang Vite.
   delete env.QCLAB_DEV_SERVER_URL;
   const app = await _electron.launch({ args: ['.'], cwd: REPO_ROOT, env });

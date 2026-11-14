@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
+import type { FormError } from '../lib/field-error';
 
 export interface ConfirmOptions { title?: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
 /** `error`: thao tác thất bại (nền đỏ); `warn`: lưu ý/hướng dẫn trước khi làm
@@ -47,6 +48,21 @@ export function infoDialog(message: string, opts: InfoOptions = {}): Promise<voi
 /** Báo thao tác không thực hiện được — thường là `result.error.message`. */
 export function errorDialog(message: string, opts: Omit<InfoOptions, 'type'> = {}): Promise<void> {
   return infoDialog(message, { ...opts, type: 'error' });
+}
+
+/** Lỗi nhập liệu giữ viền đỏ và focus tại ô sai; lỗi thao tác dùng hộp thoại
+ * chung để luôn nhìn thấy khi biểu mẫu đang cuộn xuống dưới. */
+export async function reportFormError(
+  error: FormError,
+  setFieldError: (error: FormError | null) => void,
+  opts: Omit<InfoOptions, 'type'> = {},
+): Promise<void> {
+  if (error.fields.length) {
+    setFieldError(error);
+    return;
+  }
+  setFieldError(null);
+  await errorDialog(error.message, { title: 'Chưa lưu được', ...opts });
 }
 
 /** Mở dialog xác thực lại mật khẩu người dùng hiện tại — resolve true nếu

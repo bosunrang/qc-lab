@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 import { dismissToast, showToast, toastDuration, toastStore } from '../renderer/state/toast-store.ts';
-import { closeDialog, dialogStore, errorDialog } from '../renderer/state/dialog-store.ts';
+import { closeDialog, dialogStore, errorDialog, reportFormError } from '../renderer/state/dialog-store.ts';
 
 test('dòng báo thành công tự tắt, giữ tối đa 3 dòng', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -31,4 +31,29 @@ test('errorDialog mở hộp thoại kiểu lỗi, giữ tiêu đề', () => {
   assert.equal(dialog.kind, 'info');
   assert.deepEqual(dialog.opts, { title: 'Chưa lưu được', type: 'error' });
   closeDialog();
+});
+
+test('lỗi nhập liệu giữ trường cần focus, không mở hộp thoại', async () => {
+  const error = { message: 'Vui lòng nhập tên xét nghiệm.', fields: ['name'] };
+  let fieldError = null;
+  await reportFormError(error, (value) => { fieldError = value; });
+  assert.equal(fieldError, error);
+  assert.equal(dialogStore.getState().dialog.kind, 'none');
+});
+
+test('lỗi thao tác xoá lỗi đầu form và chờ xác nhận hộp thoại hệ thống', async () => {
+  let fieldError = { message: 'Lỗi cũ', fields: ['name'] };
+  let completed = false;
+  const pending = reportFormError({ message: 'Thao tác không được mở qua mạng nội bộ.', fields: [] }, (value) => { fieldError = value; })
+    .then(() => { completed = true; });
+  assert.equal(fieldError, null);
+  const dialog = dialogStore.getState().dialog;
+  assert.equal(dialog.kind, 'info');
+  assert.deepEqual(dialog.opts, { title: 'Chưa lưu được', type: 'error' });
+  assert.equal(dialog.message, 'Thao tác không được mở qua mạng nội bộ.');
+  assert.equal(completed, false, 'chưa cho lưu lại trong khi đang đọc lỗi');
+  dialog.resolve();
+  closeDialog();
+  await pending;
+  assert.equal(completed, true);
 });

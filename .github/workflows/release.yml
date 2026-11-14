@@ -18,6 +18,15 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
+      - run: npm run license:check
+      - name: Check release tag
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -ne "v$version") { throw "Tag must match package.json version: v$version" }
       - run: npm run verify-release
       - run: npm run dist:publish
         env:

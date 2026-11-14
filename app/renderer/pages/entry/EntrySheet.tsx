@@ -27,8 +27,6 @@ function pointsForColumnDay(column: EntryColumn, date: string): QcPointView[] {
 }
 
 export interface SheetMessages {
-  noteErr: string | null;
-  pointErr: string | null;
   pointFeedback: { kind: 'ok' | 'warn' | 'rej'; message: string } | null;
   voidMsg: string | null;
 }
@@ -51,7 +49,7 @@ export const EntrySheet = memo(function EntrySheet({
   onViewMonth: (month: number) => void;
   messages: SheetMessages;
   /** `raw` là chuỗi người dùng gõ; trang tự đọc số và báo lỗi nếu không hợp lệ. */
-  onCommitRun: (column: EntryColumn, date: string, runId: string, raw: string) => Promise<boolean>;
+  onCommitRun: (column: EntryColumn, date: string, runId: string, raw: string) => Promise<{ saved: boolean; fieldError?: string }>;
   onSaveNote: (date: string, note: string) => void;
 }) {
   // Ngày đã có điểm chỉ mở lần chạy bổ sung khi người dùng bấm "＋ Thêm".
@@ -88,7 +86,7 @@ export const EntrySheet = memo(function EntrySheet({
     );
   }
 
-  const { noteErr, pointErr, pointFeedback, voidMsg } = messages;
+  const { pointFeedback, voidMsg } = messages;
   return (
     <div className="panel qc-sheet-panel">
       <div className="qc-sheet-heading">
@@ -211,9 +209,9 @@ export const EntrySheet = memo(function EntrySheet({
                             );
                           })}
                           {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (raw) => {
-                            const saved = await onCommitRun(column, date, sharedRunIdFor(column, date), raw);
-                            if (saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
-                            return saved;
+                            const result = await onCommitRun(column, date, sharedRunIdFor(column, date), raw);
+                            if (result.saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
+                            return result;
                           }} />}
                         </div>
                         {showAddBtn && (
@@ -244,10 +242,8 @@ export const EntrySheet = memo(function EntrySheet({
           </tbody>
         </table>
       </div>
-      {(noteErr || pointErr || pointFeedback || voidMsg) && (
+      {(pointFeedback || voidMsg) && (
         <div className="entry-sheet-message" role="status" aria-live="polite">
-          {noteErr && <div className="alert rej" role="alert">{noteErr}</div>}
-          {pointErr && <div className="alert rej" role="alert">{pointErr}</div>}
           {pointFeedback && <div className={`alert ${pointFeedback.kind}`}>{pointFeedback.message}</div>}
           {voidMsg && <div className="alert warn">{voidMsg}</div>}
         </div>
@@ -264,17 +260,21 @@ export const EntrySheet = memo(function EntrySheet({
  * ngày cùng mức; Enter xuống hàng dưới và quay vòng về đầu cột. */
 function RunSlot({ date, level, columnKey, columnOrder, onCommit }: {
   date: string; level: number; columnKey: string; columnOrder: number;
-  onCommit: (raw: string) => Promise<boolean>;
+  onCommit: (raw: string) => Promise<{ saved: boolean; fieldError?: string }>;
 }) {
   const [val, setVal] = useState('');
+  const [error, setError] = useState('');
+  const errorId = `qc-run-error-${date}-${columnOrder}`;
   return (
     <div className="qc-run-slot">
       <input className="qc-inline-input is-empty" type="text" inputMode="decimal" placeholder="--" value={val}
         aria-label={`Mức ${level} ngày ${vnDate(date)}`}
+        aria-invalid={!!error || undefined} aria-describedby={error ? errorId : undefined}
         data-focus-date={date} data-focus-level={level} data-focus-column={columnKey} data-focus-column-order={columnOrder}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={async () => { if (val.trim() !== '' && await onCommit(val)) setVal(''); }}
+        onChange={(e) => { setVal(e.target.value); setError(''); }}
+        onBlur={async () => { if (val.trim() === '') return; const result = await onCommit(val); if (result.saved) setVal(''); setError(result.fieldError || ''); }}
         onKeyDown={handleSheetKeyDown} />
+      {error && <p id={errorId} className="field-error" role="alert">{error}</p>}
     </div>
   );
 }

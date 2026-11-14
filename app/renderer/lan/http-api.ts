@@ -80,6 +80,7 @@ export function createLanHttpApi(fetcher: Fetcher = (path, init) => fetch(path, 
       if (property === 'exportTableXlsx') return exportTableXlsxInBrowser;
       if (property === 'printHtmlToPdf') return ({ html }: { html: string }) => printHtmlToPdfInBrowser(html);
       if (property === 'getLoginBrand') return async () => request('/api/brand') as ReturnType<QcApi['getLoginBrand']>;
+      if (property === 'getLicenseStatus') return async () => request('/api/license') as ReturnType<QcApi['getLicenseStatus']>;
       return async (...args: unknown[]) => request('/api/rpc', { method: 'POST', body: JSON.stringify({ method: property, args }) });
     },
   });

@@ -17,6 +17,7 @@ const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js')
 const { nceQueueRows } = require('../../app-dist/main/db/nce-evaluation.js');
 const { reviewDataFingerprint } = require('../../app-dist/main/domain/monthly-review.js');
 const { validateLockPeriod } = require('../../app-dist/main/domain/period-lock-validation.js');
+const { addChangeListener, setCloudChangeNotifier } = require('../../app-dist/main/ipc/shared.js');
 
 const admin = { userId: 'review-admin', username: 'review', name: 'Người rà soát', role: 'admin', clientId: 'review' };
 const must = (result) => { assert.equal(result.ok, true, JSON.stringify(result.error)); return result.data; };
@@ -36,7 +37,106 @@ function qc(t) {
   const operation = makeOperationalQc(db, { testId: assay.id, instrumentId: instrument.id, assignments: lots.map((lot, i) => ({ level: i + 1, lotId: lot.id })) });
   const entry = createEntryHandlers(db), report = createReportHandlers(db);
   const add = (level, date, val) => must(entry.addPoint({ data: { testId: assay.id, level, date, val, runId: `${date}-1` } }, admin));
-  return { db, config, instrument, assay, entry, report, add, operation };
+  return { db, config, instrument, assay, lots, entry, report, add, operation };
+}
+
+/** Tạo nhóm mới hợp lệ, chỉ chuyển mức 1 để nhóm cũ vẫn đang vận hành. */
+function replaceFirstLevel(f) {
+  const lots = [1, 2].map((level) => must(f.config.saveLot({ data: { lotNo: `PARTIAL-NEW-${level}`, level } }, admin)));
+  must(f.config.saveLotGroup({ data: { name: 'Nhóm thay từng mức', lotIds: lots.map((lot) => lot.id) } }, admin));
+  must(f.config.saveTestLevel({ testId: f.assay.id, data: { level: 1, mean: 100, sd: 2, qcLotId: lots[0].id } }, admin));
+}
+
+test('RC01: ngừng dùng qua form nhiều máy bị chặn và hoàn nguyên toàn bộ lần lưu', (t) => {
+  const f = qc(t);
+  f.add(1, '2026-10-01', 108); f.add(2, '2026-10-01', 200);
+  const secondInstrument = must(f.config.saveInstrument({ data: { name: 'Máy thứ hai' } }, admin));
+  const second = must(f.config.saveTest({ data: { name: 'Glucose', instrumentId: secondInstrument.id } }, admin));
+  const before = f.db.prepare('SELECT id,name,active FROM tests ORDER BY id').all();
+  const auditBefore = f.db.prepare('SELECT COUNT(*) AS n FROM activity').get().n;
+  const changes = [];
+  let cloudPushes = 0;
+  t.after(addChangeListener((event) => changes.push(event)));
+  setCloudChangeNotifier(() => { cloudPushes++; });
+  t.after(() => setCloudChangeNotifier(null));
+  const input = { id: f.assay.id, data: { name: 'Glucose đổi tên', instrumentIds: [secondInstrument.id, f.instrument.id],
+    assignmentIds: [second.id, f.assay.id], active: false } };
+  const result = f.config.saveTest(input, admin);
+  assert.equal(result.ok, false); assert.equal(result.error.code, 'pending-rejected-runs');
+  assert.deepEqual(f.db.prepare('SELECT id,name,active FROM tests ORDER BY id').all(), before);
+  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM activity').get().n, auditBefore);
+  assert.deepEqual(changes, [], 'lần lưu bị huỷ không gửi lời báo thay đổi');
+  assert.equal(cloudPushes, 0, 'lần lưu bị huỷ không hẹn đẩy đám mây');
+  assert.equal(nceQueueRows(f.db).length, 1);
+  createIqcNce(createNceHandlers(f.db), admin, f.assay.id, { date: '2026-10-01', runId: '2026-10-01-1' });
+  must(f.config.saveTest(input, admin));
+  assert.ok(f.db.prepare('SELECT active FROM tests').all().every((row) => row.active === 0));
+});
+
+test('RC03: tạo nhóm dự kiến bằng lô đang dùng bị chặn, không để nhóm hay liên kết dở', (t) => {
+  const f = qc(t);
+  f.add(1, '2026-10-01', 108); f.add(2, '2026-10-01', 200);
+  const spare = must(f.config.saveLot({ data: { lotNo: 'SPARE', level: 1 } }, admin));
+  const before = f.db.prepare('SELECT id,group_id FROM qc_lots ORDER BY id').all();
+  const groupsBefore = f.config.listLotGroups().length;
+  const auditBefore = f.db.prepare('SELECT COUNT(*) AS n FROM activity').get().n;
+  const result = f.config.saveLotGroup({ data: { name: 'Nhóm mới dự kiến', status: 'planned', lotIds: [f.lots[0].id, spare.id] } }, admin);
+  assert.equal(result.ok, false); assert.equal(result.error.code, 'pending-rejected-runs');
+  assert.deepEqual(f.db.prepare('SELECT id,group_id FROM qc_lots ORDER BY id').all(), before);
+  assert.equal(f.config.listLotGroups().length, groupsBefore);
+  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM activity').get().n, auditBefore);
+  assert.equal(nceQueueRows(f.db).length, 1);
+});
+
+test('RC03: sửa trực tiếp nhóm của lô cũng phải giữ lần chạy chưa lập hồ sơ', (t) => {
+  const f = qc(t);
+  f.add(1, '2026-10-01', 108); f.add(2, '2026-10-01', 200);
+  const lots = [1, 2].map((level) => must(f.config.saveLot({ data: { lotNo: `PLAN-${level}`, level } }, admin)));
+  const group = must(f.config.saveLotGroup({ data: { name: 'Nhóm chưa chạy', status: 'planned', lotIds: lots.map((lot) => lot.id) } }, admin));
+  const auditBefore = f.db.prepare('SELECT COUNT(*) AS n FROM activity').get().n;
+  const result = f.config.saveLot({ id: f.lots[0].id, data: { groupId: group.id, lotNo: f.lots[0].lot_no, level: 1 } }, admin);
+  assert.equal(result.ok, false); assert.equal(result.error.code, 'pending-rejected-runs');
+  assert.equal(f.db.prepare('SELECT group_id FROM qc_lots WHERE id=?').get(f.lots[0].id).group_id, f.operation.groupId);
+  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM activity').get().n, auditBefore);
+  assert.equal(nceQueueRows(f.db).length, 1);
+});
+
+test('RC02: đổi một mức không đổi kết luận hay chữ ký của kỳ khoá và không trộn lần chạy mới', (t) => {
+  const f = qc(t);
+  f.add(1, '2026-10-01', 105); f.add(2, '2026-10-01', 190);
+  createIqcNce(createNceHandlers(f.db), admin, f.assay.id, { date: '2026-10-01', runId: '2026-10-01-1' });
+  must(f.report.signQcMonthlyReview({ data: { ym: '2026-10', conclusion: 'action', note: 'Cần khắc phục sự cố QC đã bị loại' } }, admin));
+  must(f.report.lockPeriod({ data: { ym: '2026-10', acknowledge: true } }, admin));
+  const before = f.report.getQcMonthlyReview('2026-10');
+  const pointsBefore = f.report.queryReport({ testId: f.assay.id, from: '2026-10-01', to: '2026-10-01' });
+  replaceFirstLevel(f);
+  const after = f.report.getQcMonthlyReview('2026-10');
+  assert.deepEqual(after.rows, before.rows);
+  assert.deepEqual(after.totals, before.totals);
+  assert.equal(after.signature_stale, false);
+  assert.equal(f.report.isPeriodLocked('2026-10'), true);
+  assert.deepEqual(f.report.queryReport({ testId: f.assay.id, from: '2026-10-01', to: '2026-10-01' }), pointsBefore);
+  f.add(1, '2026-11-01', 100); f.add(2, '2026-11-01', 200);
+  const fresh = f.report.queryReport({ testId: f.assay.id, from: '2026-11-01', to: '2026-11-01' });
+  assert.equal(fresh.length, 2);
+  assert.ok(fresh.every((point) => point.verdict === 'ok' && point.accepted));
+});
+
+for (const [rule, values] of [['R4s', [105, 190]], ['1-3s', [108, 200]]]) for (const level of [1, 2]) {
+  test(`RC02: huỷ mức ${level} sau khi chỉ đổi mức 1 vẫn giữ bằng chứng lần chạy ${rule}`, (t) => {
+    const f = qc(t);
+    const points = values.map((value, index) => f.add(index + 1, '2026-10-01', value));
+    createIqcNce(createNceHandlers(f.db), admin, f.assay.id, { date: '2026-10-01', runId: '2026-10-01-1' });
+    replaceFirstLevel(f);
+    const pointId = points[level - 1].id;
+    const blank = f.entry.voidPoint({ data: { pointId, kind: 'data-entry', reason: '' } }, admin);
+    assert.equal(blank.ok, false); assert.equal(blank.error.code, 'reason-required-rejected-run');
+    assert.equal(f.db.prepare('SELECT voided FROM qc_points WHERE id=?').get(pointId).voided, 0);
+    must(f.entry.voidPoint({ data: { pointId, kind: 'data-entry', reason: 'Đối chiếu phiếu máy, đã xác minh nhập sai giá trị' } }, admin));
+    const evidence = JSON.parse(f.db.prepare('SELECT void_rejection_json FROM qc_points WHERE id=?').get(pointId).void_rejection_json);
+    assert.ok(evidence.rejectedLevels.includes(1));
+    if (rule === 'R4s' || level === 1) assert.ok(evidence.rules.includes(rule));
+  });
 }
 
 test('R01: dừng nhóm lô không đổi kết luận của biên bản tháng', (t) => {

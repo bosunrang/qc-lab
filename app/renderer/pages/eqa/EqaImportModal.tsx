@@ -21,6 +21,7 @@ import { eqaNormalize } from '../../../main/domain/eqa/evaluation';
 import { eqaPairKey, groupEqaSources, mergeEqaSources, type EqaParsedSource } from '../../../main/domain/eqa/import';
 import type { EqaPdfReport } from '../../../main/domain/eqa/pdf-report';
 import { Facts, pctText, roundLabel, StatCard } from './shared';
+import { errorDialog } from '../../state/dialog-store';
 
 const TITLE = 'Nhập báo cáo ngoại kiểm';
 const ERROR_ROW_LIMIT = 50;
@@ -236,10 +237,10 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
     try {
       const result = await importRound({ ...previewInput, replaceReason, expectedVersion: preview?.existing?.row_version });
       setBusy(false);
-      if (result.ok) onImported(result.data.round.id); else setError(result.error.message);
+      if (result.ok) onImported(result.data.round.id); else await errorDialog(result.error.message, { title: 'Chưa nhập được đợt ngoại kiểm' });
     } catch (e) {
       setBusy(false);
-      setError(e instanceof Error ? e.message : 'Không ghi được đợt ngoại kiểm.');
+      await errorDialog(e instanceof Error ? e.message : 'Không ghi được đợt ngoại kiểm.', { title: 'Chưa nhập được đợt ngoại kiểm' });
     }
   }
 

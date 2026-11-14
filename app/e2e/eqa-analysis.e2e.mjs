@@ -204,17 +204,21 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await page.waitForFunction(() => document.querySelector('.eqa-assay-item[aria-pressed=true] .eqa-assay-z')?.textContent === '3.40');
     for (const width of [1366, 1000, 800]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.waitForFunction(() => {
-        const node = document.querySelector('[data-eqa-chart] canvas');
-        return node && Math.abs(node.width - node.clientWidth * devicePixelRatio) <= 2;
-      });
-      // Đợi thêm hai frame để thanh cuộn nội bộ ổn định chiều rộng cột phải;
-      // ResizeObserver của canvas sẽ vẽ lại theo kích thước cuối cùng đó.
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      await page.waitForFunction(() => {
-        const node = document.querySelector('[data-eqa-chart] canvas');
-        return node && Math.abs(node.width - node.clientWidth * devicePixelRatio) <= 2;
-      });
+      // Chuyển động của bố cục có thể còn đổi chiều rộng sau hai frame dù
+      // bitmap vừa khớp canvas. Đợi khung đứng yên và vẽ đúng trong ba frame
+      // liên tiếp, vẫn giữ nguyên các phép kiểm độ phân giải bên dưới.
+      const resizeState = await page.evaluateHandle(() => ({ width: null, height: null, frames: 0 }));
+      try {
+        await page.waitForFunction((state) => {
+          const node = document.querySelector('[data-eqa-chart] canvas');
+          if (!node) return false;
+          const box = node.getBoundingClientRect();
+          const drawn = Math.abs(node.width - node.clientWidth * devicePixelRatio) <= 2;
+          state.frames = drawn && state.width === box.width && state.height === box.height ? state.frames + 1 : 0;
+          state.width = box.width; state.height = box.height;
+          return state.frames >= 3;
+        }, resizeState, { polling: 'raf' });
+      } finally { await resizeState.dispose(); }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `không cuộn ngang toàn trang ở ${width}px`);
       assert.equal(await canvas.evaluate((node) => Math.abs(node.width - node.clientWidth * devicePixelRatio) <= 2), true, `canvas vẽ lại đúng độ phân giải ở ${width}px`);
       await page.screenshot({ path: path.join(shots, `eqa-analysis-${width}.png`), fullPage: true });

@@ -23,6 +23,8 @@ export interface LanServerDeps<User> {
   login(input: unknown, clientId: string): Promise<LoginResult<User>> | LoginResult<User>;
   /** Nhận diện công khai cho màn hình đăng nhập; không có cài đặt nội bộ. */
   getLoginBrand?(): Promise<unknown> | unknown;
+  getLicenseStatus?(): unknown;
+  licenseAllowed?(): boolean;
   actorOf(user: User, clientId: string): Actor;
   currentUser(actor: Actor): User | null;
   /** Kiểm lại phiên ở mỗi yêu cầu (GV5, xem `ipc/access-gate.ts`). Không khai
@@ -169,6 +171,7 @@ export class LanHttpServer<User> {
         if (served) { res.writeHead(200, { 'content-type': served.type, 'cache-control': served.html ? 'no-store' : 'public, max-age=3600', 'x-content-type-options': 'nosniff' }); res.end(served.content); return; }
       }
       if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true, data: { service: 'qc-lab-lan' } });
+      if (req.method === 'GET' && url.pathname === '/api/license') return send(res, 200, this.deps.getLicenseStatus?.() ?? null);
       if (req.method === 'GET' && url.pathname === '/api/brand') {
         if (!this.deps.getLoginBrand) return send(res, 404, { ok: false, error: { code: 'not-found', message: 'Chưa có thông tin thương hiệu.' } });
         return send(res, 200, await this.deps.getLoginBrand());
@@ -179,6 +182,7 @@ export class LanHttpServer<User> {
         res.write(': connected\n\n'); this.eventClients.add(res); req.once('close', () => this.eventClients.delete(res)); return;
       }
       if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+        if (this.deps.licenseAllowed && !this.deps.licenseAllowed()) return send(res, 403, { ok: false, error: { code: 'activation-required', message: 'Máy chủ QC Lab chưa được kích hoạt.' } });
         const input = await body(req);
         const username = String((input as { data?: { username?: unknown } })?.data?.username ?? '');
         const gate = this.loginThrottle.begin(remoteAddress(req), username);

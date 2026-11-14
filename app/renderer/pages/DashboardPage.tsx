@@ -207,7 +207,7 @@ export function DashboardPage() {
   const subtitle = (profile?.name || 'Khoa Xét nghiệm') + (profile?.dept ? ` · ${profile.dept}` : '');
   if (error) return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="panel"><EmptyState title="Không tải được Tổng quan" action={<button type="button" className="btn teal" onClick={() => { void load(); }}>Thử lại</button>}>Dữ liệu đã lưu không bị ảnh hưởng. Nội dung lỗi: {error}</EmptyState></div></>;
   if (loading) return <LoadingView subtitle={subtitle} />;
-  const today = todayIso(), model = buildDashboardViewModel(testSummaries, lots, overdueActions, today);
+  const today = todayIso(), model = buildDashboardViewModel(testSummaries, lots, overdueActions);
   // Kẹp 0..100 trước khi vẽ thanh tiến độ.
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{([

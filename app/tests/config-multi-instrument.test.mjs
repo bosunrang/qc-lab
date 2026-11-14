@@ -16,6 +16,11 @@ const machine2 = config.saveInstrument({ data: { name: 'Máy 2', section: 'Khu v
 const machine3 = config.saveInstrument({ data: { name: 'Máy 3', section: 'Khu vực 2' } }, actor).data;
 const machine4 = config.saveInstrument({ data: { name: 'Máy 4', section: 'Khu vực 3' } }, actor).data;
 
+const blank = config.saveTest({ data: { name: '', instrumentIds: [] } }, actor);
+assert.equal(blank.error.code, 'missing-name', 'cả tên và máy trống thì phải báo tên xét nghiệm trước');
+const namedWithoutMachine = config.saveTest({ data: { name: 'Chưa gán máy', instrumentIds: [] } }, actor);
+assert.equal(namedWithoutMachine.error.code, 'missing-instrument', 'đã có tên mới chuyển sang kiểm máy áp dụng');
+
 const created = config.saveTest({ data: {
   name: 'Sodium (Na)', teaRefKey: 'qclab-sodium', unit: 'mmol/L', tea: 0.73,
   instrumentIds: [machine1.id, machine2.id],

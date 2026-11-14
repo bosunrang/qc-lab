@@ -17,7 +17,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { LoadNotice } from '../components/LoadNotice';
-import { confirmDialog, reasonDialog } from '../state/dialog-store';
+import { confirmDialog, errorDialog, reasonDialog } from '../state/dialog-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
 import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
 import type { QcChartPoint } from '../components/QcChart';
@@ -75,8 +75,6 @@ export function EntryPage() {
   const [ljDays, setLjDays] = useState(30);
   const [ljFrom, setLjFrom] = useState('');
   const [ljTo, setLjTo] = useState('');
-  const [noteErr, setNoteErr] = useState<string | null>(null);
-  const [pointErr, setPointErr] = useState<string | null>(null);
   const [pointFeedback, setPointFeedback] = useState<{ kind: 'ok' | 'warn' | 'rej'; message: string } | null>(null);
 
   function setTreeVisibility(collapsed: boolean) {
@@ -251,13 +249,12 @@ export function EntryPage() {
   }, [previousLotSeries]);
 
   // Chỉ xoá ô nhập khi lưu thành công; nếu thất bại thì hiển thị lỗi trả về.
-  const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, raw: string): Promise<boolean> => {
+  const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, raw: string): Promise<{ saved: boolean; fieldError?: string }> => {
     const val = parseQcValueText(raw);
-    if (val == null) return false;
+    if (val == null) return { saved: false };
     if (Number.isNaN(val)) {
-      setPointErr(`"${raw.trim()}" không phải một giá trị số. Dùng dấu chấm hoặc dấu phẩy cho phần thập phân, ví dụ 5.25 hoặc 5,25.`);
       setPointFeedback(null);
-      return false;
+      return { saved: false, fieldError: `"${raw.trim()}" không phải một giá trị số. Dùng dấu chấm hoặc dấu phẩy cho phần thập phân, ví dụ 5.25 hoặc 5,25.` };
     }
     const deviation = extremeQcPointDeviation(val, column.mean, column.sd);
     if (deviation != null) {
@@ -265,7 +262,7 @@ export function EntryPage() {
         `Giá trị ${formatQcValue(val, decimals)} lệch ${deviation >= 0 ? '+' : ''}${deviation.toFixed(2)}SD, vượt ngưỡng ±5SD so với Mean/SD hiện tại. Hãy kiểm tra đơn vị, dấu thập phân và mức QC trước khi lưu.`,
         { title: 'Giá trị QC bất thường', confirmLabel: 'Vẫn lưu', cancelLabel: 'Kiểm tra lại', danger: false },
       );
-      if (!confirmed) return false;
+      if (!confirmed) return { saved: false };
     }
     const input = { testId, level: column.level, date, val, runId, lotNo: column.parallel ? column.lot : undefined };
     let result = await addPoint(input);
@@ -280,15 +277,14 @@ export function EntryPage() {
         confirmLabel: 'Lưu điểm',
         placeholder: 'VD: Bổ sung kết quả chạy ngày 05/10 bị sót, đối chiếu sổ máy…',
       });
-      if (retroReason == null) return false;
+      if (retroReason == null) return { saved: false };
       result = await addPoint({ ...input, retroReason });
     }
     if (!result.ok) {
-      setPointErr(result.error.message);
       setPointFeedback(null);
-      return false;
+      await errorDialog(result.error.message, { title: 'Chưa lưu được kết quả QC' });
+      return { saved: false };
     }
-    setPointErr(null);
     setVoidMsg(null);
     const rules = result.data.rules.join(', ');
     const lotSuffix = column.parallel ? ` · lô song song ${column.lot}` : '';
@@ -301,15 +297,15 @@ export function EntryPage() {
       : result.data.verdict === 'warn' || retroRejects
         ? { kind: 'warn', message: `${result.data.verdict === 'warn' ? `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}.` : `Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.`}${retro}` }
         : { kind: 'ok', message: `✓ Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.${retro}` });
-    return true;
+    return { saved: true };
   }, [testId, decimals, addPoint]);
 
   const saveDayNote = useCallback(async (date: string, note: string) => {
     const result = await setDayNote(testId, date, note);
-    setNoteErr(result.ok ? null : result.error.message);
+    if (!result.ok) await errorDialog(result.error.message, { title: 'Chưa lưu được ghi chú' });
   }, [testId, setDayNote]);
 
-  const messages: SheetMessages = useMemo(() => ({ noteErr, pointErr, pointFeedback, voidMsg }), [noteErr, pointErr, pointFeedback, voidMsg]);
+  const messages: SheetMessages = useMemo(() => ({ pointFeedback, voidMsg }), [pointFeedback, voidMsg]);
   const openVoid = useCallback((point: QcPointView) => setVoiding(point), []);
   const closeVoid = useCallback(() => setVoiding(null), []);
   const onVoided = useCallback((message: string) => {

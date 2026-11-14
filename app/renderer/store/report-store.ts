@@ -46,8 +46,13 @@ export const useReportStore = create<ReportState>((set, get) => ({
     // Đổi tháng khi lượt trước chưa xong: chỉ lượt mới nhất được hiện.
     const request = ++reviewRequestSerial;
     set({ reviewLoading: true, ...(get().review?.ym === ym ? {} : { review: null }) });
-    const review = await window.qcApi.getQcMonthlyReview(ym);
-    if (request === reviewRequestSerial) set({ review, reviewLoading: false });
+    try {
+      const review = await window.qcApi.getQcMonthlyReview(ym);
+      if (request === reviewRequestSerial) set({ review });
+    } finally {
+      // Lỗi vẫn đi tới bộ báo lỗi chung; mở lại nút tải để người dùng thử lại.
+      if (request === reviewRequestSerial) set({ reviewLoading: false });
+    }
   },
   // Main báo `qc_month_reviews` sau khi ký; trang nạp lại qua `useStoreInvalidation`.
   signReview: async (ym, conclusion, note) => window.qcApi.signQcMonthlyReview({ data: { ym, conclusion, note } }),

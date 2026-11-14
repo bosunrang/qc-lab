@@ -4,7 +4,7 @@ import { networkInterfaces } from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openDatabase } from './db/open-database';
-import { type Actor, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier } from './ipc/shared';
+import { type Actor, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier, notifyChanged } from './ipc/shared';
 import { createBusinessOperations, createLanInvoker, registerIpcOperations, sessionContext } from './ipc/operations';
 import { createDesktopOperations, desktopActor } from './ipc/desktop-operations';
 import { createAccessGate } from './ipc/access-gate';
@@ -33,6 +33,12 @@ import { LanTlsIdentity, loadOrCreateCa, sealedKeyProtector } from './lan/tls-st
 import { classifyNavigation } from './window-guard';
 import { createFileLogger } from './logging/file-logger';
 import { describeError, logEvent, setLogSink } from './logging/log-sink';
+import { autoUpdater } from 'electron-updater';
+import licensePublicKey from './licensing/public-key.json';
+import { readMachineCode } from './licensing/machine-code';
+import { createLicenseService } from './licensing/license-service';
+import { createUpdateService } from './updates/update-service';
+import { createSoftwareOperations } from './ipc/software-operations';
 
 // Test end-to-end (`app/e2e/`) chạy app thật trên thư mục dữ liệu tạm và một
 // cổng LAN riêng, để không đụng CSDL của người dùng và chạy được cả khi
@@ -218,6 +224,55 @@ async function createWindow(): Promise<void> {
   // process, không cần session token/cookie. Chỉ `login`/`logout` của máy
   // chính đổi biến này; máy trạm LAN mang actor riêng theo từng lời gọi.
   let sessionActor: Actor | null = null;
+  let machineCode = '', identityError = '';
+  try { machineCode = readMachineCode(); } catch { identityError = 'Không đọc được mã máy. Kiểm tra quyền đọc định danh Windows rồi mở lại ứng dụng.'; }
+  // Chỉ bản chạy từ mã nguồn được nhận khoá/điều kiện thử nghiệm. Biến môi
+  // trường không thể vô hiệu hoá kích hoạt hoặc thay khoá của bản đã cài.
+  const license = createLicenseService(db, {
+    required: app.isPackaged || process.env.QCLAB_REQUIRE_ACTIVATION === '1', machineCode, identityError,
+    publicKey: !app.isPackaged && process.env.QCLAB_LICENSE_PUBLIC_KEY ? process.env.QCLAB_LICENSE_PUBLIC_KEY : licensePublicKey.publicKey,
+  });
+  // Bộ cập nhật của bản cài chạy ở máy chính, không phụ thuộc tài khoản QC
+  // đang đăng nhập. Actor nội bộ chỉ dùng cho sao lưu và nhật ký cài đặt.
+  const updateActor: Actor = { userId: '', username: 'updater', name: 'Cập nhật phần mềm', role: 'admin', clientId: 'app-desktop' };
+  let updatePromptOpen = false;
+  const updates = createUpdateService(app.isPackaged && process.platform === 'win32' ? autoUpdater : null, {
+    currentVersion: app.getVersion(), changed: () => {
+      notifyChanged(['software_update']);
+      if (updates.status().phase === 'downloaded') void promptInstall();
+    },
+    prepareInstall: async () => {
+      // Chụp bản an toàn ngay trước khi cài; không đổi tệp SQLite đang dùng.
+      const snapshot = backup.exportBackupTo(path.join(userDataDir, `before-update-${Date.now()}.sqlite`), updateActor);
+      if (!snapshot.ok) throw new Error('Không tạo được bản sao lưu trước cập nhật.');
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([firebase.flushPending(), new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => reject(new Error('Đồng bộ trước cập nhật quá thời gian.')), 30_000);
+        })]);
+      } finally { if (timeout) clearTimeout(timeout); }
+    },
+    beforeInstall: () => { quitting = true; flushedBeforeQuit = true; },
+    installFailed: () => { quitting = false; flushedBeforeQuit = false; showMainWindow(); },
+  });
+
+  async function promptInstall() {
+    if (updatePromptOpen || updates.status().phase !== 'downloaded') return;
+    updatePromptOpen = true;
+    try {
+      const result = await dialog.showMessageBox({
+        type: 'info', title: 'Cập nhật QC Lab',
+        message: `Đã tải phiên bản QC Lab ${updates.status().available_version}.`,
+        detail: 'Hoàn tất các biểu mẫu đang nhập trước khi cập nhật. Ứng dụng sẽ sao lưu dữ liệu rồi khởi động lại để cài bản mới. Máy trạm LAN sẽ tạm mất kết nối.',
+        buttons: ['Khởi động lại và cập nhật', 'Để sau'], defaultId: 1, cancelId: 1, noLink: true,
+      });
+      if (result.response !== 0) return;
+      const installed = await softwareOperations.installSoftwareUpdate.run({ actor: () => updateActor });
+      if (!installed.ok) await dialog.showMessageBox({ type: 'error', title: 'Chưa cập nhật được', message: installed.error.message });
+    } catch (error) {
+      logEvent({ level: 'error', source: 'updater', message: 'Không mở được thông báo cập nhật', detail: describeError(error).message });
+    } finally { updatePromptOpen = false; }
+  }
 
   const win = new BrowserWindow({
     width: 1280,
@@ -239,8 +294,11 @@ async function createWindow(): Promise<void> {
 
   setBroadcastWindow(win);
 
-  // Mọi kênh IPC và mọi tuyến RPC của LAN sinh từ CÙNG hai bảng này — xem
+  // Mọi kênh IPC và mọi tuyến RPC của LAN sinh từ cùng các bảng này — xem
   // `ipc/operations.ts`. Không gọi `ipcMain.handle` trực tiếp ở nơi khác.
+  const softwareOperations = createSoftwareOperations(db, license, updates,
+    { get: () => sessionActor, set: (actor) => { sessionActor = actor; } },
+    () => { if (app.isPackaged && process.platform === 'win32') void updates.check(); });
   const operationTables = [
     createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis }),
     createDesktopOperations({ db, auth, backup, firebase }, {
@@ -278,15 +336,18 @@ async function createWindow(): Promise<void> {
       appVersion: app.getVersion(),
       electronVersion: process.versions.electron,
     }),
+    softwareOperations,
   ];
   // Cổng quyền đọc lại tài khoản ở MỖI lời gọi, cho cả máy chính lẫn máy trạm.
-  const accessGate = createAccessGate(db);
+  const accessGate = createAccessGate(db, license.allowed);
   registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor), accessGate);
 
   const lanTls = startLanTls(userDataDir);
   const lan = new LanHttpServer<PublicUser>({
     login: (input, clientId) => auth.login(input as { data: { username: string; password: string } }, clientId),
     getLoginBrand: () => settings.getLoginBrand(),
+    getLicenseStatus: () => ({ ...license.status(), runtime: 'lan' }),
+    licenseAllowed: license.allowed,
     actorOf: desktopActor,
     currentUser: (actor) => auth.getUser(actor.userId),
     sessionCheck: createSessionCheck(db),
@@ -322,6 +383,10 @@ async function createWindow(): Promise<void> {
 
   if (DEV_SERVER_URL) win.loadURL(DEV_SERVER_URL);
   else win.loadFile(INDEX_HTML);
+  if (app.isPackaged && process.platform === 'win32') {
+    setTimeout(() => { if (license.allowed()) void updates.check(); }, 30_000).unref();
+    setInterval(() => { if (license.allowed()) void updates.check(); }, 6 * 60 * 60_000).unref();
+  }
 }
 
 // Một lần bấm icon thứ hai không được tạo thêm server LAN. Cổng 3200 là cố

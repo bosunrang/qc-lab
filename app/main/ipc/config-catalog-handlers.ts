@@ -20,6 +20,7 @@ import { writeCommand, type WriteSteps, type WriteTx } from './write-command';
 import { commitKeepingRejectedRuns } from './pending-runs-guard';
 import { isLotGroupInUse } from '../db/lot-groups';
 import { LostRejectedRunsError, assertNoLostRejectedRuns, unrecordedRejectedRuns } from '../db/nce-evaluation';
+import { preserveSigmaTeaHistory } from '../db/sigma-tea-history';
 
 export function createCatalogConfigHandlers(db: Db) {
   const lotGroupInUse = (lotIds: string[]): boolean => isLotGroupInUse(db, lotIds);
@@ -86,6 +87,12 @@ export function createCatalogConfigHandlers(db: Db) {
    * trộn; `analyte_id` chỉ gom các hàng đó thành một mục ở giao diện. Gọi từ
    * `saveTest` (đã qua cổng quyền), ghi qua đúng lần ghi `w` của nó. */
   function saveTestAssignments(w: WriteSteps, input: { id?: string; data: TestInput }): IpcResult<Test> {
+    // Giữ cùng thứ tự kiểm tra với `validateTest`: tên là bước đầu của form,
+    // máy là bước sau. Mọi caller IPC đều phải nhận lỗi thiếu tên trước khi
+    // nhận lỗi thiếu máy khi cả hai cùng trống.
+    if (!cleanText(input.data.name).trim()) {
+      return { ok: false, error: { code: 'missing-name', message: 'Nhập tên xét nghiệm.' } };
+    }
     const instrumentIds = [...new Set((Array.isArray(input.data.instrumentIds) ? input.data.instrumentIds : [])
       .map(cleanId).filter(Boolean))];
     if (!instrumentIds.length) return { ok: false, error: { code: 'missing-instrument', message: 'Chọn ít nhất một máy xét nghiệm.' } };
@@ -147,25 +154,37 @@ export function createCatalogConfigHandlers(db: Db) {
       || cleanId(uid());
     const savedIds: string[] = [];
     const preserveExisting = input.data.preserveExistingAssignments === true;
-    const saved = w.commit((tx) => {
+    // Form nhiều máy cũng có thể ngừng dùng các cấu hình đã có. Kiểm cả lần
+    // lưu trong một giao dịch để không cập nhật dở các máy trước khi bị chặn.
+    const leavesOperation = !preserveExisting && existingAssignments.some((row) => row.active
+      && prepared.some((item) => item.instrumentId === row.instrument_id && !item.data.active));
+    const commitAssignments = <R>(work: (tx: WriteTx) => R): IpcResult<R> => leavesOperation
+      ? commitKeepingRejectedRuns(db, w, 'Ngừng sử dụng xét nghiệm này', work)
+      : { ok: true, data: w.commit(work) };
+    const saved = commitAssignments((tx) => {
+      let preserved = 0;
+      const sourceChanges: string[] = [];
       for (const item of prepared) {
         const current = existingAssignments.find(row => row.instrument_id === item.instrumentId);
         const d = item.data;
         if (current) {
           const currentId = String(current.id);
           if (!preserveExisting) {
+            const source = input.data.operationalTeaSource == null ? String(current.operational_tea_source || '') : d.operationalTeaSource;
+            preserved += preserveSigmaTeaHistory(db, currentId);
+            if (source !== current.operational_tea_source) sourceChanges.push(`${item.instrumentId}: ${current.operational_tea_source || 'tự động'} → ${source || 'tự động'}`);
             db.prepare(`UPDATE tests SET analyte_id=?,name=?,instrument_id=?,unit=?,decimal_places=?,tea=?,section=?,
-              tea_source=?,tea_ref_key=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
+              tea_source=?,tea_ref_key=?,operational_tea_source=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
               .run(analyteId, d.name, item.instrumentId, d.unit, d.decimalPlaces, d.tea, item.section,
-                d.teaSource, d.teaRefKey, d.method, d.reagent, d.cusumOn ? 1 : 0, d.cusumK, d.cusumH, d.active ? 1 : 0, currentId);
+                source || d.teaSource, d.teaRefKey, source, d.method, d.reagent, d.cusumOn ? 1 : 0, d.cusumK, d.cusumH, d.active ? 1 : 0, currentId);
           }
           savedIds.push(currentId);
         } else {
           const newId = cleanId(uid());
-          db.prepare(`INSERT INTO tests(id,analyte_id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,method,reagent,cusum_on,cusum_k,cusum_h,active)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          db.prepare(`INSERT INTO tests(id,analyte_id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,operational_tea_source,method,reagent,cusum_on,cusum_k,cusum_h,active)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
             .run(newId, analyteId, d.name, item.instrumentId, d.unit, d.decimalPlaces, d.tea, item.section,
-              d.teaSource, d.teaRefKey, d.method, d.reagent, d.cusumOn ? 1 : 0, d.cusumK, d.cusumH, d.active ? 1 : 0);
+              d.teaSource, d.teaRefKey, d.operationalTeaSource, d.method, d.reagent, d.cusumOn ? 1 : 0, d.cusumK, d.cusumH, d.active ? 1 : 0);
           db.prepare('INSERT INTO test_levels(id,test_id,level) VALUES (?,?,1)').run(`${newId}:1`, newId);
           savedIds.push(newId);
         }
@@ -174,12 +193,13 @@ export function createCatalogConfigHandlers(db: Db) {
       const detail = preserveExisting
         ? `Gán thêm máy cho xét nghiệm "${prepared[0].data.name}"`
         : `${existingAssignments.length ? 'Cập nhật' : 'Tạo'} xét nghiệm "${prepared[0].data.name}" trên ${savedIds.length} máy`;
-      tx.audit(action, detail, prepared[0].data.name);
-      tx.changed(['tests', 'test_levels'], savedIds);
+      tx.audit(action, `${detail}${sourceChanges.length ? `; nguồn TEa vận hành: ${sourceChanges.join('; ')}` : ''}${preserved ? `; giữ TEa của ${preserved} kỳ cũ` : ''}`, prepared[0].data.name);
+      tx.changed(preserved ? ['tests', 'test_levels', 'sigma_data'] : ['tests', 'test_levels'], savedIds);
       const representativeId = input.id && savedIds.includes(input.id) ? input.id : savedIds[0];
       return db.prepare('SELECT * FROM tests WHERE id=?').get(representativeId) as Test;
     });
-    return { ok: true, data: { ...saved, assignment_ids: savedIds } };
+    if (!saved.ok) return saved;
+    return { ok: true, data: { ...saved.data, assignment_ids: savedIds } };
   }
 
   const saveTest = writeCommand(db, 'saveTest', 'admin', (w, input: { id?: string; data: TestInput }): IpcResult<Test> => {
@@ -192,11 +212,12 @@ export function createCatalogConfigHandlers(db: Db) {
     const result = validateTest(input.data, knownInstrumentIds,
       existingTests.map(row => row.name), existingTests.map(row => row.tea_ref_key).filter(Boolean));
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const { name, unit, decimalPlaces, tea, section, teaSource, teaRefKey, method, reagent, cusumOn, cusumK, cusumH, active } = result.data;
+    const { name, unit, decimalPlaces, tea, section, teaSource, teaRefKey, operationalTeaSource, method, reagent, cusumOn, cusumK, cusumH, active } = result.data;
     if (id) {
-      const existing = db.prepare('SELECT id, instrument_id, active FROM tests WHERE id=?').get(id) as
-        { id: string; instrument_id: string; active: number } | undefined;
+      const existing = db.prepare('SELECT id, instrument_id, active, operational_tea_source FROM tests WHERE id=?').get(id) as
+        { id: string; instrument_id: string; active: number; operational_tea_source: string } | undefined;
       if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm cần cập nhật.' } };
+      const source = input.data.operationalTeaSource == null ? existing.operational_tea_source : operationalTeaSource;
       let removedPanelMemberships = 0;
       // Ngừng dùng hoặc đổi máy đưa xét nghiệm ra khỏi vận hành: giữ lần chạy
       // bị loại chưa lập hồ sơ NCE (R03). Sửa thông tin khác không cần đọc hàng chờ.
@@ -204,18 +225,19 @@ export function createCatalogConfigHandlers(db: Db) {
       const pendingBefore = leavesOperation ? unrecordedRejectedRuns(db) : new Map();
       try {
         w.commit((tx) => {
+          const preserved = preserveSigmaTeaHistory(db, id);
           db.prepare(`UPDATE tests SET name=?,instrument_id=?,unit=?,decimal_places=?,tea=?,section=?,
-            tea_source=?,tea_ref_key=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
+            tea_source=?,tea_ref_key=?,operational_tea_source=?,method=?,reagent=?,cusum_on=?,cusum_k=?,cusum_h=?,active=? WHERE id=?`)
             .run(name, result.data.instrumentId, unit, decimalPlaces, tea, section,
-              teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0, id);
+              source || teaSource, teaRefKey, source, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0, id);
           if (existing.instrument_id !== result.data.instrumentId) {
             removedPanelMemberships = Number(db.prepare(`DELETE FROM qc_panel_tests
               WHERE test_id=? AND panel_id IN (SELECT id FROM qc_panels WHERE instrument_id!=?)`)
               .run(id, result.data.instrumentId).changes);
           }
           assertNoLostRejectedRuns(db, pendingBefore, active ? 'Đổi máy của xét nghiệm này' : 'Ngừng sử dụng xét nghiệm này');
-          tx.audit('Sửa xét nghiệm', `Cập nhật xét nghiệm "${name}"`, name);
-          tx.changed(removedPanelMemberships ? ['tests', 'qc_panels', 'qc_panel_tests'] : ['tests'], [id]);
+          tx.audit('Sửa xét nghiệm', `Cập nhật xét nghiệm "${name}"${source !== existing.operational_tea_source ? `; nguồn TEa vận hành: ${existing.operational_tea_source || 'tự động'} → ${source || 'tự động'}` : ''}${preserved ? `; giữ TEa của ${preserved} kỳ cũ` : ''}`, name);
+          tx.changed(['tests', ...(removedPanelMemberships ? ['qc_panels', 'qc_panel_tests'] : []), ...(preserved ? ['sigma_data'] : [])], [id]);
         });
       } catch (e) {
         return { ok: false, error: { code: e instanceof LostRejectedRunsError ? e.code : 'save-failed', message: e instanceof Error ? e.message : 'Cập nhật xét nghiệm thất bại.' } };
@@ -225,9 +247,9 @@ export function createCatalogConfigHandlers(db: Db) {
     const newId = cleanId(uid());
     try {
       w.commit((tx) => {
-        db.prepare(`INSERT INTO tests(id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,method,reagent,cusum_on,cusum_k,cusum_h,active)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-          .run(newId, name, result.data.instrumentId, unit, decimalPlaces, tea, section, teaSource, teaRefKey, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0);
+        db.prepare(`INSERT INTO tests(id,name,instrument_id,unit,decimal_places,tea,section,tea_source,tea_ref_key,operational_tea_source,method,reagent,cusum_on,cusum_k,cusum_h,active)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(newId, name, result.data.instrumentId, unit, decimalPlaces, tea, section, teaSource, teaRefKey, operationalTeaSource, method, reagent, cusumOn ? 1 : 0, cusumK, cusumH, active ? 1 : 0);
         db.prepare('INSERT INTO test_levels(id,test_id,level) VALUES (?,?,1)').run(`${newId}:1`, newId);
         tx.audit('Thêm xét nghiệm', `Tạo xét nghiệm "${name}"`, name);
         tx.changed(['tests'], [newId]);

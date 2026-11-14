@@ -1,5 +1,92 @@
 # Rà soát chuyên sâu Six Sigma & Sai số — lần 2 — 22/09/2026
 
+## Điều chỉnh biểu mẫu 12/11/2026 — tách TEa chung và TEa theo mức
+
+Theo yêu cầu người dùng, chế độ theo mức bỏ ô TEa chung cho các mức còn
+lại. Lưu theo mức gửi `labValue` rỗng và các mức đã chọn; không tiếp tục
+dùng một giá trị chung bị ẩn. Chuyển chế độ trong bản nháp vẫn giữ số đang
+gõ. Không đổi công thức, hợp đồng API hoặc tự di chuyển dữ liệu hồ sơ cũ;
+hồ sơ chỉ cập nhật theo lựa chọn khi người dùng bấm lưu.
+
+## Khôi phục luồng 11/11/2026 — tự tính theo TEa vận hành đang chọn
+
+Người dùng xác nhận nghiệp vụ cũ: đổi nguồn TEa thì toàn bộ kết quả trên
+màn Sigma phải tự tính lại. Không thêm nút tính lại hoặc nhập Sigma trực
+tiếp. Màn hình yêu cầu `listSigmaPeriods(testId, 'operational')`: main giải
+TEa theo nguồn hiện hành tại Mean của từng kỳ, rồi tính Sigma, MU và thiết
+kế QC từ CV/Bias đang có. Tình trạng, bảng, biểu đồ và báo cáo dùng chung
+danh sách kết quả này; nguồn thiếu thì hiện thiếu, không lấy số cũ thay.
+
+Đường đọc mặc định `stored` và dữ liệu `sigma_data` vẫn giữ bản đã lưu để
+truy vết. Kết quả hiện hành mang `savedTea` và `teaSnapshot` gốc; lưu CV/Bias
+không chép nguồn/tỷ lệ TEa đang tính lên snapshot. Hồi quy dùng trường hợp
+Ricos 0,73% (Sigma 0,39 và 1,87) đổi CLIA tại Mean 140/200 (1,54 và 5,21),
+cả SQLite thật và Electron, cùng ca sửa CV sau khi đổi nguồn.
+
+Kiểm tra bổ sung luồng danh mục → Sigma: lưu qua handler danh mục khi Sigma
+đang mở phải tự nhận thông báo đổi và tính lại; sửa trực tiếp trên form rồi
+quay lại cũng cập nhật nguồn, tiêu chí, Tình trạng, bảng, xu hướng và MDC.
+Các ca Ricos → CLIA → PXN thiếu → CLIA giữ nguyên CV/Bias và bản kỳ gốc.
+
+## Hiển thị bổ sung 11/11/2026 — TEa% và Mean quy đổi tại từng mức
+
+Phần thiết lập giữ tiêu chí CLIA gốc. Dưới từng mức hiển thị TEa% quy đổi
+và Mean kèm đơn vị thực dùng. Metadata `teaConversion` lấy từ chính căn cứ
+đã cung cấp TEa cho bộ tính; không giải lại hoặc thay số TEa/Sigma để hiển
+thị. Snapshot mới chụp Mean trong `teaBasis`; snapshot cũ thiếu Mean ghi
+"Chưa lưu Mean", không suy từ Mean hiện hành. Hồi quy kiểm Mean đi qua
+nguồn dự phòng, Mean lịch sử và giá trị hiển thị trên giao diện Electron.
+
+## Khắc phục tiếp 11/11/2026 — không khóa trạng thái thiếu TEa
+
+Người dùng báo nguồn CLIA đã có tiêu chí nhưng kỳ vẫn hiện Thiếu TEa.
+Nguyên nhân là lần đồng bộ trước đã ghi `teaLocked: true` cả cho `tea: null`.
+Chốt lại: chỉ bảo vệ snapshot số đã lưu; mức chưa có TEa được giải khi có
+nguồn hợp lệ và đủ nồng độ. Cờ khóa null từ bản trước được bỏ qua khi đọc,
+không yêu cầu xoá kỳ hoặc sửa trực tiếp dữ liệu của người dùng. Các lần đổi
+cấu hình tiếp theo không khóa null nữa. Quy tắc này thay thế phần giữ null
+trong quyết định ngay bên dưới; snapshot số và căn cứ đã chụp giữ nguyên.
+
+## Quyết định tiếp theo 11/11/2026 — đồng bộ nguồn vận hành hai chiều
+
+Người dùng chốt cả Sigma và danh mục đều là **Nguồn TEa vận hành**, không
+còn lựa chọn so sánh riêng. Hai đường lưu ghi cùng nguồn cho đúng cặp xét
+nghiệm–máy; dùng tên nguồn vốn có của Sigma, TEa PXN đứng đầu. EFLM vẫn
+được hỗ trợ và giữ riêng số TEa, ngày tra cứu, mức APS, tài liệu gốc.
+Nguồn đã chọn thiếu dữ liệu hiện "Chưa có", không mượn nguồn khác.
+
+Không sửa snapshot số của kỳ Sigma đã lưu. Trước khi đổi cấu hình, kỳ cũ
+chưa chụp giá trị được giữ đúng TEa đang hiển thị và căn cứ nguồn thực sự
+đã giải; nếu đang thiếu thì giữ `null`. Trạng thái này lưu trong `lv_json`
+(`teaLocked`) cùng transaction, audit và notify của thao tác cấu hình, nên
+lỗi nhật ký hoàn nguyên cả cấu hình lẫn lịch sử. Sửa CV/Bias/MU tiếp theo
+không tự lấy nguồn mới để lấp TEa cũ còn thiếu. Quyết định này thay thế cơ
+chế tự bù nguồn mới cho các kỳ cũ khi đổi cấu hình vận hành.
+
+Hồi quy: `operational-tea.test.mjs` kiểm đồng bộ hai chiều, cô lập máy,
+EFLM, snapshot đủ/thiếu và rollback; `assay-tea-source.e2e.mjs` kiểm tên
+nguồn dùng chung, đổi từ hai giao diện và kỳ lịch sử giữ nguyên.
+
+## Cập nhật 11/11/2026 — chọn nguồn TEa vận hành tại danh mục
+
+Theo yêu cầu người dùng, form Thêm/Sửa xét nghiệm có hai ô Nguồn TEa và
+Tiêu chí CLIA/TEa% tham chiếu; hỗ trợ CLIA, Ricos và TEa chuẩn hóa của PXN.
+Lựa chọn lưu riêng ở `tests.operational_tea_source` (schema 12), tránh nhầm
+với nguồn so sánh ở Sigma hoặc TEa đã chép từ gợi ý trong dữ liệu cũ.
+
+Nguồn vận hành được chọn rõ thắng thứ tự tự động; thiếu giá trị thì báo
+thiếu, không đổi sang nguồn khác. Trường rỗng của dữ liệu cũ giữ nguyên
+thứ tự PXN theo mức → PXN chung → nguồn Sigma đã khai → thiếu. Không đổi
+công thức CLIA hoặc dữ liệu catalog; tiêu chí tuyệt đối vẫn giải tại Mean
+của đúng mức QC/giá trị ấn định của mẫu ngoại kiểm. Sigma mở theo nguồn
+vận hành nhưng các kỳ đã chốt vẫn giữ snapshot, nguồn khác dùng để so sánh.
+
+Hồi quy: `operational-tea.test.mjs` kiểm nguồn chọn rõ khi đã có TEa PXN,
+thiếu dữ liệu/khác đơn vị, cổng Bias, ngoại kiểm, snapshot Sigma và lưu theo
+nhiều máy; `schema-migrations.test.mjs` kiểm nâng schema 11 không đổi TEa cũ.
+`assay-tea-source.e2e.mjs` kiểm hai cột thẳng hàng, thứ tự trước Hoá chất,
+giá trị khi đổi nguồn, lưu/mở lại và nguồn mặc định khi mở Sigma.
+
 ## Cập nhật khắc phục
 
 Đã sửa **SG13 → SG19**; SG20 sửa một phần; SG21 giữ nguyên có chủ đích. Phần

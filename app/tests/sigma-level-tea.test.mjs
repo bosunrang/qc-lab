@@ -114,12 +114,8 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   assert.equal(m2.tea, 10, 'muc thieu Mean roi ve TEa cap ky');
 }
 
-// Kỳ được tạo lúc nguồn TEa CHƯA giải được (chọn "TEa chuẩn hoá của PXN" mà
-// chưa có hồ sơ) chốt `tea = null`. Một snapshot NULL không phải lịch sử cần
-// bảo vệ — nó có nghĩa "chưa bao giờ giải được". Trước 2026-09-11 kỳ đó ghim
-// vĩnh viễn vào nguồn đã chốt, nên sau khi phòng xét nghiệm đổi nguồn sang
-// Ricos thì panel "Thiết lập phân tích" hiện đúng 0,73% mà bảng kỳ vẫn báo
-// "Thiếu TEa" — đúng lỗi người dùng báo.
+// Kỳ chưa có TEa phải nhận được nguồn hợp lệ để tính; null không phải
+// snapshot số cần bảo vệ. Chỉ các con số đã lưu mới giữ nguyên khi đổi nguồn.
 {
   const db = openDatabase(':memory:');
   const config = createConfigHandlers(db);
@@ -141,9 +137,12 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   // Phòng xét nghiệm đổi nguồn sang Ricos (Sodium: 0,73%).
   sigma.saveTeaConfig({ testId: test.id, source: 'ricos' }, actor);
   const after = sigma.listPeriods(test.id)[0].levels[0];
-  assert.equal(after.tea, 0.73, 'ky khong co snapshot phai giai lai theo nguon DANG KHAI');
-  assert.ok(after.sigma, 'Sigma phai tinh duoc sau khi da co TEa');
-  assert.equal(round(after.sigma.sigma, 2), round((0.73 - 1.5) / 0.21388015, 2), 'Sigma dung cong thuc (TEa - |Bias|)/CV');
+  assert.equal(after.tea, 0.73, 'kỳ còn thiếu nhận được nguồn vận hành hợp lệ');
+  assert.equal(round(after.sigma.sigma, 2), round((0.73 - 1.5) / 0.21388015, 2));
+  const next = sigma.savePeriod({ testId: test.id, period: '2026-10', teaSource: 'ricos', levels: [{ level: 1, cv: 0.21388015, biasEqa: 1.5 }] }, actor);
+  assert.equal(next.ok, true);
+  assert.equal(next.data.levels[0].tea, 0.73, 'kỳ mới dùng nguồn đã chọn');
+  assert.equal(round(next.data.levels[0].sigma.sigma, 2), round((0.73 - 1.5) / 0.21388015, 2), 'Sigma đúng công thức (TEa - |Bias|)/CV');
 }
 
 // Bậc fallback KHÔNG được kéo lại kỳ đã có snapshot thật — đó mới là lịch sử.

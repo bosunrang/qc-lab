@@ -8,7 +8,7 @@
 //
 // Toàn bộ phép tính đến từ `calculateReagentComparison()` ở main — trang
 // này chỉ trình bày, không tự tính lại thống kê nào.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalog } from '../lib/useCatalog';
 import { useReagentStore } from '../store/reagent-store';
@@ -18,42 +18,18 @@ import { canWrite, isAdmin } from '../lib/permissions';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { LoadNotice } from '../components/LoadNotice';
-import { StatCard } from '../components/StatCard';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
 import { RowActionButton } from '../components/RowActionButton';
-import { ReagentChart } from '../components/ReagentChart';
+import { StatsPanel, CriteriaPanel, ReagentCharts } from '../components/ReagentResults';
+import { fmtFixed, MIN_PAIRS } from '../lib/reagent-format';
 import { ReagentToolIcon } from '../components/ReagentToolIcon';
 import { confirmDialog, errorDialog } from '../state/dialog-store';
 import { printHtmlToPdf } from '../lib/export';
-import { DOCUMENT_CSS, documentHeader, escapeHtml, loadPrintIdentity, signatureBlock } from '../lib/print-document';
-import { vnDate } from '../lib/format';
+import { loadPrintIdentity } from '../lib/print-document';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { TEA_CATALOG } from '../../main/domain/tea-catalog';
-import type { ReagentComparisonResult, ReagentComparisonView, TeaRef } from '../../shared/qc-api';
-
-// Trang này dùng ĐÚNG HAI formatter khác nhau:
-//   • phần THỐNG KÊ/tiêu chí (`fmt`) bỏ số 0 dư: "R² = 1", "6%",
-//     "139.2 / 140.592";
-//   • cột tính sẵn của hàng cặp mẫu (`fmtFixed`) giữ nguyên số 0:
-//     "130.650", "-1.300".
-// Trộn 2 chỗ này là lệch hàng loạt dòng chữ, nên giữ riêng.
-const fmt = (value: unknown, decimals = 2): string => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '—';
-  return String(Number(n.toFixed(decimals)));
-};
-const fmtFixed = (value: unknown, decimals = 3): string => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(decimals) : '–';
-};
-
-const fmtT = (value: unknown): string => {
-  const n = Number(value);
-  return Number.isFinite(n) ? Number(n.toFixed(4)).toString() : (n > 0 ? '+∞' : '−∞');
-};
-const equation = (slope: number, intercept: number) =>
-  `y = ${fmt(slope, 4)}x ${intercept >= 0 ? '+' : '−'} ${fmt(Math.abs(intercept), 4)}`;
+import type { IpcResult, ReagentComparisonView, TeaRef } from '../../shared/qc-api';
 
 /** Nhãn 1 phép so sánh trong ô chọn, dạng "<hoá chất> — <lô
  * cũ>→<lô mới>". */
@@ -62,144 +38,6 @@ function comparisonLabel(row: ReagentComparisonView): string {
   return lots ? `${row.reagent} — ${lots}` : row.reagent;
 }
 
-const MIN_PAIRS = 5;
-
-
-function verdictOf(result: ReagentComparisonResult): { cls: string; icon: string; title: string; desc: string } {
-  const calibrationWarning = !result.passR2 || !result.passSlope;
-  if (result.level === 'ok') {
-    return {
-      cls: 'ok', icon: '✓', title: 'Kết luận: Đạt tiêu chí sàng lọc phần mềm',
-      desc: 'Độ chệch trong giới hạn, đủ cỡ mẫu (n≥20) và đã xác nhận bao phủ khoảng đo/điểm quyết định. Lô mới đủ điều kiện trình phê duyệt theo SOP trước khi đưa vào sử dụng cho mẫu bệnh nhân.'
-        + (calibrationWarning || !result.passP ? ' Lưu ý: một số chỉ số mô tả (P-value/R²/độ dốc) chưa lý tưởng, cần ghi nhận khi phê duyệt.' : ''),
-    };
-  }
-  if (result.level === 'mid') {
-    return {
-      cls: 'mid', icon: '!', title: 'Kết luận: Chưa đủ điều kiện sàng lọc',
-      desc: 'Độ chệch (%Bias) nằm trong giới hạn cho phép, song chưa đủ cỡ mẫu (n≥20) và/hoặc chưa xác nhận bao phủ khoảng đo/điểm quyết định theo SOP.'
-        + (calibrationWarning ? ' Ngoài ra hệ số tương quan và/hoặc độ dốc hồi quy chưa đạt, nên kiểm tra hiệu chuẩn.' : '')
-        + ' Bổ sung dữ liệu hoặc ghi nhận ngoại lệ theo SOP trước khi phê duyệt.',
-    };
-  }
-  return {
-    cls: 'no', icon: '✕', title: 'Kết luận: Hai lô hoá chất có khác biệt',
-    desc: 'Độ chệch (%Bias) vượt giới hạn cho phép. Không đưa lô mới vào sử dụng cho mẫu bệnh nhân; tiến hành điều tra, xử lý theo quy trình.',
-  };
-}
-
-function StatRow({ label, value }: { label: string; value: unknown }) {
-  return <div className="rc-stat-row"><span>{label}</span><b>{String(value)}</b></div>;
-}
-
-function StatsPanel({ result }: { result: ReagentComparisonResult | null }) {
-  return (
-    <div className="panel rc-stats-panel">
-      <h2 className="panel-title">Kết quả thống kê</h2>
-      {!result ? (
-        <EmptyState>
-          Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để xem thống kê mô tả; khuyến nghị ≥20 cặp cho sàng lọc phần mềm.
-        </EmptyState>
-      ) : (
-        <div className="rc-stats-content">
-          <div className="rc-stat-kpis">
-            <StatCard label="Hệ số tương quan (Pearson r)" value={fmt(result.r, 4)} sub={<>R² = {fmt(result.fit.r2, 4)}</>} tone="accent" />
-            <StatCard label="%Bias" value={<>{fmt(result.bias, 3)}%</>} sub={<>Mong muốn &lt; {fmt(result.biasT, 3)}%</>} tone={result.passBias ? 'accent' : 'danger'} />
-            <StatCard label="P (hai phía / two-tail)" value={fmt(result.p2, 4)} sub={<>α = {fmt(result.alpha, 4)}</>} tone="accent" />
-          </div>
-          <div className="rc-stat-section">
-            <h4>Kiểm định t bắt cặp (t-Test: Paired Two Sample for Means)</h4>
-            <div className="rc-stat-columns">
-              <div>
-                <StatRow label="Trung bình (Mean) – Lô cũ / Lô mới" value={`${fmt(result.mO, 3)} / ${fmt(result.mN, 3)}`} />
-                <StatRow label="Phương sai (Variance) – cũ / mới" value={`${fmt(result.vO, 3)} / ${fmt(result.vN, 3)}`} />
-                <StatRow label="Số quan sát (Observations), n" value={result.N} />
-                <StatRow label="Tương quan Pearson (Pearson Correlation)" value={fmt(result.r, 5)} />
-                <StatRow label="Chênh lệch TB giả định (Hypothesized Mean Diff.)" value="0" />
-              </div>
-              <div>
-                <StatRow label="Bậc tự do (df)" value={result.df} />
-                <StatRow label="Giá trị t (t Stat)" value={fmtT(result.tStat)} />
-                <StatRow label="P(T≤t) một phía (one-tail)" value={fmt(result.p1, 5)} />
-                <StatRow label="t tới hạn một phía (t Critical one-tail)" value={fmt(result.tc1, 4)} />
-                <StatRow label="P(T≤t) hai phía (two-tail)" value={fmt(result.p2, 4)} />
-                <StatRow label="t tới hạn hai phía (t Critical two-tail)" value={fmt(result.tc2, 4)} />
-              </div>
-            </div>
-          </div>
-          <div className="rc-stat-section">
-            <h4>Hồi quy &amp; độ chệch (Regression &amp; bias)</h4>
-            <div className="rc-stat-columns">
-              <div>
-                <StatRow label="Hồi quy tuyến tính (OLS)" value={equation(result.fit.b, result.fit.a)} />
-                <StatRow label="R² (OLS)" value={fmt(result.fit.r2, 5)} />
-              </div>
-              <div>
-                <StatRow label="Passing-Bablok" value={equation(result.pb.b, result.pb.a)} />
-                <StatRow label="Chênh lệch tương đối TB theo cặp (Mean abs. rel. diff.)" value={`${fmt(result.mard, 3)}%`} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
-  if (!result) return (
-    <div className="panel rc-crit-panel">
-      <h2 className="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2>
-      <EmptyState title="Chưa đủ dữ liệu để kết luận">
-        Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để xem các tiêu chí; cần ≥20 cặp, xác nhận bao phủ khoảng đo/điểm quyết định và %Bias trong giới hạn SOP để đạt sàng lọc phần mềm.
-      </EmptyState>
-    </div>
-  );
-  // 6 tiêu chí theo thứ tự cố định. `decision` = tiêu chí QUYẾT
-  // ĐỊNH (ĐẠT/KHÔNG ĐẠT), còn lại chỉ mô tả (TỐT/LƯU Ý).
-  const criteria: [boolean, boolean, string, string][] = [
-    [result.passBias, true, 'Độ chệch trong giới hạn cho phép (tiêu chí quyết định)',
-      `%Bias = ${fmt(result.bias, 3)}% ${result.passBias ? '<' : '≥'} ${fmt(result.biasT, 3)}% mong muốn`],
-    [result.enoughN, true, 'Đủ cỡ mẫu sàng lọc (tiêu chí quyết định)',
-      `n = ${result.N} ${result.enoughN ? '≥' : '<'} 20 cặp hợp lệ`],
-    [result.coverage, true, 'Bao phủ khoảng đo / điểm quyết định (tiêu chí quyết định)',
-      result.coverage ? 'Đã xác nhận theo SOP' : 'Chưa xác nhận theo SOP'],
-    [result.passP, false, 'Không khác biệt có ý nghĩa thống kê (mô tả)',
-      `P(two-tail) = ${fmt(result.p2, 4)} ${result.passP ? '>' : '≤'} α = ${fmt(result.alpha, 4)}; không dùng riêng để chấp nhận lô`],
-    [result.passR2, false, 'Tương quan chặt chẽ (mô tả)',
-      `R² = ${fmt(result.fit.r2, 4)}; cần ≥ 0,95 để xem là tương quan chặt`],
-    [result.passSlope, false, 'Độ dốc hồi quy chấp nhận được (mô tả)',
-      `Slope = ${fmt(result.fit.b, 4)}; mục tiêu trong khoảng [0,90 - 1,10]`],
-  ];
-  const verdict = verdictOf(result);
-  return (
-    <div className="panel rc-crit-panel">
-      <h2 className="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2>
-      <div className="rc-criteria-content">
-        {criteria.map(([ok, decision, title, why]) => {
-          // Tiêu chí quyết định: đạt/không đạt; tiêu chí tham khảo: tốt/lưu ý.
-          const tone = decision ? (ok ? 'ok' : 'rej') : (ok ? 'ok' : 'warn');
-          const text = decision ? (ok ? 'ĐẠT' : 'KHÔNG ĐẠT') : (ok ? 'TỐT' : 'LƯU Ý');
-          return (
-            <div className="rc-crit-item" key={title}>
-              <span className={`tag rc-crit-status ${tone}`}>{text}</span>
-              <div className="rc-crit-text">{title}<div>{why}</div></div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="rc-verdict-wrap">
-        <div className={`rc-verdict ${verdict.cls}`}>
-          <div className="rc-verdict-icon">{verdict.icon}</div>
-          <div>
-            <div className="rc-verdict-title">{verdict.title}</div>
-            <div className="rc-verdict-desc">{verdict.desc}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
 function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampleType'; onPick: (value: string) => void; onClose: () => void }) {
@@ -239,31 +77,6 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Thêm ${label} mới`} aria-label={`Thêm ${label} mới`}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
         <button type="button" className="btn teal sm" onClick={add}>Thêm</button>
-      </div>
-    </Modal>
-  );
-}
-
-function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, onClose }: {
-  comparisons: ReagentComparisonView[]; currentId: string; canDelete: boolean;
-  onSelect: (id: string) => void; onRemove: (id: string) => void; onClose: () => void;
-}) {
-  const [query, setQuery] = useState('');
-  const needle = query.trim().toLowerCase();
-  const rows = comparisons.filter((c) => !needle || comparisonLabel(c).toLowerCase().includes(needle));
-  return (
-    <Modal title="Chọn phép so sánh" onClose={onClose} guardUnsaved={false} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." aria-label="Tìm phép so sánh" autoFocus />
-      <div className="flow-control rc-picker-list">
-        {rows.length ? rows.map((comparison) => (
-          <div className={`mrow ${comparison.id === currentId ? 'on' : ''}`} key={comparison.id}>
-            <span><b>{comparisonLabel(comparison)}</b><div className="hint flow-tight">{comparison.unit || 'Chưa có đơn vị'} {comparison.rows.length ? `· ${comparison.rows.length} dòng` : ''}</div></span>
-            <span className="acts">
-              <button className={`btn ${comparison.id === currentId ? 'teal' : 'ghost'} sm`} onClick={() => onSelect(comparison.id)}>{comparison.id === currentId ? 'Đang chọn' : 'Chọn'}</button>
-              {canDelete && comparisons.length > 1 && <RowActionButton kind="delete" label={`Xoá ${comparison.reagent}`} onClick={() => onRemove(comparison.id)} />}
-            </span>
-          </div>
-        )) : <EmptyState size="compact">Không có phép so sánh phù hợp.</EmptyState>}
       </div>
     </Modal>
   );
@@ -316,8 +129,21 @@ export function ReagentPage() {
   const writable = canWrite(role);
   const admin = isAdmin(role);
   const [currentId, setCurrentId] = useState('');
-  const [picking, setPicking] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const pendingWrites = useRef(new Set<Promise<IpcResult<ReagentComparisonView>>>());
+
+  function trackWrite(write: Promise<IpcResult<ReagentComparisonView>>) {
+    const pending = write.then((saved) => {
+      pendingWrites.current.delete(pending);
+      return saved;
+    }, (error) => {
+      pendingWrites.current.delete(pending);
+      throw error;
+    });
+    pendingWrites.current.add(pending);
+    return pending;
+  }
   const [quickType, setQuickType] = useState<'operator' | 'sampleType' | null>(null);
   const [rowsDraft, setRowsDraft] = useState<[string, string][]>([]);
 
@@ -364,7 +190,7 @@ export function ReagentPage() {
 
   const result = current.result;
   const meta = async (data: Record<string, unknown>) => {
-    const saved = await store.saveMetadata(current.id, data);
+    const saved = await trackWrite(store.saveMetadata(current.id, data));
     if (!saved.ok) await errorDialog(saved.error.message, { title: 'Chưa lưu được thông tin' });
   };
   const wp = { disabled: !writable };
@@ -376,21 +202,13 @@ export function ReagentPage() {
       return next;
     });
   }
-  const commitRows = (rows: [string, string][]) => { setRowsDraft(rows); store.saveRows(current.id, rows); };
+  const commitRows = (rows: [string, string][]) => { setRowsDraft(rows); trackWrite(store.saveRows(current.id, rows)); };
 
   async function removeCurrent() {
     if (!(await confirmDialog(`Xoá phép so sánh "${current.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xoá phép so sánh', danger: true, confirmLabel: 'Xoá' }))) return;
     const r = await store.remove(current.id);
     if (!r.ok) await errorDialog(r.error.message);
     else setCurrentId('');
-  }
-
-  async function removeFromPicker(id: string) {
-    const comparison = store.comparisons.find((item) => item.id === id);
-    if (!comparison || !(await confirmDialog(`Xoá phép so sánh "${comparison.reagent}"? Dữ liệu đã nhập sẽ mất.`, { title: 'Xoá phép so sánh', danger: true, confirmLabel: 'Xoá' }))) return;
-    const removed = await store.remove(id);
-    if (!removed.ok) await errorDialog(removed.error.message);
-    else if (id === current.id) setCurrentId('');
   }
 
   async function createFromTea(name: string, unit: string): Promise<boolean> {
@@ -404,27 +222,26 @@ export function ReagentPage() {
     return true;
   }
 
-  /** In 1 phép so sánh hoặc báo cáo tổng hợp — dùng chung cơ chế
-   * `printHtmlToPdf` của main. */
-  async function printComparison(summary: boolean) {
-    const rows = summary ? store.comparisons : [current];
-    const body = rows.map((c) => {
-      const r = c.result;
-      // Tên hoá chất và số lô là chữ người dùng gõ: phải escape trước khi ghép HTML.
-      return `<tr><td>${escapeHtml(c.reagent)}</td><td>${escapeHtml([c.lot_old, c.lot_new].filter(Boolean).join(' → '))}</td><td>${c.date ? vnDate(c.date) : ''}</td>`
-        + `<td>${r ? r.N : '—'}</td><td>${r ? fmt(r.bias, 3) + '%' : '—'}</td><td>${r ? fmt(r.r, 4) : '—'}</td>`
-        + `<td>${escapeHtml(r ? verdictOf(r).title.replace('Kết luận: ', '') : 'Chưa đủ dữ liệu')}</td></tr>`;
-    }).join('');
-    const title = summary ? 'So sánh hoá chất — báo cáo tổng hợp' : `So sánh hoá chất — ${current.reagent}`;
-    const identity = await loadPrintIdentity('reagent');
-    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
-      <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#183843;margin:0}
-      table{border-collapse:collapse;width:100%}th,td{border:1px solid #c9d9d6;padding:4px 6px;text-align:left}
-      thead{display:table-header-group}tr{break-inside:avoid}th{background:#e9f1f2;print-color-adjust:exact;-webkit-print-color-adjust:exact}${DOCUMENT_CSS}</style></head>
-      <body>${documentHeader(identity, 'So sánh hoá chất', summary ? 'Báo cáo tổng hợp' : current.reagent, [])}<table><thead><tr><th>Hoá chất</th><th>Lô cũ → mới</th><th>Ngày</th><th>n</th><th>%Bias</th><th>r</th><th>Kết luận</th></tr></thead>
-      <tbody>${body}</tbody></table>${signatureBlock()}</body></html>`;
-    const error = await printHtmlToPdf(html, summary ? 'so-sanh-hoa-chat-tong-hop.pdf' : `so-sanh-${current.reagent}.pdf`, { pageNumbers: true });
-    if (error) await errorDialog(error);
+  /** Chờ các ô vừa rời focus lưu xong rồi lấy lại đúng phép so sánh đang chọn. */
+  async function printComparison() {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      const writes = await Promise.all([...pendingWrites.current]);
+      if (writes.some((saved) => !saved.ok)) throw new Error('Chưa lưu được dữ liệu. Vui lòng kiểm tra lại trước khi in PDF.');
+      const comparisons = await window.qcApi.listReagentComparisons();
+      const selected = comparisons.find((item) => item.id === current.id);
+      if (!selected) throw new Error('Phép so sánh đang chọn không còn tồn tại. Vui lòng tải lại trang.');
+      const identity = await loadPrintIdentity('reagent');
+      const { buildReagentReport } = await import('../lib/reagent-report');
+      const html = buildReagentReport(selected, identity);
+      const error = await printHtmlToPdf(html, 'so-sanh-' + selected.reagent + '.pdf', { pageNumbers: true });
+      if (error) await errorDialog(error);
+    } catch (error) {
+      await errorDialog(error instanceof Error ? error.message : String(error), { title: 'Chưa xuất được PDF' });
+    } finally {
+      setPrinting(false);
+    }
   }
 
   return (
@@ -440,17 +257,11 @@ export function ReagentPage() {
               {store.comparisons.map((c) => <option key={c.id} value={c.id}>{comparisonLabel(c)}</option>)}
             </select>
           </div>
-          {writable && (
-            <div className="rc-toolbar-primary"><div>
-              <button className="btn teal rc-add-btn" onClick={() => setCreating(true)}>+ Thêm</button>
-              {admin && <button className="btn danger rc-delete-btn" onClick={removeCurrent} disabled={store.comparisons.length <= 1} title={store.comparisons.length <= 1 ? 'Cần giữ lại ít nhất một phép so sánh' : undefined}><ReagentToolIcon type="trash" /> Xoá</button>}
-            </div></div>
-          )}
-          <div className="rc-toolbar-secondary">
-            {writable && <button className="btn ghost rc-find-btn" onClick={() => setPicking(true)}><ReagentToolIcon type="search" /> Tìm</button>}
-            <button className="btn teal rc-report-btn" onClick={() => printComparison(false)}><ReagentToolIcon type="print" /> In hoá chất này</button>
-            <button className="btn teal rc-report-main" onClick={() => printComparison(true)}><ReagentToolIcon type="report" /> Báo cáo tổng hợp</button>
-          </div>
+          <div className="rc-toolbar-primary"><div>
+            {writable && <button className="btn teal rc-add-btn" onClick={() => setCreating(true)}>+ Thêm</button>}
+            {admin && <button className="btn danger rc-delete-btn" onClick={removeCurrent} disabled={store.comparisons.length <= 1} title={store.comparisons.length <= 1 ? 'Cần giữ lại ít nhất một phép so sánh' : undefined}><ReagentToolIcon type="trash" /> Xoá</button>}
+            <button className="btn teal rc-report-btn" onClick={printComparison} disabled={printing}><ReagentToolIcon type="print" /> {printing ? 'Đang xuất…' : 'In PDF'}</button>
+          </div></div>
         </div>
       </div>
 
@@ -513,8 +324,8 @@ export function ReagentPage() {
               return (
                 <div className="rc-pair-row" data-rc-row={i} key={`${rowsDraft.length}-${i}`}>
                   <div className="rc-idx">{i + 1}</div>
-                  <input {...wp} type="number" step="any" placeholder="–" aria-label={`Mẫu ${i + 1} – lô cũ`} value={row[0]} onChange={(e) => updateCell(i, 0, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
-                  <input {...wp} type="number" step="any" placeholder="–" aria-label={`Mẫu ${i + 1} – lô mới`} value={row[1]} onChange={(e) => updateCell(i, 1, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
+                  <input {...wp} type="number" step="any" placeholder="–" aria-label={`Mẫu ${i + 1} – lô cũ`} value={row[0]} onChange={(e) => updateCell(i, 0, e.target.value)} onBlur={() => trackWrite(store.saveRows(current.id, rowsDraft))} />
+                  <input {...wp} type="number" step="any" placeholder="–" aria-label={`Mẫu ${i + 1} – lô mới`} value={row[1]} onChange={(e) => updateCell(i, 1, e.target.value)} onBlur={() => trackWrite(store.saveRows(current.id, rowsDraft))} />
                   <div className="rc-calc">{both ? fmtFixed((o + nv) / 2) : '–'}</div>
                   <div className={`rc-calc dif${dif != null && dif < 0 ? ' neg' : ''}`}>{dif != null ? fmtFixed(dif) : '–'}</div>
                   {writable
@@ -539,38 +350,8 @@ export function ReagentPage() {
       <StatsPanel result={result} />
       <CriteriaPanel result={result} />
 
-      <div className="panel rc-chart-panel">
-        <h2 className="panel-title">Biểu đồ</h2>
-        {!result ? (
-          <EmptyState title="Chưa có biểu đồ">Nhập tối thiểu {MIN_PAIRS} cặp giá trị hợp lệ để vẽ biểu đồ.</EmptyState>
-        ) : (
-          <div className="rc-charts">
-            <div className="rc-chart-box">
-              <h3>Biểu đồ tương quan</h3>
-              <p>Lô cũ (trục X) so với Lô mới (trục Y)</p>
-              <ReagentChart mode="scatter" result={result} lotOld={current.lot_old} lotNew={current.lot_new} />
-              <div className="rc-chart-legend"><span><i className="reg"></i>Đường hồi quy</span><span><i className="ideal"></i>Đường lý tưởng y = x</span><span>Lô cũ ({current.lot_old || '—'})</span><span>Lô mới ({current.lot_new || '—'})</span></div>
-            </div>
-            <div className="rc-chart-box">
-              <h3>Biểu đồ Bland-Altman</h3>
-              <p>Hiệu số (cũ − mới) so với giá trị trung bình</p>
-              <ReagentChart mode="bland" result={result} />
-              <div className="rc-chart-legend"><span><i className="bias"></i>Bias trung bình</span><span><i className="limit"></i>±1.96 SD</span>
-                <span>Trung bình (cũ + mới)/2</span>
-                <span>Bias {fmt(result.md, 3)}</span><span>+1.96SD {fmt(result.loaUpper, 3)}</span><span>−1.96SD {fmt(result.loaLower, 3)}</span></div>
-            </div>
-          </div>
-        )}
-      </div>
+      <ReagentCharts comparison={current} />
 
-      {picking && (
-        <PickerModal
-          comparisons={store.comparisons} currentId={current.id} canDelete={admin}
-          onSelect={(id) => { setCurrentId(id); setPicking(false); }}
-          onRemove={removeFromPicker}
-          onClose={() => setPicking(false)}
-        />
-      )}
       {creating && <CreateComparisonModal onClose={() => setCreating(false)} onCreate={createFromTea} />}
       {quickType && (
         <QuickPickerModal type={quickType} onClose={() => setQuickType(null)}

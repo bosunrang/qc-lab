@@ -3,7 +3,10 @@
 // nguyên nhân. Mỗi phần có chế độ xem và chế độ sửa riêng.
 import { useRef, useState, type ReactNode } from 'react';
 import { DateField } from '../../components/DateField';
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 import { useNceStore } from '../../store/nce-store';
+import { controlValue, findFieldControl, formErrorFrom, pickField, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
 import type { NceDossierView, NceUserOption } from '../../../shared/qc-api';
 import { checklistKeys } from '../../../main/domain/nce/checklist';
 import {
@@ -14,32 +17,64 @@ import { NCE_DRAFT_BLANK } from '../../../main/domain/nce/containment-draft';
 import { useDetectedAtCorrection } from './DetectedAtCorrection';
 import { QcRunDetails } from './DossierTimeline';
 import type { DossierError } from './dossier-session';
-import { dateText, timeText, Facts, Field, OptionSelect, RUN_ROLE_LABEL, ScaleSelect, Section, UserSelect, type DossierWrite, type DossierWriteOptions, type SectionDisclosure } from './shared';
+import { dateText, timeText, Field, OptionSelect, RUN_ROLE_LABEL, ScaleSelect, Section, UserSelect, type DossierWrite, type DossierWriteOptions, type SectionDisclosure } from './shared';
 
 export interface SectionProps { dossier: NceDossierView; users: readonly NceUserOption[]; busy: boolean; pending: boolean; run: (write: DossierWrite, options?: DossierWriteOptions) => Promise<boolean>; onIdentity?: () => void; error?: DossierError | null; disclosure?: SectionDisclosure; headingLevel?: 2 | 3; onSaved?: () => void }
 
 type Patch = Record<string, unknown>;
 
+const IDENTITY_FIELD_ERRORS: FieldErrorMap = {
+  'missing-description': 'idDesc', 'missing-correction': 'idCorr', 'invalid-hold': 'idHold',
+  'invalid-phase': 'idPhase', 'missing-owner': 'idOwner',
+  'invalid-due-date': 'idDue', 'due-before-detected': 'idDue',
+};
+const TIER_FIELD_ERRORS: FieldErrorMap = {
+  'invalid-tier': 'tierSel', 'invalid-risk-scale': ['riskS', 'riskP'], 'invalid-risk-level': 'riskL',
+};
+const CAUSE_FIELD_ERRORS: FieldErrorMap = {
+  'invalid-cause-status': 'causeStatus', 'invalid-cause-category': 'causeCat',
+};
+
 /** Khung xem/sửa dùng chung: nút "Sửa" mở bản nháp, "Lưu" gửi đúng các trường của phần đó. */
-export function useEditor<T extends Patch>(props: SectionProps, initial: () => T) {
+export function useEditor<T extends Patch>(props: SectionProps, initial: () => T, fieldErrors: FieldErrorMap = {}) {
   const update = useNceStore((s) => s.update);
   const [draft, setDraft] = useState<T | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
-  const set = <K extends keyof T>(key: K, value: T[K]) => setDraft((current) => current && { ...current, [key]: value });
+  const [fieldError, setFieldError] = useState<FormError | null>(null);
+  const formRoot = useRef<HTMLDivElement>(null);
+  const errorId = useInvalidField(formRoot, fieldError);
+  const set = <K extends keyof T>(key: K, value: T[K]) => {
+    setFieldError(null);
+    setDraft((current) => current && { ...current, [key]: value });
+  };
   const save = async () => {
     if (!draft) return;
+    setFieldError(null);
     // Trường còn "chưa xác định" (null, ví dụ chưa ghi có giữ kết quả hay
     // không) thì không gửi: main chỉ nhận giá trị đã chọn.
     const patch = Object.fromEntries(Object.entries(draft).filter(([, value]) => value !== null));
     // Phiên bản thuộc BẢN NHÁP, không lấy phiên bản vừa được tự nạp lại:
     // người khác sửa trong lúc mở form thì main phải trả `stale`.
-    if (await props.run((base) => update({ ...base, expectedVersion: draftVersion, patch }))) { setDraft(null); props.onSaved?.(); }
+    if (await props.run((base) => update({ ...base, expectedVersion: draftVersion, patch }), {
+      handleValidationError: (error) => {
+        const root = formRoot.current;
+        if (!root || root.closest('.nce-stage[hidden]')) return false;
+        const mapped = formErrorFrom(error, fieldErrors);
+        const field = pickField(mapped.fields, (name) => {
+          const control = findFieldControl(root, name);
+          return control ? controlValue(control) : null;
+        });
+        if (!field) return false;
+        setFieldError({ message: mapped.message, fields: [field] });
+        return true;
+      },
+    })) { setFieldError(null); setDraft(null); props.onSaved?.(); }
   };
-  const begin = () => { setDraft(initial()); setDraftVersion(props.dossier.record.row_version); };
+  const begin = () => { setFieldError(null); setDraft(initial()); setDraftVersion(props.dossier.record.row_version); };
   const actions = (canEdit: boolean): ReactNode => !canEdit ? null : draft
     ? <>{draftVersion !== props.dossier.record.row_version && <span className="nce-editor-warning">Hồ sơ đã được cập nhật ở nơi khác</span>}<button type="button" className="btn ghost sm" disabled={props.pending} onClick={() => setDraft(null)}>Bỏ qua</button><button type="button" className="btn sm" disabled={props.busy} onClick={() => void save()}>Lưu</button></>
     : <button type="button" className="btn ghost sm" disabled={props.busy} onClick={begin}>Sửa</button>;
-  return { draft, set, actions, begin };
+  return { draft, set, actions, begin, fieldError, formRoot, errorId };
 }
 
 const CHECK_STATUS_LABEL: Record<string, string> = { ok: 'Đạt', abnormal: 'Bất thường', na: 'Không áp dụng' };
@@ -51,7 +86,7 @@ export function IdentitySection(props: SectionProps) {
     description: record.description, correction: record.correction, holdResults: record.hold_results === null ? null : !!record.hold_results,
     containmentNote: record.containment_note, occurredNote: record.occurred_note,
     phase: record.phase, ownerUserId: record.owner_user_id, dueDate: record.due_date,
-  }));
+  }), IDENTITY_FIELD_ERRORS);
   const d = editor.draft;
   const focusContainment = useRef(false);
   const correction = useDetectedAtCorrection(props);
@@ -64,7 +99,8 @@ export function IdentitySection(props: SectionProps) {
   return (
     <Section title="Ghi nhận và xử lý tức thời" actions={editor.actions(can.edit)}>
       {d ? (
-        <div className="nce-form-grid">
+        <div className="nce-form-grid" ref={editor.formRoot}>
+          <FormErrorMessage rootRef={editor.formRoot} error={editor.fieldError} id={editor.errorId} />
           <Field label="Mô tả sự kiện" htmlFor="idDesc" wide><textarea id="idDesc" rows={3} value={d.description} onChange={(e) => editor.set('description', e.target.value)} /></Field>
           <Field label="Xử lý tức thời đã thực hiện" htmlFor="idCorr" wide><textarea id="idCorr" rows={2} value={d.correction} onChange={(e) => editor.set('correction', e.target.value)} /></Field>
           <Field label="Phạm vi kiểm soát và thông báo" htmlFor="idContainment" wide>
@@ -147,7 +183,7 @@ export function TierRiskSection(props: SectionProps) {
   const editor = useEditor(props, () => ({
     tier: record.tier, tierReason: record.tier_reason, riskSeverity: record.risk_severity, riskProbability: record.risk_probability,
     riskLevel: record.risk_level, riskBasis: record.risk_basis,
-  }));
+  }), TIER_FIELD_ERRORS);
   const d = editor.draft;
   return (
     <Section title="Phân tầng và đánh giá nguy cơ" actions={editor.actions(can.edit)} disclosure={props.disclosure} headingLevel={props.headingLevel}>
@@ -156,7 +192,8 @@ export function TierRiskSection(props: SectionProps) {
       )}
       {recurrence && !triggers.some((t) => t.code === 'recurrence') && <div className="alert warn">Có hồ sơ cùng xét nghiệm, cùng loại sai số trong cửa sổ theo dõi tái diễn.</div>}
       {d ? (
-        <div className="nce-capa-form">
+        <div className="nce-capa-form" ref={editor.formRoot}>
+          <FormErrorMessage rootRef={editor.formRoot} error={editor.fieldError} id={editor.errorId} />
           <Field label="Tầng xử lý" htmlFor="tierSel"><OptionSelect id="tierSel" value={d.tier} options={NCE_TIER_LABEL} placeholder="— Chưa phân tầng —" onChange={(v) => editor.set('tier', v as typeof d.tier)} /></Field>
           {d.tier === 'low' && <Field label="Lý do không cần RCA/CAPA" htmlFor="tierReason" wide><textarea id="tierReason" rows={2} value={d.tierReason} onChange={(e) => editor.set('tierReason', e.target.value)} /></Field>}
           <div className="nce-form-grid nce-capa-risk-grid">
@@ -270,13 +307,14 @@ export function InvestigationSection(props: SectionProps) {
   const { record, can } = props.dossier;
   const editor = useEditor(props, () => ({
     causeStatus: record.cause_status, causeCategory: record.cause_category, causeText: record.cause_text, causeCheckPlan: record.cause_check_plan,
-  }));
+  }), CAUSE_FIELD_ERRORS);
   const d = editor.draft;
   return (
     <Section title="Điều tra và nguyên nhân" actions={editor.actions(can.edit)} disclosure={props.disclosure} headingLevel={props.headingLevel}>
       <div className="nce-capa-guidance" role="note"><p>Luật QC chỉ gợi ý kiểu sai số, không chứng minh nguyên nhân. Đối chiếu nhật ký máy, hiệu chuẩn, vật liệu QC và phương pháp; không hiệu chuẩn lại hay đổi Mean chỉ để hết cảnh báo.</p></div>
       {d ? (
-        <div className="nce-form-grid nce-capa-form">
+        <div className="nce-form-grid nce-capa-form" ref={editor.formRoot}>
+          <FormErrorMessage rootRef={editor.formRoot} error={editor.fieldError} id={editor.errorId} />
           <Field label="Kết luận nguyên nhân" htmlFor="causeStatus"><OptionSelect id="causeStatus" value={d.causeStatus} options={NCE_CAUSE_STATUS_LABEL} placeholder="— Chưa kết luận —" onChange={(v) => editor.set('causeStatus', v as typeof d.causeStatus)} /></Field>
           {d.causeStatus !== 'undetermined' && <Field label="Nhóm nguyên nhân" htmlFor="causeCat"><OptionSelect id="causeCat" value={d.causeCategory} options={NCE_CAUSE_CATEGORY_LABEL} placeholder="— Chọn nhóm —" onChange={(v) => editor.set('causeCategory', v)} /></Field>}
           {d.causeStatus !== 'undetermined'

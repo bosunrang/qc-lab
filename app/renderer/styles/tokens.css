@@ -44,6 +44,7 @@
   --gray-600:#536a76;
   --gray-900:#172b35;
   --navy-950:#14242e;
+  --naviva-navy:#1b2247;
 
   --teal-100:#e2f1f0;
   /* Bốn bậc lấp vào khoảng trống giữa teal-100 và teal-500. Giá trị là mã
@@ -224,12 +225,12 @@
   --neutral-text:var(--gray-600);    --neutral-surface:var(--gray-100);
   --neutral-border:var(--gray-200);  --neutral-accent:var(--gray-600);
 
-  /* Sidebar navy đặc để cạnh điều hướng rõ, không bị mờ bởi gradient. */
-  --sidebar-bg:var(--navy-950);
+  /* Nền dự phòng cùng tông ảnh Naviva; chữ/icon đủ sáng trên cả vùng hoạ tiết. */
+  --sidebar-bg:var(--naviva-navy);
   --sidebar-border:var(--dark-line);
   --sidebar-text:var(--dark-text);
   --sidebar-text-muted:var(--dark-text-muted);
-  --sidebar-icon:var(--dark-icon);
+  --sidebar-icon:var(--dark-text-muted);
   --sidebar-active-bg:var(--dark-surface-active);
   --sidebar-active-bar:var(--dark-accent-bar);
   --sidebar-active-ink:var(--white);
@@ -271,7 +272,7 @@
   --filter-text:var(--ink-filter);
   --filter-active-text:var(--ink-filter-active);
   --filter-count-text:var(--ink-filter-count);
-  --sidebar-group-text:var(--dark-text-group);
+  --sidebar-group-text:var(--dark-text-muted);
   --sidebar-link-text:var(--dark-text-link);
 
   /* ═══════════════════════════════════════════════════════════════════
@@ -378,6 +379,7 @@
   --modal-w-md:600px;
   --modal-w-lg:800px;
   --modal-w-xl:1120px;
+  --modal-w-assay:940px;
   /* Khoảng cách nhãn → ô nhập. Là NGUỒN DUY NHẤT: chỉ `margin-bottom` của
      nhãn mang giá trị này; khối `.field` bao quanh không dùng `gap` chen
      giữa. Trước 2026-09-24 có nơi 4px (margin nhãn), nơi 6px (gap khối),

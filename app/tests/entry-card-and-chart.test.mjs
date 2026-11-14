@@ -322,16 +322,18 @@ test('EN13: thẻ biểu đồ là vùng thông tin, không lồng tương tác 
     'canvas có mô tả thay thế cho công cụ hỗ trợ');
 });
 
-test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận Westgard', () => {
+test('EN12: listHistoryPoints trả kết luận Westgard thật và giữ snapshot Mean/SD', () => {
   const { db, test: subject, entry } = twoOperationalLevels();
   const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
   // Điểm vượt +3,5SD phải nhận verdict từ engine Westgard, không từ một ngưỡng
   // z-score hiển thị độc lập.
   ins.run('a0', subject.id, 1, '2026-09-01', '2026-09-01-1', 107, 'A1', 100, 2);
   const [point] = entry.listHistoryPoints(subject.id);
-  assert.equal('verdict' in point, false, 'không còn trường verdict');
-  assert.equal('rules' in point, false, 'không còn trường rules');
-  // Vẫn đủ dữ liệu để tab Lịch sử tự xếp theo dải Z như nó vẫn làm.
+  assert.equal(point.verdict, 'rej');
+  assert.ok(point.rules.includes('1-3s'));
+  assert.equal(point.accepted, false);
+  assert.deepEqual(point.run_rejected_by, [1]);
+  // Vẫn giữ đủ dữ liệu gốc để cột Z không đổi cách hiển thị.
   for (const field of ['id', 'level', 'date', 'run_id', 'lot', 'val', 'qc_mean', 'qc_sd', 'operator_username']) {
     assert.ok(field in point, `thiếu trường ${field}`);
   }

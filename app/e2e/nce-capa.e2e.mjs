@@ -76,6 +76,13 @@ test('NCE CAPA: điều tra, hoàn thành hành động và giữ lịch sử đ
     await cause.getByRole('button', { name: 'Lưu', exact: true }).click();
     await actions.getByRole('button', { name: 'Thêm hành động', exact: true }).click();
     let dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
+    const actionDescription = dialog.locator('#actDesc');
+    const actionError = actionDescription.locator('..').getByRole('alert');
+    await actionError.waitFor();
+    assert.match(await actionError.innerText(), /Mô tả hành động ít nhất 10 ký tự/);
+    assert.equal(await actionDescription.getAttribute('aria-invalid'), 'true');
+    assert.equal(await page.locator('.nce-dossier-error').count(), 0, 'lỗi hành động không tạo thanh lỗi đầu hồ sơ');
     await dialog.locator('#actDesc').fill('Bổ sung kiểm tra chéo và hướng dẫn lại quy trình bàn giao.');
     await dialog.locator('#actOwner').selectOption(created.record.owner_user_id);
     await dialog.locator('#actDue').fill(today);
@@ -93,6 +100,13 @@ test('NCE CAPA: điều tra, hoàn thành hành động và giữ lịch sử đ
     await effectiveness.locator('#effDue').fill(today);
     await effectiveness.getByRole('button', { name: 'Lưu', exact: true }).click();
     await effectiveness.getByRole('button', { name: 'Ghi đánh giá hiệu lực', exact: true }).click();
+    await effectiveness.getByRole('button', { name: 'Ghi đánh giá', exact: true }).click();
+    const resultControl = effectiveness.locator('#revResult');
+    const resultError = resultControl.locator('..').getByRole('alert');
+    await resultError.waitFor();
+    assert.match(await resultError.innerText(), /Chọn kết luận hiệu lực/);
+    assert.equal(await resultControl.getAttribute('aria-invalid'), 'true');
+    assert.equal(await page.locator('.nce-dossier-error').count(), 0, 'lỗi đánh giá hiệu lực nằm tại ô nhập');
     await effectiveness.locator('#revResult').selectOption('extend');
     await effectiveness.locator('#revEvidence').fill('Đã hướng dẫn lại, cần theo dõi thêm dữ liệu bàn giao ở các ca tiếp theo.');
     await effectiveness.getByRole('button', { name: 'Ghi đánh giá', exact: true }).click();

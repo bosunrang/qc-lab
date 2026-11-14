@@ -1,3 +1,4 @@
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Hộp thêm/sửa một đợt trong lịch ngoại kiểm. Kiểm tra dữ liệu do main làm
 // (`domain/eqa/schedule.ts`); form chỉ chỉ ra ô sai theo mã lỗi.
 import { useRef, useState } from 'react';
@@ -10,6 +11,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { useAsyncAction } from '../../components/AsyncButton';
 import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
 import { useInvalidField } from '../../lib/useInvalidField';
+import { reportFormError } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
 import { isoLocalDate } from '../../../main/domain/local-date';
 import { EQA_SAMPLE_TYPES } from '../../../main/domain/eqa/schedule';
@@ -61,7 +63,7 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
       assignee: String(fd.get('assignee') || ''), note: String(fd.get('note') || ''),
     }, row?.id);
     if (!result.ok) {
-      setErr(isNew && result.error.code === 'missing-program' ? formError(result.error.message, 'programName') : formErrorFrom(result.error, FIELD_ERRORS));
+      await reportFormError(isNew && result.error.code === 'missing-program' ? formError(result.error.message, 'programName') : formErrorFrom(result.error, FIELD_ERRORS), setErr);
       return;
     }
     showToast(row ? 'Đã lưu đợt trong lịch.' : 'Đã thêm đợt vào lịch.');
@@ -73,7 +75,7 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
     <Modal busy={saving.busy} title={row ? 'Sửa đợt ngoại kiểm' : 'Thêm đợt ngoại kiểm'} onClose={onClose} size="md"
       footer={<><button type="button" className="btn ghost" onClick={onClose}>Huỷ</button><button className="btn teal" type="submit" form="eqa-schedule-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : row ? 'Lưu thay đổi' : 'Thêm vào lịch'}</button></>}>
       <form id="eqa-schedule-form" ref={formRef} className="eqa-form" onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-        {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
+        <FormErrorMessage rootRef={formRef} error={err} id={errorId} />
         <div className="eqa-form-program">
           <div className="field">
             <label htmlFor="eqa-s-program">Chương trình</label>

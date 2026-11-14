@@ -1,3 +1,4 @@
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Tab "LotsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useRef, useState } from 'react';
@@ -8,7 +9,7 @@ import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
 import { Pagination, pageBounds } from '../../components/Pagination';
-import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
+import { reportFormError, confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
 import { vnDate } from '../../lib/format';
 import { EmptyState, lotStatus } from './shared';
@@ -152,7 +153,7 @@ export function LotsTab() {
       }
     }
     const result = await saveLot(id, data);
-    if (!result.ok) { setLotErr(formErrorFrom(result.error, LOT_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, LOT_FIELD_ERRORS), setLotErr); return; }
     setEditingLot(null);
   }
 
@@ -174,7 +175,7 @@ export function LotsTab() {
     };
     const id = editingGroup !== 'new' && editingGroup ? editingGroup.id : undefined;
     const result = await saveLotGroup(id, data);
-    if (!result.ok) { setGroupErr(formErrorFrom(result.error, LOT_GROUP_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, LOT_GROUP_FIELD_ERRORS), setGroupErr); return; }
     setEditingGroup(null);
   }
 
@@ -246,7 +247,7 @@ export function LotsTab() {
         <Modal busy={savingLot.busy} title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
           footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Huỷ</button><button className="btn teal" type="submit" form="lot-form" disabled={savingLot.busy}>{savingLot.busy ? 'Đang lưu…' : editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
           <form id="lot-form" ref={lotFormRef} onSubmit={(e) => { e.preventDefault(); void savingLot.run(e.currentTarget); }}>
-            {lotErr && <p id={lotErrorId} className="field-error" role="alert">{lotErr.message}</p>}
+            <FormErrorMessage rootRef={lotFormRef} error={lotErr} id={lotErrorId} />
             <div className="grid2">
               <div className="field"><label htmlFor="lot-no">Số lô</label><input id="lot-no" name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
               <div className="field">
@@ -272,7 +273,7 @@ export function LotsTab() {
         <Modal busy={savingGroup.busy} title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
           footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Huỷ</button><button className="btn teal" type="submit" form="lot-group-form" disabled={savingGroup.busy}>{savingGroup.busy ? 'Đang lưu…' : editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
           <form id="lot-group-form" ref={groupFormRef} onSubmit={(e) => { e.preventDefault(); void savingGroup.run(e.currentTarget); }}>
-            {groupErr && <p id={groupErrorId} className="field-error" role="alert">{groupErr.message}</p>}
+            <FormErrorMessage rootRef={groupFormRef} error={groupErr} id={groupErrorId} />
             <label id="lot-group-picker-label" className="lot-group-picker-label">Chọn các lô QC</label>
             <div className="lot-level-picker" role="group" aria-labelledby="lot-group-picker-label">
               {[1, 2, 3, 4, 5, 6].map((level) => {

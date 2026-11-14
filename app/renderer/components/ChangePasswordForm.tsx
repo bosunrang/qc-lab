@@ -1,3 +1,4 @@
+import { FormErrorMessage } from './FormErrorMessage';
 import { useRef, useState } from 'react';
 import { MIN_PASSWORD_LENGTH } from '../../main/domain/auth-validation';
 import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../lib/field-error';
@@ -40,7 +41,7 @@ export function ChangePasswordForm({ onDone, submitLabel = 'Đổi mật khẩu'
       <input id="cpw-new" data-field="newPassword" type="password" autoComplete="new-password" value={newPassword} onChange={edit(setNewPassword)} onKeyDown={enter} /></div>
     <div className="field"><label htmlFor="cpw-confirm">Nhập lại mật khẩu mới</label>
       <input id="cpw-confirm" data-field="confirmPassword" type="password" autoComplete="new-password" value={confirm} onChange={edit(setConfirm)} onKeyDown={enter} /></div>
-    {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
+    <FormErrorMessage rootRef={rootRef} error={err} id={errorId} />
     <div className="change-password-actions"><AsyncButton className="btn teal" onClick={submit}>{submitLabel}</AsyncButton></div>
   </div>;
 }

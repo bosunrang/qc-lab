@@ -174,7 +174,7 @@ export function TargetsTab() {
 
   return (
     <>
-      <div className="rcfg-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, phần mềm tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." /></div></div>
+      <div className="rcfg-toolbar target-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, phần mềm tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." /></div></div>
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.</EmptyState> : <>
       <div className="target-selector target-config-selector">
@@ -189,7 +189,6 @@ export function TargetsTab() {
             {rows.map(({ test, target }) => {
               const decimals = test.decimal_places ?? 2;
               const k = target?.range_k && target.range_k > 0 ? target.range_k : 2;
-              const ready = target?.mean != null && target?.sd != null && target.sd > 0;
               const linkedLot = target ? groupLots.find((lot) => lot.id === target.qc_lot_id) : undefined;
               // Ưu tiên lô đang gắn; nếu chưa gắn thì chọn lô còn dùng đầu
               // tiên của mức. Lô `depleted` bị khoá.

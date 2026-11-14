@@ -1,5 +1,42 @@
 # Rà soát chuyên sâu thẻ Westgard — lần 2 — 22/09/2026
 
+## Cập nhật 11/11/2026 — kết luận QC trong Lịch sử dữ liệu
+
+Theo yêu cầu người dùng, thay cột phân loại khoảng Z bằng Kết luận QC;
+giữ nguyên cột Z và snapshot Mean/SD lúc nhập. `pointEvaluationsOf()` được
+tách nguyên từ nguồn đánh giá báo cáo để dùng chung với lịch sử: giữ đủ chuỗi,
+luật liên mức, cấu hình theo lần chạy, mốc NCE, lô đang chạy/song song/lô cũ
+và nhóm dừng. Không thay công thức hoặc ngưỡng luật Westgard.
+
+Kết luận hiển thị theo cả lần chạy: điểm không tự vi phạm nhưng có
+`run_rejected_by` vẫn hiện Bị loại và nêu mức gây loại khi rê chuột. Điểm
+không có ngữ cảnh đánh giá hiện Chưa đánh giá, không suy Đạt từ Z. Nguồn
+lịch sử tiếp tục chỉ liệt kê điểm chưa huỷ; điểm đã huỷ không vào chuỗi.
+
+Hồi quy: `app/tests/history-qc-conclusion.test.mjs` kiểm chuỗi 4-1s với Z
+trong ±2s, mức đi kèm lần chạy bị loại, cảnh báo/chưa đánh giá, đổi riêng
+một mức, nhóm đã dừng và R4s trên lô song song; đối chiếu kết quả với báo cáo
+và Westgard. `app/e2e/history-pagination.e2e.mjs` kiểm cột Z, kết luận và
+tự cập nhật khi nhập điểm trong lúc mở chi tiết. EN12 được cập nhật từ
+hợp đồng cũ không trả verdict sang hợp đồng mới trả đánh giá thật từ main.
+
+## Cập nhật 10/11/2026 — giữ ngữ cảnh khi đổi lô từng mức
+
+Khắc phục RC02 trong `APP-REVIEW-2026-11-10-RECHECK.md`, không đổi công thức,
+hành động luật hoặc cách xác định mốc cắt. `historicalPointEvaluations()` đọc
+cả nhóm còn vận hành khi đã có lô của xét nghiệm được thay và có điểm lịch
+sử. Kết luận của lần chạy đó được tính với đầy đủ các mức của nhóm cũ.
+
+Biên bản tháng và báo cáo chi tiết áp dụng kết luận này cho cả điểm ở mức đã
+đổi lô lẫn mức còn gán hiện hành; cổng huỷ kiểm cùng ngữ cảnh cho cả hai mức.
+Lần chạy mới không có điểm của lô đã thay vẫn dùng kết luận vận hành hiện tại,
+không ghép lô cũ vào lần chạy mới. Nhóm đang chạy nhưng không có bằng chứng
+đổi lô không tự biến dữ liệu chưa cấu hình thành dữ liệu đã đánh giá.
+
+Hồi quy ở `app/tests/review-2026-11-10.test.mjs`: giữ số liệu/chữ ký của kỳ
+khoá khi chỉ đổi một mức; lần chạy mới vẫn đạt; huỷ từng mức của lần chạy
+R4s hoặc 1-3s đều cần lý do và giữ bằng chứng.
+
 ## Cập nhật khắc phục
 
 **Đã sửa toàn bộ WG-15 → WG-25.** Phần mô tả bên dưới là ghi nhận **trước

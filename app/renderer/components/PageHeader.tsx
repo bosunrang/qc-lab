@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
 import { AvatarModal } from './AvatarModal';
+import { SoftwareLicenseExpiryNotice } from './SoftwareLicenseExpiry';
 
 function roleLabel(role?: string): string {
   if (role === 'admin') return 'Quản trị';
@@ -16,7 +17,7 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
   const { user, logout } = useAuthStore(useShallow((s) => ({ user: s.user, logout: s.logout })));
   const [avatarOpen, setAvatarOpen] = useState(false);
   return (
-    <div className="head">
+    <><div className="head">
       <div><h1>{title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
       <div className="head-actions">
         {user && (
@@ -38,6 +39,7 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
       </div>
       {avatarOpen && <AvatarModal onClose={() => setAvatarOpen(false)} />}
     </div>
+    <SoftwareLicenseExpiryNotice /></>
   );
 }
 

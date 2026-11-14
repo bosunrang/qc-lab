@@ -1,3 +1,4 @@
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Tab "TransitionsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 //
@@ -11,7 +12,7 @@ import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
+import { reportFormError, confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
 import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
 import { vnDate } from '../../lib/format';
 import { todayIso } from '../../state/date-picker-store';
@@ -19,7 +20,7 @@ import { EmptyState } from './shared';
 import { normalizeSearch } from '../../lib/useTestSelection';
 import type { LotTransition } from '../../../shared/qc-api';
 import { useAsyncAction } from '../../components/AsyncButton';
-import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
 import { useInvalidField } from '../../lib/useInvalidField';
 
 /** Mã lỗi `createLotTransition` (`validateLotTransition` + handler) → ô cần
@@ -128,7 +129,14 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
         meanRaw: read('.tm-mean'), lowRaw: read('.tm-low'), highRaw: read('.tm-high'), sdRaw: read('.tm-sd'),
         k: Number(row.getAttribute('data-k') || 2) || 2,
       });
-      if ('error' in parsed) { setErr(formError(parsed.message)); return; }
+      if ('error' in parsed) {
+        const key = `${row.getAttribute('data-test')}:${row.getAttribute('data-level')}`;
+        setErr(formErrorFrom({ code: parsed.error, message: parsed.message }, {
+          'invalid-mean': `mean:${key}`, 'invalid-sd': `sd:${key}`, 'missing-sd': `sd:${key}`,
+          'invalid-limits': [`low:${key}`, `high:${key}`], 'invalid-range': [`low:${key}`, `high:${key}`],
+        }));
+        return;
+      }
       criteria.push({ testId: row.getAttribute('data-test') || '', level: Number(row.getAttribute('data-level') || 1), mean: parsed.mean, sd: parsed.sd, low: parsed.low, high: parsed.high });
     }
     const editing = creating !== 'new' ? creating : null;
@@ -139,7 +147,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
       toLotId: String(fd.get('toLotId') || ''), startDate: String(fd.get('startDate') || ''), note: editing?.note || '',
       status, criteria,
     }, editing?.id);
-    if (!result.ok) { setErr(formErrorFrom(result.error, TRANSITION_FIELD_ERRORS)); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, TRANSITION_FIELD_ERRORS), setErr); return; }
     setCreating(null);
   }
 
@@ -184,7 +192,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
           <Modal busy={saving.busy} title={creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Sửa hồ sơ chuyển lô'} onClose={() => setCreating(null)} size="xl" className="rcfg-modal lot-trans-modal"
             footer={<><button className="btn ghost" onClick={() => setCreating(null)}>Huỷ</button><button className="btn teal" type="submit" form="transition-form" disabled={saving.busy}>{saving.busy ? 'Đang lưu…' : creating === 'new' ? 'Thêm hồ sơ chuyển lô' : 'Lưu thay đổi'}</button></>}>
             <form id="transition-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); void saving.run(e.currentTarget); }}>
-              {err && <p id={errorId} className="field-error" role="alert">{err.message}</p>}
+              <FormErrorMessage rootRef={formRef} error={err} id={errorId} />
               <div className="lot-trans-row3">
                 <div className="field">
                   <label htmlFor="transition-panel">Panel QC áp dụng</label>
@@ -245,10 +253,10 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                             chọn từng dòng (`checked disabled readOnly`). */}
                         <label className="lot-assay-check"><input type="checkbox" checked disabled readOnly aria-label={`Đưa ${test.name} vào chuyển lô`} /><span></span></label>
                         <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
-                        <input className="tm-mean" type="number" step="any" defaultValue={mean ?? ''} placeholder="Trung bình" aria-label={`Trung bình mục tiêu mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
-                        <input className="tm-low" type="number" step="any" defaultValue={ready ? (mean! - k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" aria-label={`Giới hạn dưới mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
-                        <input className="tm-high" type="number" step="any" defaultValue={ready ? (mean! + k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" aria-label={`Giới hạn trên mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
-                        <input className="tm-sd" type="number" step="any" defaultValue={sd ?? ''} placeholder="Độ lệch chuẩn" aria-label={`Độ lệch chuẩn mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
+                        <input data-field={`mean:${test.id}:${levelNo}`} className="tm-mean" type="number" step="any" defaultValue={mean ?? ''} placeholder="Trung bình" aria-label={`Trung bình mục tiêu mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
+                        <input data-field={`low:${test.id}:${levelNo}`} className="tm-low" type="number" step="any" defaultValue={ready ? (mean! - k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" aria-label={`Giới hạn dưới mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
+                        <input data-field={`high:${test.id}:${levelNo}`} className="tm-high" type="number" step="any" defaultValue={ready ? (mean! + k * sd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" aria-label={`Giới hạn trên mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'limits')} />
+                        <input data-field={`sd:${test.id}:${levelNo}`} className="tm-sd" type="number" step="any" defaultValue={sd ?? ''} placeholder="Độ lệch chuẩn" aria-label={`Độ lệch chuẩn mức ${levelNo} – ${test.name}`} onChange={(event) => syncTargetRange(event.currentTarget, 'target')} />
                         <span><b className={`tag ${saved ? 'ok' : 'none'}`}>{status}</b></span>
                       </div>;
                     })}

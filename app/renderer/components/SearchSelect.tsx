@@ -59,7 +59,7 @@ export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTI
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      showOptions();
+      if (!open) { showOptions(); return; }
       if (!filtered.length) return;
       const step = event.key === 'ArrowDown' ? 1 : -1;
       setActiveIndex((index) => (Math.max(0, Math.min(index, filtered.length - 1)) + step + filtered.length) % filtered.length);
@@ -77,15 +77,13 @@ export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTI
       if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
       setOpen(false); setDirtyQuery(false); setQuery('');
     }}>
-      <input ref={inputRef} id={id} type="search" role="combobox" autoComplete="off" spellCheck={false}
-        aria-label={ariaLabel} aria-expanded={open} aria-controls={open ? listId : undefined} aria-autocomplete="list"
+      <input ref={inputRef} id={id} type="text" role="combobox" autoComplete="off" spellCheck={false}
+        aria-label={ariaLabel} aria-expanded={open} aria-controls={open ? listId : undefined} aria-autocomplete="list" aria-haspopup="listbox"
         aria-activedescendant={open && safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
         placeholder={placeholder} value={dirtyQuery ? query : selected?.label ?? ''}
-        // Nhận focus (kể cả Tab đi ngang qua) chỉ bôi đen chữ để gõ đè; danh sách
-        // mở khi bấm chuột, gõ chữ hoặc ↓/↑ (gồm Alt+↓). Trước đây Tab qua bộ lọc
-        // Báo cáo là danh sách bung ra che các nút Xuất bên dưới (U31).
-        onFocus={(event) => { event.currentTarget.select(); }}
-        onClick={(event) => { showOptions(); event.currentTarget.select(); }}
+        // Giữ cách đặt con trỏ và chọn chữ tự nhiên như ô nhập tên xét nghiệm.
+        // Tab chỉ chuyển focus; bấm chuột, gõ chữ hoặc ↓/↑ mới mở danh sách.
+        onClick={showOptions}
         onChange={(event) => { setQuery(event.target.value); setDirtyQuery(true); setOpen(true); setActiveIndex(0); }}
         onKeyDown={onInputKeyDown} />
       {open && (
