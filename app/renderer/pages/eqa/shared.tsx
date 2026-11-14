@@ -23,11 +23,6 @@ export function ClassTag({ cls }: { cls: EqaClassView | null }) {
   return cls ? <span className={`tag ${cls}`}>{EQA_CLASS_LABEL[cls]}</span> : <span className="tag none">Chưa đánh giá</span>;
 }
 
-/** Viền trái của dòng bảng theo xếp loại. */
-export function rowTone(cls: EqaClassView | null): string | undefined {
-  return cls === 'rej' ? 'is-rej' : cls === 'warn' ? 'is-warn' : undefined;
-}
-
 /** Chọn kết quả mặc định theo mức đánh giá trước, rồi theo |z|. Không dùng
  * thứ tự dòng vì một đợt có thể có nhiều mẫu của cùng xét nghiệm. */
 export function worstEqaResult<T extends { class: EqaClassView; z: number }>(rows: readonly T[]): T | undefined {
@@ -53,6 +48,13 @@ export function TrendTags({ signals, unsuccessful }: { signals: readonly EqaSign
 
 export function roundLabel(round: { round: string; year: number | null }): string {
   return `${round.round} / ${round.year ?? '—'}`;
+}
+
+/** Trục biểu đồ chỉ giữ số đợt/mẫu và năm; tên gốc nằm trong tooltip. */
+export function roundAxisLabel(round: { round: string; year: number | null }): string {
+  const number = round.round.match(/(?:SAMPLE|ĐỢT|ROUND)\s*(\d+)\b/i)?.[1]
+    ?? round.round.trim().match(/^\d+$/)?.[0];
+  return `${number ? Number(number) : round.round}/${round.year ?? '—'}`;
 }
 
 /** Khối nhãn – giá trị; giá trị trống hiện "Chưa ghi nhận.". */

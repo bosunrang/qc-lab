@@ -34,6 +34,7 @@ const CHANNEL_PAGES: Readonly<Record<string, readonly string[]>> = {
   'auth:listUsers': ['users'], 'auth:createUser': ['users'], 'auth:updateUser': ['users'], 'auth:deleteUser': ['users'],
   'auth:resetPassword': ['users'], 'auth:setNceCapabilities': ['users'],
   'entry:addPoint': ['entry'], 'entry:voidPoint': ['entry'], 'entry:setDayNote': ['entry'],
+  'entry:voidPointAssessment': ['entry'],
   'entry:applyLabRange': ['entry'], 'entry:revertManufacturerRange': ['entry'], 'entry:rangeCandidate': ['entry'],
   'westgard:saveRuleAction': ['manage'], 'westgard:saveRuleSetting': ['westgard'], 'westgard:resetRuleSettings': ['westgard'],
   // Tổng quan và Báo cáo đọc tóm tắt NCE; Cài đặt sửa cấu hình NCE.

@@ -27,9 +27,9 @@ test('hồ sơ NCE: lập, cho chạy lại, nộp duyệt, người độc lậ
     await openPage(page, 'Nhập QC & Biểu đồ');
     await page.locator('.qc-sheet-title strong', { hasText: seeded.testName }).waitFor();
     await enterValue(page, today, 1, 5.1);
-    await page.locator('.entry-sheet-message .alert.ok', { hasText: 'Mức 1' }).waitFor();
+    await page.locator('.toast-ok', { hasText: 'Mức 1' }).waitFor();
     await enterValue(page, today, 2, 17.1);
-    await page.locator('.entry-sheet-message .alert.rej', { hasText: '1-3s' }).waitFor();
+    await page.locator('.toast-rej', { hasText: '1-3s' }).waitFor();
     // Lần chạy QC lại sau khi xử lý: hai mức đều đạt.
     const rerunId = await page.evaluate(async ({ testId, day }) => {
       const [first] = await window.qcApi.queryPoints(testId, 1);

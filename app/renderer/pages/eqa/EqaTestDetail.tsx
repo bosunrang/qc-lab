@@ -1,15 +1,16 @@
 // Danh sách xét nghiệm giữ bên trái để đổi chuỗi mà không mất phạm vi đọc.
-import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useEqaStore } from '../../store/eqa-store';
 import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchSelect } from '../../components/SearchSelect';
 import { ResizeHandle, useStoredWidth } from '../../components/ResizeHandle';
-import type { EqaInstrumentGridRow } from '../../../shared/qc-api';
+import type { EqaInstrumentGridRow, EqaSeriesView } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { normalizeSearchText } from '../../lib/search-options';
-import { ClassTag, numText, pctText, rawNum, roundLabel, rowTone, StatCard, TrendTags, worstEqaResult } from './shared';
+import { ClassTag, numText, pctText, rawNum, roundLabel, TrendTags, worstEqaResult } from './shared';
 import { EqaSeriesChart } from './EqaSeriesChart';
+import { EqaResultFilter, useEqaResultFilter } from './EqaResultFilter';
 import { useEqaScope, type EqaNavigationContext } from './useEqaScope';
 import { useEqaRead, useEqaRevision } from './useEqaRead';
 
@@ -52,49 +53,39 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
   // Danh sách bên trái cùng chương trình với biểu đồ.
   const programId = seriesProgramId || scope.programId;
   const readGrid = useCallback(() => programId && instrumentId ? instrumentGrid(programId, year, instrumentId) : Promise.resolve([]), [instrumentGrid, programId, year, instrumentId]);
-  const grid = useEqaRead(`${programId}:${year}:${instrumentId}:${revision}`, readGrid);
+  const grid = useEqaRead(`${programId}:${year}:${instrumentId}:${revision}:${refresh}`, readGrid);
   const listRounds = allRounds.filter((r) => r.status === 'open' && r.program_id === programId && r.year === year)
     .sort((a, b) => a.round_no - b.round_no || a.report_date.localeCompare(b.report_date));
   const [search, setSearch] = useState('');
   const [mode, setMode] = useState<'z' | 'pct'>('z');
-  const [onlyAttention, setOnlyAttention] = useState(false);
   // Biểu đồ mặc định phủ toàn bộ lịch sử của chương trình: tín hiệu chuỗi
   // (6 đợt cùng phía, điểm J, không thành công) tính trên toàn lịch sử, nên
   // người xem phải thấy được các đợt gây ra tín hiệu (N-07).
   const [span, setSpan] = useState<'all' | 'year'>('all');
+  const [filter, setFilter] = useEqaResultFilter(`${testId}:${programId}:${year}:${span}`);
   const layoutRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLElement>(null);
   const assayItemsRef = useRef<HTMLDivElement>(null);
   const [storedWidth, setListWidth] = useStoredWidth('qclab.eqaAssayListWidth', 340);
   const listWidth = storedWidth ?? 340;
   const stacked = useSyncExternalStore(subscribeLayout, isStacked);
+  // Khôi phục sau khi đúng danh sách đã dựng, kể cả khi quay lại từ kỳ báo cáo.
+  useLayoutEffect(() => {
+    const node = assayItemsRef.current;
+    if (!node) return;
+    const saved = useEqaStore.getState();
+    node.scrollTop = saved.analysisListScrollTarget ?? saved.analysisListScroll;
+    finishAnalysisListScrollRestore();
+  }, [grid.data, testId, stacked, finishAnalysisListScrollRestore]);
   const listMaxNow = () => Math.min(480, (layoutRef.current?.clientWidth ?? 1000) * 0.42);
   function resizeList(width: number) {
     setListWidth(Math.round(Math.max(280, Math.min(width, listMaxNow()))));
   }
   function openAssay(id: string) {
+    if (id === testId) return;
     const top = assayItemsRef.current?.scrollTop ?? useEqaStore.getState().analysisListScroll;
     rememberAnalysisListScroll(top);
     onOpenTest(id, { ...scope.context, programId }, true);
-    // Điều hướng bằng HashRouter có thể dựng lại cả vùng danh sách. Theo dõi
-    // đến khi đúng xét nghiệm mới đã được chọn rồi trả thanh cuộn về vị trí
-    // người dùng đang rà soát; callback vẫn sống dù component cũ bị remount.
-    let attempts = 0;
-    const restore = () => {
-      const node = document.querySelector<HTMLDivElement>('.eqa-assay-items');
-      const current = node?.querySelector(`[data-eqa-test-id="${CSS.escape(id)}"][aria-pressed="true"]`);
-      if (node && current && node.scrollHeight > node.clientHeight) {
-        node.scrollTop = top;
-        requestAnimationFrame(() => {
-          const latest = document.querySelector<HTMLDivElement>('.eqa-assay-items');
-          const stillCurrent = latest?.querySelector(`[data-eqa-test-id="${CSS.escape(id)}"][aria-pressed="true"]`);
-          if (latest && stillCurrent) latest.scrollTop = top;
-          finishAnalysisListScrollRestore();
-        });
-      } else if (++attempts < 60) requestAnimationFrame(restore);
-      else finishAnalysisListScrollRestore();
-    };
-    requestAnimationFrame(restore);
   }
   const program = programs.find((p) => p.program_id === seriesProgramId);
   const programPoints = (view?.points ?? []).filter((p) => p.program_id === seriesProgramId);
@@ -111,7 +102,11 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
   }
   const latestRound = points.filter((p) => p.round_id === points.at(-1)?.round_id);
   const latestWorst = worstEqaResult(latestRound);
-  const selected = points.find((p) => p.result_id === scope.params.get('point')) ?? latestWorst;
+  const explicitSelected = points.find((p) => p.result_id === scope.params.get('point'));
+  const selected = explicitSelected ?? latestWorst;
+  function selectPoint(point: EqaSeriesView['points'][number]) {
+    scope.select({ testId, roundId: point.round_id, resultId: point.result_id, sample: point.sample }, { programId });
+  }
   const searchKey = normalizeSearchText(search);
   // Kết quả nặng nhất ở đợt mới nhất của năm cho từng xét nghiệm trong danh sách.
   const worstOf = (r: EqaInstrumentGridRow) => {
@@ -128,7 +123,11 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
   const flaggedAssays = assayOptions.filter((o) => o.flagged).map((o) => o.value);
   const ok = points.filter((p) => p.class === 'ok').length;
   const latestSignals = [...new Set(latestRound.flatMap((p) => p.signals))];
-  const tablePoints = [...points].reverse().filter((p) => !onlyAttention || p.class !== 'ok' || p.signals.length || p.unsuccessful || p.within_tea === false);
+  const latestUnsuccessful = latestRound.some((p) => p.unsuccessful);
+  const latestHasSignals = latestSignals.length > 0 || latestUnsuccessful;
+  const tablePoints = [...points].reverse().filter((p) => filter === 'all' || (filter === 'attention'
+    ? p.class !== 'ok' || p.signals.length > 0 || p.unsuccessful || p.within_tea === false
+    : p.class === filter));
 
   return <div className="eqa-test">
     <div className="eqa-round-bar"><button type="button" className="btn ghost sm" onClick={onBack}>← Quay lại</button>
@@ -170,28 +169,25 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
         {result.error ? <section className="panel"><EmptyState title="Không tải được chuỗi ngoại kiểm" action={<button className="btn ghost sm" onClick={result.retry}>Thử lại</button>}>{result.error}</EmptyState></section>
           : view === undefined ? <section className="panel"><EmptyState title="Đang tải chuỗi ngoại kiểm…" /></section>
           : view === null ? <section className="panel"><EmptyState title="Không tìm thấy xét nghiệm" /></section> : <>
-        <div className="eqa-stats">
-          <StatCard tone="info" label="Đợt có kết quả" value={new Set(points.map((p) => p.round_id)).size} detail={`${points.length} mẫu trong phạm vi`} />
-          <StatCard tone="neutral" label="Tỷ lệ chấp nhận" value={points.length ? pctText(ok / points.length * 100) : '—'} detail={`${ok}/${points.length} mẫu · chỉ số tổng hợp`} />
-          <StatCard tone={selected?.class === 'rej' ? 'danger' : selected?.class === 'warn' ? 'warning' : 'neutral'} label="z đang chọn" value={numText(selected?.z)} detail={selected ? `${roundLabel(selected)} · mẫu ${selected.sample || '—'}` : 'Chưa chọn kết quả'} />
-          <StatCard tone={selected?.within_tea === false ? 'danger' : 'neutral'} label="% lệch đang chọn" value={pctText(selected?.pct)} detail={!selected ? 'Chưa chọn kết quả' : selected.tea_pct === null ? 'Chưa khai TEa' : `TEa ${pctText(selected.tea_pct)}`} />
-        </div>
-        <section className="panel" aria-label="Biểu đồ phân tích xét nghiệm"><div className="panel-head"><h2>Diễn biến qua các đợt</h2>
+        <section className="panel" aria-label="Biểu đồ phân tích xét nghiệm"><div className="panel-head"><div className="eqa-series-chart-heading"><div className="eqa-zmap-heading"><h2>Diễn biến qua các đợt</h2>
+          {program && !program.enough && <span className="tag none" title={`Cần ít nhất ${view.min_points} đợt để kết luận về xu hướng. Tín hiệu |z| ≥ ${view.config.z_reject} và không thành công vẫn có hiệu lực.`}>Chưa đủ đợt đánh giá xu hướng · {program.rounds}/{view.min_points}</span>}
+          </div><p className="eqa-series-counts">{new Set(points.map((p) => p.round_id)).size} đợt · {points.length} mẫu · Chấp nhận {points.length ? `${ok}/${points.length} (${pctText(ok / points.length * 100)})` : '—'}</p>
+          </div>
           <div className="dayseg" role="group" aria-label="Chỉ số biểu đồ"><button type="button" className={mode === 'z' ? 'on' : ''} aria-pressed={mode === 'z'} onClick={() => setMode('z')}>z-score</button><button type="button" className={mode === 'pct' ? 'on' : ''} aria-pressed={mode === 'pct'} onClick={() => setMode('pct')}>% lệch / TEa</button></div>
         </div><div className="eqa-section-body">
-          {program && !program.enough && <div className="alert info">Chương trình này mới có {program.rounds} đợt; cần ít nhất {view.min_points} đợt để kết luận về xu hướng. Tín hiệu |z| ≥ {view.config.z_reject} và "không thành công" vẫn có hiệu lực.</div>}
-          <EqaSeriesChart points={points} selectedId={selected?.result_id} onSelect={(p) => scope.select({ testId, roundId: p.round_id, resultId: p.result_id }, { programId })} mode={mode} config={view.config} unit={view.unit} />
-          {latestRound[0] && <div className="eqa-zmap-legend"><span className="eqa-note">Tín hiệu đợt mới nhất đang xem · {roundLabel(latestRound[0])}:</span><TrendTags signals={latestSignals} unsuccessful={latestRound.some((p) => p.unsuccessful)} /></div>}
-          {/* Một dòng ghi chú: ngưỡng của chế độ đang xem và căn cứ tính tín hiệu. */}
-          <p className="eqa-note">{mode === 'z' ? `Cảnh báo khi |z| > ${view.config.z_warn}, không chấp nhận khi |z| ≥ ${view.config.z_reject}` : 'Nét đứt: ±TEa của PXN tại từng mẫu; điểm xám: chưa khai TEa'}
+          <EqaSeriesChart points={points} selectedId={selected?.result_id} onSelect={selectPoint} mode={mode} config={view.config} unit={view.unit} />
+          {latestRound[0] && (program?.enough || latestHasSignals) && <div className="eqa-zmap-legend"><span className="eqa-note">Tín hiệu đợt mới nhất đang xem · {roundLabel(latestRound[0])}:</span>{latestHasSignals ? <TrendTags signals={latestSignals} unsuccessful={latestUnsuccessful} /> : <span className="hint-inline">Không có tín hiệu chuỗi</span>}</div>}
+          <details className="eqa-details eqa-series-basis"><summary>Căn cứ đánh giá chuỗi</summary><p className="eqa-note">{mode === 'z' ? `Cảnh báo khi |z| > ${view.config.z_warn}, không chấp nhận khi |z| ≥ ${view.config.z_reject}` : 'Nét đứt: ±TEa của PXN tại từng mẫu; điểm xám: chưa khai TEa'}
             {' · '}{span === 'year' ? `Đang xem năm ${year}; tín hiệu chuỗi vẫn tính trên toàn bộ ${program?.rounds ?? 0} đợt của chương trình` : `Tín hiệu chuỗi tính trên ${program?.rounds ?? 0} đợt của chương trình`}
-            {' · '}Ngưỡng điểm J {view.j_limit}.</p>
+            {' · '}Ngưỡng điểm J {view.j_limit}.</p></details>
         </div></section>
-        <section className="panel" aria-label="Kết quả từng đợt"><div className="panel-head"><h2>Kết quả từng đợt <span className="count">{tablePoints.length}</span></h2><label className="eqa-toggle"><input type="checkbox" checked={onlyAttention} onChange={(e) => setOnlyAttention(e.target.checked)} />Cần xem</label></div>
-            <div className="eqa-section-body">{!tablePoints.length ? <EmptyState size="compact" title={onlyAttention ? 'Không có kết quả cần xem trong phạm vi' : 'Chưa có kết quả trong phạm vi này'} /> : <div className="eqa-table-wrap"><table className="eqa-table eqa-center-rest"><thead><tr><th>Đợt / mẫu</th><th>Kết quả</th><th>Ấn định</th><th>z</th><th>% lệch</th><th>Đánh giá</th><th>J</th><th>Tín hiệu</th><th aria-label="Thao tác" /></tr></thead><tbody>
-              {tablePoints.map((p) => <tr key={p.result_id} className={`${rowTone(p.class) ?? ''}${p.result_id === selected?.result_id ? ' is-selected' : ''}`}>
-                <td><button type="button" className="eqa-test-link" aria-pressed={p.result_id === selected?.result_id} onClick={() => scope.select({ testId, roundId: p.round_id, resultId: p.result_id }, { programId })}>{roundLabel(p)}{p.sample ? ` · ${p.sample}` : ''}</button><span className="eqa-sub">{vnDate(p.report_date, '—')}</span></td>
-                <td>{rawNum(p.result)}</td><td>{rawNum(p.assigned)}</td><td>{numText(p.z)}</td><td>{pctText(p.pct)}</td><td><ClassTag cls={p.class} /></td><td>{p.j}</td><td><TrendTags signals={p.signals} unsuccessful={p.unsuccessful} /></td><td><button type="button" className="btn ghost sm" onClick={() => onOpenRound(p.round_id, p.result_id)}>Mở kỳ</button></td>
+        <section className="panel" aria-label="Kết quả từng đợt"><div className="panel-head"><h2>Kết quả từng đợt <span className="count">{tablePoints.length}</span></h2>
+          <EqaResultFilter value={filter} onChange={setFilter} label="Lọc kết quả từng đợt theo đánh giá" allLabel="Tất cả kết quả" />
+        </div>
+            <div className="eqa-section-body">{!tablePoints.length ? <EmptyState size="compact" title={filter === 'all' ? 'Chưa có kết quả trong phạm vi này' : 'Không có kết quả phù hợp bộ lọc'} /> : <div className="eqa-table-wrap eqa-results-scroll" tabIndex={0} role="region" aria-label="Vùng cuộn kết quả từng đợt"><table className="eqa-table eqa-center-rest"><thead><tr><th>Đợt / mẫu</th><th>Kết quả<span className="eqa-sub">{view.unit}</span></th><th>Giá trị ấn định<span className="eqa-sub">{view.unit}</span></th><th>z</th><th>Đánh giá</th><th aria-label="Thao tác" /></tr></thead><tbody>
+              {tablePoints.map((p) => <tr key={p.result_id} className={p.result_id === selected?.result_id ? 'is-selected' : undefined}>
+                <td><button type="button" className="eqa-test-link" aria-pressed={p.result_id === selected?.result_id} onClick={() => selectPoint(p)}>{roundLabel(p)}{p.sample ? ` · ${p.sample}` : ''}</button><span className="eqa-sub">{vnDate(p.report_date, '—')}</span></td>
+                <td>{rawNum(p.result)}</td><td>{rawNum(p.assigned)}</td><td>{numText(p.z)}</td><td><ClassTag cls={p.class} /></td><td><button type="button" className="btn ghost sm" onClick={() => onOpenRound(p.round_id, p.result_id)}>Mở kỳ báo cáo</button></td>
               </tr>)}
             </tbody></table></div>}</div>
           </section>

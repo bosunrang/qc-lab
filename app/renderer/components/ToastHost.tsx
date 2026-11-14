@@ -10,8 +10,8 @@ export function ToastHost() {
   return createPortal(
     <div className="toast-stack" role="status" aria-live="polite">
       {toasts.map((toast) => (
-        <div key={toast.id} className="toast">
-          <span className="toast-icon" aria-hidden="true">✓</span>
+        <div key={toast.id} className={`toast toast-${toast.kind}`}>
+          <span className="toast-icon" aria-hidden="true">{toast.kind === 'ok' ? '✓' : '⚠'}</span>
           <span className="toast-text">{toast.message}</span>
           <button type="button" className="toast-close" aria-label="Đóng thông báo" onClick={() => dismissToast(toast.id)}>✕</button>
         </div>

@@ -10,6 +10,30 @@
 .eqa-intro p{margin:var(--space-1) 0 0;color:var(--text-secondary);font-size:var(--text-sm);}
 .eqa-intro-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
 
+/* Tổng quan: tỷ lệ là chỉ số tổng hợp, hai ô bên cạnh lọc theo đánh giá mẫu. */
+.eqa-overview-summary{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));margin-bottom:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-panel);overflow:hidden;}
+.eqa-accept-summary,.eqa-summary-count{display:grid;align-content:start;gap:var(--space-2);min-width:0;padding:var(--space-4) var(--space-5);border:0;background:transparent;color:var(--text-primary);font:inherit;text-align:left;cursor:pointer;}
+.eqa-summary-count{border-left:1px solid var(--surface-divider);}
+.eqa-summary-label{font-size:var(--text-sm);font-weight:var(--weight-semibold);}
+.eqa-accept-value{display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap;}
+.eqa-accept-value>b,.eqa-summary-count>b{font-size:var(--text-2xl);font-weight:var(--weight-bold);line-height:var(--leading-display);font-variant-numeric:tabular-nums;}
+.eqa-accept-value>span,.eqa-accept-summary>small,.eqa-summary-count>small{color:var(--text-tertiary);font-size:var(--text-xs);}
+.eqa-summary-count.is-rej>b{color:var(--danger-text);}
+.eqa-summary-count.is-warn>b{color:var(--warning-text);}
+.eqa-accept-bar{display:flex;height:var(--space-1-5);overflow:hidden;border-radius:var(--radius-sm);background:var(--surface-sunken);}
+.eqa-accept-bar .is-ok{background:var(--success-accent);}
+.eqa-accept-bar .is-warn{background:var(--warning-accent);}
+.eqa-accept-bar .is-rej{background:var(--danger-accent);}
+.eqa-accept-summary:hover,.eqa-accept-summary[aria-pressed=true]{background:var(--accent-surface-tint);}
+.eqa-summary-count.is-rej:hover,.eqa-summary-count.is-rej[aria-pressed=true]{background:var(--danger-surface);}
+.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=true]{background:var(--warning-surface);}
+.eqa-overview-summary button:disabled{cursor:default;}
+.eqa-map-filter{width:auto;max-width:100%;}
+.eqa-zmap-heading{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;min-width:0;}
+.eqa-zmap-heading h2{margin:0;}
+.eqa-zmap-heading .tag{cursor:pointer;}
+.eqa-attention-panel{scroll-margin-top:calc(var(--panel-header-h) * 2 + var(--space-4));}
+
 /* Ô tổng hợp: số lớn, viền trái theo trạng thái; không bấm được. */
 .eqa-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-3);margin-bottom:var(--space-5);}
 .eqa-stats.is-five{grid-template-columns:repeat(5,minmax(0,1fr));}
@@ -31,8 +55,6 @@
 .eqa-strong{display:block;color:var(--text-primary);font-weight:var(--weight-semibold);}
 .eqa-sub{display:block;margin-top:var(--space-0-5);color:var(--text-tertiary);font-size:var(--text-xs);}
 .eqa-wrap{min-width:180px;white-space:normal;overflow-wrap:anywhere;}
-.eqa-table tbody tr.is-rej td:first-child{box-shadow:inset 3px 0 0 var(--danger-accent);}
-.eqa-table tbody tr.is-warn td:first-child{box-shadow:inset 3px 0 0 var(--warning-accent);}
 .eqa-table td.num{white-space:nowrap;}
 .eqa-test-cell{min-width:200px;}
 .eqa-row-actions{display:flex;justify-content:center;gap:var(--space-1);white-space:nowrap;}
@@ -40,8 +62,14 @@
 .eqa-center-rest th:not(:first-child),.eqa-center-rest td:not(:first-child){text-align:center;}
 .eqa-table .eqa-center{text-align:center;}
 
+/* Hai bảng kết quả dùng cùng khung cuộn, giữ tiêu đề cột khi cuộn dọc. */
+.eqa-results-scroll{max-height:70vh;overflow:auto;border:1px solid var(--surface-divider);border-radius:var(--table-radius);}
+.eqa-results-scroll>.eqa-table{border:0;border-radius:0;overflow:visible;}
+.eqa-results-scroll>.eqa-table>thead>tr>th{position:sticky;top:0;z-index:var(--z-sticky);background:var(--table-head-bg);}
 /* Bảng kết quả kỳ: căn giữa mọi cột trừ Xét nghiệm và dòng mở rộng. */
 .eqa-results-table th,.eqa-results-table td{text-align:center;}
+.eqa-results-table .eqa-trend-cell{text-align:center;vertical-align:middle;}
+.eqa-results-table .eqa-trend-cell>.eqa-tags{display:flex;justify-content:center;}
 .eqa-results-table th.eqa-test-cell,.eqa-results-table td.eqa-test-cell,.eqa-results-table tr.eqa-detail-row>td{text-align:left;}
 .eqa-results-table .eqa-peer th,.eqa-results-table .eqa-peer td{text-align:left;}
 .eqa-results-table .eqa-peer .num{text-align:center;}
@@ -53,6 +81,7 @@
 .eqa-detail h3{margin:0 0 var(--space-2);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-secondary);}
 .eqa-peer{width:auto;min-width:min(100%,560px);}
 .eqa-peer th,.eqa-peer td{padding:var(--space-1-5) var(--space-3);background:transparent;}
+.eqa-peer th{position:static;}
 .eqa-peer-name{display:inline-flex;align-items:center;gap:var(--space-2);color:var(--text-primary);font-weight:var(--weight-semibold);white-space:nowrap;}
 
 .eqa-toggle{display:inline-flex;align-items:center;gap:var(--space-2);color:var(--text-secondary);font-size:var(--text-sm);cursor:pointer;}
@@ -146,19 +175,19 @@
 .eqa-sample-type{margin:0 0 0 var(--space-2);}
 .eqa-machine-tags{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:var(--space-1);}
 
-/* Bản đồ z: cột đầu dính khi cuộn ngang, ô tô theo xếp loại. */
+/* Bảng tổng hợp z-score: cột đầu dính khi cuộn ngang, ô tô theo xếp loại. */
 /* Khung tự cuộn hai chiều để hàng tiêu đề đợt dính trên khi danh sách dài. */
 .eqa-zmap-wrap{width:100%;max-height:70vh;overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);}
 .eqa-zmap{width:100%;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;overflow:visible;border:0;border-radius:0;}
 .eqa-zmap th,.eqa-zmap td{padding:var(--space-1-5) var(--space-2);border-bottom:1px solid var(--surface-divider);text-align:center;white-space:nowrap;}
 .eqa-zmap tbody tr:last-child>*{border-bottom:none;}
 .eqa-zmap thead th{position:sticky;top:0;z-index:var(--z-sticky);height:var(--table-header-h);background:var(--table-head-bg);color:var(--table-head-ink);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-tracking);vertical-align:bottom;}
-.eqa-zmap .eqa-zmap-test{position:sticky;left:0;top:auto;z-index:var(--z-sticky);min-width:160px;background:var(--surface);text-align:left;border-right:1px solid var(--surface-divider);}
+.eqa-zmap .eqa-zmap-test{position:sticky;left:0;top:auto;z-index:var(--z-sticky);width:180px;min-width:160px;max-width:220px;background:var(--surface);text-align:left;border-right:1px solid var(--surface-divider);white-space:normal;}
 /* Ô góc dính cả hai chiều: `top:0` đặt lại vì rule cột trên ghi `top:auto`. */
 .eqa-zmap thead .eqa-zmap-test{top:0;z-index:var(--z-sticky-head);background:var(--surface-section-header);vertical-align:middle;}
 .eqa-zmap-round{display:block;color:var(--text-primary);}
 .eqa-zmap-meta{display:block;margin-top:var(--space-0-5);color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-normal);}
-.eqa-zcell{min-width:72px;height:var(--table-row-h-compact);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
+.eqa-zcell{min-width:60px;height:var(--table-row-h-compact);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
 /* Ô đạt để nền trắng: chỉ cảnh báo và không chấp nhận có nền màu cho nổi. */
 .eqa-zcell.is-ok{background:var(--surface);color:var(--success-text);}
 .eqa-zcell.is-warn{background:var(--warning-surface);color:var(--warning-text);}
@@ -177,9 +206,6 @@
 .eqa-zmap-panel>.eqa-section-body{display:flex;flex:1;flex-direction:column;}
 .eqa-zmap-panel>.eqa-section-body>.empty-notice{flex:1;}
 .eqa-zmap-legend{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-top:auto;}
-/* Tín hiệu đợt mới nhất: bảng phạm vi đang xem rồi bảng ngoài phạm vi. */
-.eqa-attention-panel{scroll-margin-top:calc(var(--panel-header-h) * 2 + var(--space-4));}
-.eqa-subhead{display:flex;align-items:center;gap:var(--space-2);margin:0;color:var(--text-primary);font-size:var(--title-sub);font-weight:var(--title-sub-weight);line-height:var(--leading-snug);}
 
 /* Chuỗi một xét nghiệm: trang cao bằng cửa sổ, danh sách và vùng phân tích tự cuộn. */
 /* Như Cấu hình chung: lề đáy của <main> chỉ còn 16px để danh sách và vùng
@@ -216,36 +242,51 @@ button.eqa-tl-due{cursor:pointer;}
    cuộn ngang; thanh chọn và bằng chứng luôn nằm trong chiều rộng trang. */
 .eqa-scope-controls{display:flex;align-items:end;gap:var(--field-gap);flex-wrap:wrap;padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-panel);}
 .eqa-scope-controls .field{margin:0;min-width:96px;}
-.eqa-scope-program{flex:1;min-width:200px;}
-.eqa-scope-machine{flex:1;max-width:280px;}
+.eqa-scope-controls .field:first-child{flex:0 0 96px;}
+.eqa-scope-controls .eqa-scope-program{flex:1 1 300px;min-width:min(100%,280px);}
+.eqa-scope-controls .eqa-scope-machine{flex:1 1 240px;min-width:min(100%,160px);max-width:280px;}
+.eqa-scope-action{flex:none;margin-left:auto;}
 .eqa-review-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,320px);gap:var(--space-4);align-items:start;}
-.eqa-review-workspace.is-empty{align-items:stretch;}
+.eqa-review-workspace.is-empty{grid-template-columns:minmax(0,1fr);align-items:stretch;}
 .eqa-review-workspace>.panel{min-width:0;}
 .eqa-inspector .eqa-facts{grid-template-columns:repeat(2,minmax(0,1fr));}
 .eqa-inspector-title h3{margin:0;color:var(--text-primary);font-size:var(--title-card);font-weight:var(--weight-bold);}
 .eqa-facts-group{display:grid;gap:var(--space-2);align-content:start;}
 .eqa-facts-title{margin:0;color:var(--text-tertiary);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
-.eqa-result-score{display:flex;align-items:baseline;gap:var(--space-2);flex-wrap:wrap;}
+.eqa-result-score{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
 .eqa-result-score>b{font-size:var(--text-2xl);font-weight:var(--weight-bold);line-height:var(--leading-display);font-variant-numeric:tabular-nums;}
 .eqa-score-label{color:var(--text-tertiary);font-size:var(--text-sm);}
+.eqa-z-discrepancy{color:var(--warning-text);}
 .eqa-source{display:grid;justify-items:start;gap:var(--space-1-5);padding-top:var(--space-3);border-top:1px solid var(--surface-divider);overflow-wrap:anywhere;font-size:var(--text-sm);color:var(--text-secondary);}
 .eqa-source>b{color:var(--text-primary);font-weight:var(--weight-semibold);}
 .eqa-details[open]>summary{margin-bottom:var(--space-3);}
 .eqa-details>.eqa-note{margin-top:var(--space-3);}
 .eqa-zmap td.eqa-zcell{padding:0;}
-.eqa-cell-button{display:block;width:100%;min-width:72px;min-height:var(--table-row-h);padding:var(--space-2);border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.eqa-cell-button{display:block;width:100%;min-width:60px;min-height:var(--table-row-h);padding:var(--space-2);border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;}
 .eqa-zcell.is-selected{box-shadow:inset 0 0 0 2px var(--accent);}
+.eqa-zcell.is-selected .eqa-cell-button{text-decoration:underline;text-underline-offset:var(--space-1);font-weight:var(--weight-bold);}
 .eqa-cell-button:hover{box-shadow:inset 0 0 0 1px var(--accent-border);}
+.eqa-zmap-trend{width:124px;min-width:124px;border-left:1px solid var(--surface-divider);}
+.eqa-row-trend{display:block;width:112px;margin:auto;padding:0;border:0;background:transparent;cursor:pointer;}
+.eqa-row-trend svg{display:block;width:100%;height:auto;}
+.eqa-spark-zero{stroke:var(--surface-border);stroke-width:1;stroke-dasharray:3 3;}
+.eqa-spark-line{fill:none;stroke:var(--accent);stroke-width:1.2;}
+.eqa-spark-line.is-secondary{stroke-dasharray:3 2;}
+.eqa-spark-point{stroke:var(--surface);stroke-width:0.7;}
+.eqa-spark-point.is-ok{fill:var(--success-accent);}
+.eqa-spark-point.is-warn{fill:var(--warning-accent);}
+.eqa-spark-point.is-rej{fill:var(--danger-accent);}
 .eqa-analysis-workspace{display:grid;flex:1;grid-template-columns:clamp(280px,340px,42%) var(--space-2) minmax(0,1fr);gap:var(--space-2);align-items:stretch;min-height:0;}
 .eqa-analysis-main{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;}
-.eqa-analysis-main>.eqa-stats{gap:var(--space-2);margin-bottom:var(--space-4);}
-.eqa-analysis-main .eqa-stat{padding:var(--space-3);}
+.eqa-series-chart-heading{display:grid;gap:var(--space-1);min-width:0;}
+.eqa-series-counts{margin:0;color:var(--text-tertiary);font-size:var(--text-xs);}
+.eqa-series-basis{font-size:var(--text-xs);color:var(--text-tertiary);}
 .eqa-assay-list{display:flex;flex-direction:column;height:100%;margin-bottom:0;overflow:hidden;}
-.eqa-assay-search{padding:0 var(--space-3) var(--space-3);}
+.eqa-assay-search{width:100%;padding:0 var(--space-3) var(--space-3);}
 .eqa-assay-items{flex:1;min-height:0;overflow-y:auto;border-top:1px solid var(--surface-divider);}
 .eqa-assay-item{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);width:100%;min-height:var(--table-row-h-input);padding:var(--space-3);border:0;border-bottom:1px solid var(--surface-divider);background:var(--surface);color:var(--text-primary);font:inherit;text-align:left;cursor:pointer;}
 .eqa-assay-item:hover{background:var(--surface-subtle);}
-.eqa-assay-item.is-selected{background:var(--accent-surface);box-shadow:inset 3px 0 0 var(--accent);}
+.eqa-assay-item.is-selected{background:var(--accent-surface);}
 .eqa-assay-item>span:first-child{display:grid;gap:var(--space-1);min-width:0;overflow-wrap:break-word;}
 .eqa-assay-item b{font-weight:var(--weight-semibold);}
 .eqa-assay-item small{color:var(--text-tertiary);font-size:var(--text-xs);}
@@ -256,6 +297,7 @@ button.eqa-tl-due{cursor:pointer;}
 .eqa-table tr.is-selected>td{background:var(--accent-surface-tint);}
 .eqa-series-plot{min-width:0;}
 .eqa-chart-legend{margin:var(--space-2-5) 0 0;}
+.eqa-chart-unrated{border-radius:var(--radius-full);background:var(--text-tertiary);}
 @media (max-width:1100px){
   .eqa-review-workspace{grid-template-columns:minmax(0,1fr);}
   .eqa-review-workspace .eqa-inspector .eqa-section-body{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -265,6 +307,9 @@ button.eqa-tl-due{cursor:pointer;}
   .eqa-facts{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:850px){
+  .eqa-overview-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .eqa-accept-summary{grid-column:1/-1;border-bottom:1px solid var(--surface-divider);}
+  .eqa-summary-count.is-rej{border-left:0;}
   .eqa-page.is-test-detail{display:block;height:auto;}
   .eqa-test{display:block;}
   .eqa-file-picker{grid-template-columns:var(--control-h) minmax(0,1fr);}
@@ -274,5 +319,5 @@ button.eqa-tl-due{cursor:pointer;}
   .eqa-analysis-resize{display:none;}
   .eqa-assay-list{display:block;height:auto;margin-bottom:var(--space-5);}
   .eqa-review-workspace .eqa-inspector .eqa-section-body{grid-template-columns:minmax(0,1fr);}
-  .eqa-scope-controls .field{max-width:none;flex:1;}
+  .eqa-scope-controls .eqa-scope-machine{max-width:none;}
 }

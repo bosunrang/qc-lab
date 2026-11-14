@@ -22,6 +22,9 @@ export interface LisMessage {
 }
 export interface LisQueueRecord {
   id: string; receivedAt: string; status: string; message: LisMessage; resolved: LisResolved;
+  /** Nguồn và mã bản tin gốc của LIS (Gateway SQLite cấp); `message.messageId`
+   * là UUID của Gateway. QC Lab dùng để không nhận trùng sau khi phục hồi Gateway. */
+  source?: { sourceId: string; messageId: string };
 }
 
 export interface Instrument {
@@ -331,10 +334,20 @@ export interface HistoryQcPointView {
   accepted: boolean; run_rejected_by: number[];
 }
 
+export interface VoidPointAssessment {
+  error_class: 'SE' | 'RE' | '';
+  /** Chỉ các luật cùng loại sai số trong những điểm bị loại của lần chạy. */
+  rules: string[];
+  run_rejected: boolean;
+  rejected_levels: number[];
+}
+
 export interface VoidedQcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string;
   lot: string; val: number; operator_name: string; void_reason: string;
   void_kind: string; void_requires_rerun: 0 | 1; voided_at: string; voided_by: string;
+  /** Họ tên tài khoản người huỷ; dùng username gốc khi không còn tên để đối chiếu. */
+  voided_by_name: string;
 }
 
 export interface RangeCandidateView {
@@ -918,6 +931,7 @@ export interface QcApi {
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */
   listEntryHistoryPoints(testId: string): Promise<HistoryQcPointView[]>;
   listVoidedEntryPoints(testId: string): Promise<VoidedQcPointView[]>;
+  getVoidPointAssessment(pointId: string): Promise<IpcResult<VoidPointAssessment>>;
   listParallelEntryColumns(testId: string): Promise<ParallelEntryColumn[]>;
   listPreviousEntryLotSeries(testId: string): Promise<PreviousLotSeries[]>;
   getRangeCandidate(testId: string, level: number): Promise<IpcResult<RangeCandidateView>>;

@@ -18,13 +18,14 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { LoadNotice } from '../components/LoadNotice';
 import { confirmDialog, errorDialog, reasonDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
 import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
 import type { QcChartPoint } from '../components/QcChart';
 import type { QcPointView, TestLevel } from '../../shared/qc-api';
 import { createOperationalCatalog } from './entry/operational';
 import { EntryTree, TreeToggleIcon } from './entry/EntryTree';
-import { EntrySheet, type SheetMessages } from './entry/EntrySheet';
+import { EntrySheet } from './entry/EntrySheet';
 import { EntryLjPanel } from './entry/EntryLjPanel';
 import { EntryPointsPanel } from './entry/EntryPointsPanel';
 import { EntryRangePanel } from './entry/EntryRangePanel';
@@ -68,14 +69,12 @@ export function EntryPage() {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
   const [voiding, setVoiding] = useState<QcPointView | null>(null);
-  const [voidMsg, setVoidMsg] = useState<string | null>(null);
   // Mỗi mức chỉ mở một chuỗi lô cũ trên biểu đồ/bảng chi tiết. Worksheet vẫn
   // hiện mọi điểm lô cũ theo ngày ở dạng chỉ đọc để lịch sử tháng liền mạch.
   const [previousLotOpen, setPreviousLotOpen] = useState<Record<number, string>>({});
   const [ljDays, setLjDays] = useState(30);
   const [ljFrom, setLjFrom] = useState('');
   const [ljTo, setLjTo] = useState('');
-  const [pointFeedback, setPointFeedback] = useState<{ kind: 'ok' | 'warn' | 'rej'; message: string } | null>(null);
 
   function setTreeVisibility(collapsed: boolean) {
     setTreeCollapsed(collapsed);
@@ -253,7 +252,6 @@ export function EntryPage() {
     const val = parseQcValueText(raw);
     if (val == null) return { saved: false };
     if (Number.isNaN(val)) {
-      setPointFeedback(null);
       return { saved: false, fieldError: `"${raw.trim()}" không phải một giá trị số. Dùng dấu chấm hoặc dấu phẩy cho phần thập phân, ví dụ 5.25 hoặc 5,25.` };
     }
     const deviation = extremeQcPointDeviation(val, column.mean, column.sd);
@@ -281,22 +279,18 @@ export function EntryPage() {
       result = await addPoint({ ...input, retroReason });
     }
     if (!result.ok) {
-      setPointFeedback(null);
       await errorDialog(result.error.message, { title: 'Chưa lưu được kết quả QC' });
       return { saved: false };
     }
-    setVoidMsg(null);
     const rules = result.data.rules.join(', ');
     const lotSuffix = column.parallel ? ` · lô song song ${column.lot}` : '';
     // Lần chạy khác đổi kết luận (kể cả chỉ Đạt ↔ Cảnh báo) phải hiện ra, không
     // chỉ nằm trong nhật ký.
     const retro = result.data.retroChanges.length ? ` Đổi kết luận lần chạy khác: ${describeRunChanges(result.data.retroChanges)}.` : '';
     const retroRejects = result.data.retroChanges.some(flipsRejection);
-    setPointFeedback(result.data.verdict === 'rej'
-      ? { kind: 'rej', message: `⚠ Mức ${column.level}${lotSuffix} vi phạm${rules ? ` — ${rules}` : ''}${retro}` }
-      : result.data.verdict === 'warn' || retroRejects
-        ? { kind: 'warn', message: `${result.data.verdict === 'warn' ? `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}.` : `Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.`}${retro}` }
-        : { kind: 'ok', message: `✓ Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.${retro}` });
+    if (result.data.verdict === 'rej') showToast(`Mức ${column.level}${lotSuffix} vi phạm${rules ? ` — ${rules}` : ''}${retro}`, 'rej');
+    else if (result.data.verdict === 'warn' || retroRejects) showToast(`${result.data.verdict === 'warn' ? `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}.` : `Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.`}${retro}`, 'warn');
+    else showToast(`Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.${retro}`);
     return { saved: true };
   }, [testId, decimals, addPoint]);
 
@@ -305,12 +299,10 @@ export function EntryPage() {
     if (!result.ok) await errorDialog(result.error.message, { title: 'Chưa lưu được ghi chú' });
   }, [testId, setDayNote]);
 
-  const messages: SheetMessages = useMemo(() => ({ pointFeedback, voidMsg }), [pointFeedback, voidMsg]);
   const openVoid = useCallback((point: QcPointView) => setVoiding(point), []);
   const closeVoid = useCallback(() => setVoiding(null), []);
   const onVoided = useCallback((message: string) => {
-    setVoidMsg(message);
-    setPointFeedback(null);
+    showToast(message, 'warn');
     setVoiding(null);
   }, []);
   const closeRange = useCallback(() => setRangeMode(null), []);
@@ -354,7 +346,7 @@ export function EntryPage() {
               <EntrySheet testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
                 pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable}
                 viewYear={viewYear} viewMonth={viewMonth} onViewYear={setViewYear} onViewMonth={setViewMonth}
-                messages={messages} onCommitRun={commitRun} onSaveNote={saveDayNote} />
+                onCommitRun={commitRun} onSaveNote={saveDayNote} />
               <EntryLjPanel displayColumns={displayColumns} levelCount={levels.length} pointsByLevel={pointsByLevel}
                 analysisByLevel={analysisByLevel} previousLotSeries={previousLotSeries} decimals={decimals}
                 ljFrom={ljFrom} ljTo={ljTo} ljDays={ljDays} onFrom={setLjFrom} onTo={setLjTo} onPreset={applyDayPreset}

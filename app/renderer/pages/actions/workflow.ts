@@ -31,7 +31,12 @@ export function stageForMissing(item: NceMissingItem): NceStage {
 
 export function nextStage(record: NceRecordRow, missing: readonly NceMissingItem[]): NceStage {
   if (record.next_step === 'approve' || !record.next_step) return 'review';
-  if (missing.length) return stageForMissing(missing[0]);
+  // Danh sách cổng từ main không có thứ tự thao tác; ưu tiên bước còn thiếu
+  // sớm nhất trên thanh điều hướng để không bỏ qua ảnh hưởng bệnh nhân.
+  if (missing.length) {
+    const stages = new Set(missing.map(stageForMissing));
+    return NCE_STAGES.find((stage) => stages.has(stage.id))!.id;
+  }
   return record.next_step === 'release' ? 'release' : 'review';
 }
 

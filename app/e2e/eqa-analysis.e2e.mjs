@@ -36,7 +36,7 @@ async function seed(page) {
           }
         }
         imports.push(must(await api.importEqaRound({ data: {
-          round: { program, provider: 'Trung tâm ngoại kiểm', programCode: program === 'Sinh hóa' ? 'BC' : 'DC', unitCode: 'E2E', year, round: `ĐỢT ${String(n).padStart(2, '0')}`, reportCode: `${year}-${n}`, reportDate: `${year}-${String(n).padStart(2, '0')}-20`, assignedLevel: '' },
+          round: { program, provider: 'Trung tâm ngoại kiểm', programCode: program === 'Sinh hóa' ? 'BC' : 'DC', unitCode: 'E2E', year, round: year === 2025 ? `CYCLE 22 SAMPLE ${n}` : `ĐỢT ${String(n).padStart(2, '0')}`, reportCode: `${year}-${n}`, reportDate: `${year}-${String(n).padStart(2, '0')}-20`, assignedLevel: '' },
           rows, mappings, source: 'pdf', sourceName: `${program}_${year}_${n}.pdf`,
         } })));
       }
@@ -72,11 +72,27 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
   mkdirSync(shots, { recursive: true });
   try {
     await bootstrapAndLogin(page);
+    // Ghi lại nhãn canvas thật để đo khoảng cách sau mỗi lần đổi kích thước.
+    await page.evaluate(() => {
+      const clear = CanvasRenderingContext2D.prototype.clearRect;
+      const fill = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+        this.canvas.__eqaAxisLabels = [];
+        return clear.apply(this, args);
+      };
+      CanvasRenderingContext2D.prototype.fillText = function (text, x, y, ...rest) {
+        const height = this.canvas.height / devicePixelRatio;
+        if (this.canvas.closest('[data-eqa-chart]') && y > height - 48 && y < height - 15) {
+          (this.canvas.__eqaAxisLabels ??= []).push({ text, x, width: this.measureText(text).width });
+        }
+        return fill.call(this, text, x, y, ...rest);
+      };
+    });
     const data = await seed(page);
     await page.setViewportSize({ width: 1630, height: 1000 });
     await openPage(page, 'Phân tích ngoại kiểm');
     // Khi danh sách kỳ còn đang tải, ô trống cũng có nút cùng tên; dùng nút ở đầu trang.
-    await page.locator('.eqa-intro').getByRole('button', { name: 'Nhập báo cáo PDF', exact: true }).click();
+    await page.locator('.eqa-scope-controls').getByRole('button', { name: 'Nhập báo cáo PDF', exact: true }).click();
     const importDialog = page.getByRole('dialog', { name: 'Nhập báo cáo ngoại kiểm' });
     await importDialog.getByRole('button', { name: 'Chọn tệp PDF', exact: true }).waitFor();
     assert.equal(await importDialog.locator('input[type=file]').isVisible(), false, 'control file mặc định được thay bằng bộ chọn theo giao diện hệ thống');
@@ -118,6 +134,41 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     // Mặc định phủ toàn bộ lịch sử của chương trình, để thấy các đợt gây tín hiệu (N-07).
     const shown = series.points.filter((p) => p.program_name === 'Sinh hóa');
     assert.ok(shown.some((p) => p.year === 2025) && shown.some((p) => p.year === 2026), 'chuỗi gồm cả năm trước');
+    const resultsTable = page.getByRole('region', { name: 'Kết quả từng đợt', exact: true });
+    const resultsFilter = resultsTable.getByRole('combobox', { name: 'Lọc kết quả từng đợt theo đánh giá' });
+    assert.equal(await resultsFilter.inputValue(), 'all');
+    assert.equal(await resultsFilter.locator('option:checked').innerText(), 'Tất cả kết quả');
+    assert.equal(await resultsTable.getByRole('checkbox').count(), 0, 'dropdown thay ô đánh dấu Cần xem');
+    await resultsFilter.selectOption('rej');
+    await page.locator('#eqa-series-span').selectOption('2025');
+    assert.equal(await resultsFilter.inputValue(), 'all', 'đổi khoảng xem đặt lại bộ lọc kết quả');
+    await page.locator('#eqa-series-span').selectOption('2026');
+    await page.locator('#eqa-series-span').selectOption('all');
+    const selectedBeforeFilter = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('point'));
+    for (const value of ['attention', 'ok', 'warn', 'rej', 'all']) {
+      await resultsFilter.selectOption(value);
+      const expected = shown.filter((p) => value === 'all' || (value === 'attention'
+        ? p.class !== 'ok' || p.signals.length > 0 || p.unsuccessful || p.within_tea === false
+        : p.class === value));
+      assert.equal(await resultsTable.locator('tbody>tr').count(), expected.length, `lọc đúng kết quả ${value}`);
+      if (!expected.length) await resultsTable.getByText('Không có kết quả phù hợp bộ lọc', { exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('point')), selectedBeforeFilter, 'lọc bảng giữ điểm đang chọn');
+      await page.getByRole('img', { name: new RegExp(`${shown.length} kết quả`) }).waitFor();
+    }
+    const seriesScroll = page.getByRole('region', { name: 'Vùng cuộn kết quả từng đợt' });
+    await seriesScroll.scrollIntoViewIfNeeded();
+    const seriesHeaderBefore = await seriesScroll.locator('thead th').first().boundingBox();
+    await seriesScroll.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    assert.ok(await seriesScroll.evaluate((node) => node.scrollTop > 0), 'chuỗi dài có vùng cuộn riêng');
+    const seriesHeaderAfter = await seriesScroll.locator('thead th').first().boundingBox();
+    const seriesScrollBox = await seriesScroll.boundingBox();
+    const oldestRow = await seriesScroll.locator('tbody>tr').last().boundingBox();
+    assert.ok(Math.abs(seriesHeaderAfter.y - seriesHeaderBefore.y) <= 1, 'tiêu đề từng đợt giữ vị trí khi cuộn đến đợt cũ nhất');
+    assert.ok(oldestRow.y >= seriesHeaderAfter.y + seriesHeaderAfter.height - 1, 'đợt cũ nhất nằm dưới tiêu đề cố định');
+    assert.ok(oldestRow.y + oldestRow.height <= seriesScrollBox.y + seriesScrollBox.height + 1, 'cuộn đến được đợt cũ nhất');
+    await page.screenshot({ path: path.join(shots, 'eqa-series-sticky-header.png') });
+    await seriesScroll.evaluate((node) => { node.scrollTop = 0; });
+    await page.locator('.eqa-analysis-main').evaluate((node) => { node.scrollTop = 0; });
     const box = await canvas.boundingBox();
     const peak = Math.max(...shown.map((p) => Math.abs(p.z)));
     const limit = Math.max(3.25, peak * 1.12, peak + 0.5);
@@ -128,7 +179,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     for (let dx = 56; dx < 160 && firstX === null; dx += 3) {
       await page.mouse.move(box.x + dx, box.y + firstY);
       const tip = page.locator('.qc-chart-tooltip');
-      if (await tip.count() && /ĐỢT 01 \/ 2025.*Mẫu A/s.test(await tip.innerText())) firstX = dx;
+      if (await tip.count() && /CYCLE 22 SAMPLE 1 \/ 2025.*Mẫu A/s.test(await tip.innerText())) firstX = dx;
     }
     assert.ok(firstX !== null, 'tìm thấy điểm đầu của chuỗi');
     assert.doesNotMatch(await page.locator('.qc-chart-tooltip').innerText(), /Lần chạy|Westgard|SD/);
@@ -139,6 +190,41 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await page.waitForFunction((id) => new URLSearchParams(location.hash.split('?')[1]).get('point') === id, shown.at(-1).result_id);
     await page.keyboard.press('Home');
     await page.waitForFunction((id) => new URLSearchParams(location.hash.split('?')[1]).get('point') === id, shown[0].result_id);
+    assert.equal(await page.getByRole('region', { name: 'Chi tiết dòng kết quả' }).count(), 0, 'chọn điểm không mở khối chi tiết trong bảng');
+    assert.equal(await page.locator('.eqa-table tr.is-selected>td').nth(3).innerText(), shown[0].z.toFixed(2));
+    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
+    await page.locator(`.eqa-results-table tr[data-eqa-result="${shown[0].result_id}"].is-selected`).waitFor();
+    assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('id')), shown[0].round_id, 'mở đúng kỳ lịch sử và mẫu đã chọn');
+    const multiRound = await page.evaluate(() => window.qcApi.getEqaRound(new URLSearchParams(location.hash.split('?')[1]).get('id')));
+    const roundSummary = page.locator('.eqa-overview-summary');
+    await roundSummary.getByText(`${multiRound.round.ok}/${multiRound.round.total} kết quả`, { exact: true }).waitFor();
+    assert.equal(await page.locator('.eqa-stats.is-five').count(), 0, 'kỳ báo cáo dùng cùng dải tổng hợp với Tổng quan');
+    await page.getByRole('combobox', { name: 'Lọc xét nghiệm theo đánh giá' }).selectOption('rej');
+    await page.locator('#eqaInstrument').selectOption(data.devices[0].id);
+    assert.equal(await page.getByRole('combobox', { name: 'Lọc xét nghiệm theo đánh giá' }).inputValue(), 'all', 'đổi máy đặt lại bộ lọc kết quả kỳ');
+    const machineSummary = multiRound.instruments.find((item) => item.instrument_id === data.devices[0].id);
+    await roundSummary.getByText(`${machineSummary.ok}/${machineSummary.total} kết quả`, { exact: true }).waitFor();
+    assert.equal(await page.locator('.eqa-results-table>tbody>tr:not(.eqa-detail-row)').count(), machineSummary.total);
+    await page.locator('#eqaInstrument').selectOption('');
+    await roundSummary.getByText(`${multiRound.round.ok}/${multiRound.round.total} kết quả`, { exact: true }).waitFor();
+    const resultsScroll = page.getByRole('region', { name: 'Vùng cuộn kết quả ngoại kiểm' });
+    await resultsScroll.scrollIntoViewIfNeeded();
+    const headerBeforeScroll = await resultsScroll.locator('thead').boundingBox();
+    await resultsScroll.evaluate((node) => { node.scrollTop = node.scrollHeight; node.scrollLeft = node.scrollWidth; });
+    const stickyHeader = await resultsScroll.locator('thead th').first().boundingBox();
+    assert.ok(Math.abs(stickyHeader.y - headerBeforeScroll.y) <= 1, 'tiêu đề giữ nguyên vị trí khi cuộn đến cuối bảng');
+    const scrollBox = await resultsScroll.boundingBox();
+    const finalResult = resultsScroll.locator('tbody>tr:not(.eqa-detail-row)').last();
+    const finalCell = await finalResult.locator('td').first().boundingBox();
+    assert.ok(finalCell.y >= stickyHeader.y + stickyHeader.height - 1, 'dòng cuối nằm dưới tiêu đề cố định');
+    assert.ok(finalCell.y + finalCell.height <= scrollBox.y + scrollBox.height + 1, 'cuộn đến được xét nghiệm cuối bảng');
+    assert.ok(Math.abs(stickyHeader.x - finalCell.x) <= 1, 'cuộn ngang giữ tiêu đề thẳng cột dữ liệu');
+    await page.screenshot({ path: path.join(shots, 'eqa-round-sticky-header.png') });
+    await resultsScroll.evaluate((node) => { node.scrollTop = 0; node.scrollLeft = 0; });
+    await page.evaluate(() => { document.querySelector('main').scrollTop = 0; });
+    await page.screenshot({ path: path.join(shots, 'eqa-round-summary-multi.png') });
+    await page.getByRole('button', { name: 'Danh sách kỳ' }).click();
+    await canvas.waitFor();
     const separator = page.getByRole('separator', { name: 'Độ rộng danh sách xét nghiệm' });
     await separator.focus();
     await page.keyboard.press('ArrowRight');
@@ -164,12 +250,36 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     assert.equal(await assayItems.evaluate((node) => node.scrollTop), assayScrollBefore, 'đổi xét nghiệm không dựng lại và kéo danh sách về đầu');
     assert.ok((await page.locator('.eqa-assay-list').boundingBox()).width >= 359, 'đổi xét nghiệm giữ độ rộng đã chỉnh');
     assert.equal(await page.getByRole('region', { name: 'Kết quả đang chọn' }).count(), 0, 'màn phân tích không lặp lại bảng kết quả đang chọn');
-    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở kỳ', exact: true }).click();
+    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
     const highlighted = page.locator('.eqa-results-table tr.is-selected');
     await highlighted.waitFor();
     assert.match(await highlighted.innerText(), /Ure/);
+    const roundView = await page.evaluate(() => window.qcApi.getEqaRound(new URLSearchParams(location.hash.split('?')[1]).get('id')));
+    const denominator = `${roundView.round.ok}/${roundView.round.total} kết quả`;
+    await roundSummary.getByText(denominator, { exact: true }).waitFor();
+    const roundFilters = page.getByRole('combobox', { name: 'Lọc xét nghiệm theo đánh giá' });
+    assert.equal(await roundFilters.inputValue(), 'all', 'mặc định hiển thị tất cả xét nghiệm');
+    assert.equal(await roundFilters.locator('option:checked').innerText(), 'Tất cả xét nghiệm');
+    const primaryRows = page.locator('.eqa-results-table>tbody>tr:not(.eqa-detail-row)');
+    for (const [selector, count, label, value] of [
+      ['.eqa-summary-count.is-rej', roundView.round.rej, 'Không chấp nhận', 'rej'],
+      ['.eqa-summary-count.is-warn', roundView.round.warn, 'Cảnh báo', 'warn'],
+      ['.eqa-accept-summary', roundView.round.ok, 'Chấp nhận', 'ok'],
+    ]) {
+      await roundSummary.locator(selector).click();
+      assert.equal(await primaryRows.count(), count, `bấm tổng hợp lọc đúng ${label}`);
+      assert.equal(await roundFilters.inputValue(), value);
+      await roundSummary.getByText(denominator, { exact: true }).waitFor();
+    }
+    await roundFilters.selectOption('rej');
+    assert.equal(await primaryRows.count(), roundView.round.rej, 'dropdown lọc đúng không chấp nhận');
+    await roundFilters.selectOption('all');
+    assert.equal(await primaryRows.count(), roundView.round.total);
+    await page.evaluate(() => { document.querySelector('main').scrollTop = 0; });
+    await page.screenshot({ path: path.join(shots, 'eqa-round-summary.png') });
     await page.getByRole('button', { name: 'Danh sách kỳ' }).click();
     await page.getByRole('heading', { name: 'Ure · AU5800', exact: true }).waitFor();
+    await page.waitForFunction((top) => document.querySelector('.eqa-assay-items')?.scrollTop === top, assayScrollBefore);
     await page.getByRole('button', { name: 'Quay lại', exact: false }).click();
     await page.locator('.eqa-zmap').waitFor();
     assert.equal(await page.locator('#eqa-scope-program').inputValue(), data.programId);
@@ -196,9 +306,9 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await page.getByText('Không tải được danh sách', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
     await page.locator('.eqa-assay-item').first().waitFor();
-    await page.waitForFunction(() => [...document.querySelectorAll('.eqa-stat')]
-      .find((node) => node.querySelector('span')?.textContent === 'z đang chọn')?.querySelector('b')?.textContent === '-0.60');
-    await page.getByText(/Chương trình này mới có 1 đợt; cần ít nhất 6 đợt/).waitFor();
+    await page.waitForFunction(() => document.querySelector('.eqa-table tr.is-selected>td:nth-child(4)')?.textContent === '-0.60');
+    await page.getByText('Chưa đủ đợt đánh giá xu hướng · 1/6', { exact: true }).waitFor();
+    assert.ok((await canvas.boundingBox()).height <= 221, 'một đợt dùng biểu đồ thấp, không tạo diện tích trống lớn');
     await page.screenshot({ path: path.join(shots, 'eqa-analysis-single-round.png'), fullPage: true });
     await setDetailScope(page, { programId: data.programId });
     await page.waitForFunction(() => document.querySelector('.eqa-assay-item[aria-pressed=true] .eqa-assay-z')?.textContent === '3.40');
@@ -221,11 +331,18 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
       } finally { await resizeState.dispose(); }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `không cuộn ngang toàn trang ở ${width}px`);
       assert.equal(await canvas.evaluate((node) => Math.abs(node.width - node.clientWidth * devicePixelRatio) <= 2), true, `canvas vẽ lại đúng độ phân giải ở ${width}px`);
+      const labels = await canvas.evaluate((node) => node.__eqaAxisLabels);
+      assert.ok(labels.length > 1, 'có nhãn đợt trên trục X');
+      assert.ok(labels.every(({ text }) => /^\d+\/202[56]$/.test(text)), `nhãn chỉ giữ số đợt/mẫu và năm tại ${width}px`);
+      for (let i = 1; i < labels.length; i++) {
+        assert.ok(labels[i].x - labels[i].width / 2 - (labels[i - 1].x + labels[i - 1].width / 2) >= 10, `nhãn không chồng nhau tại ${width}px`);
+      }
       await page.screenshot({ path: path.join(shots, `eqa-analysis-${width}.png`), fullPage: true });
     }
     await page.getByRole('img', { name: new RegExp(`${shown.length} kết quả`) }).waitFor();
     await page.locator('#eqa-series-span').selectOption('2025');
     await page.getByRole('img', { name: /4 kết quả/ }).waitFor();
+    await page.locator('summary', { hasText: 'Căn cứ đánh giá chuỗi' }).click();
     await page.getByText(/Đang xem năm 2025; tín hiệu chuỗi vẫn tính trên toàn bộ 11 đợt/).waitFor();
     // Ô khoảng xem đổi URL bằng replace; các bước deep-link ở trên lại thêm mục
     // lịch sử. Mở lại bằng đường dẫn để "Quay lại" về tổng quan như khi mở thẳng.

@@ -77,7 +77,7 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
                 <tr key={point.id}>
                   <td>{vnDate(point.date)}</td><td>Mức {point.level} · Lô {point.lot || '—'}</td>
                   <td className="num">{valText(point.val)}</td><td>{point.run_id || '—'}</td>
-                  <td>{point.voided_by || '—'}</td><td>{point.void_reason || '—'}</td>
+                  <td>{point.voided_by_name || point.voided_by || '—'}</td><td>{point.void_reason || '—'}</td>
                 </tr>
               ))}</tbody>
             </table>

@@ -248,3 +248,57 @@ test('LIS: bản tin đã nhận rồi huỷ điểm không tạo lại điểm 
   assert.equal(f.count('qc_points'), 1);
   assert.equal(f.db.prepare('SELECT voided FROM qc_points WHERE id=?').get(saved.pointId).voided, 1);
 });
+
+test('LIS: đọc hết các trang hàng chờ, bản tin hợp lệ không bị bản tin chưa ánh xạ che mất', async (t) => {
+  const f = fixture(t), seen = [];
+  const unmapped = Array.from({ length: 500 }, (_, i) => ({ ...f.record(`unmapped-${i}`), resolved: { ok: false, code: 'UNMAPPED', reason: 'Chưa ánh xạ' } }));
+  const valid = f.record('valid-after-500');
+  const pages = { '': { items: unmapped, nextCursor: 'unmapped-499' }, 'unmapped-499': { items: [valid], nextCursor: null } };
+  globalThis.fetch = async (url, options) => {
+    const parsed = new URL(String(url));
+    if (parsed.pathname === '/api/v1/qc-results') {
+      seen.push(parsed.searchParams.get('after') || '');
+      return { ok: true, json: async () => structuredClone(pages[parsed.searchParams.get('after') || '']) };
+    }
+    if (parsed.pathname.endsWith('/decide')) {
+      const body = JSON.parse(options.body); f.state.calls.push(body);
+      pages['unmapped-499'].items = pages['unmapped-499'].items.filter((item) => item.message.messageId !== body.messageId);
+    }
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  const queue = must(await f.lis.pullQueue(f.actor));
+  assert.deepEqual(seen, ['', 'unmapped-499']);
+  assert.equal(queue.pending.length, 1); assert.equal(queue.unresolved.length, 500);
+  const saved = must(await f.lis.importResult({ data: { record: valid } }, f.actor));
+  assert.equal(saved.gatewayWarning, undefined); assert.equal(f.count('qc_points'), 1);
+});
+
+test('LIS: tên người nhận/bỏ dài hoặc xuống dòng vẫn gửi được sang Gateway', async (t) => {
+  const f = fixture(t), actor = { ...f.actor, name: `Nguyễn\nVăn ${'A'.repeat(250)}` };
+  must(await f.lis.importResult({ data: { record: (f.state.queue = [f.record('long-name')])[0] } }, actor));
+  f.state.queue = [f.record('reject-me')];
+  must(await f.lis.rejectResult({ data: { messageId: 'reject-me', note: '  dòng 1\ndòng 2  ' } }, actor));
+  assert.equal(f.state.calls.length, 2);
+  for (const call of f.state.calls) {
+    assert.ok(call.by.length <= 200 && call.by.startsWith('Nguyễn Văn A'));
+    assert.doesNotMatch(call.by, /[\u0000-\u001f]/u);
+  }
+  assert.equal(f.state.calls[1].note, 'dòng 1 dòng 2');
+});
+
+test('LIS: cùng bản tin gốc dưới mã Gateway mới (sau phục hồi Gateway) không thành điểm QC thứ hai', async (t) => {
+  const f = fixture(t), source = { sourceId: 'LIS01', messageId: 'QC-0001' };
+  const first = must(await f.receive({ ...f.record('gateway-uuid-1'), source }));
+  assert.equal(first.gatewayWarning, undefined);
+  const again = { ...f.record('gateway-uuid-2'), source }; f.state.queue = [again]; f.state.calls = [];
+  const queue = must(await f.lis.pullQueue(f.actor));
+  assert.equal(queue.pending.length, 0); assert.equal(queue.unresolved[0].resolved.code, 'DUPLICATE_SOURCE');
+  assert.equal((await f.lis.importResult({ data: { record: again } }, f.actor)).error.code, 'lis-duplicate-source');
+  assert.equal(f.count('qc_points'), 1); assert.equal(f.state.calls.length, 0);
+  // Bỏ bản tin trùng vẫn được phép; nguồn khác cùng mã gốc vẫn nhận bình thường.
+  must(await f.lis.rejectResult({ data: { messageId: 'gateway-uuid-2' } }, f.actor));
+  const otherSource = { ...f.record('gateway-uuid-3', 101), source: { sourceId: 'LIS02', messageId: 'QC-0001' } };
+  otherSource.message.runId = 'other-run';
+  must(await f.receive(otherSource));
+  assert.equal(f.count('qc_points'), 2);
+});

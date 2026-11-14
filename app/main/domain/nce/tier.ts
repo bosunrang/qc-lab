@@ -40,7 +40,7 @@ export function nceTierMissing(dossier: Pick<NceDossier, 'tier' | 'tierReason' |
 export function nceErrorClass(runs: readonly { role: string; snapshot: NceRunSnapshot }[]): 'SE' | 'RE' | '' {
   const trigger = runs.find((run) => run.role === 'trigger');
   if (!trigger) return '';
-  return errorClass(trigger.snapshot.points.filter((point) => point.verdict === 'rej').flatMap((point) => [...point.rules]));
+  return errorClass(trigger.snapshot.points.filter((point) => !point.voided && point.verdict === 'rej').flatMap((point) => [...(point.rejectRules ?? point.rules)]));
 }
 
 export interface NceRecurrenceCandidate { id: string; testId: string | null; source: NceSource; errorClass: string; detectedDate: string; cancelled: boolean }

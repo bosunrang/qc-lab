@@ -1,6 +1,7 @@
 // Phạm vi đọc ngoại kiểm đi cùng URL để mở xét nghiệm, xem kỳ rồi quay lại
 // vẫn giữ năm, chương trình và máy. Chỉ lọc dữ liệu; kết luận do main tính.
 import { useSearchParams } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useEqaStore } from '../../store/eqa-store';
 import { isoLocalDate } from '../../../main/domain/local-date';
 
@@ -66,10 +67,15 @@ export function useEqaScope(preferredInstrumentId?: string) {
     else query.set('assay', selection.testId);
     setParams(query, { replace: true });
   }
-  return { year, years, programs, programId, machines, instrumentId, rounds: scopedRounds, context, params, change, select };
+  function clearSelection() {
+    const query = eqaContextParams(params, context);
+    if (params.get('test')) query.set('test', params.get('test')!);
+    setParams(query, { replace: true });
+  }
+  return { year, years, programs, programId, machines, instrumentId, rounds: scopedRounds, context, params, change, select, clearSelection };
 }
 
-export function EqaScopeControls({ scope }: { scope: ReturnType<typeof useEqaScope> }) {
+export function EqaScopeControls({ scope, action }: { scope: ReturnType<typeof useEqaScope>; action?: ReactNode }) {
   return <div className="eqa-scope-controls" aria-label="Phạm vi ngoại kiểm">
     <div className="field"><label htmlFor="eqa-scope-year">Năm</label><select id="eqa-scope-year" value={scope.year} onChange={(e) => scope.change({ year: Number(e.target.value) })}>
       {(scope.years.length ? scope.years : [scope.year]).map((y) => <option key={y} value={y}>{y}</option>)}
@@ -82,5 +88,6 @@ export function EqaScopeControls({ scope }: { scope: ReturnType<typeof useEqaSco
       {!scope.machines.length && <option value="">Chưa có máy</option>}
       {scope.machines.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
     </select></div>
+    {action && <div className="eqa-scope-action">{action}</div>}
   </div>;
 }

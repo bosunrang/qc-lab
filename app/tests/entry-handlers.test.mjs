@@ -72,7 +72,18 @@ const voidedRows = entry.listVoidedPoints(test.id);
 assert.equal(voidedRows.length, 1, 'điểm đã huỷ phải có endpoint tra cứu riêng');
 assert.equal(voidedRows[0].id, p2.data.id);
 assert.equal(voidedRows[0].voided_by, actor.username);
+assert.equal(voidedRows[0].voided_by_name, actor.username, 'không còn tài khoản thì vẫn đối chiếu được username gốc');
 assert.match(voidedRows[0].void_reason, /Nhap sai gia tri/);
+
+// Điểm cũ tự hiển thị họ tên khi tra được tài khoản, kể cả tài khoản đã tắt.
+db.prepare('INSERT INTO users(id,username,name,role,active) VALUES (?,?,?,?,0)')
+  .run('void-display-user', actor.username, 'Nguyễn Văn Cần', 'admin');
+assert.equal(entry.listVoidedPoints(test.id)[0].voided_by_name, 'Nguyễn Văn Cần');
+assert.equal(entry.listVoidedPoints(test.id)[0].voided_by, actor.username, 'họ tên hiển thị không được thay username truy vết');
+db.prepare("UPDATE users SET name='   ' WHERE id='void-display-user'").run();
+assert.equal(entry.listVoidedPoints(test.id)[0].voided_by_name, actor.username, 'tên trống không che mất người huỷ gốc');
+db.prepare("DELETE FROM users WHERE id='void-display-user'").run();
+assert.equal(entry.listVoidedPoints(test.id)[0].voided_by_name, actor.username);
 
 const voidAgain = entry.voidPoint({ data: { pointId: p2.data.id, reason: 'Nhap sai gia tri lan nua' } }, actor);
 assert.equal(voidAgain.ok, false);

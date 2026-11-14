@@ -33,7 +33,8 @@ const point = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09
 
 // Tạo khoảng trống 01,03. Cách COUNT(*) cũ sẽ sinh lại 03 và đụng UNIQUE;
 // cách mới phải lấy MAX suffix + 1 = 04.
-const today = new Date().toISOString().slice(0, 10);
+// Mã hồ sơ dùng ngày địa phương, không lấy ngày UTC lúc đầu ngày ở Việt Nam.
+const today = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const prefix = `NCE-${today.replace(/-/g, '')}`;
 db.prepare('INSERT INTO actions(id,nce_id) VALUES (?,?)').run('gap-01', `${prefix}-01`);
 db.prepare('INSERT INTO actions(id,nce_id) VALUES (?,?)').run('gap-03', `${prefix}-03`);

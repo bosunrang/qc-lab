@@ -56,7 +56,7 @@ test('máy trạm LAN đăng nhập, nhập điểm, không làm được thao t
     await openPage(station, 'Nhập QC & Biểu đồ');
     await station.locator('.qc-sheet-title strong', { hasText: seeded.testName }).waitFor();
     await enterValue(station, today, 1, 4.95);
-    await station.locator('.entry-sheet-message .alert.ok', { hasText: 'Mức 1' }).waitFor();
+    await station.locator('.toast-ok', { hasText: 'Mức 1' }).waitFor();
 
     // Điểm máy trạm nhập nằm trong CSDL của máy chính, ghi đúng người nhập.
     const saved = await page.evaluate((testId) => window.qcApi.queryPoints(testId, 1), seeded.testId);

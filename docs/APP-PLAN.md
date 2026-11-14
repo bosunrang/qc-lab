@@ -17,6 +17,16 @@ rộng hoặc chỉnh sửa mã nguồn.
 - Bản xem trước chạy bằng Vite và sql.js/WASM. Bản Electron dùng `node:sqlite`.
 - Renderer chỉ gọi API đã công bố qua preload; không tự thực hiện SQL hoặc
   lặp lại nghiệp vụ của main process.
+- Thông báo nhập/huỷ QC dùng cùng toast góc dưới phải với Cài đặt, tự tắt
+  sau 4–8 giây theo độ dài. Giữ màu thành công/cảnh báo/loại bỏ; lỗi không
+  lưu được vẫn hiện ở ô nhập hoặc hộp thoại. Không đặt thông báo dưới bảng.
+- Phần nền Gateway chạy độc lập trong `app/main/gateway/`, dùng SQLite riêng
+  `gateway.sqlite`: API tiếp nhận QC chuẩn hoá, token phân quyền/gắn nguồn,
+  ánh xạ chính xác, hàng chờ bền vững, quyết định nhận/bỏ, nhật ký và sao lưu.
+  Cổng QC Lab/quản trị chỉ nghe loopback 8787. Có thể bật cổng ingress HTTPS
+  riêng, chỉ nhận token nguồn LIS. Không tự thêm dữ liệu mẫu khi chạy thật.
+  Bộ chuyển đổi theo giao thức của từng LIS chưa nằm trong phần nền này.
+  Xem `docs/LIS-GATEWAY.md` để vận hành và bàn giao hợp đồng tích hợp.
 - Bản cài từ 1.1.0 xác minh giấy phép offline Ed25519 gắn với mã máy ở main;
   máy chưa kích hoạt hoặc hết hạn bị chặn cả IPC nghiệp vụ và máy trạm LAN.
   Khoá bí mật cấp mã nằm ngoài repository; bộ cài chỉ có khoá công khai.
@@ -50,6 +60,10 @@ rộng hoặc chỉnh sửa mã nguồn.
   thuần, transaction, `writeAudit()`, rồi `notifyChanged()`.
 - Không xoá cứng điểm QC. Khi cần loại bỏ, dùng quy trình huỷ điểm hiện có để
   giữ dấu vết, lý do và liên kết khắc phục sai lệch.
+  Hộp thoại huỷ đọc phân loại Westgard và luật làm căn cứ từ main theo toàn
+  bộ lần chạy trước huỷ, cùng ảnh chụp dùng khi lập NCE; tách lô song song
+  khỏi lô chính. Chỉ luật thực sự gây loại quyết định RE/SE, cảnh báo không
+  tự thành căn cứ. Thiếu căn cứ thì báo rõ, không tự điền loại hoặc lý do huỷ.
 - Kỳ đã khoá không được sửa dữ liệu QC liên quan. Mọi thay đổi có ảnh hưởng
   đánh giá phải tôn trọng cổng khoá kỳ.
 - Danh mục xét nghiệm, máy, lô QC và mức QC là nguồn dữ liệu chung. Các trang
@@ -210,6 +224,46 @@ rộng hoặc chỉnh sửa mã nguồn.
 | Khắc phục sự cố | Hồ sơ NCE theo lần chạy: kiểm soát, cho phép hoạt động trở lại, CAPA, hiệu lực và duyệt độc lập |
 | Báo cáo & Biểu mẫu | Báo cáo dữ liệu, báo cáo Sigma, PDF/Excel và mẫu biểu |
 | Cài đặt & Đám mây | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
+
+Tổng quan ngoại kiểm dùng tỷ lệ chấp nhận theo số kết quả đã nhập của đúng
+máy–chương trình–năm; đây là chỉ số tổng hợp, không thay kết luận từng mẫu
+hoặc trạng thái xử lý. Lọc theo xếp loại chỉ lọc xét nghiệm, giữ các đợt và
+mẫu để đối chiếu; đổi phạm vi rồi quay về vẫn đặt lại bộ lọc về tất cả.
+Lỗi tải có trạng thái và nút thử lại riêng, không hiển thị như danh sách rỗng
+hoặc kết luận không có tín hiệu. Bảng tổng hợp z-score dùng nhãn số đợt/năm; đường z nhỏ có cùng thang đo,
+tách đường theo mẫu và ngắt khi thiếu đợt. Chi tiết chỉ mở khi chọn đúng ô,
+không tự thay bằng kết quả khác. Tín hiệu chuỗi vẫn lấy từ main theo toàn
+bộ lịch sử chương trình. Phần tín hiệu chỉ hiển thị đúng máy–chương trình–năm
+đang chọn, không có bảng hoặc thông báo tín hiệu ngoài phạm vi.
+Kỳ báo cáo dùng cùng dải tổng hợp với Tổng quan: tỷ lệ kèm số kết quả,
+không chấp nhận và cảnh báo. Số liệu theo máy đang chọn (hoặc toàn kỳ khi
+chọn tất cả máy); lọc xếp loại chỉ đổi bảng, không đổi mẫu số tổng hợp.
+Lọc xếp loại ở kỳ báo cáo dùng dropdown, mặc định “Tất cả xét nghiệm”,
+đồng bộ với thao tác bấm số liệu trên dải tổng hợp.
+Hai màn chi tiết dùng chung dropdown đánh giá; đổi máy, xét nghiệm hoặc
+phạm vi xem đặt lại bộ lọc về tất cả. Các lượt tải kỳ chồng nhau chỉ nhận
+phản hồi mới nhất, không ghi đè dữ liệu đã cập nhật bằng phản hồi cũ.
+“Cần xem” ở cả hai màn chi tiết gồm cả kết quả vượt TEa nội bộ; tiêu chí
+lọc này không đổi đánh giá ngoại kiểm chính thức.
+Bảng kết quả kỳ và bảng kết quả từng đợt dùng chung khung cuộn hai chiều,
+giữ hàng tiêu đề cột trên cùng khi cuộn dọc; cuộn ngang giữ tiêu đề và dữ liệu thẳng cột.
+Trong chi tiết kết quả, z tính lại nằm trong mục đối chiếu; nếu main báo lệch
+hoặc ngược dấu nhà cung cấp thì nhắc ngay dưới z chính thức. Trạng thái chuỗi
+phân biệt thiếu dữ liệu, chưa đủ đợt và không có tín hiệu; vẫn hiện tín hiệu
+đã có khi chưa đủ đợt kết luận xu hướng. Mã và ngày báo cáo luôn hiện, tên tệp
+nguồn nằm trong mục mở rộng.
+Đối chiếu TEa chỉ ghi trong/vượt khi main đã trả kết luận; giá trị trống
+được hiển thị là chưa đủ dữ liệu đối chiếu.
+Chi tiết xét nghiệm chỉ có dòng tổng hợp nhỏ dưới tiêu đề biểu đồ; không có
+khối kết quả đang chọn riêng. Biểu đồ một đợt có chiều cao gọn, vẫn giữ điểm/mẫu riêng và ngắt ở
+dữ liệu thiếu; nhãn thiếu đợt lấy trạng thái của toàn bộ chương trình từ main.
+Bảng từng đợt giữ kết quả, giá trị ấn định, z và đánh giá chính thức; không có
+khối chi tiết mở rộng. Nút “Mở kỳ báo cáo” dẫn đến đúng kỳ và kết quả của dòng.
+Dropdown của bảng từng đợt mặc định “Tất cả kết quả”, có các lựa chọn cần xem,
+chấp nhận, cảnh báo và không chấp nhận; chỉ lọc bảng, giữ nguyên chuỗi biểu đồ.
+Danh sách xét nghiệm giữ vị trí cuộn khi đổi xét nghiệm hoặc mở kỳ rồi quay
+lại; thay đổi cấu hình nạp lại cả chuỗi lẫn danh sách. Biểu đồ phần trăm có
+chú giải riêng cho điểm chưa có đối chiếu TEa, không coi là trong/vượt TEa.
 
 Quy trình quản lý khoá, cấp mã theo máy và phát hành cập nhật nằm tại
 `docs/SOFTWARE-LICENSE-AND-UPDATES.md`. Giấy phép là cấu hình riêng của máy,

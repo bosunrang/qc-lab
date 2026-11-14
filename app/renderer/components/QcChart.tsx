@@ -535,9 +535,17 @@ function drawLJ(
   ctx.fillStyle = '#536772'; ctx.font = '700 11.5px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   if (layout) {
-    // Nhãn theo nhóm, giãn đều; khoảng 120px một nhãn để không chồng chữ.
-    const total = Math.min(layout.count, Math.max(1, Math.floor(cw / 120)));
-    const picks = total === 1 ? [layout.count - 1] : [...new Set(Array.from({ length: total }, (_, i) => Math.round((i * (layout.count - 1)) / (total - 1))))];
+    // Giãn nhãn theo chiều rộng chữ thực tế; tự bớt nhãn khi khung hẹp.
+    const labelWidth = Math.max(0, ...(comparison?.groupLabels ?? []).map((label) => ctx.measureText(label).width));
+    const pitch = layout.count > 1 ? layout.center(1) - layout.center(0) : cw;
+    const step = Math.max(1, Math.ceil(Math.max(60, labelWidth + 16) / Math.max(1, pitch)));
+    const picks = Array.from({ length: Math.ceil(layout.count / step) }, (_, i) => i * step);
+    const last = layout.count - 1;
+    if (picks.at(-1) !== last) {
+      // Giữ nhãn đợt cuối, bỏ nhãn sát nó nếu không còn đủ khoảng trống.
+      if (last - picks[picks.length - 1] < step) picks.pop();
+      picks.push(last);
+    }
     for (const g of picks) ctx.fillText(comparison?.groupLabels?.[g] ?? '', layout.center(g), padT + ch + 10);
   } else for (const tick of ticksOf(points, comparison ? Math.max(1, Math.floor(cw / 140)) : 5)) {
     const label = comparison ? comparison.labels[tick.index] ?? '' : tick.label;

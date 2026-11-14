@@ -63,6 +63,8 @@ export interface NceRunKey { date: string; runId: string }
 export interface NceRunPoint {
   pointId: string; level: number; lot: string; voided: boolean;
   verdict: RuleVerdict | 'none'; rules: readonly string[];
+  /** Luật thực sự gây loại sau ghi đè hành động; snapshot cũ có thể chưa lưu. */
+  rejectRules?: readonly string[];
   val: number; mean: number | null; sd: number | null; z: number | null;
 }
 

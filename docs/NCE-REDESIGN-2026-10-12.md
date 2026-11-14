@@ -829,6 +829,11 @@ commit `9017e96`), không thuộc phạm vi này.
   đủ của main vẫn được giữ trong mục thu gọn ngay dưới thanh bước và mỗi mục
   tiếp tục dẫn tới đúng phần cần xử lý; giao diện không tự suy đoán bước hoàn
   tất từ thứ tự hiển thị.
+- Điều hướng tự động (14/11/2026): từ các điều kiện còn thiếu do main trả
+  về, chọn bước sớm nhất trên thanh bảy bước. Sau xác minh kỹ thuật phải mở
+  Ảnh hưởng bệnh nhân nếu bước này còn thiếu, dù cổng QC rerun đứng trước
+  trong danh sách. Không đổi điều kiện cho hoạt động trở lại hoặc quyền duyệt;
+  người dùng vẫn có thể chọn bước để xem và sửa.
 
 Chưa có e2e riêng cho máy trạm LAN thiếu quyền và hai máy cùng sửa một hồ sơ;
 hai ca này đã có test handler (`nce-handlers.test.mjs`, `ipc-operations`).

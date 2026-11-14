@@ -8,7 +8,8 @@ const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handler
 const db = openDatabase(':memory:');
 const config = createConfigHandlers(db);
 const actor = { userId: 'u1', username: 'admin', name: 'Quản trị viên', role: 'admin', clientId: 'test-client' };
-const today = new Date().toISOString().slice(0, 10);
+// Mốc hiệu lực theo ngày địa phương; đầu ngày ở Việt Nam, UTC vẫn là hôm trước.
+const today = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 const instrument = config.saveInstrument({ data: { name: 'Máy A' } }, actor).data;
 const test = config.saveTest({ data: { name: 'Glucose', instrumentId: instrument.id } }, actor).data;

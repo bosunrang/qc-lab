@@ -6,6 +6,50 @@ import path from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import { bootstrapAndLogin, launchApp, openPage, seedOperationalTest, todayIn } from './helpers.mjs';
 
+test('NCE: lưu bước 3 tự mở bước 4 khi chưa đánh giá ảnh hưởng bệnh nhân', { timeout: 90_000 }, async () => {
+  const { app, page, errors } = await launchApp();
+  try {
+    await bootstrapAndLogin(page);
+    const { testId } = await seedOperationalTest(page);
+    const date = await todayIn(page);
+    await page.evaluate(async ({ testId, date }) => {
+      const api = window.qcApi;
+      const must = (result) => { if (!result.ok) throw new Error(JSON.stringify(result.error)); return result.data; };
+      must(await api.addPoint({ data: { testId, level: 1, date, runId: '1', val: 6 } }));
+      const user = await api.currentUser();
+      const created = must(await api.createNce({ data: {
+        source: 'iqc', testId, trigger: { date, runId: '1' },
+        description: 'QC vượt giới hạn, kiểm tra chuyển bước sau xác minh',
+        correction: 'Đã giữ kết quả và kiểm tra máy', holdResults: true,
+        detectedAt: date, ownerUserId: user.id,
+      } }));
+      const checklist = Object.fromEntries(['qcMaterial', 'reagent', 'calibration', 'instrument', 'environment', 'operator', 'lotChange'].map((key) => [key, { status: 'ok', note: '' }]));
+      must(await api.updateNce({ data: { id: created.record.id, expectedVersion: created.record.row_version, patch: {
+        containmentNote: 'Giữ toàn bộ kết quả ca sáng, đã báo phụ trách xét nghiệm.', checklist,
+      } } }));
+    }, { testId, date });
+    await openPage(page, 'Khắc phục sự cố');
+    await page.getByRole('region', { name: 'Danh sách hồ sơ NCE' }).getByRole('button', { name: 'Mở hồ sơ' }).click();
+    const navigation = page.getByRole('navigation', { name: 'Các bước xử lý hồ sơ' });
+    await navigation.getByRole('button', { name: /Xác minh kỹ thuật/, pressed: true }).waitFor();
+    const technical = page.getByRole('region', { name: 'Xác minh kỹ thuật IQC' });
+    await technical.getByRole('button', { name: 'Ghi đánh giá', exact: true }).click();
+    await technical.locator('#techNature').selectOption('random');
+    await technical.locator('#techMode').selectOption('not_applicable');
+    await technical.locator('#techMethod').fill('Đối chiếu nhật ký máy và thao tác của ca chạy.');
+    await technical.locator('#techEvidence').fill('Đã thay lọ QC và kiểm tra lại thao tác hút mẫu.');
+    await technical.locator('#techConclusion').fill('Chưa ghi nhận bằng chứng sai lệch hệ thống.');
+    await technical.locator('#techMetricReason').fill('Sai số ngẫu nhiên, chưa đủ dữ liệu ước lượng Bias tin cậy.');
+    await technical.getByRole('button', { name: 'Ghi đánh giá kỹ thuật', exact: true }).click();
+    await navigation.getByRole('button', { name: /Ảnh hưởng bệnh nhân/, pressed: true }).waitFor();
+    await page.getByRole('region', { name: 'Ảnh hưởng kết quả bệnh nhân' }).waitFor();
+    assert.equal(await navigation.getByRole('button', { name: /Cho hoạt động trở lại/ }).getAttribute('aria-pressed'), 'false');
+    assert.deepEqual(errors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test('NCE: khung bước và nội dung thẳng hàng khi mở hoặc thu gọn menu', { timeout: 90_000 }, async () => {
   const { app, page, errors } = await launchApp();
   try {
@@ -53,7 +97,7 @@ test('NCE: khung bước và nội dung thẳng hàng khi mở hoặc thu gọn 
     const identity = page.getByRole('region', { name: 'Ghi nhận và xử lý tức thời' });
     await identity.getByRole('button', { name: 'Sửa', exact: true }).click();
     await identity.locator('#idContainment').fill('Máy A, ca sáng; báo phụ trách lúc 08:15');
-    await identity.locator('#idOccurred').fill('08:00 phát hiện; 08:30 xử lý xong');
+    assert.equal(await identity.locator('#idOccurred').count(), 0, 'đã bỏ ô nhập diễn biến bổ sung khỏi biểu mẫu');
     await navigation.getByRole('button', { name: /Kiểm tra nhanh/ }).click();
     await page.getByRole('region', { name: 'Kiểm tra nhanh các yếu tố thường gặp' }).waitFor();
     await navigation.getByRole('button', { name: /Ghi nhận sự cố/ }).click();

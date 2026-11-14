@@ -72,6 +72,7 @@ export function nceRunSnapshot(db: Db, testId: string, run: NceRunKey, extraCuts
   }
   const rows = db.prepare('SELECT id,level,lot,val,voided,qc_mean,qc_sd FROM qc_points WHERE test_id=? AND date=? AND run_id=? ORDER BY level')
     .all(testId, run.date, run.runId) as { id: string; level: number; lot: string; val: number; voided: number; qc_mean: number | null; qc_sd: number | null }[];
+  const actionOf = testRuleActionOf(db, testId, run);
   return {
     testId, date: run.date, runId: run.runId,
     points: rows.map((row) => {
@@ -81,6 +82,7 @@ export function nceRunSnapshot(db: Db, testId: string, run: NceRunKey, extraCuts
         mean: found?.mean ?? row.qc_mean, sd: found?.sd ?? row.qc_sd,
         z: found && Number.isFinite(found.flag.z) ? found.flag.z : null,
         verdict: verdictOf(found?.flag), rules: found ? [...found.flag.rules] : [],
+        rejectRules: found ? rejectingRules(found.flag.rules, actionOf) : [],
       };
     }),
   };

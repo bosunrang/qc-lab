@@ -14,6 +14,8 @@ import { listParallelColumns } from './parallel-columns';
 const APP_META_KEY = 'lisGatewaySettings';
 const FETCH_TIMEOUT_MS = 8000;
 const ACK_RETRY_LIMIT = 20;
+const QUEUE_PAGE_SIZE = 500;
+const QUEUE_MAX_PAGES = 20;
 
 interface LisImportReceipt {
   id: string; gateway_origin: string; message_id: string; point_id: string;
@@ -60,11 +62,36 @@ async function gatewayFetch(settings: LisGatewaySettings, path: string, init: { 
   }
 }
 
-/** Hàng chờ `pending` của Gateway — nguồn duy nhất của bản ghi LIS. */
+/** Hàng chờ `pending` của Gateway — nguồn duy nhất của bản ghi LIS. Đọc hết
+ * các trang theo `nextCursor`: bản tin chưa ánh xạ vẫn ở trạng thái chờ, nếu
+ * chỉ đọc trang đầu thì chúng chiếm chỗ và che mất bản tin hợp lệ mới hơn. */
 async function fetchPending(settings: LisGatewaySettings): Promise<LisQueueRecord[]> {
-  const body = await gatewayFetch(settings, '/api/v1/qc-results?status=pending&limit=500');
-  return Array.isArray(body.items) ? body.items.filter((item: LisQueueRecord | null) => item && typeof item === 'object' && item.message && typeof item.message === 'object') : [];
+  const items: LisQueueRecord[] = [];
+  let after = '';
+  for (let page = 0; page < QUEUE_MAX_PAGES; page++) {
+    const body = await gatewayFetch(settings, `/api/v1/qc-results?status=pending&limit=${QUEUE_PAGE_SIZE}${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+    if (Array.isArray(body.items)) items.push(...body.items.filter((item: LisQueueRecord | null) => item && typeof item === 'object' && item.message && typeof item.message === 'object'));
+    // Gateway giả lập cũ không trả `nextCursor`; khi đó chỉ có một trang.
+    const next = typeof body.nextCursor === 'string' ? body.nextCursor : '';
+    if (!next || next === after) break;
+    after = next;
+  }
+  return items;
 }
+
+/** Chuỗi gửi sang Gateway: một dòng, không ký tự điều khiển, không quá `max`
+ * (Gateway từ chối cả lô nếu sai, khiến điểm đã lưu không xác nhận được).
+ * Người quyết định tối đa 200 ký tự như họ tên trong QC Lab. */
+function gatewayText(value: unknown, max: number): string {
+  let out = '';
+  // Cắt theo ký tự Unicode để không tách đôi cặp surrogate; Gateway đo theo độ dài chuỗi JS.
+  for (const ch of String(value || '').replace(/[\u0000-\u001f\u007f-\u009f]+/gu, ' ').replace(/\s+/gu, ' ').trim()) {
+    if (out.length + ch.length > max) break;
+    out += ch;
+  }
+  return out.trim();
+}
+const gatewayActorName = (name: string) => gatewayText(name, 200) || 'QC Lab';
 
 export function createLisHandlers(db: Db) {
   function receiptOf(settings: LisGatewaySettings, messageId: string): LisImportReceipt | undefined {
@@ -76,6 +103,19 @@ export function createLisHandlers(db: Db) {
     try { return lisMessageFingerprint(JSON.parse(receipt.record_json)) === lisMessageFingerprint(record); }
     catch { return false; }
   }
+
+  /** Dấu vết đã nhận cùng bản tin GỐC (nguồn + mã của LIS) dưới một mã Gateway
+   * khác. Xảy ra khi Gateway được phục hồi từ bản sao lưu cũ rồi LIS gửi lại:
+   * Gateway cấp UUID mới, chỉ chống trùng theo UUID sẽ tạo thêm điểm QC. */
+  function receiptOfSource(settings: LisGatewaySettings, record: LisQueueRecord): LisImportReceipt | undefined {
+    const sourceId = lisText(record.source?.sourceId), sourceMessageId = lisText(record.source?.messageId);
+    if (!sourceId || !sourceMessageId) return undefined;
+    return db.prepare(`SELECT * FROM lis_imports WHERE gateway_origin=? AND message_id<>?
+      AND CASE WHEN json_valid(record_json) THEN json_extract(record_json,'$.source.sourceId') END=?
+      AND CASE WHEN json_valid(record_json) THEN json_extract(record_json,'$.source.messageId') END=? LIMIT 1`)
+      .get(lisGatewayKey(settings.url), lisText(record.message.messageId), sourceId, sourceMessageId) as LisImportReceipt | undefined;
+  }
+  const duplicateSourceReason = (record: LisQueueRecord) => `Bản tin gốc ${record.source?.messageId} của nguồn ${record.source?.sourceId} đã được nhận thành điểm QC dưới mã Gateway khác (thường do phục hồi Gateway từ bản sao lưu). Không nhận lại; đối chiếu rồi Bỏ bản tin này.`;
 
   function prepareRecord(record: LisQueueRecord): IpcResult<LisPointInput> {
     const point = resultToPointInput(record);
@@ -112,7 +152,7 @@ export function createLisHandlers(db: Db) {
 
   async function acknowledge(settings: LisGatewaySettings, receipt: LisImportReceipt, actor: Actor): Promise<IpcResult<ImportOutcome>> {
     try {
-      await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: receipt.message_id, status: 'imported', by: receipt.imported_by } });
+      await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: receipt.message_id, status: 'imported', by: gatewayActorName(receipt.imported_by) } });
       const confirmed = confirmReceipt(receipt, actor);
       return confirmed.ok ? confirmed : pendingAcknowledgement(receipt, new Error(confirmed.error.message));
     } catch (error) { return pendingAcknowledgement(receipt, error); }
@@ -164,6 +204,10 @@ export function createLisHandlers(db: Db) {
       for (const record of items) {
         if (completed.has(record.message.messageId)) continue;
         const receipt = receiptOf(settings, lisText(record.message.messageId));
+        if (!receipt && receiptOfSource(settings, record)) {
+          unresolved.push({ ...record, resolved: { ...record.resolved, ok: false, reason: duplicateSourceReason(record), code: 'DUPLICATE_SOURCE' } });
+          continue;
+        }
         if (!receipt && record.resolved?.ok !== true) { unresolved.push(record); continue; }
         const prepared = receipt ? null : prepareRecord(record);
         const reason = receipt && !sameSource(receipt, record) ? 'Mã bản tin LIS đã nhận nhưng nội dung nguồn đã thay đổi. Cần đối chiếu tại Gateway.'
@@ -205,6 +249,8 @@ export function createLisHandlers(db: Db) {
       return acknowledge(settings, receipt, actor);
     }
     if (!record) return { ok: false, error: { code: 'not-pending', message: 'Kết quả này không còn trong hàng chờ của Gateway (có thể đã được nhận hoặc bỏ ở máy khác). Tải lại hàng chờ.' } };
+    // Không có await nào từ đây tới lúc ghi điểm, nên kiểm tra này không bị chen ngang.
+    if (receiptOfSource(settings, record)) return { ok: false, error: { code: 'lis-duplicate-source', message: duplicateSourceReason(record) } };
     const prepared = prepareRecord(record);
     if (!prepared.ok) return prepared;
     const pointInput = prepared.data;
@@ -228,7 +274,7 @@ export function createLisHandlers(db: Db) {
     if (!settings.enabled) return { ok: false, error: { code: 'disabled', message: 'LIS Gateway chưa được bật.' } };
     if (receiptOf(settings, lisText(input?.data?.messageId))) return { ok: false, error: { code: 'already-imported', message: 'Bản tin này đã được ghi thành điểm QC. Dùng Nhận hoặc Làm mới để gửi lại xác nhận; không bỏ bản tin đã nhận.' } };
     try {
-      await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: input.data.messageId, status: 'rejected', by: actor.name, note: input.data.note || '' } });
+      await gatewayFetch(settings, '/api/v1/qc-results/decide', { method: 'POST', body: { messageId: input.data.messageId, status: 'rejected', by: gatewayActorName(actor.name), note: gatewayText(input.data.note, 1000) } });
     } catch (e) {
       return { ok: false, error: { code: 'gateway-error', message: e instanceof Error ? e.message : 'Không kết nối được LIS Gateway.' } };
     }

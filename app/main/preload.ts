@@ -67,6 +67,7 @@ const api = {
   queryPoints: (testId: string, level: number) => ipcRenderer.invoke('entry:queryPoints', testId, level),
   listEntryHistoryPoints: (testId: string) => ipcRenderer.invoke('entry:listHistoryPoints', testId),
   listVoidedEntryPoints: (testId: string) => ipcRenderer.invoke('entry:listVoidedPoints', testId),
+  getVoidPointAssessment: (pointId: string) => ipcRenderer.invoke('entry:voidPointAssessment', pointId),
   listParallelEntryColumns: (testId: string) => ipcRenderer.invoke('entry:listParallelColumns', testId),
   listPreviousEntryLotSeries: (testId: string) => ipcRenderer.invoke('entry:listPreviousLotSeries', testId),
   getRangeCandidate: (testId: string, level: number) => ipcRenderer.invoke('entry:rangeCandidate', testId, level),

@@ -27,7 +27,7 @@ test('một thao tác ghi chỉ làm nạp lại một lần', { timeout: 180_00
     await settle(page);
     await counter.reset();
     await enterValue(page, today, 1, 5.1);
-    await page.locator('.entry-sheet-message .alert.ok').waitFor();
+    await page.locator('.toast-ok').waitFor();
     await settle(page);
     assert.deepEqual(await counter.read(), { [SUMMARIES]: 1, [QUERY_POINTS]: 2 },
       'nhập một điểm: cây xét nghiệm nạp lại 1 lần, bảng hai mức nạp lại 1 lần');

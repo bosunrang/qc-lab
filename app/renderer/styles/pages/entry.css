@@ -74,7 +74,6 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    luôn nằm trong cửa sổ. Sàn 360px giữ đủ khoảng 7 hàng ngày khi cửa sổ
    thấp hơn `minHeight` 700px của Electron (vd trình duyệt preview). */
 .qc-sheet-wrap{display:block;max-width:100%;margin:var(--space-3-5) var(--panel-padding);border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:max(360px,calc(100vh - 208px));overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
-.entry-sheet-message{display:grid;gap:var(--space-2);margin:var(--space-3) var(--panel-padding) var(--space-4);}
 /* Một sàn bề rộng DUY NHẤT, không đổi theo cửa sổ. Bản trước đặt 1080px ở
    trên 1280px rồi hạ 840/780px ở cửa sổ hẹp, nên ở 1366px bảng bị ép rộng
    1080px trong vùng chỉ ~740px — cuộn ngang NHIỀU hơn ở 1280px (sàn 840px).

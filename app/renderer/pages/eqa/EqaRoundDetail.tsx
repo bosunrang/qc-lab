@@ -1,7 +1,7 @@
 // Một kỳ ngoại kiểm: thông tin kỳ, tổng hợp theo máy, bảng kết quả (z, z nhà
 // cung cấp, % lệch, xu hướng; dòng mở rộng có nhóm đồng đẳng và lưu ý) và
 // lịch sử nhập/bổ sung/huỷ.
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEqaStore } from '../../store/eqa-store';
 import { useAuthStore } from '../../store/auth-store';
 import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
@@ -11,20 +11,17 @@ import { EmptyState } from '../../components/EmptyState';
 import { Modal } from '../../components/Modal';
 import { errorDialog } from '../../state/dialog-store';
 import type { EqaResultRow, EqaRoundView } from '../../../shared/qc-api';
-import { EQA_PEER_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
+import { eqaCounts, EQA_PEER_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EqaImportModal } from './EqaImportModal';
-import { ClassTag, Facts, numText, pctText, rawNum, roundLabel, RoundStatusTag, rowTone, StatCard, TrendTags } from './shared';
+import { ClassTag, Facts, numText, pctText, rawNum, roundLabel, RoundStatusTag, TrendTags } from './shared';
+import { EqaResultsSummary } from './EqaResultsSummary';
+import { EqaResultFilter, useEqaResultFilter } from './EqaResultFilter';
 import type { EqaNavigationContext } from './useEqaScope';
 
 const DECISION_LABEL: Readonly<Record<string, string>> = {
   import: 'Nhập đợt', append: 'Bổ sung máy vào đợt', reimport: 'Nhập lại (phiên bản mới)', cancel: 'Huỷ đợt',
 };
 const SOURCE_LABEL: Readonly<Record<string, string>> = { pdf: 'Báo cáo PDF của trung tâm ngoại kiểm' };
-
-type ClassFilter = 'all' | 'attention' | 'rej';
-const CLASS_FILTERS: { key: ClassFilter; label: string }[] = [
-  { key: 'all', label: 'Tất cả' }, { key: 'attention', label: 'Cần xem' }, { key: 'rej', label: 'Không chấp nhận' },
-];
 
 function decisionDetail(type: string, payloadJson: string): string {
   let p: Record<string, unknown> = {};
@@ -50,9 +47,9 @@ function notes(row: EqaResultRow): string[] {
   return [...out, ...row.warnings];
 }
 
-/** Dòng cần xem: chưa chấp nhận, có tín hiệu chuỗi hoặc có lưu ý. */
+/** Dòng cần xem: chưa chấp nhận, vượt TEa nội bộ, có tín hiệu hoặc có lưu ý. */
 function needsReview(row: EqaResultRow): boolean {
-  return row.class !== 'ok' || !!row.trend?.signals.length || !!row.trend?.unsuccessful || notes(row).length > 0;
+  return row.class !== 'ok' || row.within_tea === false || !!row.trend?.signals.length || !!row.trend?.unsuccessful || notes(row).length > 0;
 }
 
 export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id: string; focusedResultId?: string; onBack: () => void; onOpenTest: (testId: string, context?: EqaNavigationContext) => void }) {
@@ -60,21 +57,31 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const [view, setView] = useState<EqaRoundView | null | undefined>(undefined);
   const [error, setError] = useState('');
-  const [instrument, setInstrument] = useState('');
-  const [filter, setFilter] = useState<ClassFilter>('all');
+  const [requestedInstrument, setInstrument] = useState('');
+  const instrument = view && !view.instruments.some((item) => item.instrument_id === requestedInstrument) ? '' : requestedInstrument;
+  if (view && requestedInstrument && !instrument) setInstrument('');
+  const [filter, setFilter] = useEqaResultFilter(`${id}:${instrument}`);
   const [reimport, setReimport] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   // Nhóm đồng đẳng và lưu ý ít khi cần đọc nên mở theo từng dòng, giữ bảng gọn.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(focusedResultId ? [focusedResultId] : []));
+  const request = useRef({ sequence: 0 });
 
   const reload = useCallback(() => {
-    get(id).then((data) => { setView(data); setError(''); }).catch((e) => setError(e instanceof Error ? e.message : 'Không tải được kỳ ngoại kiểm.'));
+    const current = ++request.current.sequence;
+    get(id).then((data) => { if (current === request.current.sequence) { setView(data); setError(''); } })
+      .catch((e) => { if (current === request.current.sequence) setError(e instanceof Error && e.message ? e.message : 'Không tải được kỳ ngoại kiểm.'); });
   }, [get, id]);
-  useEffect(reload, [reload]);
+  useEffect(() => {
+    const pending = request.current;
+    reload();
+    // Phản hồi cũ không được ghi đè lượt tải mới hoặc màn đã đóng.
+    return () => { pending.sequence++; };
+  }, [reload]);
   useStoreInvalidation(['eqa_rounds', 'tests', 'instruments', 'tea_refs'], undefined, reload);
 
-  const results = useMemo(() => (view?.results ?? []).filter((r) => (!instrument || r.instrument_id === instrument)
-    && (filter === 'all' || (filter === 'attention' ? needsReview(r) : r.class === filter))), [view, instrument, filter]);
+  const scopedResults = useMemo(() => (view?.results ?? []).filter((r) => !instrument || r.instrument_id === instrument), [view, instrument]);
+  const results = useMemo(() => scopedResults.filter((r) => filter === 'all' || (filter === 'attention' ? needsReview(r) : r.class === filter)), [scopedResults, filter]);
 
   const toggle = useCallback((rowId: string) => setExpanded((prev) => {
     const next = new Set(prev);
@@ -86,7 +93,9 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   if (view === undefined) return <section className="panel"><EmptyState title="Đang tải kỳ ngoại kiểm…" /></section>;
   if (view === null) return <section className="panel"><EmptyState title="Không tìm thấy kỳ ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={onBack}>Về danh sách</button>}>Kỳ có thể đã bị xoá khi phục hồi dữ liệu.</EmptyState></section>;
 
-  const { round, config } = view;
+  const { round } = view;
+  const totals = eqaCounts(scopedResults.map((r) => r.class));
+  const summaryScope = instrument ? view.instruments.find((item) => item.instrument_id === instrument)?.instrument_name ?? 'Máy đang chọn' : 'Tất cả máy';
   const open = round.status === 'open';
   // Cột Máy, Mẫu chỉ hiện khi kỳ có nhiều giá trị; một giá trị thì đã nằm ở Thông tin kỳ.
   const samples = [...new Set(view.results.map((r) => r.sample).filter(Boolean))];
@@ -111,13 +120,8 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
         )}
       </div>
 
-      <div className="eqa-stats is-five">
-        <StatCard tone="neutral" label="Kết quả" value={round.total} />
-        <StatCard tone="success" label="Chấp nhận" value={round.ok} detail={`|z| ≤ ${numText(config.z_warn, 1)}`} />
-        <StatCard tone="warning" label="Cảnh báo" value={round.warn} detail={`${numText(config.z_warn, 1)} < |z| < ${numText(config.z_reject, 1)}`} />
-        <StatCard tone="danger" label="Không chấp nhận" value={round.rej} detail={`|z| ≥ ${numText(config.z_reject, 1)}`} />
-        <StatCard tone="info" label="Tỷ lệ chấp nhận" value={pctText(round.accept_pct)} detail="Chỉ số tổng hợp, không phải tiêu chí đạt" />
-      </div>
+      <EqaResultsSummary totals={totals} filter={filter} onFilter={setFilter}
+        description={`${summaryScope} · Chỉ số tổng hợp theo từng mẫu`} />
 
       <section className="panel" aria-label="Thông tin kỳ">
         <div className="panel-head"><h2>Thông tin kỳ</h2></div>
@@ -166,20 +170,18 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
                 </select>
               </div>
             )}
-            <div className="dayseg" role="group" aria-label="Lọc theo đánh giá">
-              {CLASS_FILTERS.map((f) => <button type="button" key={f.key} className={filter === f.key ? 'on' : ''} aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>{f.label}</button>)}
-            </div>
+            <EqaResultFilter value={filter} onChange={setFilter} label="Lọc xét nghiệm theo đánh giá" allLabel="Tất cả xét nghiệm" />
           </div>
         </div>
         <div className="eqa-section-body">
           {!results.length ? <EmptyState size="compact" title="Không có kết quả phù hợp bộ lọc" /> : (
-            <div className="eqa-table-wrap">
+            <div className="eqa-table-wrap eqa-results-scroll" tabIndex={0} role="region" aria-label="Vùng cuộn kết quả ngoại kiểm">
               <table className="eqa-table eqa-results-table">
                 <thead>
                   <tr>
                     {showInstrument && <th>Máy</th>}<th className="eqa-test-cell">Xét nghiệm</th>{showSample && <th>Mẫu</th>}<th className="num">KQ PXN</th><th className="num">Giá trị ấn định</th>
                     <th className="num">σp</th><th className="num">z</th><th className="num">z NCC</th><th className="num">% lệch</th>
-                    <th>Đánh giá</th><th>Xu hướng</th><th>So TEa PXN</th><th aria-label="Thao tác" />
+                    <th>Đánh giá</th><th className="eqa-trend-cell">Xu hướng</th><th>So TEa PXN</th><th aria-label="Thao tác" />
                   </tr>
                 </thead>
                 <tbody>
@@ -188,7 +190,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
                     const isOpen = expanded.has(r.id);
                     return (
                       <Fragment key={r.id}>
-                        <tr className={`${rowTone(r.class) ?? ''}${r.id === focusedResultId ? ' is-selected' : ''}`} data-eqa-result={r.id}>
+                        <tr className={r.id === focusedResultId ? 'is-selected' : undefined} data-eqa-result={r.id}>
                           {showInstrument && <td>{r.instrument_name}</td>}
                           <td className="eqa-test-cell"><b className="eqa-strong">{r.test_name}</b><span className="eqa-sub">{[r.code, r.unit].filter(Boolean).join(' · ')}</span></td>
                           {showSample && <td>{r.sample || '—'}</td>}
@@ -199,7 +201,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
                           <td className="num">{numText(r.z_provider)}</td>
                           <td className="num">{pctText(r.pct)}</td>
                           <td><span className="eqa-tags"><ClassTag cls={r.class} />{flags.length > 0 && <span className="tag warn">Có lưu ý</span>}</span></td>
-                          <td>{r.trend && (r.trend.signals.length || r.trend.unsuccessful) ? <TrendTags signals={r.trend.signals} unsuccessful={r.trend.unsuccessful} /> : '—'}</td>
+                          <td className="eqa-trend-cell">{r.trend && (r.trend.signals.length || r.trend.unsuccessful) ? <TrendTags signals={r.trend.signals} unsuccessful={r.trend.unsuccessful} /> : '—'}</td>
                           <td>{r.within_tea === null ? '—' : <span className={`tag ${r.within_tea ? 'ok' : 'warn'}`}>{r.within_tea ? 'Trong' : 'Vượt'} TEa {numText(r.tea_pct, 1)}%</span>}</td>
                           <td>
                             <div className="eqa-row-actions">

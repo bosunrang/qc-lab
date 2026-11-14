@@ -1,13 +1,14 @@
 // Hộp thoại huỷ điểm QC. Tự giữ trạng thái form (loại huỷ, lý do, có mở NCE
 // không): trước khi tách (2026-09-26), mỗi ký tự gõ vào ô lý do làm vẽ lại cả
 // bảng nhập 31 ngày và mọi biểu đồ của trang.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useEntryStore } from '../../store/entry-store';
 import { voidNceChoice, voidReasonMinimum, type VoidKind } from '../../../main/domain/entry-validation';
 import { describeRunChanges, RETRO_REASON_MIN } from '../../../main/domain/run-conclusion-change';
 import { formatQcValue, vnDate } from './shared';
-import type { QcPointView } from '../../../shared/qc-api';
+import type { QcPointView, VoidPointAssessment } from '../../../shared/qc-api';
+import { ERROR_CLASS_LABEL } from '../../../main/domain/westgard-rules';
 import { AsyncButton } from '../../components/AsyncButton';
 import { errorDialog } from '../../state/dialog-store';
 
@@ -25,12 +26,24 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   const [voidOpenNce, setVoidOpenNce] = useState(true);
   const [voidReason, setVoidReason] = useState('');
   const [voidErr, setVoidErr] = useState<string | null>(null);
+  const [assessment, setAssessment] = useState<VoidPointAssessment | null>(null);
+  const [assessmentError, setAssessmentError] = useState('');
+  useEffect(() => {
+    let current = true;
+    setAssessment(null); setAssessmentError('');
+    void window.qcApi.getVoidPointAssessment(point.id).then((result) => {
+      if (!current) return;
+      if (result.ok) setAssessment(result.data);
+      else setAssessmentError(result.error.message);
+    }).catch(() => { if (current) setAssessmentError('Không tải được phân loại Westgard. Vui lòng đóng và mở lại hộp thoại.'); });
+    return () => { current = false; };
+  }, [point.id]);
   // Main báo huỷ điểm này đổi trạng thái loại bỏ của lần chạy KHÁC (N26): từ
   // đó lý do là bắt buộc, kể cả với loại "Nhập sai dữ liệu".
   const [retroRequired, setRetroRequired] = useState(false);
   const voidChoice = voidNceChoice(voidKind);
   // Điểm thuộc lần chạy bị loại cần lý do với mọi loại huỷ (N4); main kiểm lại.
-  const runRejected = point.verdict === 'rej' || (point.runRejectedBy?.length ?? 0) > 0;
+  const runRejected = assessment?.run_rejected ?? (point.verdict === 'rej' || (point.runRejectedBy?.length ?? 0) > 0);
   const reasonMin = Math.max(voidReasonMinimum(voidKind, runRejected), retroRequired ? RETRO_REASON_MIN : 0);
 
   async function submitVoid() {
@@ -53,7 +66,14 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
     <Modal title="Huỷ điểm QC" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submitVoid}>Huỷ điểm này</AsyncButton></>}>
       <div className="hint">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
-      {runRejected && <div className="alert warn void-run-rejected">Điểm này thuộc lần chạy bị loại{point.rules.length ? ` (luật ${point.rules.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
+      <div className="field" role="status" aria-live="polite">
+        {assessment ? <>
+          <div><strong>Phân loại theo Westgard:</strong> {assessment.error_class ? ERROR_CLASS_LABEL[assessment.error_class] : 'Chưa đủ căn cứ phân loại'}</div>
+          <div><strong>Luật làm căn cứ:</strong> {assessment.rules.length ? assessment.rules.join(', ') : 'Chưa có luật loại bỏ làm căn cứ phân loại'}</div>
+          <div className="hint">Theo toàn bộ lần chạy trước khi huỷ, kể cả mức QC khác vi phạm. Đây là phân loại thống kê; nguyên nhân thực tế cần được xác minh.</div>
+        </> : assessmentError ? <div className="field-error">{assessmentError}</div> : <div className="hint">Đang tải phân loại Westgard của lần chạy…</div>}
+      </div>
+      {runRejected && <div className="alert warn void-run-rejected">Điểm này thuộc lần chạy bị loại{assessment?.rejected_levels.length ? ` (mức vi phạm: ${assessment.rejected_levels.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
       <div className="field">
         <label htmlFor="voidKindInput">Loại huỷ</label>
         <select id="voidKindInput" aria-label="Loại huỷ điểm QC" value={voidKind}

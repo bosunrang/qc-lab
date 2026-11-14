@@ -233,6 +233,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     queryPoints: { channel: 'entry:queryPoints', lan: true, run: (_ctx, testId, level) => entry.queryPoints(testId, level) },
     listEntryHistoryPoints: { channel: 'entry:listHistoryPoints', lan: true, run: (_ctx, testId) => entry.listHistoryPoints(testId) },
     listVoidedEntryPoints: { channel: 'entry:listVoidedPoints', lan: true, run: (_ctx, testId) => entry.listVoidedPoints(testId) },
+    // Máy trạm được đọc cùng căn cứ phân loại trước khi huỷ điểm QC.
+    getVoidPointAssessment: { channel: 'entry:voidPointAssessment', lan: true, run: (_ctx, pointId) => entry.getVoidPointAssessment(pointId) },
     listParallelEntryColumns: { channel: 'entry:listParallelColumns', lan: true, run: (_ctx, testId) => entry.listParallelColumns(testId) },
     listPreviousEntryLotSeries: { channel: 'entry:listPreviousLotSeries', lan: true, run: (_ctx, testId) => entry.listPreviousLotSeries(testId) },
     getRangeCandidate: { channel: 'entry:rangeCandidate', lan: true, run: (_ctx, testId, level) => entry.rangeCandidate(testId, level) },

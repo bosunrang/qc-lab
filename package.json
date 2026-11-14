@@ -1,6 +1,6 @@
 {
   "name": "qc-lab",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "QC Lab - Nội kiểm chất lượng xét nghiệm (IQC) cho phòng xét nghiệm lâm sàng",
   "author": "QC Lab",
   "license": "UNLICENSED",
@@ -22,6 +22,9 @@
     "app:build:renderer": "vite build --config vite.app-renderer.config.mjs",
     "app:build": "npm run app:build:main && npm run app:build:renderer",
     "app:dev": "vite --config vite.app-renderer.config.mjs",
+    "lis:gateway": "npm run app:build:main && node app-dist/main/gateway/cli.js",
+    "lis:mock": "node app/scripts/lis-gateway.mjs",
+    "lis:demo": "npm run build && node app/scripts/lis-demo.mjs",
     "app:css-parity": "node app/scripts/css-parity-check.cjs",
     "verify-release": "npm run typecheck && npm run lint && npm test && npm run app:css-parity && npm run build && node app/scripts/run-e2e.cjs",
     "patch-build": "node scripts/patch-7za-symlink.js",

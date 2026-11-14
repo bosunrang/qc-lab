@@ -26,14 +26,9 @@ function pointsForColumnDay(column: EntryColumn, date: string): QcPointView[] {
   return column.points.filter((point) => point.date === date && !point.voided);
 }
 
-export interface SheetMessages {
-  pointFeedback: { kind: 'ok' | 'warn' | 'rej'; message: string } | null;
-  voidMsg: string | null;
-}
-
 export const EntrySheet = memo(function EntrySheet({
   testId, testName, entryColumns, levels, pointsByLevel, previousLotSeries, decimals, writable,
-  viewYear, viewMonth, onViewYear, onViewMonth, messages, onCommitRun, onSaveNote,
+  viewYear, viewMonth, onViewYear, onViewMonth, onCommitRun, onSaveNote,
 }: {
   testId: string;
   testName: string;
@@ -47,7 +42,6 @@ export const EntrySheet = memo(function EntrySheet({
   viewMonth: number;
   onViewYear: (year: number) => void;
   onViewMonth: (month: number) => void;
-  messages: SheetMessages;
   /** `raw` là chuỗi người dùng gõ; trang tự đọc số và báo lỗi nếu không hợp lệ. */
   onCommitRun: (column: EntryColumn, date: string, runId: string, raw: string) => Promise<{ saved: boolean; fieldError?: string }>;
   onSaveNote: (date: string, note: string) => void;
@@ -86,7 +80,6 @@ export const EntrySheet = memo(function EntrySheet({
     );
   }
 
-  const { pointFeedback, voidMsg } = messages;
   return (
     <div className="panel qc-sheet-panel">
       <div className="qc-sheet-heading">
@@ -242,12 +235,6 @@ export const EntrySheet = memo(function EntrySheet({
           </tbody>
         </table>
       </div>
-      {(pointFeedback || voidMsg) && (
-        <div className="entry-sheet-message" role="status" aria-live="polite">
-          {pointFeedback && <div className={`alert ${pointFeedback.kind}`}>{pointFeedback.message}</div>}
-          {voidMsg && <div className="alert warn">{voidMsg}</div>}
-        </div>
-      )}
     </div>
   );
 });

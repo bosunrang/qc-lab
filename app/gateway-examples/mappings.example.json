@@ -1,0 +1,15 @@
+[
+  {
+    "sourceId": "LIS01",
+    "analyzerId": "MAY01",
+    "testCode": "GLU",
+    "qcLevel": "L1",
+    "qcLotCode": "LOT01",
+    "qclabTestId": "THAY-BANG-ID-XET-NGHIEM-TRONG-QC-LAB",
+    "level": 1,
+    "lot": "LOT01",
+    "unit": "mmol/L",
+    "displayName": "Glucose",
+    "active": true
+  }
+]

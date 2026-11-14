@@ -81,7 +81,7 @@ test('nhập nhiều đợt một lần: ánh xạ ở đợt đầu, các đợ
       for (const name of ['Chloride', 'Potassium', 'Sodium']) must(await window.qcApi.saveTest({ data: { name, instrumentId: machine.id, unit: 'mmol/L' } }));
     });
     await openPage(page, 'Phân tích ngoại kiểm');
-    await page.locator('.eqa-intro').getByRole('button', { name: 'Nhập báo cáo PDF', exact: true }).click();
+    await page.locator('.eqa-scope-controls').getByRole('button', { name: 'Nhập báo cáo PDF', exact: true }).click();
     const modal = page.getByRole('dialog', { name: 'Nhập báo cáo ngoại kiểm' });
     await modal.locator('#eqaFile').setInputFiles([1, 2, 3].map((n) => ({ name: `RIQAS_C23_S${n}.pdf`, mimeType: 'application/pdf', buffer: riqasPdf(n) })));
     await modal.getByText('3 tệp thuộc 3 đợt', { exact: false }).waitFor();

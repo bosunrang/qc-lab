@@ -1,9 +1,10 @@
-// Dòng báo thành công tự tắt (U8 của đánh giá 2026-10-31): lưu xong không bật
-// hộp thoại chặn thao tác. Lỗi và cảnh báo vẫn đi qua `dialog-store`.
+// Thông báo thao tác tự tắt: lưu xong không chặn nhập tiếp. Màu cảnh báo QC
+// đi theo kết luận; lỗi không lưu được vẫn qua `dialog-store` hoặc ngay ô nhập.
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 
-export interface Toast { id: number; message: string }
+export type ToastKind = 'ok' | 'warn' | 'rej';
+export interface Toast { id: number; message: string; kind: ToastKind }
 
 interface ToastStoreShape { toasts: Toast[] }
 
@@ -26,8 +27,8 @@ export function dismissToast(id: number): void {
   toastStore.setState((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
 }
 
-export function showToast(message: string): void {
+export function showToast(message: string, kind: ToastKind = 'ok'): void {
   const id = nextId++;
-  toastStore.setState((s) => ({ toasts: [...s.toasts, { id, message }].slice(-MAX_TOASTS) }));
+  toastStore.setState((s) => ({ toasts: [...s.toasts, { id, message, kind }].slice(-MAX_TOASTS) }));
   setTimeout(() => dismissToast(id), toastDuration(message));
 }

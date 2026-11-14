@@ -25,6 +25,18 @@ test('thời gian hiện theo độ dài câu, trong khoảng 4–8 giây', () =
   assert.equal(toastDuration('x'.repeat(500)), 8000);
 });
 
+test('thông báo nhập QC giữ mức cảnh báo và loại bỏ, không hiển thị như lưu thành công', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    showToast('Đã lưu Mức 1.');
+    showToast('Mức 1 cảnh báo — 1-2s.', 'warn');
+    showToast('Mức 2 vi phạm — 1-3s.', 'rej');
+    assert.deepEqual(toastStore.getState().toasts.map((t) => t.kind), ['ok', 'warn', 'rej']);
+    mock.timers.tick(8000);
+    assert.equal(toastStore.getState().toasts.length, 0);
+  } finally { mock.timers.reset(); }
+});
+
 test('errorDialog mở hộp thoại kiểu lỗi, giữ tiêu đề', () => {
   void errorDialog('Tên máy xét nghiệm này đã tồn tại.', { title: 'Chưa lưu được' });
   const dialog = dialogStore.getState().dialog;

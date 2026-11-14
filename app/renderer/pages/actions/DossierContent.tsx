@@ -84,7 +84,7 @@ export function IdentitySection(props: SectionProps) {
   const incidentRuns = runs.filter((run) => run.role !== 'rerun');
   const editor = useEditor(props, () => ({
     description: record.description, correction: record.correction, holdResults: record.hold_results === null ? null : !!record.hold_results,
-    containmentNote: record.containment_note, occurredNote: record.occurred_note,
+    containmentNote: record.containment_note,
     phase: record.phase, ownerUserId: record.owner_user_id, dueDate: record.due_date,
   }), IDENTITY_FIELD_ERRORS);
   const d = editor.draft;
@@ -116,7 +116,6 @@ export function IdentitySection(props: SectionProps) {
             {!d.containmentNote.trim() && containmentDraft && <div className="nce-field-assist"><button type="button" className="btn ghost sm" onClick={() => editor.set('containmentNote', containmentDraft)}>Điền sẵn từ dữ liệu</button><span>Xét nghiệm, máy, lô QC và khoảng nghi ngờ; bạn bổ sung đã giữ kết quả từ lúc nào và đã báo cho ai.</span></div>}
             {d.containmentNote.includes(NCE_DRAFT_BLANK) && <p className="nce-field-assist is-warning" role="status">Còn chỗ {NCE_DRAFT_BLANK} cần bổ sung trước khi cho hoạt động trở lại.</p>}
           </Field>
-          <Field label="Ghi thêm về diễn biến (tuỳ chọn)" htmlFor="idOccurred" wide><textarea id="idOccurred" rows={2} placeholder="Chỉ ghi điều phần mềm không tự ghi được, ví dụ sự cố thực tế bắt đầu từ ca đêm theo nhật ký máy. Các mốc tự ghi nằm ở Phê duyệt & lịch sử." value={d.occurredNote} onChange={(e) => editor.set('occurredNote', e.target.value)} /></Field>
           <Field label="Dừng/giữ kết quả liên quan" htmlFor="idHold">
             <select id="idHold" value={d.holdResults === null ? '' : d.holdResults ? 'yes' : 'no'} onChange={(e) => editor.set('holdResults', e.target.value === 'yes')}>
               {d.holdResults === null && <option value="">— Chưa xác định —</option>}

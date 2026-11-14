@@ -3,11 +3,11 @@
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
 import { OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
-// 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
+// Các kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
 // đợt 2026-09-10 đi gỡ.
-import type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
+import type { QcPointView, HistoryQcPointView, VoidedQcPointView, VoidPointAssessment, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
 import type { NceRunSnapshot } from '../domain/nce/types';
 
 export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries };
@@ -25,6 +25,8 @@ import { nextNceId } from '../db/nce-ids';
 import { insertNceRecord, insertNceRun, openRecordOfRun, readNceConfig } from '../db/nce-repository';
 import { nceRunSnapshot } from '../db/nce-evaluation';
 import { nceErrorClass } from '../domain/nce/tier';
+import { WG_RULE_BY_ID } from '../domain/westgard-rules';
+import { testRuleActionOf } from '../db/westgard-evaluation';
 import { emptyChecklist } from '../domain/nce/update';
 import { defaultNceDueDate } from '../domain/nce/config';
 import { type IpcResult, nowIso, requireQcConfig } from './shared';
@@ -195,10 +197,14 @@ export function createEntryHandlers(db: Db, options: {
   /** Danh sách audit điểm đã huỷ dùng riêng cho khối tra cứu. Tách endpoint
    * khỏi `queryPoints()` để điểm voided tuyệt đối không lọt lại vào chuỗi
    * Westgard, biểu đồ, thống kê hay quyết định ngày. */
-  function listVoidedPoints(testId: string) {
-    return db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,operator_name,
-        void_reason,void_kind,void_requires_rerun,voided_at,voided_by
-      FROM qc_points WHERE test_id=? AND voided=1 ORDER BY date,run_id`).all(testId);
+  function listVoidedPoints(testId: string): VoidedQcPointView[] {
+    // Tra tên từ tài khoản để cả điểm đã huỷ trước đây cũng hiện họ tên;
+    // giữ nguyên username gốc phục vụ truy vết khi tài khoản không còn.
+    return db.prepare(`SELECT p.id,p.test_id,p.level,p.date,p.run_id,p.lot,p.val,p.operator_name,
+        p.void_reason,p.void_kind,p.void_requires_rerun,p.voided_at,p.voided_by,
+        COALESCE(NULLIF(TRIM(u.name),''),p.voided_by) AS voided_by_name
+      FROM qc_points p LEFT JOIN users u ON u.username=p.voided_by
+      WHERE p.test_id=? AND p.voided=1 ORDER BY p.date,p.run_id`).all(testId) as unknown as VoidedQcPointView[];
   }
 
   function rangeCandidate(testId: string, level: number): IpcResult<RangeCandidateView> {
@@ -426,6 +432,42 @@ export function createEntryHandlers(db: Db, options: {
 
   /** Huỷ điểm QC. "kind" (nguyên nhân huỷ) quyết định có tự mở/dùng lại hồ
    * sơ NCE hay không (`voidNceChoice()`). */
+  /** Cùng ảnh chụp trước huỷ cho phần xem trước và hồ sơ NCE. Điểm ngoài
+   * tập đang vận hành lấy đủ kết luận của chuỗi lô lịch sử hoặc song song,
+   * không chỉ bổ sung riêng điểm đang được chọn huỷ. */
+  function snapshotBeforeVoid(point: { id: string; test_id: string; date: string; run_id: string }): NceRunSnapshot {
+    const snapshot = nceRunSnapshot(db, point.test_id, { date: point.date, runId: point.run_id });
+    const selected = snapshot.points.find((p) => p.pointId === point.id)!;
+    const parallelIds = new Set(listParallelColumns(point.test_id).flatMap((column) => column.points.map((p) => p.id)));
+    const groupOf = (p: { lot: string; level: number }) => (db.prepare('SELECT group_id FROM qc_lots WHERE lot_no=? AND level=?').get(p.lot, p.level) as { group_id: string | null } | undefined)?.group_id;
+    const selectedGroup = groupOf(selected);
+    // Lô song song đánh giá riêng với lô chính, dù trùng ngày và mã run.
+    const sameContext = (p: typeof selected) => parallelIds.has(selected.pointId) ? parallelIds.has(p.pointId)
+      : !parallelIds.has(p.pointId) && (selectedGroup ? groupOf(p) === selectedGroup : p.pointId === selected.pointId);
+    const rows = snapshot.points.filter((p) => !p.voided && sameContext(p)).map((p) => ({ id: p.pointId, level: p.level, lot: p.lot }));
+    const evaluated = pointEvaluationsOf(db, point.test_id, rows);
+    const actionOf = testRuleActionOf(db, point.test_id, { date: point.date, runId: point.run_id });
+    return { ...snapshot, points: snapshot.points.map((p) => {
+      const result = p.voided ? undefined : evaluated.get(p.pointId);
+      return result ? { ...p, verdict: result.verdict, rules: [...result.rules], rejectRules: rejectingRules(result.rules, actionOf), mean: result.target_mean, sd: result.target_sd, z: result.z }
+        : { ...p, verdict: 'none', rules: [], rejectRules: [] };
+    }) };
+  }
+
+  function getVoidPointAssessment(pointId: string): IpcResult<VoidPointAssessment> {
+    if (typeof pointId !== 'string' || !pointId.trim()) return { ok: false, error: { code: 'missing-point', message: 'Thiếu mã điểm QC.' } };
+    const point = db.prepare('SELECT id,test_id,date,run_id,voided FROM qc_points WHERE id=?').get(pointId) as { id: string; test_id: string; date: string; run_id: string; voided: number } | undefined;
+    if (!point) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy điểm QC.' } };
+    if (point.voided) return { ok: false, error: { code: 'already-voided', message: 'Điểm QC này đã bị huỷ trước đó.' } };
+    const snapshot = snapshotBeforeVoid(point);
+    const rejected = snapshot.points.filter((p) => !p.voided && p.verdict === 'rej');
+    const errorClass = nceErrorClass([{ role: 'trigger', snapshot }]);
+    const rejectedRules = [...new Set(rejected.flatMap((p) => [...(p.rejectRules ?? p.rules)]))];
+    const rules = errorClass ? rejectedRules.filter((id) => WG_RULE_BY_ID[id]?.err === errorClass) : rejectedRules;
+    return { ok: true, data: { error_class: errorClass, rules, run_rejected: rejected.length > 0,
+      rejected_levels: [...new Set(rejected.map((p) => p.level))].sort((a, b) => a - b) } };
+  }
+
   const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] }> => {
     const actor = w.actor;
     const result = validateVoidInput(input.data);
@@ -481,9 +523,9 @@ export function createEntryHandlers(db: Db, options: {
     const existingNce = openNce ? openRecordOfRun(db, point.test_id, point.date, point.run_id) : undefined;
     let snapshot: NceRunSnapshot | null = null;
     if (openNce && !existingNce) {
-      const taken = nceRunSnapshot(db, point.test_id, { date: point.date, runId: point.run_id });
+      const taken = snapshotBeforeVoid(point);
       snapshot = { ...taken, points: taken.points.map((p) => p.pointId === pointId && p.verdict === 'none' && view
-        ? { ...p, verdict: view.verdict, rules: Array.from(new Set(view.rules)) } : p) };
+        ? { ...p, verdict: view.verdict, rules: Array.from(new Set(view.rules)), rejectRules: rejectingRules(view.rules, testRuleActionOf(db, point.test_id, { date: point.date, runId: point.run_id })) } : p) };
     }
     let mutation: { nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] };
     try {
@@ -569,7 +611,7 @@ export function createEntryHandlers(db: Db, options: {
     return { ok: true, data: { note, updated: rows.length } };
   });
 
-  return { queryPoints, listHistoryPoints, listVoidedPoints, listParallelColumns, listPreviousLotSeries, rangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote };
+  return { queryPoints, listHistoryPoints, listVoidedPoints, getVoidPointAssessment, listParallelColumns, listPreviousLotSeries, rangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote };
 }
 
 export type EntryHandlers = ReturnType<typeof createEntryHandlers>;

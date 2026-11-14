@@ -6,7 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { vnDate } from '../../lib/format';
 import { EQA_CLASS_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EQA_SIGNAL_LABEL } from '../../../main/domain/eqa/series';
-import { numText, pctText, rawNum, roundLabel } from './shared';
+import { numText, pctText, rawNum, roundAxisLabel, roundLabel } from './shared';
 
 type EqaSeriesPoint = EqaSeriesView['points'][number];
 
@@ -29,12 +29,12 @@ export function EqaSeriesChart({ points, selectedId, onSelect, mode = 'z', confi
   points.forEach((p, i) => {
     if (i && p.round_id === points[i - 1].round_id) { groups.push(groups[i - 1]); return; }
     const g = groupLabels.length;
-    groups.push(g); groupLabels.push(roundLabel(p));
+    groups.push(g); groupLabels.push(roundAxisLabel(p));
     if (i && p.year !== points[i - 1].year) groupBreaks.push(g);
   });
   return <div className="eqa-series-plot" role="group" aria-label={`${mode === 'z' ? 'z-score' : '% lệch'} qua các đợt ngoại kiểm`} data-eqa-chart={mode}>
     {!hasValues ? <EmptyState size="compact" title={mode === 'z' ? 'Chưa có điểm z trong phạm vi này' : 'Chưa có phần trăm lệch trong phạm vi này'} /> : <>
-      <QcChart mode="lj" height={340} responsiveHeight points={chartPoints} comparison={{
+      <QcChart mode="lj" height={groupLabels.length === 1 ? 220 : 300} responsiveHeight={groupLabels.length > 1} points={chartPoints} comparison={{
         title: mode === 'z' ? 'Biểu đồ z-score ngoại kiểm' : 'Phần trăm lệch so với TEa',
         xTitle: 'Đợt / mẫu ngoại kiểm', unit: mode === 'z' ? 'z' : '%',
         warning: mode === 'z' ? config.z_warn : null, rejection: mode === 'z' ? config.z_reject : null,
@@ -55,7 +55,8 @@ export function EqaSeriesChart({ points, selectedId, onSelect, mode = 'z', confi
             <div>z-score: <strong>{numText(p.z)}</strong></div>
             <div>% lệch: {pctText(p.pct)} · TEa: {pctText(p.tea_pct)}</div>
             <div>Đánh giá ngoại kiểm: {EQA_CLASS_LABEL[p.class]}</div>
-            {mode === 'pct' && <div>Đối chiếu TEa: {p.within_tea === null ? 'Chưa có TEa' : p.within_tea ? 'Trong TEa' : 'Vượt TEa'}</div>}
+            {mode === 'pct' && <div>Đối chiếu TEa: {p.tea_pct === null ? 'Chưa khai TEa' : p.within_tea === null ? 'Chưa đủ dữ liệu đối chiếu' : p.within_tea ? 'Trong TEa' : 'Vượt TEa'}</div>}
+            {p.unsuccessful && <div>Chuỗi xét nghiệm: Không thành công</div>}
             {!!p.signals.length && <div className="muted">Tín hiệu: {p.signals.map((s) => EQA_SIGNAL_LABEL[s]).join('; ')}</div>}
           </>;
         },
@@ -64,6 +65,7 @@ export function EqaSeriesChart({ points, selectedId, onSelect, mode = 'z', confi
         <li><span className="qc-mark ok" aria-hidden="true" />{mode === 'z' ? 'Chấp nhận' : 'Trong TEa'}</li>
         {mode === 'z' && <li><span className="qc-mark warn" aria-hidden="true" />Cảnh báo</li>}
         <li><span className="qc-mark rej" aria-hidden="true" />{mode === 'z' ? 'Không chấp nhận' : 'Vượt TEa'}</li>
+        {mode === 'pct' && points.some((p) => p.pct !== null && p.within_tea === null) && <li><span className="qc-mark eqa-chart-unrated" aria-hidden="true" />Chưa có đối chiếu TEa</li>}
       </ul>
     </>}
   </div>;
