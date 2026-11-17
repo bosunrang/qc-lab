@@ -35,7 +35,7 @@ test('In PDF kỳ Sigma có đầy đủ các bảng và biểu đồ của báo
   assert.match(report, /Số liệu kỳ/);
   assert.match(report, /\['Mức', 'TEa', 'Mean mục tiêu'/);
   assert.doesNotMatch(report, /TEa snapshot/);
-  assert.match(report, /Thiết kế QC theo Sigma \(OPSpecs\)/);
+  assert.match(report, /Thiết kế QC theo Westgard Sigma Rules/);
   assert.match(report, /Độ không đảm bảo đo \(MU\)/);
   assert.match(report, /Biểu đồ Sigma &amp; MDC/);
   assert.match(report, /chartsSection\(\[input\.period\]\)/);
@@ -78,7 +78,7 @@ test('In PDF tổng hợp Sigma dùng bảng so sánh theo kỳ và biểu đồ
   assert.match(report, /Thiết lập báo cáo tổng hợp/);
   assert.match(report, /Kết quả theo mức QC/);
   assert.match(report, /Số liệu kỳ/);
-  assert.match(report, /Thiết kế QC theo Sigma \(OPSpecs\)/);
+  assert.match(report, /Thiết kế QC theo Westgard Sigma Rules/);
   assert.match(report, /Độ không đảm bảo đo \(MU\)/);
   assert.match(report, /Biểu đồ Sigma &amp; MDC/);
   assert.match(report, /rowspan="\$\{group\.rows\.length\}"/);

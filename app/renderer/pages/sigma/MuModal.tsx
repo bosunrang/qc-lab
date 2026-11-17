@@ -13,7 +13,7 @@ export function MuModal({ level, onClose, onSubmit }: {
   const [uCref, setUCref] = useState(level.uCref != null ? String(level.uCref) : '');
   const [uCal, setUCal] = useState(level.uCal != null ? String(level.uCal) : '');
   const [includeBias, setIncludeBias] = useState(level.muBiasMode ? level.muBiasMode !== 'exclude' : level.mu?.includeBias !== false);
-  const preview = uncertaintyBudget({ cv: level.cv, bias: level.biasEqa, uCref, uCal, includeBias, tea: level.tea, target: level.targetMean });
+  const preview = uncertaintyBudget({ cv: level.cv, bias: level.biasRms ?? level.biasEqa, uCref, uCal, includeBias, tea: level.tea, target: level.targetMean });
 
   async function submit() {
     const result = await onSubmit(uCref === '' ? undefined : Number(uCref), uCal === '' ? undefined : Number(uCal), includeBias ? 'include' : 'exclude');
@@ -27,7 +27,7 @@ export function MuModal({ level, onClose, onSubmit }: {
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>
         <tbody>
           <tr><td>u(Rw) — từ CV%</td><td>{level.cv != null ? level.cv.toFixed(3) : <span className="tag warn">Chưa có</span>}</td></tr>
-          <tr><td>Bias quan sát (RMS các vòng EQA)</td><td>{level.biasEqa != null ? Math.abs(level.biasEqa).toFixed(3) : <span className="tag warn">Chưa có</span>}</td></tr>
+          <tr><td>Bias quan sát (RMS các vòng EQA)</td><td>{(level.biasRms ?? level.biasEqa) != null ? Math.abs((level.biasRms ?? level.biasEqa)!).toFixed(3) : <span className="tag warn">Chưa có</span>}</td></tr>
           <tr><td>u(Cref)% — giá trị gán EQA/CRM</td><td>{preview?.uCref != null ? preview.uCref.toFixed(3) : <span className="tag warn">Chưa đánh giá / không áp dụng</span>}</td></tr>
           <tr><td>u(bias)% = √(bias² + u(Cref)²)</td><td>{preview?.uBias != null ? preview.uBias.toFixed(3) : <span className="tag warn">Chưa có / không áp dụng</span>}</td></tr>
           <tr><td>u(cal)%</td><td>{preview?.uCal != null ? preview.uCal.toFixed(3) : <span className="tag warn">Chưa đánh giá</span>}</td></tr>

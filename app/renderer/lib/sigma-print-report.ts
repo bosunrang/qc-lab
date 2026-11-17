@@ -108,7 +108,7 @@ function cvSource(level: SigmaLevelResult): string {
 }
 
 function biasSource(level: SigmaLevelResult): string {
-  return level.eqaRounds.length ? `${level.eqaRounds.length} vòng EQA/EQC · RMS` : 'Nhập tay';
+  return level.eqaRounds.length ? `${level.eqaRounds.length} ${level.eqaRounds.some((r) => r.eqaResultId) ? 'mẫu ngoại kiểm' : 'vòng EQA/EQC'} · TB có dấu` : 'Nhập tay';
 }
 
 function designCells(level: SigmaLevelResult): [string, string, string] {
@@ -122,7 +122,7 @@ function designCells(level: SigmaLevelResult): [string, string, string] {
   return [design.rules.join(' / '), `${design.risk} · ${run}`, design.plan];
 }
 
-const LEVEL_COLUMNS = ['Sigma', 'Xếp loại', 'CV (%)', 'Bias RMS (%)', 'DPMO', 'Yield (%)', 'Thiết kế QC'];
+const LEVEL_COLUMNS = ['Sigma', 'Xếp loại', 'CV (%)', 'Bias (%)', 'DPMO', 'Yield (%)', 'Thiết kế QC'];
 
 function levelsOf(periods: SigmaPeriodView[]): number[] {
   return Array.from(new Set(periods.flatMap((period) => period.levels.map((level) => level.level)))).sort((left, right) => left - right);
@@ -174,7 +174,7 @@ function chartsSection(periods: SigmaPeriodView[]): string {
     ? `<img src="data:image/png;base64,${png}" alt="${alt}">` : `<p class="empty-chart">${empty}</p>`;
   return '<section class="charts"><h2>Biểu đồ Sigma &amp; MDC</h2>'
     + `<div class="chart"><h3>Biểu đồ Sigma – so sánh các mức QC</h3>${image(drawPeriodChart(periods, levels), 'Biểu đồ Sigma theo mức QC', 'Chưa có kỳ Sigma đủ dữ liệu để vẽ biểu đồ.')}</div>`
-    + `<div class="chart"><h3>Biểu đồ quyết định phương pháp (MDC)</h3>${image(drawMdcChart(periods, levels), 'Biểu đồ quyết định phương pháp MDC', 'Chưa có TEa, CV IQC và Bias RMS EQA/EQC đầy đủ để vẽ biểu đồ MDC.')}</div></section>`;
+    + `<div class="chart"><h3>Biểu đồ quyết định phương pháp (MDC)</h3>${image(drawMdcChart(periods, levels), 'Biểu đồ quyết định phương pháp MDC', 'Chưa có TEa, CV IQC và Bias EQA/EQC đầy đủ để vẽ biểu đồ MDC.')}</div></section>`;
 }
 
 const DESIGN_NOTE = '<p class="note">Gợi ý theo Westgard Sigma Rules là điểm khởi đầu; người phụ trách vẫn cần rà soát nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng trước khi cấu hình luật QC.</p>';
@@ -188,12 +188,12 @@ function muCells(level: SigmaLevelResult): string[] {
 }
 
 /** Báo cáo một kỳ: thiết lập, bảng tổng hợp kiểu Excel, biểu đồ; các bảng
- * truy vết (số liệu kỳ, OPSpecs, MU) để ở phụ lục các trang sau. */
+ * truy vết (số liệu kỳ, thiết kế QC, MU) để ở phụ lục các trang sau. */
 export function buildSigmaPeriodPrintHtml(input: SigmaPeriodPrintInput): string {
   const levels = [...input.period.levels].sort((left, right) => left.level - right.level);
   const dataRows = levels.map((level) => [
     `Mức ${level.level}`, `${number(level.tea)}%`, level.targetMean == null ? '—' : `${level.targetMean.toLocaleString(VI, { maximumFractionDigits: 4 })}${input.unit ? ` ${input.unit}` : ''}`,
-    `${number(level.cv)}%`, cvSource(level), `${number(level.biasEqa)}%`, biasSource(level), level.eqaRounds.length > 1 && level.biasMean != null ? `${number(level.biasMean)}%` : '—', level.teaCriterion || '—',
+    `${number(level.cv)}%`, cvSource(level), `${number(level.biasEqa)}%`, biasSource(level), level.eqaRounds.length > 1 && level.biasRms != null ? `${number(level.biasRms)}%` : '—', level.teaCriterion || '—',
   ]);
   const designRows = levels.map((level) => [`Mức ${level.level}`, number(level.sigma?.sigma), ...designCells(level)]);
   const muRows = levels.map((level) => [`Mức ${level.level}`, ...muCells(level)]);
@@ -201,8 +201,8 @@ export function buildSigmaPeriodPrintHtml(input: SigmaPeriodPrintInput): string 
   <h2>Thiết lập phân tích</h2>${setupTable(input)}
   <h2>Kết quả theo mức QC</h2>${summaryTables(input.testName, [input.period])}${DPMO_NOTE}${gradeLegend()}
   ${chartsSection([input.period])}
-  <section class="appendix"><h2>Phụ lục A. Số liệu kỳ</h2>${table(['Mức', 'TEa', 'Mean mục tiêu', 'CV IQC', 'Nguồn CV', 'Bias RMS', 'Nguồn Bias', 'Bias TB có dấu', 'Tiêu chí TEa'], dataRows, 'appx')}
-  <h2>Phụ lục B. Thiết kế QC theo Sigma (OPSpecs)</h2>${table(['Mức', 'Sigma', 'Bộ quy tắc QC gợi ý', 'Mức nguy cơ tham khảo', 'Hành động'], designRows, 'appx')}${DESIGN_NOTE}
+  <section class="appendix"><h2>Phụ lục A. Số liệu kỳ</h2>${table(['Mức', 'TEa', 'Mean mục tiêu', 'CV IQC', 'Nguồn CV', 'Bias', 'Nguồn Bias', 'Bias RMS (cho MU)', 'Tiêu chí TEa'], dataRows, 'appx')}
+  <h2>Phụ lục B. Thiết kế QC theo Westgard Sigma Rules</h2>${table(['Mức', 'Sigma', 'Bộ quy tắc QC gợi ý', 'Mức nguy cơ tham khảo', 'Hành động'], designRows, 'appx')}${DESIGN_NOTE}
   <h2>Phụ lục C. Độ không đảm bảo đo (MU)</h2>${table(['Mức', ...MU_HEADERS], muRows, 'appx')}</section>
   <p class="footer">Báo cáo được tạo từ dữ liệu Six Sigma đã lưu tại thời điểm in.</p>${signatureBlock()}</body></html>`;
 }
@@ -215,7 +215,7 @@ export function buildSigmaComparisonPrintHtml(input: SigmaComparisonPrintInput):
     period: periodLabel(period.period),
     rows: [...period.levels].sort((left, right) => left.level - right.level).map((level) => [`Mức ${level.level}`, ...row(level)]),
   }));
-  const sourceGroups = groups((level) => [level.teaCriterion || '—', cvSource(level), biasSource(level), level.eqaRounds.length > 1 && level.biasMean != null ? `${number(level.biasMean)}%` : '—']);
+  const sourceGroups = groups((level) => [level.teaCriterion || '—', cvSource(level), biasSource(level), level.eqaRounds.length > 1 && level.biasRms != null ? `${number(level.biasRms)}%` : '—']);
   const designGroups = groups((level) => [number(level.sigma?.sigma), ...designCells(level)]);
   const muGroups = groups(muCells);
   const today = new Intl.DateTimeFormat('vi-VN').format(new Date());
@@ -223,8 +223,8 @@ export function buildSigmaComparisonPrintHtml(input: SigmaComparisonPrintInput):
   <h2>Thiết lập báo cáo tổng hợp</h2>${comparisonSetupTable(input, periods, today)}
   <h2>Kết quả theo mức QC</h2>${summaryTables(input.testName, periods)}${DPMO_NOTE}${gradeLegend()}
   ${chartsSection(periods)}
-  <section class="appendix"><h2>Phụ lục A. Số liệu kỳ</h2>${groupedPeriodTable(['Kỳ', 'Mức', 'Tiêu chí TEa đã chốt', 'Nguồn CV', 'Nguồn Bias', 'Bias TB có dấu%'], sourceGroups, 'appx')}
-  <h2>Phụ lục B. Thiết kế QC theo Sigma (OPSpecs)</h2>${groupedPeriodTable(['Kỳ', 'Mức', 'Sigma', 'Bộ quy tắc QC gợi ý', 'Mức nguy cơ tham khảo', 'Hành động'], designGroups, 'appx')}${DESIGN_NOTE}
+  <section class="appendix"><h2>Phụ lục A. Số liệu kỳ</h2>${groupedPeriodTable(['Kỳ', 'Mức', 'Tiêu chí TEa đã chốt', 'Nguồn CV', 'Nguồn Bias', 'Bias RMS (cho MU)%'], sourceGroups, 'appx')}
+  <h2>Phụ lục B. Thiết kế QC theo Westgard Sigma Rules</h2>${groupedPeriodTable(['Kỳ', 'Mức', 'Sigma', 'Bộ quy tắc QC gợi ý', 'Mức nguy cơ tham khảo', 'Hành động'], designGroups, 'appx')}${DESIGN_NOTE}
   <h2>Phụ lục C. Độ không đảm bảo đo (MU)</h2>${groupedPeriodTable(['Kỳ', 'Mức', ...MU_HEADERS], muGroups, 'appx')}</section>
   <p class="footer">Báo cáo được tạo từ dữ liệu Six Sigma đã lưu tại thời điểm in.</p>${signatureBlock()}</body></html>`;
 }

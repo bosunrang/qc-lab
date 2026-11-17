@@ -17,7 +17,7 @@ const page = readSigmaPageSources();
 const muModalSource = readFileSync(new URL('../renderer/pages/sigma/MuModal.tsx', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../renderer/lib/sigma-workflow.ts', import.meta.url), 'utf8');
 function evaluate(source, context = {}) { return vm.runInNewContext(stripTypeScriptTypes(source.replace(/^import .*;\r?$/gm, '').replace(/export /g, '')), context); }
-const helpers = evaluate(workflow + '\n({parseEqaDraft, mdcRatios, governingSigmaLevel, sigmaMuExport})');
+const helpers = evaluate(workflow + '\n({parseEqaDraft, mdcRatios, governingSigmaLevel})');
 function section(source, start, end) {
   const a = source.indexOf(start), b = source.indexOf(end, a);
   assert.ok(a >= 0 && b > a, start);
@@ -125,14 +125,15 @@ test('SG03: blank EQA is not zero; actual zero stays valid; partial objects cann
   assert.equal(save([{ level: 1, eqaRounds: [{ lab: null, target: null, bias: -2 }] }]).ok, false);
 });
 
-test('SG03c: Bias RMS giữ thêm trung bình có dấu để truy xuất hướng lệch', t => {
+test('SG03c (đổi theo SIGMA-REVIEW-2026-11-17 SB-1): Sigma dùng Bias trung bình có dấu, RMS chỉ cho MU', t => {
   const { save } = scenario(t);
   const result = save([{ level: 1, eqaRounds: [{ lab: 97, target: 100 }, { lab: 95, target: 100 }] }]);
-  assert.equal(result.data.levels[0].biasEqa, Math.sqrt(17));
-  assert.equal(result.data.levels[0].biasMean, -4, 'RMS là độ lớn; trung bình có dấu phải còn để truy xuất');
-  assert.match(page, /Bias RMS EQA\/EQC/);
+  assert.equal(result.data.levels[0].biasEqa, -4);
+  assert.equal(result.data.levels[0].biasMean, -4);
+  assert.equal(result.data.levels[0].biasRms, Math.sqrt(17), 'RMS vẫn có cho ngân sách MU');
+  assert.match(page, /<span>Bias EQA\/EQC<\/span>/);
   const printReport = readFileSync(new URL('../renderer/lib/sigma-print-report.ts', import.meta.url), 'utf8');
-  assert.match(printReport, /Bias TB có dấu%/);
+  assert.match(printReport, /Bias RMS \(cho MU\)%/);
 });
 
 test('SG03b: lỗi nhập Bias dùng thông báo trung tâm, không chen vào phía trên bảng', () => {
@@ -238,15 +239,14 @@ test('SG08: common design requires ALL levels; choose worst only after every lev
   assert.equal(helpers.governingSigmaLevel({ levels }), undefined);
 });
 
-test('SG09: incomplete MU never reports acceptance or numeric final U in export', () => {
+// Hàm xuất MU riêng (sigmaMuExport) đã bỏ vì không còn nơi gọi; bản in PDF kiểm
+// riêng việc chỉ hiện U khi đủ thành phần (sigma-print-report.test.mjs).
+test('SG09: incomplete MU never reports acceptance or numeric final U', () => {
   const mu = uncertaintyBudget({ cv: 1, bias: 0, tea: 10, target: 100 });
   assert.equal(mu.complete, false); assert.equal(mu.withinTea, null); assert.equal(mu.teaRatio, null);
-  const cells = helpers.sigmaMuExport({ mu, cvSource: 'manual' });
-  assert.equal(cells[0], ''); assert.equal(cells[1], ''); assert.equal(cells[2], '');
-  assert.match(cells[3], /u\(Cref\).*u\(cal\)/);
+  assert.match(mu.missing.join(', '), /u\(Cref\).*u\(cal\)/);
   const full = uncertaintyBudget({ cv: 1, bias: 0, uCref: 0, uCal: 0, tea: 10 });
-  assert.equal(full.complete, true); assert.equal(full.withinTea, true);
-  assert.equal(helpers.sigmaMuExport({ mu: full, cvSource: 'manual' })[0], 2);
+  assert.equal(full.complete, true); assert.equal(full.withinTea, true); assert.equal(full.U, 2);
 });
 
 test('SG10: every Sigma write rolls back when audit fails, including rename', t => {
@@ -293,7 +293,7 @@ test('SG11: delayed and failed requests cannot replace newest test, including re
 test('SG12 and supplementary: units, draft preview, no clipped trend, and shared export are wired', () => {
   assert.match(page, /u = U\/k/); assert.match(page, /chỉ chia 2 khi k = 2/);
   assert.match(page, /100 × u \/ \|giá trị tham chiếu\|/);
-  assert.match(page, /const preview = uncertaintyBudget\(\{ cv: level.cv, bias: level.biasEqa, uCref, uCal, includeBias/);
+  assert.match(page, /const preview = uncertaintyBudget\(\{ cv: level.cv, bias: level.biasRms \?\? level.biasEqa, uCref, uCal, includeBias/);
   const printReport = readFileSync(new URL('../renderer/lib/sigma-print-report.ts', import.meta.url), 'utf8');
   assert.match(page, /buildSigmaPeriodPrintHtml\(\{/);
   assert.match(printReport, /mu\?\.complete \? number\(mu\.U, 4\) : '—'/);

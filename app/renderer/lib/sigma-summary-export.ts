@@ -186,7 +186,7 @@ export async function exportSigmaReportXlsx(input: SigmaReportInput): Promise<st
     sheet.mergeCells(`A2:${lastName}2`); sheet.getCell('A2').value = `Xét nghiệm: ${input.test.name}${input.test.unit ? ` (${input.test.unit})` : ''}${input.instrumentName ? ` · Máy: ${input.instrumentName}` : ''} · Xuất ngày ${currentDate()} · ${periods.length} kỳ`;
     sheet.getCell('A2').font = { name: 'Arial', size: 9, color: { argb: 'FF40515C' }, italic: true }; sheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' }; sheet.getRow(2).height = 17;
     const headers = ['Xét nghiệm', onePeriod ? 'Kỳ' : 'Kỳ đánh giá', 'TEa (%)'];
-    levels.forEach((level) => headers.push(`Mức ${level}\nSigma`, `Mức ${level}\nXếp loại`, `Mức ${level}\nCV (%)`, `Mức ${level}\nBias RMS (%)`, `Mức ${level}\nDPMO`, `Mức ${level}\nYield (%)`, `Mức ${level}\nThiết kế QC`));
+    levels.forEach((level) => headers.push(`Mức ${level}\nSigma`, `Mức ${level}\nXếp loại`, `Mức ${level}\nCV (%)`, `Mức ${level}\nBias (%)`, `Mức ${level}\nDPMO (quy đổi, dịch 1,5σ)`, `Mức ${level}\nYield (%)`, `Mức ${level}\nThiết kế QC`));
     const header = sheet.getRow(3); header.values = headers; header.height = 40;
     header.eachCell({ includeEmpty: true }, (cell) => { cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: SECTION_TEAL } }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cell.border = { top: { style: 'thin', color: { argb: 'FFB8D1C0' } }, bottom: { style: 'thin', color: { argb: 'FFB8D1C0' } }, left: { style: 'thin', color: { argb: 'FFB8D1C0' } }, right: { style: 'thin', color: { argb: 'FFB8D1C0' } } }; });
     periods.forEach((period, index) => {

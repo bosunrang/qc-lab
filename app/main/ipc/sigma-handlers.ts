@@ -14,6 +14,9 @@ import { type IpcResult, requireQcConfig } from './shared';
 import { writeCommand } from './write-command';
 import { resolvePeriodTea } from '../domain/sigma-period-tea';
 import { preserveSigmaTeaHistory } from '../db/sigma-tea-history';
+import { selectSigmaEqaBias, resolveSigmaEqaWindow, SIGMA_EQA_EXCLUSION_LABEL, type SigmaEqaBiasSelection, type SigmaEqaSample } from '../domain/sigma-eqa-bias';
+import { createEqaHandlers } from './eqa-handlers';
+import { eqaNceSourceKey } from './eqa-corrective-reader';
 
 const PERIOD_RE = /^\d{4}-\d{2}$/;
 const TEA_SOURCES = new Set(['lab', 'eflm', 'clia', 'ricos']);
@@ -23,15 +26,17 @@ export interface SigmaLevelInput {
   level: number; tea?: unknown; targetMean?: unknown; cv?: unknown; biasEqa?: unknown; eqaRounds?: unknown[]; uCref?: unknown; uCal?: unknown; muBiasMode?: 'include' | 'exclude';
   cvSource?: 'manual' | 'iqc-cohort'; cohortN?: unknown; sourceLot?: unknown; sourceStart?: unknown; sourceEnd?: unknown; cohortStatus?: unknown;
 }
-export interface SigmaPeriodInput { testId: unknown; period: unknown; tea?: unknown; teaSource?: unknown; levels: SigmaLevelInput[]; createOnly?: unknown }
+export interface SigmaPeriodInput { testId: unknown; period: unknown; tea?: unknown; teaSource?: unknown; levels: SigmaLevelInput[]; createOnly?: unknown; sharedEqaRounds?: unknown[]; eqaWindowMonths?: unknown }
 
-/** Một vòng EQA/EQC lưu kết quả PXN, giá trị đích và Bias% tính từ hai số đó. */
-export interface SigmaEqaRound { lab: number; target: number; bias: number }
+/** Một vòng EQA/EQC lưu kết quả PXN, giá trị đích và Bias% tính từ hai số đó;
+ * vòng lấy từ ngoại kiểm đã nhập mang mã kết quả và nhãn (SB-7). */
+export interface SigmaEqaRound { lab: number; target: number; bias: number; eqaResultId?: string; label?: string }
 
 export interface SigmaLevelResult {
+  eqaWindowMonths?: number;
   teaConversion?: SigmaLevelResultView['teaConversion'];
   muBiasMode?: 'include' | 'exclude'; cohortReviewed?: boolean; cohortReviewBy?: string; cohortReviewAt?: string; cohortStale?: boolean; teaCriterion?: string;
-  level: number; tea: number | null; teaSnapshot: number | null; targetMean: number | null; cv: number | null; biasEqa: number | null; /** Trung bình Bias có dấu từ các vòng EQA; null khi nhập Bias tay. */ biasMean: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean; biasSem: number | null; uCref: number | null; uCal: number | null;
+  level: number; tea: number | null; teaSnapshot: number | null; targetMean: number | null; cv: number | null; biasEqa: number | null; /** Trung bình Bias có dấu từ các vòng EQA; null khi nhập Bias tay. */ biasMean: number | null; biasRms: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean; biasSem: number | null; uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
   sigma: SigmaMetricResult | null; mu: UncertaintyBudgetResult | null; qualityDesign: ReturnType<typeof sigmaQualityDesign>;
 }
@@ -41,6 +46,8 @@ interface StoredLevel { level: number; /** TEa% đã chụp theo mức QC; nếu
 
 type TeaBasis = Pick<ReturnType<typeof resolveTea>, 'value' | 'criterion' | 'criterionDetail'> & { source: string; reference?: string; capturedAt?: string; targetMean?: number | null };
 interface StoredLevel {
+  /** Số tháng đã chụp khi áp dụng Bias chung; sửa CV/MU không thay khoảng này. */
+  eqaWindowMonths?: number;
   /** Cờ tương thích của kỳ cũ; chỉ giữ cố định khi có snapshot số. */
   teaLocked?: boolean;
   teaBasis?: TeaBasis;
@@ -62,11 +69,14 @@ function normalizeEqaRounds(raw: unknown): { ok: true; rounds: SigmaEqaRound[] }
   for (const value of raw) {
     if (value == null || String(value).trim() === '') continue;
     if (typeof value === 'object' && !Array.isArray(value)) {
-      const row = value as { lab?: unknown; target?: unknown; bias?: unknown };
+      const row = value as { lab?: unknown; target?: unknown; bias?: unknown; eqaResultId?: unknown; label?: unknown };
       const lab = row.lab == null || String(row.lab).trim() === '' ? NaN : finiteNumber(row.lab, NaN);
       const target = row.target == null || String(row.target).trim() === '' ? NaN : finiteNumber(row.target, NaN);
       if (Number.isFinite(lab) && Number.isFinite(target) && target !== 0) {
-        rounds.push({ lab, target, bias: eqaRoundBias(lab, target) });
+        // Vòng lấy từ ngoại kiểm giữ mã kết quả và nhãn để truy vết (SB-7).
+        const eqaResultId = typeof row.eqaResultId === 'string' ? cleanId(row.eqaResultId) : '';
+        const label = eqaResultId ? cleanText(row.label, 160).trim() : '';
+        rounds.push({ lab, target, bias: eqaRoundBias(lab, target), ...(eqaResultId ? { eqaResultId, label } : {}) });
         continue;
       }
       return { ok: false };
@@ -118,15 +128,18 @@ function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLeve
     ? { targetMean: stored.tea != null ? stored.targetMean ?? usedBasis.targetMean ?? null : usedBasis.targetMean ?? null, unit: usedBasis.criterionDetail.unit }
     : undefined;
   const roundsStats = stored.eqaRounds && stored.eqaRounds.length ? eqaRoundsStats(stored.eqaRounds.map((round) => round.bias)) : null;
-  const biasEqa = roundsStats ? roundsStats.rms : stored.biasEqa;
+  // SB-1: Sigma dùng trung bình có dấu (sai số hệ thống; phần dao động đã nằm
+  // trong CV). RMS gộp cả độ phân tán nên chỉ dùng cho ngân sách MU (Nordtest).
+  const biasEqa = roundsStats ? roundsStats.mean : stored.biasEqa;
+  const biasRms = roundsStats ? roundsStats.rms : stored.biasEqa;
   const biasSem = roundsStats ? roundsStats.biasSem : null;
   // Bias chưa được đánh giá không đồng nghĩa Bias = 0; không suy ra Sigma
   // từ một giả định lạc quan.
   const sigma = tea != null && stored.cv != null && biasEqa != null ? sigmaMetric(tea, biasEqa, stored.cv) : null;
   const mu = stored.cv != null
-    ? uncertaintyBudget({ cv: stored.cv, bias: biasEqa, uCref: stored.uCref, includeBias: stored.muBiasMode !== 'exclude', uCal: stored.uCal, tea: tea ?? undefined, target: stored.targetMean ?? undefined })
+    ? uncertaintyBudget({ cv: stored.cv, bias: biasRms, uCref: stored.uCref, includeBias: stored.muBiasMode !== 'exclude', uCal: stored.uCal, tea: tea ?? undefined, target: stored.targetMean ?? undefined })
     : null;
-  return { level: stored.level, tea, teaSnapshot: stored.tea, ...(conversion ? { teaConversion: conversion } : {}), targetMean: stored.targetMean, cv: stored.cv, biasEqa, biasMean: roundsStats?.mean ?? null, eqaRounds: stored.eqaRounds || [], mixedSigns: roundsStats?.mixedSigns ?? false, biasSem, uCref: stored.uCref, uCal: stored.uCal,
+  return { level: stored.level, tea, teaSnapshot: stored.tea, ...(stored.eqaWindowMonths ? { eqaWindowMonths: stored.eqaWindowMonths } : {}), ...(conversion ? { teaConversion: conversion } : {}), targetMean: stored.targetMean, cv: stored.cv, biasEqa, biasMean: roundsStats?.mean ?? null, biasRms, eqaRounds: stored.eqaRounds || [], mixedSigns: roundsStats?.mixedSigns ?? false, biasSem, uCref: stored.uCref, uCal: stored.uCal,
     muBiasMode: stored.muBiasMode || 'include', teaCriterion: [stored.teaBasis?.criterion, stored.teaBasis?.reference].filter(Boolean).join(' · '), cohortReviewed: !!stored.cohortReview,
     cohortReviewBy: stored.cohortReview?.by || '', cohortReviewAt: stored.cohortReview?.at || '',
     cvSource: stored.cvSource === 'iqc-cohort' ? 'iqc-cohort' : 'manual', cohortN: stored.cohortN ?? null, sourceLot: stored.sourceLot || '', sourceStart: stored.sourceStart || '', sourceEnd: stored.sourceEnd || '', cohortStatus: stored.cohortStatus || '',
@@ -134,6 +147,7 @@ function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLeve
 }
 
 export function createSigmaHandlers(db: Db) {
+  const eqa = createEqaHandlers(db);
   /** Dấu vân tay của ĐÚNG những gì `buildSigmaCohorts()` đọc, không hơn:
    * các điểm QC của (xét nghiệm, mức, lô) tới hết kỳ, và tập điểm đã có hồ sơ
    * khắc phục duyệt xong + hiệu quả (`resolvedPointIds`).
@@ -318,21 +332,36 @@ export function createSigmaHandlers(db: Db) {
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     const period = cleanText(input.period, 7).trim();
     if (!PERIOD_RE.test(period) || Number(period.slice(5)) < 1 || Number(period.slice(5)) > 12) return { ok: false, error: { code: 'invalid-period', message: 'Kỳ phải có định dạng YYYY-MM hợp lệ.' } };
+    let windowMonths: number;
+    try { windowMonths = resolveSigmaEqaWindow(period, input.eqaWindowMonths).windowMonths; }
+    catch { return { ok: false, error: { code: 'invalid-eqa-window', message: 'Số tháng lấy ngoại kiểm phải là số nguyên từ 1 trở lên và nằm trong phạm vi lịch hợp lệ.' } }; }
     if (!Array.isArray(input.levels) || !input.levels.length) return { ok: false, error: { code: 'missing-levels', message: 'Cần ít nhất 1 mức dữ liệu.' } };
     const id = `${testId}:${period}`;
     const existing = db.prepare('SELECT id,lv_json,tea_source FROM sigma_data WHERE id=?').get(id) as { id: string; lv_json: string; tea_source: string } | undefined;
     if (existing && input.createOnly === true) return { ok: false, error: { code: 'duplicate-period', message: `Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.` } };
     const prior = existing ? readStoredLevels(existing.lv_json) : [];
+    // Chỉ thao tác áp dụng Bias chung mới thay các mức; sửa CV/MU giữ căn cứ cũ.
+    let sharedRounds: SigmaEqaRound[] | undefined;
+    if (input.sharedEqaRounds !== undefined) {
+      const checked = normalizeEqaRounds(input.sharedEqaRounds);
+      if (!Array.isArray(input.sharedEqaRounds) || !checked.ok || !checked.rounds.length) return { ok: false, error: { code: 'invalid-eqa-round', message: 'Bias chung cần ít nhất một mẫu có đủ kết quả và giá trị ấn định hợp lệ.' } };
+      // SB-4b: Bias chung chỉ lấy từ ngoại kiểm và dùng đủ mọi mẫu hợp lệ; không
+      // trộn vòng nhập tay để chọn riêng mẫu có lợi.
+      if (checked.rounds.some(round => !round.eqaResultId)) return { ok: false, error: { code: 'eqa-mixed', message: 'Bias chung chỉ lấy từ ngoại kiểm. Vòng nhập tay lưu riêng cho từng mức, không trộn với mẫu ngoại kiểm.' } };
+      sharedRounds = checked.rounds;
+    }
     const teaSource = cleanText(input.teaSource, 200).trim().toLowerCase();
     if (teaSource && !TEA_SOURCES.has(teaSource)) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
     const resolver = makeLevelTeaResolver(testId);
     const tea = input.tea == null || input.tea === '' ? null : finiteNumber(input.tea, NaN);
     if (tea != null && (!Number.isFinite(tea) || tea <= 0)) return { ok: false, error: { code: 'invalid-tea', message: 'TEa phải là số dương.' } };
     for (const inputLevel of input.levels) {
-      if (!normalizeEqaRounds(inputLevel.eqaRounds).ok) return { ok: false, error: { code: 'invalid-eqa-round', message: 'Mỗi vòng EQA/EQC cần đủ KQ PXN và Target EQA hợp lệ (Target khác 0).' } };
+      const normalized = normalizeEqaRounds(inputLevel.eqaRounds);
+      if (!normalized.ok) return { ok: false, error: { code: 'invalid-eqa-round', message: 'Mỗi vòng EQA/EQC cần đủ KQ PXN và Target EQA hợp lệ (Target khác 0).' } };
     }
     const stored: StoredLevel[] = input.levels.map(lv => ({
       level: finiteNumber(lv.level, NaN),
+      eqaWindowMonths: prior.find(p => p.level === finiteNumber(lv.level, NaN))?.eqaWindowMonths,
       tea: lv.tea == null || lv.tea === '' ? null : finiteNumber(lv.tea, NaN),
       targetMean: lv.targetMean == null || lv.targetMean === '' ? null : finiteNumber(lv.targetMean, NaN),
       cv: lv.cv == null || lv.cv === '' ? null : finiteNumber(lv.cv, NaN),
@@ -345,6 +374,12 @@ export function createSigmaHandlers(db: Db) {
       cohortN: lv.cohortN == null ? null : finiteNumber(lv.cohortN, NaN),
       sourceLot: cleanText(lv.sourceLot, 120).trim(), sourceStart: cleanText(lv.sourceStart, 10).trim(), sourceEnd: cleanText(lv.sourceEnd, 10).trim(), cohortStatus: cleanText(lv.cohortStatus, 30).trim(),
     }));
+    if (sharedRounds) for (const level of stored) {
+      level.eqaRounds = sharedRounds.map(round => ({ ...round }));
+      level.biasEqa = null;
+      level.eqaWindowMonths = windowMonths;
+    }
+    if (sharedRounds && prior.some(p => !stored.some(l => l.level === p.level))) return { ok: false, error: { code: 'shared-bias-levels', message: 'Cần giữ đủ các mức QC đã có khi áp dụng Bias chung. Tải lại kỳ trước khi lưu.' } };
     for (const level of stored) {
       if (!Number.isInteger(level.level) || level.level < 1) return { ok: false, error: { code: 'invalid-level', message: 'Mức QC không hợp lệ.' } };
       if (level.tea != null && (!Number.isFinite(level.tea) || level.tea <= 0)) return { ok: false, error: { code: 'invalid-level-tea', message: 'TEa của mức QC phải là số dương.' } };
@@ -420,6 +455,48 @@ export function createSigmaHandlers(db: Db) {
           level.cohortReview = { by: actor.name || actor.username, at: new Date().toISOString(), fingerprint: level.cohortFingerprint };
         }
       }
+    }
+    // Mọi mức dùng cùng cửa sổ và bộ lọc mẫu; không lọc theo nồng độ QC.
+    // Mỗi vòng cũ được giữ đúng một lần, kể cả dữ liệu cũ từng có vòng trùng;
+    // không sửa lịch sử và cũng không cho nhân thêm số lần dùng một mẫu.
+    let currentEqaSamples: SigmaEqaSample[] | undefined;
+    for (const level of stored) {
+      const previous = prior.find(p => p.level === level.level);
+      const remaining = [...(previous?.eqaRounds ?? [])];
+      const seen = new Set<string>();
+      let selection: SigmaEqaBiasSelection | undefined;
+      for (let i = 0; i < level.eqaRounds.length; i++) {
+        const round = level.eqaRounds[i], resultId = round.eqaResultId;
+        if (!resultId) continue;
+        const oldIndex = remaining.findIndex(p => p.eqaResultId === resultId && p.lab === round.lab && p.target === round.target);
+        if (!sharedRounds && oldIndex >= 0) {
+          level.eqaRounds[i] = { ...remaining.splice(oldIndex, 1)[0] };
+          seen.add(resultId);
+          continue;
+        }
+        if (seen.has(resultId)) return { ok: false, error: { code: 'duplicate-eqa-source', message: 'Một mẫu ngoại kiểm chỉ được dùng một lần trong mỗi mức QC.' } };
+        // Mẫu ngoại kiểm mới chỉ vào qua "Lấy từ ngoại kiểm" (áp dụng chung, đủ mẫu).
+        if (!sharedRounds) return { ok: false, error: { code: 'eqa-shared-only', message: 'Mẫu ngoại kiểm mới chỉ được áp dụng qua Lấy từ ngoại kiểm, chung cho mọi mức. Tải lại kỳ rồi thử lại.' } };
+        seen.add(resultId);
+        currentEqaSamples ??= eqaSamples(testId);
+        const source = currentEqaSamples.find(s => s.resultId === resultId);
+        if (!source || source.result !== round.lab || source.assigned !== round.target) return { ok: false, error: { code: 'invalid-eqa-source', message: 'Kết quả ngoại kiểm đã thay đổi hoặc không thuộc xét nghiệm này. Lấy lại Bias từ ngoại kiểm.' } };
+        selection ??= selectSigmaEqaBias(currentEqaSamples, { period, windowMonths });
+        const excluded = selection.excluded.find(s => s.resultId === resultId);
+        if (excluded) return { ok: false, error: { code: 'invalid-eqa-selection', message: `${source.label}: ${SIGMA_EQA_EXCLUSION_LABEL[excluded.reason]}. Lấy lại Bias từ ngoại kiểm trước khi áp dụng.` } };
+        round.label = source.label;
+      }
+    }
+    // Một mức không trộn mẫu ngoại kiểm với vòng nhập tay (SB-4b).
+    for (const level of stored) {
+      if (level.eqaRounds.some(r => r.eqaResultId) && level.eqaRounds.some(r => !r.eqaResultId)) return { ok: false, error: { code: 'eqa-mixed', message: `Mức ${level.level}: không trộn mẫu ngoại kiểm với vòng nhập tay. Lấy lại từ ngoại kiểm hoặc chuyển hẳn sang nhập tay.` } };
+      if (!level.eqaRounds.some(r => r.eqaResultId)) level.eqaWindowMonths = undefined;
+    }
+    // Bias chung: kiểm cả mẫu mới xuất hiện sau lúc xem trước, phải dùng đủ mọi mẫu hợp lệ.
+    if (sharedRounds) {
+      const included = selectSigmaEqaBias(currentEqaSamples ?? eqaSamples(testId), { period, windowMonths }).included;
+      const ids = new Set(sharedRounds.map(round => round.eqaResultId));
+      if (included.length !== ids.size || included.some(s => !ids.has(s.resultId))) return { ok: false, error: { code: 'eqa-selection-changed', message: `Danh sách ngoại kiểm hợp lệ trong ${windowMonths} tháng đã thay đổi. Lấy lại Bias từ ngoại kiểm để dùng đầy đủ các mẫu.` } };
     }
     // CV nhập tay thì KHÔNG được mang theo mô tả nhóm IQC — nếu không, một
     // bản ghi có thể vừa nói "CV nhập tay" vừa khoe `cohortStatus: eligible`.
@@ -500,7 +577,40 @@ export function createSigmaHandlers(db: Db) {
     return { ok: true, data: { id } };
   });
 
-  return { listPeriods, listCohorts, saveTeaConfig, savePeriod, renamePeriod, removePeriod };
+  /** Dùng cùng nguồn và khoá nội dung với Khắc phục, tránh gán NCE cũ sang báo cáo sửa số.
+   * Chỉ loại khi hồ sơ đã kết luận (xác định hoặc nghi ngờ) nguyên nhân hành chính hoặc
+   * chương trình/mẫu: "chưa xác định" giữ nhóm cũ trong CSDL nhưng không phải kết luận (N-11). */
+  function eqaSamples(testId: string): SigmaEqaSample[] {
+    const excludedSources = new Map((db.prepare(`SELECT eqa_source_key, cause_category FROM nce_records
+      WHERE source='eqa' AND status<>'cancelled' AND eqa_source_key<>'' AND cause_category IN ('eqa_administrative','eqa_program')
+        AND cause_status IN ('identified','suspected')`)
+      .all() as { eqa_source_key: string; cause_category: string }[]).map(r => [r.eqa_source_key, r.cause_category]));
+    const rounds = db.prepare(`SELECT DISTINCT r.id FROM eqa_rounds r JOIN eqa_results e ON e.round_id=r.id AND e.version=r.version
+      WHERE e.test_id=? AND r.status='open'`).all(testId) as { id: string }[];
+    return rounds.flatMap(({ id }) => {
+      const view = eqa.getEqaRound(id);
+      if (!view) return [];
+      return view.results.filter(r => r.test_id === testId).map(result => ({
+        resultId: result.id, label: `${view.round.program_name} · ${view.round.round}/${view.round.year}${result.sample ? ` · mẫu ${result.sample}` : ''}`,
+        reportDate: view.round.report_date || view.round.created_at.slice(0, 10), result: result.result, assigned: result.assigned,
+        assignedUncertain: !!result.assigned_check?.uncertain,
+        ncCauseCategory: excludedSources.get(eqaNceSourceKey({ round: view.round, result })) ?? '',
+      }));
+    });
+  }
+
+  /** Mẫu ngoại kiểm đề xuất làm Bias cho một mức QC của kỳ Sigma (SIGMA-REVIEW-2026-11-17
+   * SB-2..SB-6). Chỉ đọc; người phụ trách xem rồi bấm áp dụng mới lưu. */
+  function eqaBias(testIdRaw: unknown, periodRaw: unknown, levelRaw: unknown, windowMonthsRaw?: unknown): (SigmaEqaBiasSelection & { targetMean: number | null }) | null {
+    const testId = cleanId(testIdRaw), period = cleanText(periodRaw, 7).trim(), level = finiteNumber(levelRaw, NaN);
+    if (!testId || !PERIOD_RE.test(period) || Number(period.slice(5)) < 1 || Number(period.slice(5)) > 12 || !Number.isInteger(level) || level < 1) return null;
+    let windowMonths: number;
+    try { windowMonths = resolveSigmaEqaWindow(period, windowMonthsRaw).windowMonths; } catch { return null; }
+    // Giữ tham số mức và targetMean=null để tương thích IPC cũ; nguồn Bias nay chung.
+    return { ...selectSigmaEqaBias(eqaSamples(testId), { period, windowMonths }), targetMean: null };
+  }
+
+  return { listPeriods, listCohorts, saveTeaConfig, savePeriod, renamePeriod, removePeriod, eqaBias };
 }
 
 export type SigmaHandlers = ReturnType<typeof createSigmaHandlers>;

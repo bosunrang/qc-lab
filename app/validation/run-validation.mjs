@@ -209,7 +209,8 @@ function sigmaChecks(ctx, item, created) {
       add('DPMO', fmt(want.dpmo), fmt(round(dpmo, 3)), dpmo != null && Math.abs(dpmo - want.dpmo) <= Math.max(0.5, want.dpmo * 1e-3));
     }
     if ('biasEqa' in want) add('Bias% dùng cho Sigma', fmt(want.biasEqa), fmt(got?.biasEqa), sameNumber(got?.biasEqa, want.biasEqa));
-    if ('biasMean' in want) add('Bias% trung bình có dấu (tham khảo)', fmt(want.biasMean), fmt(got?.biasMean), sameNumber(got?.biasMean, want.biasMean));
+    if ('biasRms' in want) add('Bias% RMS (chỉ cho MU)', fmt(want.biasRms), fmt(got?.biasRms), sameNumber(got?.biasRms, want.biasRms));
+    if ('biasMean' in want) add('Bias% trung bình có dấu', fmt(want.biasMean), fmt(got?.biasMean), sameNumber(got?.biasMean, want.biasMean));
     if ('mixedSigns' in want) add('Cảnh báo vòng EQA trái dấu', want.mixedSigns ? 'Có' : 'Không', got?.mixedSigns ? 'Có' : 'Không', got?.mixedSigns === want.mixedSigns);
     if ('tier' in want) add(`Bậc Sigma${designSource}`, want.tier, design?.tier ?? '—', design?.tier === want.tier);
     if ('capable' in want) add(`Đủ năng lực${designSource}`, want.capable ? 'Có' : 'Không', design ? (design.capable ? 'Có' : 'Không') : '—', design?.capable === want.capable);

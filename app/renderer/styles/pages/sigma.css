@@ -87,6 +87,7 @@
 .sg-cohort-table{width:100%;min-width:760px;table-layout:fixed;}
 .sg-cohort-table th{font-size:var(--table-head-size-sm);letter-spacing:var(--table-head-tracking-sm);height:var(--table-header-h-sm);text-align:center;background:var(--table-head-bg);color:var(--table-head-ink);border-bottom-color:var(--table-head-border);}.sg-cohort-table td{height:var(--table-row-h);vertical-align:middle;}
 .sg-cohort-table tbody tr{height:var(--table-row-h-compact);}
+.sg-cohort-excluded{display:block;font-size:var(--text-2xs);}
 /* Nội dung là một câu có `<b>` ở giữa; không dùng flex của `.alert`, nếu
    không text node trước/sau thẻ đậm bị tách thành các cột và rơi dòng giả. */
 .sg-opspec-note{display:block;width:100%;margin:var(--space-3) 0 0;}
@@ -113,13 +114,13 @@
 
 .sg-add-period-form{display:grid;gap:var(--space-2-5);}.sg-add-period-form .hint{margin:0;line-height:var(--leading-body);}.sg-add-period-picker{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2-5);}.sg-add-period-picker label{display:grid;gap:var(--space-1);margin:0;color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-add-period-picker select{width:100%;height:var(--control-h);min-height:var(--control-h);}
 .sg-eqa-table-wrap{overflow-x:auto;}
-.sg-eqa-table{width:100%;min-width:468px;margin:0 0 var(--space-2-5);border:1px solid var(--surface-border);border-radius:var(--table-radius);border-collapse:separate;border-spacing:0;overflow:hidden;table-layout:fixed;font:var(--table-body-size) var(--font-sans);}
+.sg-eqa-table{width:100%;min-width:600px;margin:0 0 var(--space-2-5);border:1px solid var(--surface-border);border-radius:var(--table-radius);border-collapse:separate;border-spacing:0;overflow:hidden;table-layout:fixed;font:var(--table-body-size) var(--font-sans);}
 /* Đây là bảng NHẬP LIỆU chính của modal, nên giữ header chuẩn 13px. Cột thao
    tác có tiêu đề để nút xoá không
    thành một biểu tượng lơ lửng ở cuối hàng. */
 .sg-eqa-table th{position:static;height:var(--table-header-h);padding:0 var(--table-cell-px-compact);background:var(--table-head-bg);color:var(--table-head-ink);border-bottom:1px solid var(--table-head-border);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-tracking);text-align:center;text-transform:none;white-space:nowrap;}
 .sg-eqa-table th:first-child{width:44px;}
-.sg-eqa-table th:nth-child(2),.sg-eqa-table th:nth-child(3){width:140px;}
+.sg-eqa-table th:nth-child(3),.sg-eqa-table th:nth-child(4){width:130px;}
 .sg-eqa-table th:nth-last-child(2){width:72px;}
 .sg-eqa-table th:last-child{width:72px;}
 .sg-eqa-table tbody tr:last-child td{border-bottom:0;}
@@ -130,6 +131,13 @@
 .sg-eqa-table td input[type=number]::-webkit-inner-spin-button,.sg-eqa-table td input[type=number]::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
 .sg-eqa-table input:focus:not(:focus-visible){border-color:var(--accent-border);background:var(--surface);}
 .sg-eqa-index{color:var(--text-tertiary);font-size:var(--text-xs);}
+/* Nguồn của từng vòng: nhãn đợt/mẫu ngoại kiểm hoặc "Nhập tay" (SIGMA-REVIEW-2026-11-17). */
+.sg-eqa-table td.sg-eqa-label{text-align:left;color:var(--text-secondary);font-size:var(--text-xs);overflow-wrap:anywhere;}
+.sg-eqa-source{display:flex;align-items:end;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3);}
+.sg-eqa-window{width:12ch;margin:0;}
+.sg-eqa-selection{display:grid;gap:var(--space-2);margin-bottom:var(--space-3);}
+.sg-eqa-selection p{margin:0;}
+.sg-eqa-excluded{margin:var(--space-2) 0 0;padding-left:var(--space-5);color:var(--text-secondary);font-size:var(--text-xs);}
 .sg-eqa-bias{color:var(--text-tertiary);font-weight:var(--weight-bold);}
 .sg-eqa-del{min-width:0;margin:0 auto;}
 .sg-eqa-add{margin:var(--space-3) 0 0;}

@@ -1,5 +1,5 @@
 // Six Sigma — thiết lập nguồn TEa, trạng thái cấu hình, không gian làm việc
-// theo kỳ (CV/Bias có nguồn gốc theo từng mức QC), modal Bias% RMS có cảnh
+// theo kỳ (CV/Bias có nguồn gốc theo từng mức QC), modal Bias% có cảnh
 // báo lệch dấu và modal MU ba thành phần. Hộp thoại, khối hiển thị và hàm
 // thuần nằm ở `pages/sigma/`. Bộ chọn luôn lấy toàn bộ danh mục
 // Cấu hình chung — không tạo hay bật/tắt xét nghiệm riêng trong Sigma.
@@ -49,7 +49,7 @@ export function SigmaPage() {
   const currentTest = useRef(testId);
   currentTest.current = testId;
   const periods = loadedPeriods.filter(period => period.testId === testId);
-  /** Kỳ được chọn điều khiển workspace, OPSpecs và MU. `null` rơi về kỳ mới
+  /** Kỳ được chọn điều khiển workspace, thiết kế QC và MU. `null` rơi về kỳ mới
    * nhất; khi đổi xét nghiệm, danh sách kỳ và lựa chọn đều phải được đặt lại. */
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [historyMonthFilter, setHistoryMonthFilter] = useState('');
@@ -185,7 +185,7 @@ export function SigmaPage() {
       // lại là đóng băng một TEa không nguồn gốc vào hồ sơ chỉ vì người dùng
       // sửa CV. Kỳ chưa có snapshot thì cứ để trống và tiếp tục được giải lại.
       level: level.level, tea: level.teaSnapshot ?? undefined, targetMean: level.targetMean ?? undefined, cv: level.cv ?? undefined, biasEqa: level.biasEqa ?? undefined,
-      eqaRounds: level.eqaRounds.map(({ lab, target, bias }) => ({ lab, target, bias })), uCref: level.uCref ?? undefined, uCal: level.uCal ?? undefined,
+      eqaRounds: level.eqaRounds.map(round => ({ ...round })), uCref: level.uCref ?? undefined, uCal: level.uCal ?? undefined,
       muBiasMode: level.muBiasMode ?? (level.mu?.includeBias === false ? 'exclude' : 'include'), cvSource: level.cvSource, cohortN: level.cohortN ?? undefined,
       sourceLot: level.sourceLot, sourceStart: level.sourceStart, sourceEnd: level.sourceEnd, cohortStatus: level.cohortStatus,
     };
@@ -195,13 +195,13 @@ export function SigmaPage() {
     return period.levels.map((level) => ({ ...levelPayload(level), ...(level.level === overrideLevel ? patch : {}) }));
   }
 
-  function saveOwnedPeriod(period: SigmaPeriodView, levels: SigmaLevelSaveInput[]) {
+  function saveOwnedPeriod(period: SigmaPeriodView, levels: SigmaLevelSaveInput[], sharedEqaRounds?: Array<{ lab: number; target: number; eqaResultId?: string; label?: string }>, eqaWindowMonths?: number) {
     if (period.testId !== currentTest.current || useSigmaStore.getState().loading) return Promise.resolve({ ok: false as const, error: { code: 'stale-sigma-view', message: 'Xét nghiệm hoặc dữ liệu đang xem đã thay đổi. Vui lòng tải lại kỳ trước khi lưu.' } });
     // Nếu mã nguồn TEa đã lưu không còn hợp lệ, dùng nguồn cấu hình hiện hành
     // để tiếp tục sửa kỳ. Snapshot TEa hợp lệ của kỳ vẫn được giữ nguyên.
     const saved = period.savedTea ?? { tea: period.tea, source: period.teaSource };
     const teaSource = isKnownTeaSource(saved.source) ? saved.source : configuredTeaSource;
-    return savePeriod(period.testId, period.period, saved.tea ?? undefined, teaSource, levels);
+    return savePeriod(period.testId, period.period, saved.tea ?? undefined, teaSource, levels, false, sharedEqaRounds, eqaWindowMonths);
   }
 
   function periodTeaText(period: SigmaPeriodView): string {
@@ -375,7 +375,7 @@ export function SigmaPage() {
               <p>Kết quả, biểu đồ và báo cáo được tính theo nguồn TEa vận hành đang chọn, dùng CV/Bias của từng kỳ.</p>
               <ul>
                 <li>Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>.</li>
-                <li>Nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu; dữ liệu IQC không được dùng để tính Bias.</li>
+                <li>Nhiều vòng EQA được tổng hợp bằng <b>trung bình có dấu</b> (sai số hệ thống); RMS chỉ dùng cho ngân sách MU. Bias lấy được từ kết quả ngoại kiểm đã nhập; dữ liệu IQC không được dùng để tính Bias.</li>
                 <li>Quy tắc thận trọng: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC.</li>
                 <li>DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.</li>
               </ul>
@@ -424,11 +424,11 @@ export function SigmaPage() {
             <section className="sg-period-workbench" key={displayPeriod.id} aria-label={`Chi tiết kỳ ${vnPeriod(displayPeriod.period)}`}>
               <div className="sg-level-matrix-wrap">
                 <div className="sg-level-matrix" role="table" aria-label={`Dữ liệu Sigma kỳ ${vnPeriod(displayPeriod.period)}`}>
-                  <div className="sg-level-matrix-head" role="row"><span>Mức QC</span><span>CV IQC</span><span>Bias RMS EQA/EQC</span><span>Sigma</span></div>
+                  <div className="sg-level-matrix-head" role="row"><span>Mức QC</span><span>CV IQC</span><span>Bias EQA/EQC</span><span>Sigma</span></div>
                   {displayPeriod.levels.map((lv) => {
                     const zone = sigmaZone(lv.sigma?.sigma);
                     const cvSource = lv.cvSource === 'iqc-cohort' ? `Lô ${lv.sourceLot || '—'} · n=${lv.cohortN ?? 0}` : 'Nhập tay';
-                    const biasSource = lv.eqaRounds.length ? `${lv.eqaRounds.length} vòng EQA · RMS` : 'Nhập tay';
+                    const biasSource = lv.eqaRounds.length ? `${lv.eqaRounds.length} ${lv.eqaRounds.some((r) => r.eqaResultId) ? 'mẫu ngoại kiểm' : 'vòng EQA'} · TB có dấu` : 'Nhập tay';
                     const conversion = lv.teaConversion;
                     const mean = conversion ? conversion.targetMean : lv.targetMean;
                     const meanText = mean != null ? `${mean.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${conversion?.unit || test?.unit || ''}`.trim() : 'Chưa lưu Mean';
@@ -447,12 +447,11 @@ export function SigmaPage() {
                         {lv.cvSource === 'iqc-cohort' && <span className="sg-level-source">{lv.cohortStale ? 'Dữ liệu nền đã đổi — cần nạp lại' : lv.cohortReviewed ? `Đã rà soát: ${lv.cohortReviewBy}` : 'Chưa xác nhận rà soát IQC'}</span>}
                       </div>
                       <div className="sg-level-cell" role="cell">
-                        <div className="sg-level-input-row"><input key={`bias-${displayPeriod.id}-${lv.level}-${lv.biasEqa ?? ''}`} className="sg-number" type="number" step="any" defaultValue={editablePercent(lv.biasEqa)} disabled={!writable} placeholder="Bias RMS%" aria-label={`Bias RMS EQA mức ${lv.level}`} onBlur={async (e) => {
+                        <div className="sg-level-input-row"><input key={`bias-${displayPeriod.id}-${lv.level}-${lv.biasEqa ?? ''}`} className="sg-number" type="number" step="any" defaultValue={editablePercent(lv.biasEqa)} disabled={!writable} placeholder="Bias%" aria-label={`Bias EQA mức ${lv.level}`} onBlur={async (e) => {
                           const input = e.currentTarget;
                           if (!(await commitBias(displayPeriod, lv.level, input.value))) input.value = editablePercent(lv.biasEqa);
                         }} />{writable && <button className="btn ghost" title={`Nhập hoặc rà soát các vòng EQA/EQC cho mức ${lv.level}`} onClick={() => setBiasModal({ period: displayPeriod, level: lv })}><CalcIcon />Chi tiết</button>}</div>
                         <span className="sg-level-source">{biasSource}</span>
-                        {lv.eqaRounds.length > 1 && lv.biasMean != null && <span className="sg-level-source">TB có dấu: {lv.biasMean.toFixed(2)}%</span>}
                       </div>
                       <div className="sg-level-cell sg-level-sigma" role="cell"><b style={{ color: zone.c }}>{lv.sigma ? lv.sigma.sigma.toFixed(2) : '—'}</b><span style={{ color: zone.c }}>{lv.sigma ? zone.label : `Thiếu ${missingSigmaInputs(lv).join(', ')}`}</span></div>
                     </div>;
@@ -492,10 +491,15 @@ export function SigmaPage() {
       {biasModal && (
         <BiasModal
           initialRounds={biasModal.level.eqaRounds}
+          initialWindowMonths={biasModal.level.eqaWindowMonths}
+          source={{ testId: biasModal.period.testId, period: biasModal.period.period, level: biasModal.level.level }}
           onClose={() => setBiasModal(null)}
-          onSubmit={async (rounds) => {
-            const result = await saveOwnedPeriod(biasModal.period,
-              levelsPayloadFrom(biasModal.period, biasModal.level.level, { eqaRounds: rounds, biasEqa: undefined }));
+          onSubmit={async (rounds, windowMonths) => {
+            // Mẫu ngoại kiểm: Bias chung cho mọi mức (SB-4). Vòng nhập tay (EQC có
+            // target riêng từng mức) chỉ lưu cho đúng mức đang mở (SB-4b).
+            const result = rounds.some((round) => round.eqaResultId)
+              ? await saveOwnedPeriod(biasModal.period, biasModal.period.levels.map(levelPayload), rounds, windowMonths)
+              : await saveOwnedPeriod(biasModal.period, levelsPayloadFrom(biasModal.period, biasModal.level.level, { eqaRounds: rounds, biasEqa: undefined }));
             if (result.ok) setBiasModal(null);
             return result;
           }}

@@ -135,14 +135,15 @@ assert.equal(missingBias.ok, true);
 assert.equal(missingBias.data.levels[0].sigma, null);
 
 // 6) Mỗi vòng EQA/EQC phải truy vết được KQ PXN + Target; Bias% được tính
-// lại từ cặp đó. Nhiều vòng dùng RMS, không dùng trung bình cộng có dấu.
+// lại từ cặp đó. Sigma dùng trung bình có dấu; RMS chỉ cho MU (SIGMA-REVIEW-2026-11-17).
 const eqaSaved = sigmaHandlers.savePeriod({
   testId: test.id, period: '2026-10', tea: 15,
   levels: [{ level: 1, cv: 3, eqaRounds: [{ lab: 98, target: 100 }, { lab: 102, target: 100 }], uCal: 0.5 }],
 }, actor);
 assert.equal(eqaSaved.ok, true);
 const eqaLv = eqaSaved.data.levels[0];
-assert.ok(Math.abs(eqaLv.biasEqa - 2) < 1e-9, 'bias phai la RMS=2, khong phai trung binh cong=0');
+assert.ok(Math.abs(eqaLv.biasEqa) < 1e-9, 'Sigma dùng trung bình có dấu = 0');
+assert.ok(Math.abs(eqaLv.biasRms - 2) < 1e-9, 'MU dùng RMS = 2');
 assert.equal(eqaLv.mixedSigns, true, 'phai bao dau trai nhau de canh bao tren UI');
 assert.deepEqual(eqaLv.eqaRounds, [{ lab: 98, target: 100, bias: -2 }, { lab: 102, target: 100, bias: 2 }]);
 assert.ok(eqaLv.mu.uBias != null, 'co eqaRounds phai tinh duoc u(bias), khong con null');

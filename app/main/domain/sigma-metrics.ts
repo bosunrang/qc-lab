@@ -22,8 +22,9 @@ export interface SigmaQcDesign {
   tier: '≥6' | '5–6' | '4–5' | '3–4' | '<3';
   /** Bảng nào được áp — 2 hoặc 3 mức QC. Hiện ra UI để người đọc biết căn cứ. */
   levels: 2 | 3;
-  /** Số mức QC thật của xét nghiệm; khác `levels` khi có 1 mức (rơi về bảng 2
-   * mức) hoặc ≥4 mức (rơi về bảng 3 mức) — Westgard chỉ công bố 2 bảng. */
+  /** Số mức QC thật của xét nghiệm; khác `levels` khi có ≥4 mức (dùng bảng 3
+   * mức). Một mức không có bảng nên `sigmaQualityDesign()` trả null (SG13b) —
+   * Westgard chỉ công bố bảng cho 2 và 3 mức. */
   levelCount: number;
   rules: string[];
   /** N = tổng số phép đo QC mỗi lần chạy, R = số lần chạy trong ngày. */
@@ -35,7 +36,7 @@ export interface SigmaQcDesign {
   plan: string;
 }
 
-/** **Westgard Sigma Rules** — gợi ý thiết kế QC (OPSpecs). CHỈ là gợi ý: không
+/** **Westgard Sigma Rules** — gợi ý thiết kế QC (không phải OPSpecs có Pfr/Ped). CHỈ là gợi ý: không
  * tự đổi cấu hình luật đang vận hành.
  *
  * Nguồn: https://www.westgard.com/lessons/westgard-rules/westgard-rules/westgard-sigma-rules.html
@@ -127,11 +128,11 @@ export function eqaRoundBias(lab: number, target: number): number {
 
 export interface EqaRoundsStats { rms: number; mean: number; n: number; biasSem: number | null; mixedSigns: boolean }
 
-/** Bias% từ nhiều vòng EQA/EQC — Sigma dùng RMS (root-mean-square) của các
- * vòng làm bias đại diện, KHÔNG dùng trung bình cộng có dấu: dấu trái nhau
- * (1 vòng +, 1 vòng -) có thể triệt tiêu lẫn nhau trong trung bình cộng
- * (chỉ mang tính tham khảo, trả về ở `mean`), che mất sai số hệ thống thật —
- * xem CLAUDE.md "Confirmed business-logic decisions" → mục Six Sigma.
+/** Bias% từ nhiều vòng EQA/EQC (docs/SIGMA-REVIEW-2026-11-17.md SB-1):
+ * `mean` — trung bình có dấu — là Bias dùng tính Sigma, vì Sigma cần sai số
+ * hệ thống còn phần dao động giữa các vòng đã nằm trong CV. `rms` gộp cả độ
+ * phân tán nên CHỈ dùng cho ngân sách MU (Nordtest TR 537). `mixedSigns` báo
+ * Bias đổi dấu giữa các vòng (sai số hệ thống không ổn định).
  * `biasSem` = SD giữa các vòng / căn(n) — sai số chuẩn của CHÍNH ước lượng
  * bias của phòng xét nghiệm, null khi chỉ có 1 vòng. **Đây KHÔNG phải
  * u(Cref).** Nordtest TR 537 định nghĩa u(Cref) là độ không đảm bảo của

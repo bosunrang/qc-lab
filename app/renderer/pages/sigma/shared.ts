@@ -45,7 +45,7 @@ export function missingSigmaInputs(level: SigmaLevelResult): string[] {
   const missing: string[] = [];
   if (level.tea == null) missing.push('TEa');
   if (level.cv == null) missing.push('CV IQC%');
-  if (level.biasEqa == null) missing.push('Bias RMS EQA%');
+  if (level.biasEqa == null) missing.push('Bias EQA%');
   return missing;
 }
 

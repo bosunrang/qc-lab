@@ -158,8 +158,8 @@ test('đổi TEa tại danh mục: Sigma tự cập nhật khi đang mở và kh
       assert.deepEqual(await page.locator('.sg-level-sigma b').allTextContents(), expected);
       assert.equal(await page.getByRole('spinbutton', { name: 'CV IQC mức 1', exact: true }).inputValue(), '1.85');
       assert.equal(await page.getByRole('spinbutton', { name: 'CV IQC mức 2', exact: true }).inputValue(), '0.38');
-      assert.equal(await page.getByRole('spinbutton', { name: 'Bias RMS EQA mức 1', exact: true }).inputValue(), '0.01');
-      assert.equal(await page.getByRole('spinbutton', { name: 'Bias RMS EQA mức 2', exact: true }).inputValue(), '0.02');
+      assert.equal(await page.getByRole('spinbutton', { name: 'Bias EQA mức 1', exact: true }).inputValue(), '0.01');
+      assert.equal(await page.getByRole('spinbutton', { name: 'Bias EQA mức 2', exact: true }).inputValue(), '0.02');
       if (nextSource === 'lab') assert.equal(await page.locator('#sg-tea-value').inputValue(), 'Chưa có');
       assert.deepEqual(await mdcPoints(), nextSource === 'lab' ? [] : nextSource === 'clia' ? cliaPoints : ricosPoints, 'MDC dùng đúng nguồn như Tình trạng và bảng');
     }

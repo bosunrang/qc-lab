@@ -6,7 +6,8 @@
 // - Mean, SD mẫu (mẫu số n − 1), CV = SD / |Mean| × 100; Z = (x − Mean) / SD.
 // - Chỉ số Sigma = (TEa − |Bias|) / CV (theo Westgard, "Six Sigma quality design").
 // - DPMO theo quy ước dịch chuyển 1,5σ: (1 − Φ(σ − 1,5)) × 10^6.
-// - Bias nhiều vòng EQA: căn bậc hai trung bình bình phương (RMS).
+// - Bias nhiều vòng EQA cho Sigma: trung bình có dấu; RMS chỉ cho ngân sách MU,
+//   theo quyết định SB-1 ở docs/SIGMA-REVIEW-2026-11-17.md.
 // - Chỉ số mục tiêu chất lượng QGI = |Bias| / (1,5 × CV) (theo Parry).
 // - CUSUM dạng bảng: C+ = max(0, C+ + z − k), C− = min(0, C− + z + k),
 //   tín hiệu khi C+ ≥ h hoặc C− ≤ −h (Montgomery, Introduction to SQC).

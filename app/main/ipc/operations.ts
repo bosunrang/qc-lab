@@ -132,7 +132,7 @@ const DATA_API_NAMES = [
   'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
-  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
+  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'getSigmaEqaBias', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
   'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'getEqaRound', 'getEqaReport', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'listEqaCorrective', 'getEqaCorrectiveEvidence', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
@@ -258,6 +258,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
 
     listSigmaPeriods: { channel: 'sigma:listPeriods', lan: true, run: (_ctx, testId, teaMode) => sigma.listPeriods(testId, teaMode) },
     listSigmaCohorts: { channel: 'sigma:listCohorts', lan: true, run: (_ctx, testId, period, levels) => sigma.listCohorts(testId, period, levels) },
+    getSigmaEqaBias: { channel: 'sigma:eqaBias', lan: true, run: (_ctx, testId, period, level, windowMonths) => sigma.eqaBias(testId, period, level, windowMonths) },
     saveSigmaTeaConfig: { channel: 'sigma:saveTeaConfig', lan: true, run: (ctx, input) => sigma.saveTeaConfig(input, ctx.actor()) },
     saveSigmaPeriod: { channel: 'sigma:savePeriod', lan: true, run: (ctx, input) => sigma.savePeriod(input, ctx.actor()) },
     renameSigmaPeriod: { channel: 'sigma:renamePeriod', lan: true, run: (ctx, input) => sigma.renamePeriod(input, ctx.actor()) },

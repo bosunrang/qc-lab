@@ -1,5 +1,5 @@
 // Các khối chỉ hiển thị của trang Six Sigma: tình trạng kỳ đang xem, thiết kế
-// QC theo Sigma (OPSpecs), độ không đảm bảo đo và biểu đồ. Tách khỏi
+// QC theo Westgard Sigma Rules, độ không đảm bảo đo và biểu đồ. Tách khỏi
 // `SigmaPage.tsx` ngày 2026-09-26 (kế hoạch kiến trúc D.7); dữ liệu và kết luận
 // đều do main process tính, các khối này chỉ trình bày.
 import { SigmaTrendChart, SigmaMdcChart } from '../../components/SigmaCharts';
@@ -27,7 +27,7 @@ export function SigmaStatusPanel({ period, testName, teaText }: { period: SigmaP
                     <div className="grade">{lv.sigma ? `${sigmaDesignEligible(lv) ? '' : 'Ước tính · '}${zone.label}` : ''}</div>
                     <div className="sub">
                       {lv.sigma
-                        ? <>CV IQC {lv.cv != null ? lv.cv.toFixed(2) : '—'}% · {lv.eqaRounds.length ? 'Bias RMS EQA/EQC' : 'Bias EQA/EQC'} {lv.biasEqa != null ? lv.biasEqa.toFixed(2) : '—'}%{lv.eqaRounds.length > 1 && lv.biasMean != null ? ` · TB có dấu ${lv.biasMean.toFixed(2)}%` : ''}<br />DPMO {formatDpmo(lv.sigma.dpmo)} · Yield {lv.sigma.yieldPercent.toFixed(4)}%</>
+                        ? <>CV IQC {lv.cv != null ? lv.cv.toFixed(2) : '—'}% · Bias EQA/EQC {lv.biasEqa != null ? lv.biasEqa.toFixed(2) : '—'}%<br />DPMO {formatDpmo(lv.sigma.dpmo)} · Yield {lv.sigma.yieldPercent.toFixed(4)}%</>
                         : `Chưa tính được Sigma — còn thiếu ${missingSigmaInputs(lv).join(', ')}`}
                     </div>
                   </div>
@@ -46,7 +46,7 @@ export function SigmaOpspecsPanel({ period, governingLevel, hasSingleOperational
 }) {
   return (
     <details className="panel sg-collapse-panel">
-      <summary className="sg-collapse-summary"><span role="heading" aria-level={2}>Thiết kế QC theo Sigma (OPSpecs)</span></summary>
+      <summary className="sg-collapse-summary"><span role="heading" aria-level={2}>Thiết kế QC theo Westgard Sigma Rules</span></summary>
       <div className="sg-collapse-body">
         <div className="hint sg-selected-period-hint">Kỳ đang xem: <b>{vnPeriod(period.period)}</b>. Gợi ý không tự thay đổi luật Westgard đang áp dụng.</div>
         <div className="sg-opspec-table-wrap"><table className="sg-opspec-table"><thead><tr><th>Mức</th><th>Sigma</th><th>Bộ quy tắc QC gợi ý</th><th>Mức nguy cơ tham khảo</th><th>Hành động</th></tr></thead><tbody>

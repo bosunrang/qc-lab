@@ -11,9 +11,11 @@ export type SigmaCohortStatus = 'insufficient' | 'provisional' | 'eligible' | 'u
 export interface SigmaCohort {
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
   targetMean: number | null; targetSd: number | null; issues: string[];
-  excluded: { voided: number; invalidValue: number };
-  /** Điểm vượt ±3SD trong nhóm, và trong đó bao nhiêu điểm CHƯA có hồ sơ
-   * khắc phục đã duyệt + kết luận hiệu quả. Không điểm nào bị loại khỏi CV. */
+  /** `resolved`: điểm thuộc lần chạy bị loại có hồ sơ NCE đã đóng — bỏ khỏi CV
+   * (SIGMA-REVIEW-2026-11-17 SB-9, cùng quy tắc WG-16 của thống kê Westgard). */
+  excluded: { voided: number; invalidValue: number; resolved: number };
+  /** Điểm vượt ±3SD còn trong CV, và trong đó bao nhiêu điểm CHƯA có hồ sơ
+   * khắc phục đã đóng (chặn nhóm, không tự loại khỏi CV). */
   outOfControl: { rejected: number; unresolved: number };
   status: SigmaCohortStatus;
 }
@@ -44,10 +46,11 @@ function isCalendarDate(text: string): boolean {
  * mọi lần mất kiểm soát đã được điều tra và xử lý. Một nhóm 30 điểm có 1 điểm
  * +40 SD chưa ai đụng tới KHÔNG thoả điều kiện đó, nên không được `eligible`.
  *
- * CỐ Ý KHÔNG tự loại điểm mất kiểm soát ra khỏi CV: loại theo kết quả là
- * selection bias, CV sẽ đẹp giả và MU/Sigma lạc quan hơn thực tế. Điểm vẫn
- * nằm trong CV; thứ bị chặn là việc dùng nhóm đó để ĐỀ XUẤT thiết kế QC, cho
- * tới khi có hồ sơ khắc phục đã duyệt và kết luận hiệu quả. */
+ * KHÔNG tự loại điểm theo giá trị: loại vì lệch nhiều là selection bias, CV
+ * đẹp giả. Điểm mất kiểm soát CHƯA xử lý vẫn nằm trong CV và chặn nhóm. Chỉ
+ * điểm thuộc lần chạy bị loại mà hồ sơ NCE đã đóng (nguyên nhân đã xác định và
+ * khắc phục) mới bỏ khỏi CV — CLSI C24, ISO/TS 20914 và WG-16 của app
+ * (SIGMA-REVIEW-2026-11-17 SB-9, thay quyết định 22/09). */
 export function cohortStatus(n: number, issues: string[], unresolvedOutOfControl = 0): SigmaCohortStatus {
   if (unresolvedOutOfControl > 0) return 'out-of-control';
   if (issues.length) return 'unstable';
@@ -72,9 +75,8 @@ function uniqueFinite(points: SigmaCohortPoint[], key: 'qc_mean' | 'qc_sd', posi
   return values;
 }
 
-/** `resolvedPointIds` = id các điểm QC đã có hồ sơ NCE ĐƯỢC DUYỆT và kết luận
- * HIỆU QUẢ (`approval_status='approved'` + `effectiveness_status='effective'`,
- * hồ sơ chưa bị huỷ). Truyền từ handler vì file này cố ý không import gì —
+/** `resolvedPointIds` = id các điểm QC thuộc lần chạy gắn hồ sơ NCE đã đóng
+ * và xử lý xong (D-11); các điểm này bỏ khỏi CV (SB-9). Truyền từ handler vì file này cố ý không import gì —
  * xem ghi chú của `periodCutoff()`. */
 export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, levels: number[], today: string, resolvedPointIds?: ReadonlySet<string>): SigmaCohort[] {
   const cutoff = periodCutoff(period, today);
@@ -92,10 +94,11 @@ export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, le
   const out: SigmaCohort[] = [];
   for (const [key, rows] of groups) {
     const [levelText, lot] = key.split('\u0000');
-    const excluded = { voided: 0, invalidValue: 0 };
+    const excluded = { voided: 0, invalidValue: 0, resolved: 0 };
     const valid: SigmaCohortPoint[] = [];
     for (const point of rows) {
       if (point.voided) { excluded.voided++; continue; }
+      if (point.id && resolvedPointIds?.has(String(point.id))) { excluded.resolved++; continue; }
       // `Number('')` là 0 nên một giá trị rỗng sẽ lọt vào CV như một điểm 0
       // thật; phải loại trước khi kiểm tra số hữu hạn.
       if (point.val == null || String(point.val).trim() === '' || !Number.isFinite(Number(point.val))) { excluded.invalidValue++; continue; }

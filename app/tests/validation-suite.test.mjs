@@ -46,8 +46,10 @@ test('đáp án Sigma, DPMO, Bias EQA và QGI tái lập được bằng bộ t�
     } else {
       const level = item.sigma.levels[0];
       tea = item.sigma.tea; cv = level.cv;
-      bias = level.eqaRounds ? ref.rms(level.eqaRounds.map((r) => ref.eqaBiasPercent(r.lab, r.target))) : level.biasEqa;
-      if ('biasEqa' in want) assert.ok(close(bias, want.biasEqa), `${item.id} Bias RMS`);
+      const rounds = level.eqaRounds?.map((r) => ref.eqaBiasPercent(r.lab, r.target));
+      bias = rounds ? ref.mean(rounds) : level.biasEqa;
+      if ('biasEqa' in want) assert.ok(close(bias, want.biasEqa), `${item.id} Bias trung bình có dấu`);
+      if ('biasRms' in want) assert.ok(close(ref.rms(rounds), want.biasRms), `${item.id} Bias RMS cho MU`);
     }
     if (want.sigma === null) { assert.equal(bias, undefined, `${item.id} không có Bias`); continue; }
     const sigma = ref.sigmaMetric(tea, bias, cv);

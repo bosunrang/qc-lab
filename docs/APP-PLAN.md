@@ -70,6 +70,17 @@ rộng hoặc chỉnh sửa mã nguồn.
   Nhập QC, Westgard, Six Sigma và Báo cáo không tự tạo danh mục theo dõi riêng.
 - Kết luận Westgard, Sigma, TEa, Bias, CV và độ không đảm bảo đo phải do main
   process tính hoặc xác thực; renderer chỉ trình bày kết quả.
+  Bias từ ngoại kiểm dùng bộ lọc chung lúc đề xuất và lưu mẫu mới, đối chiếu
+  NCE bằng khoá nội dung nguồn và chặn mã kết quả trùng trong mỗi mức.
+  Bias chung lấy mọi mẫu hợp lệ trong số tháng người dùng chọn (nguyên từ 1
+  trở lên, mặc định 3), đến hết tháng Sigma, bỏ lọc
+  ±25% nồng độ. Thao tác áp dụng Bias chung cập nhật các mức trong đúng kỳ,
+  giữ CV/TEa/Mean riêng. Khi sửa CV/MU,
+  giữ mã, nhãn và số liệu các vòng đã lưu; không tự lọc lại lịch sử theo
+  báo cáo, NCE hoặc Mean mới. Chi tiết tại `SIGMA-REVIEW-2026-11-17.md`.
+  Số tháng được chụp cùng căn cứ khi áp dụng và khôi phục khi mở lại; sửa
+  CV/MU không đổi khoảng đã lưu. Đổi số tháng yêu cầu lấy lại mẫu trước khi
+  áp dụng, không dùng danh sách của khoảng cũ.
 - Hai ô tại Sigma và danh mục đều là Nguồn TEa vận hành, dùng cùng tên nguồn
   của Sigma và đồng bộ hai chiều cho đúng cặp xét nghiệm–máy. Nguồn chung
   lưu ở `tests.operational_tea_source`, đồng thời ghi `tests.tea_source` để

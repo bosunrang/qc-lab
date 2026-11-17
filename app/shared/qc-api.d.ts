@@ -394,8 +394,24 @@ export interface UncertaintyBudgetResult {
   target: number | null; absoluteUc: number | null; absoluteU: number | null;
   tea: number | null; teaRatio: number | null; withinTea: boolean | null;
 }
-export interface SigmaEqaRound { lab: number; target: number; bias: number }
+/** Một mẫu ngoại kiểm đề xuất làm Bias cho Sigma (SIGMA-REVIEW-2026-11-17). */
+export interface SigmaEqaBiasSampleView {
+  resultId: string; label: string; reportDate: string; result: number; assigned: number; assignedUncertain: boolean; ncCauseCategory: string;
+}
+export type SigmaEqaExclusionView = 'after-period' | 'outside-window' | 'nce-cause' | 'assigned-uncertain' | 'invalid';
+export interface SigmaEqaBiasView {
+  included: (SigmaEqaBiasSampleView & { bias: number })[];
+  excluded: (SigmaEqaBiasSampleView & { reason: SigmaEqaExclusionView })[];
+  /** Trung bình có dấu (Sigma), RMS (chỉ MU), sai số chuẩn; null khi chưa có mẫu. */
+  mean: number | null; rms: number | null; sem: number | null; n: number; mixedSigns: boolean; enough: boolean;
+  /** targetMean giữ null để tương thích bản cũ; Bias chung không lọc theo Mean QC. */
+  window: { start: string; end: string }; windowMonths: number; targetMean: number | null;
+}
+/** Vòng lấy từ ngoại kiểm đã nhập mang mã kết quả và nhãn để truy vết (SIGMA-REVIEW-2026-11-17 SB-7). */
+export interface SigmaEqaRound { lab: number; target: number; bias: number; eqaResultId?: string; label?: string }
 export interface SigmaLevelResult {
+  /** Khoảng tháng đã chụp khi áp dụng Bias chung. */
+  eqaWindowMonths?: number;
   muBiasMode?: 'include' | 'exclude';
   cohortReviewed?: boolean;
   cohortReviewBy?: string;
@@ -410,7 +426,8 @@ export interface SigmaLevelResult {
    * không phải `tea`: gửi giá trị đã giải sẽ đóng băng một con số có thể đến
    * từ bậc dự phòng (nguồn khác hẳn nguồn chốt của kỳ) và không kèm `teaBasis`
    * nào — hồ sơ khi đó mang một TEa không nguồn gốc. */
-  teaSnapshot: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; /** Bias trung bình có dấu từ các vòng EQA; chỉ để truy xuất hướng lệch. */ biasMean: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
+  teaSnapshot: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; /** Bias dùng tính Sigma: trung bình có dấu các vòng EQA, hoặc Bias nhập tay (SIGMA-REVIEW-2026-11-17 SB-1). */ biasEqa: number | null; /** Bias trung bình có dấu từ các vòng EQA; null khi nhập Bias tay. */ biasMean: number | null;
+  /** Bias RMS các vòng, CHỈ dùng cho ngân sách MU (Nordtest); bằng `biasEqa` khi nhập tay hoặc một vòng. */ biasRms: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
   /** Sai số chuẩn của chính ước lượng bias (SD giữa các vòng / căn n) — CHỈ tham khảo, KHÔNG phải u(Cref). */ biasSem: number | null;
   uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
@@ -432,7 +449,7 @@ export interface SigmaCohortView {
   fingerprint?: string;
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
   targetMean: number | null; targetSd: number | null; issues: string[];
-  excluded: { voided: number; invalidValue: number };
+  excluded: { voided: number; invalidValue: number; resolved: number };
   outOfControl: { rejected: number; unresolved: number };
   status: 'insufficient' | 'provisional' | 'eligible' | 'unstable' | 'out-of-control';
 }
@@ -1016,8 +1033,10 @@ export interface QcApi {
   listPreviousLotBlocks(testId: string): Promise<ArchivedBlock[]>;
   listSigmaPeriods(testId: string, teaMode?: SigmaTeaMode): Promise<SigmaPeriodView[]>;
   listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
+  /** Mẫu ngoại kiểm đề xuất làm Bias cho một mức QC của kỳ Sigma; null khi tham số sai. */
+  getSigmaEqaBias(testId: string, period: string, level: number, windowMonths?: number): Promise<SigmaEqaBiasView | null>;
   saveSigmaTeaConfig(input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }): Promise<IpcResult<Test>>;
-  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
+  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number; eqaResultId?: string; label?: string }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean; /** Chủ động thay Bias chung của mọi mức trong kỳ; không dùng khi chỉ sửa CV/MU. */ sharedEqaRounds?: Array<{ lab: number; target: number; eqaResultId?: string; label?: string }>; eqaWindowMonths?: number }): Promise<IpcResult<SigmaPeriodView>>;
   renameSigmaPeriod(input: { id: string; period: string }): Promise<IpcResult<SigmaPeriodView>>;
   removeSigmaPeriod(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
   listNceQueue(): Promise<NceQueueRowView[]>;

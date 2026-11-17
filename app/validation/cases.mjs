@@ -35,7 +35,7 @@ const REF = {
   sigmaRules: 'Westgard JO. "Westgard Sigma Rules" — westgard.com; bảng 2 mức và 3 mức QC',
   sigma: 'Sigma = (TEa − |Bias|) / CV; DPMO với dịch chuyển 1,5σ',
   qgi: 'Parry DM. "Quality Goal Index" — QGI < 0,8 do độ chụm, 0,8–1,2 cả hai, > 1,2 do độ chệch',
-  eqa: 'Bias nhiều vòng EQA lấy RMS (quyết định Six Sigma của app, không dùng trung bình có dấu)',
+  eqa: 'Bias nhiều vòng EQA lấy trung bình có dấu cho Sigma (docs/SIGMA-REVIEW-2026-11-17.md SB-1); RMS chỉ cho MU (Nordtest TR 537)',
   cusum: 'CUSUM dạng bảng: C+ = max(0, C+ + z − k), C− = min(0, C− + z + k); tín hiệu khi |C| ≥ h',
 };
 
@@ -356,11 +356,11 @@ export const SIGMA_CASES = [
     basis: `${REF.sigmaRules}: bảng riêng cho 3 mức QC.`,
   },
   {
-    id: 'SG-07', title: 'Bias từ 3 vòng EQA (+2%, −3%, +1%) lấy RMS, không lấy trung bình có dấu',
+    id: 'SG-07', title: 'Bias từ 3 vòng EQA (+2%, −1%, +2%) lấy trung bình có dấu, RMS chỉ cho MU',
     levels: [L1, L2],
-    sigma: { tea: 10, levels: [{ level: 1, cv: 2, eqaRounds: [{ lab: 102, target: 100 }, { lab: 97, target: 100 }, { lab: 101, target: 100 }] }] },
-    expect: { 1: { biasEqa: 2.160247, biasMean: 0, mixedSigns: true, sigma: 3.919877, tier: '3–4' } },
-    basis: `${REF.eqa}. Trung bình có dấu bằng 0 sẽ che mất độ chệch thật.`,
+    sigma: { tea: 10, levels: [{ level: 1, cv: 2, eqaRounds: [{ lab: 102, target: 100 }, { lab: 99, target: 100 }, { lab: 102, target: 100 }] }] },
+    expect: { 1: { biasEqa: 1, biasRms: 1.732051, biasMean: 1, mixedSigns: true, sigma: 4.5, tier: '4–5' } },
+    basis: `${REF.eqa}. RMS gộp độ phân tán giữa các vòng (đã nằm trong CV) nên chỉ dùng cho ngân sách MU.`,
   },
   {
     id: 'SG-08', title: 'Chưa có Bias thì không tính Sigma (không giả định Bias = 0)',

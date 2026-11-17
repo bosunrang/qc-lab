@@ -87,6 +87,7 @@ const api = {
   listPreviousLotBlocks: (testId: string) => ipcRenderer.invoke('westgard:listPreviousLotBlocks', testId),
   listSigmaPeriods: (testId: string, teaMode?: SigmaTeaMode) => ipcRenderer.invoke('sigma:listPeriods', testId, teaMode),
   listSigmaCohorts: (testId: string, period: string, levels: number[]) => ipcRenderer.invoke('sigma:listCohorts', testId, period, levels),
+  getSigmaEqaBias: (testId: string, period: string, level: number, windowMonths?: number) => ipcRenderer.invoke('sigma:eqaBias', testId, period, level, windowMonths),
   saveSigmaTeaConfig: (input: unknown) => ipcRenderer.invoke('sigma:saveTeaConfig', input),
   saveSigmaPeriod: (input: unknown) => ipcRenderer.invoke('sigma:savePeriod', input),
   renameSigmaPeriod: (input: { id: string; period: string }) => ipcRenderer.invoke('sigma:renamePeriod', input),
