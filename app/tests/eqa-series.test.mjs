@@ -72,6 +72,18 @@ test('N-07: 2/3 đếm theo đợt — hai mẫu vượt +2 trong CÙNG một đ
   assert.deepEqual(has(r, 'two_of_three'), ['p1-3-0']);
 });
 
+test('N-07: điểm J cộng dồn theo đợt — nhiều mẫu lệch nhẹ trong một đợt chưa đạt ngưỡng', () => {
+  const one = eqaSeries(rounds([[1.2, 1.2, 1.2, 1.2]]));
+  assert.deepEqual(has(one, 'j_score'), []);
+  assert.deepEqual(one.points.map((p) => p.j), [2, 2, 2, 2]);
+  // Đợt lấy điểm của mẫu lệch xa nhất: 2 + 4 + 2 = 8 ở đợt 3, báo trên mẫu cùng phía.
+  const r = eqaSeries(rounds([[1.2, 1.5], [2.1, 0.3], [1.1, -0.4]]));
+  assert.deepEqual(r.points.map((p) => p.j), [2, 2, 6, 6, 8, 8]);
+  assert.deepEqual(has(r, 'j_score'), ['p1-3-0']);
+  // Hai phía lệch ngang nhau thì đợt không góp điểm, không đặt lại chuỗi.
+  assert.deepEqual(eqaSeries(rounds([[1.5], [1.4, -1.6], [2.5]])).points.map((p) => p.j), [2, 2, 2, 6]);
+});
+
 test('N-07: 6 đợt liên tiếp cùng phía — đợt có mẫu trái dấu cắt chuỗi', () => {
   const same = eqaSeries(rounds([[0.3, 0.5], [0.2, 0.1], [0.4, 0.6], [0.1, 0.3], [0.2, 0.2], [0.5, 0.1]]));
   assert.deepEqual(has(same, 'six_same_side'), ['p1-6-0', 'p1-6-1']);

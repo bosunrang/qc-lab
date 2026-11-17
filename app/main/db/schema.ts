@@ -12,7 +12,7 @@ import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 import { eqaRoundNumber } from '../domain/eqa/evaluation';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 15;
 
 const LIS_IMPORTS_SQL = `
 CREATE TABLE IF NOT EXISTS lis_imports (
@@ -317,6 +317,9 @@ CREATE INDEX IF NOT EXISTS idx_actions_due ON actions(due_date);
 -- mã nghiệp vụ không đọc/ghi nó nữa. test_id cố ý không khoá ngoại, cùng lý
 -- do với actions.test_id: xoá xét nghiệm không được xoá hồ sơ NCE.
 CREATE TABLE IF NOT EXISTS nce_records (
+  eqa_result_id TEXT REFERENCES eqa_results(id),
+  eqa_source_key TEXT NOT NULL DEFAULT '',
+  eqa_snapshot_json TEXT NOT NULL DEFAULT '',
   id TEXT PRIMARY KEY,
   nce_id TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT 'other',
@@ -526,6 +529,7 @@ CREATE TABLE IF NOT EXISTS eqa_schedule (
   year INTEGER NOT NULL,
   round TEXT NOT NULL,
   round_no INTEGER NOT NULL,
+  sample_type TEXT NOT NULL DEFAULT '',
   receive_date TEXT NOT NULL DEFAULT '',
   run_date TEXT NOT NULL DEFAULT '',
   due_date TEXT NOT NULL,
@@ -534,10 +538,10 @@ CREATE TABLE IF NOT EXISTS eqa_schedule (
   submitted_at TEXT NOT NULL DEFAULT '',
   submitted_by TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT '',
-  updated_at TEXT NOT NULL DEFAULT '',
-  UNIQUE(program_id, year, round_no)
+  updated_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_eqa_schedule_due ON eqa_schedule(due_date);
+CREATE INDEX IF NOT EXISTS idx_eqa_schedule_scope ON eqa_schedule(program_id, year, round_no);
 -- Máy chạy mẫu của một đợt trong lịch. Mỗi máy nộp phiếu kết quả riêng (mã đơn
 -- vị riêng), nên "đã nộp" ghi theo từng máy; đợt chỉ tính đã nộp khi đủ máy.
 CREATE TABLE IF NOT EXISTS eqa_schedule_instruments (
@@ -860,6 +864,58 @@ const MIGRATIONS: Migration[] = [
     version: 13,
     name: 'Dấu vết nhận bản tin LIS và trạng thái xác nhận Gateway',
     up(db) { db.exec(LIS_IMPORTS_SQL); },
+  },
+  {
+    version: 14,
+    name: 'Lịch ngoại kiểm riêng theo nhóm máy và loại mẫu',
+    up(db) {
+      if (hasColumn(db, 'eqa_schedule', 'sample_type')) {
+        // Phục hồi backup cũ vào bảng mới: cột chưa có trong backup nhận mặc
+        // định rỗng; chụp lại loại mẫu chương trình của chính bản sao lưu.
+        db.exec(`UPDATE eqa_schedule SET sample_type=COALESCE((SELECT p.sample_type FROM eqa_programs p WHERE p.id=eqa_schedule.program_id),'') WHERE sample_type=''`);
+        return;
+      }
+      // Dựng lại cả bảng cha và bảng con trong cùng transaction, giữ khoá
+      // ngoại bật và toàn bộ mã lịch, dấu nộp, ngày giờ, người thực hiện.
+      db.exec(`
+        CREATE TABLE eqa_schedule_v14 (
+          id TEXT PRIMARY KEY, program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+          year INTEGER NOT NULL, round TEXT NOT NULL, round_no INTEGER NOT NULL,
+          sample_type TEXT NOT NULL DEFAULT '', receive_date TEXT NOT NULL DEFAULT '',
+          run_date TEXT NOT NULL DEFAULT '', due_date TEXT NOT NULL,
+          assignee TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+          submitted_at TEXT NOT NULL DEFAULT '', submitted_by TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT ''
+        );
+        INSERT INTO eqa_schedule_v14
+          (id,program_id,year,round,round_no,sample_type,receive_date,run_date,due_date,assignee,note,submitted_at,submitted_by,created_at,updated_at)
+          SELECT s.id,s.program_id,s.year,s.round,s.round_no,COALESCE(p.sample_type,''),s.receive_date,s.run_date,s.due_date,s.assignee,s.note,s.submitted_at,s.submitted_by,s.created_at,s.updated_at
+          FROM eqa_schedule s LEFT JOIN eqa_programs p ON p.id=s.program_id;
+        CREATE TABLE eqa_schedule_instruments_v14 (
+          schedule_id TEXT NOT NULL REFERENCES eqa_schedule_v14(id),
+          instrument_id TEXT NOT NULL REFERENCES instruments(id),
+          submitted_at TEXT NOT NULL DEFAULT '', submitted_by TEXT NOT NULL DEFAULT '',
+          PRIMARY KEY(schedule_id,instrument_id)
+        );
+        INSERT INTO eqa_schedule_instruments_v14 SELECT schedule_id,instrument_id,submitted_at,submitted_by FROM eqa_schedule_instruments;
+        DROP TABLE eqa_schedule_instruments;
+        DROP TABLE eqa_schedule;
+        ALTER TABLE eqa_schedule_v14 RENAME TO eqa_schedule;
+        ALTER TABLE eqa_schedule_instruments_v14 RENAME TO eqa_schedule_instruments;
+        CREATE INDEX idx_eqa_schedule_due ON eqa_schedule(due_date);
+        CREATE INDEX idx_eqa_schedule_scope ON eqa_schedule(program_id,year,round_no);
+      `);
+    },
+  },
+  {
+    version: 15,
+    name: 'Liên kết hồ sơ khắc phục với kết quả ngoại kiểm và căn cứ đã chụp',
+    up(db) {
+      addColumnIfMissing(db, 'nce_records', 'eqa_result_id', 'TEXT REFERENCES eqa_results(id)');
+      addColumnIfMissing(db, 'nce_records', 'eqa_source_key', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'nce_records', 'eqa_snapshot_json', "TEXT NOT NULL DEFAULT ''");
+      db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_nce_eqa_source ON nce_records(eqa_source_key) WHERE eqa_source_key<>'' AND status<>'cancelled'");
+    },
   },
 ];
 

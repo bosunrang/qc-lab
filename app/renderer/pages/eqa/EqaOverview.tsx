@@ -61,7 +61,7 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
     {loaded && !error && dueRows.length > 0 && <div className={`alert ${actionTone} eqa-action-alert`} role="status">
       <b>Việc cần xử lý</b>
       <ul className="eqa-action-list">
-        <li><span>{dueRows.length} đợt cần nộp: {dueRows.slice(0, 2).map((r) => `${r.program_name} ${r.round}/${r.year} (${daysLeftText(r).toLowerCase()})`).join('; ')}{dueRows.length > 2 ? '; …' : ''}</span>
+        <li><span>{dueRows.length} lịch cần nộp: {dueRows.slice(0, 2).map((r) => `${r.program_name} ${r.round}/${r.year}${r.sample_type ? ` · ${r.sample_type}` : ''} (${daysLeftText(r).toLowerCase()})`).join('; ')}{dueRows.length > 2 ? '; …' : ''}</span>
           <button type="button" className="btn ghost sm" onClick={onOpenSchedule}>Mở lịch</button></li>
       </ul>
     </div>}

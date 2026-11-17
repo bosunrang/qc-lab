@@ -23,7 +23,7 @@ export type NceRiskLevel = typeof NCE_RISK_LEVELS[number];
 export const NCE_CAUSE_STATUSES = ['identified', 'suspected', 'undetermined'] as const;
 export type NceCauseStatus = typeof NCE_CAUSE_STATUSES[number];
 
-export const NCE_CAUSE_CATEGORIES = ['qc_material', 'operator', 'instrument', 'reagent', 'calibration', 'environment', 'method', 'sample', 'information_system', 'other'] as const;
+export const NCE_CAUSE_CATEGORIES = ['qc_material', 'operator', 'instrument', 'reagent', 'calibration', 'environment', 'method', 'sample', 'information_system', 'other', 'eqa_administrative', 'eqa_technical', 'eqa_program'] as const;
 export type NceCauseCategory = typeof NCE_CAUSE_CATEGORIES[number];
 
 export const NCE_ACTION_KINDS = ['corrective', 'preventive', 'system_change'] as const;
@@ -40,7 +40,7 @@ export type NcePatientOutcome = typeof NCE_PATIENT_OUTCOMES[number];
 export const NCE_EFFECTIVENESS_RESULTS = ['effective', 'ineffective', 'extend'] as const;
 export type NceEffectivenessResult = typeof NCE_EFFECTIVENESS_RESULTS[number];
 
-export const NCE_CHECK_STATUSES = ['ok', 'abnormal', 'na'] as const;
+export const NCE_CHECK_STATUSES = ['ok', 'abnormal', 'na', 'root'] as const;
 export type NceCheckStatus = typeof NCE_CHECK_STATUSES[number];
 
 export const NCE_TECHNICAL_ERROR_NATURES = ['systematic', 'random', 'mixed', 'undetermined'] as const;
@@ -139,6 +139,8 @@ export interface NceEffectivenessReview {
 /** Toàn bộ hồ sơ ở dạng miền: bản ghi chính + các tập nhiều dòng. Các mảng
  * quyết định xếp theo thời gian tăng dần; phần tử cuối là quyết định hiện hành. */
 export interface NceDossier {
+  /** Hồ sơ ngoại kiểm có kết quả nguồn và ảnh chụp, áp dụng checklist N-10. */
+  eqaLinked?: boolean;
   status: NceStatus; source: NceSource; testId: string | null;
   reportedByUserId: string; ownerUserId: string; detectedAt: string; dueDate: string;
   /** `null` = chưa xác định (hồ sơ tự mở khi huỷ điểm); phải chọn trước khi cho chạy lại. */

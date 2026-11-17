@@ -16,7 +16,7 @@ import { sendClientError } from '../../lib/unhandled-errors';
 import { useFormError } from '../../lib/useFormError';
 import { errorDialog } from '../../state/dialog-store';
 import { NCE_PHASE_LABEL, NCE_SOURCE_LABEL } from '../../../main/domain/nce/labels';
-import type { NceDossierView, NceSource } from '../../../shared/qc-api';
+import type { EqaNceEvidence, NceDossierView, NceSource } from '../../../shared/qc-api';
 import { nceRunLabel } from '../../../main/domain/nce/presentation';
 import { Field, OptionSelect, UserSelect } from './shared';
 import { assertDossier } from './dossier-data';
@@ -28,16 +28,18 @@ const CREATE_FIELDS = {
   'invalid-source': 'nceSource', 'missing-description': 'nceDescription', 'missing-correction': 'nceCorrection',
   'missing-hold': 'nceHold', 'invalid-detected': 'nceDetected', 'detected-before-run': 'nceDetected',
   'missing-owner': 'nceOwner', 'invalid-due-date': 'nceDue', 'due-before-detected': 'nceDue',
+  'eqa-run-date': 'nceEqaRunDate',
 } as const;
 
-export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCreatePrefill | null; onClose: () => void; onCreated: (dossier: NceDossierView) => void }) {
+export function CreateNceModal({ prefill, eqaPrefill, onClose, onCreated }: { prefill: NceCreatePrefill | null; eqaPrefill?: EqaNceEvidence; onClose: () => void; onCreated: (dossier: NceDossierView) => void }) {
   const { users, create, load } = useNceStore(useShallow((s) => ({ users: s.users, create: s.create, load: s.load })));
   const tests = useManageStore((s) => s.tests);
   const me = useAuthStore((s) => s.user);
-  const [source, setSource] = useState<NceSource>(prefill ? 'iqc' : 'instrument');
+  const [source, setSource] = useState<NceSource>(eqaPrefill ? 'eqa' : prefill ? 'iqc' : 'instrument');
   const [phase, setPhase] = useState<'pre' | 'exam' | 'post'>('exam');
-  const [testId, setTestId] = useState(prefill?.testId ?? '');
-  const [description, setDescription] = useState(prefill ? prefill.summary : '');
+  const [testId, setTestId] = useState(eqaPrefill?.result.test_id || prefill?.testId || '');
+  const [description, setDescription] = useState(eqaPrefill ? `${eqaPrefill.result.test_name} · ${eqaPrefill.result.instrument_name} · ${eqaPrefill.round.round}/${eqaPrefill.round.year} · Mẫu ${eqaPrefill.result.sample || '—'} · z=${eqaPrefill.result.z_official}. ${eqaPrefill.reasons.join('; ')}.` : prefill ? prefill.summary : '');
+  const [eqaRunDate, setEqaRunDate] = useState(eqaPrefill?.run_date || '');
   const [correction, setCorrection] = useState('');
   const [hold, setHold] = useState<'' | 'yes' | 'no'>('');
   const [detectedAt, setDetectedAt] = useState(todayIso());
@@ -58,6 +60,7 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
       const result = await withDeadline(() => create({
         source, phase: source === 'iqc' ? 'exam' : phase, testId: testId || undefined,
         trigger: prefill ? { date: prefill.date, runId: prefill.runId } : undefined,
+        ...(eqaPrefill ? { eqaResultId: eqaPrefill.result.id, expectedEqaFingerprint: eqaPrefill.fingerprint, eqaRunDate } : {}),
         description, correction, holdResults: hold === 'yes', detectedAt, ownerUserId, dueDate: dueDate || undefined,
       }), 30_000);
       if (!result.ok) {
@@ -80,15 +83,15 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
   });
 
   return (
-    <Modal title={prefill ? `Lập hồ sơ NCE — ${prefill.testName}` : 'Lập hồ sơ NCE từ nguồn khác'} size="lg" onClose={onClose} busy={saving}
+    <Modal title={eqaPrefill ? `Lập hồ sơ ngoại kiểm — ${eqaPrefill.result.test_name}` : prefill ? `Lập hồ sơ NCE — ${prefill.testName}` : 'Lập hồ sơ NCE từ nguồn khác'} size="lg" onClose={onClose} busy={saving}
       footer={<><button type="button" className="btn ghost" disabled={saving} onClick={onClose}>{uncertain ? 'Về danh sách' : 'Bỏ qua'}</button><button type="button" className="btn teal" disabled={saving || uncertain} onClick={() => void submit()}>{saving ? 'Đang lưu…' : 'Lập hồ sơ'}</button></>}>
       {operationError && <div className="alert rej" role="alert">{operationError}</div>}
-      {prefill
+      {eqaPrefill ? <div className="alert info">{eqaPrefill.round.program_name} · {eqaPrefill.round.round}/{eqaPrefill.round.year} · {eqaPrefill.result.instrument_name} · Mẫu {eqaPrefill.result.sample || '—'}. Kết quả và căn cứ nội kiểm được chụp khi lập hồ sơ.</div> : prefill
         ? <div className="alert info">Lần chạy {nceRunLabel(prefill)} bị loại. Mức, lô, luật và kết luận Westgard được chụp tự động từ lần chạy này.</div>
         : <div className="hint">Dùng cho sự cố không bắt đầu từ một lần chạy QC bị loại: ngoại kiểm, thiết bị, hoá chất, hiệu chuẩn, tín hiệu CUSUM hoặc sai sót khác.</div>}
       <div className="nce-form-grid" ref={formError.rootRef}>
         <FormErrorMessage rootRef={formError.rootRef} error={formError.error} id={formError.errorId} />
-        {!prefill && <>
+        {!prefill && !eqaPrefill && <>
           <Field label="Nguồn phát hiện" htmlFor="nceSource"><OptionSelect id="nceSource" value={source} options={OTHER_SOURCES} onChange={(v) => { formError.clear(); setSource(v as NceSource); }} /></Field>
           <Field label="Giai đoạn quá trình" htmlFor="ncePhase"><OptionSelect id="ncePhase" value={phase} options={NCE_PHASE_LABEL} onChange={(v) => setPhase(v as typeof phase)} /></Field>
           <Field label="Xét nghiệm liên quan (nếu có)" htmlFor="nceTest">
@@ -98,6 +101,7 @@ export function CreateNceModal({ prefill, onClose, onCreated }: { prefill: NceCr
             </select>
           </Field>
         </>}
+        {eqaPrefill && <DateField label="Ngày chạy mẫu ngoại kiểm thực tế" id="nceEqaRunDate" value={eqaRunDate} onChange={(v) => { formError.clear(); setEqaRunDate(v); }} />}
         <Field label="Mô tả sự kiện và yêu cầu không được đáp ứng" htmlFor="nceDescription" wide>
           <textarea id="nceDescription" rows={3} value={description} onChange={(e) => { formError.clear(); setDescription(e.target.value); }} />
         </Field>

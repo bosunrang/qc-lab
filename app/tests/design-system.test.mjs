@@ -245,13 +245,13 @@ test('bản đồ z dùng đúng chữ tiêu đề cột của bảng hệ thố
   );
 });
 
-test('bộ chuyển lịch năm cao bằng select cùng hàng', () => {
+test('bộ chuyển cách xem lịch cao bằng select cùng hàng', () => {
   const eqa = readFileSync(join(STYLE_DIR, 'pages', 'eqa.css'), 'utf8');
   const schedule = readFileSync(join(ROOT, 'renderer', 'pages', 'eqa', 'EqaSchedule.tsx'), 'utf8');
-  assert.match(schedule, /className="dayseg eqa-year-view"/);
-  assert.match(eqa, /\.eqa-year-view\{height:var\(--control-h\);\}/,
-    'bộ chuyển Dòng thời gian/Bảng phải cao 36px như hai select dữ liệu');
-  assert.match(eqa, /\.eqa-year-view button\{[^}]*align-self:stretch;[^}]*height:auto;[^}]*min-height:0;/,
+  assert.match(schedule, /className="dayseg eqa-schedule-view"/);
+  assert.match(eqa, /\.eqa-schedule-view\{height:var\(--control-h\);\}/,
+    'bộ chuyển Lịch tháng/Danh sách phải cao 36px như các ô chọn dữ liệu');
+  assert.match(eqa, /\.eqa-schedule-view button\{[^}]*align-self:stretch;[^}]*height:auto;[^}]*min-height:0;/,
     'hai nút phải lấp đầy khung 36px mà không cộng thêm chiều cao riêng');
 });
 
@@ -409,7 +409,8 @@ test('mật độ control dùng token component, không viết lại số chuẩ
 });
 
 test('mọi var() trong CSS đều có định nghĩa và không tham chiếu vòng', () => {
-  const RUNTIME = new Set(['--sg-color']); // đặt inline từ SigmaPage.tsx
+  // Màu Sigma và độ rộng người dùng kéo được đặt inline từ renderer.
+  const RUNTIME = new Set(['--sg-color', '--eqa-evidence-width']);
   const missing = new Set();
   // Cả style inline trong TSX: `var(--type-body)` ở Westgard từng trỏ vào
   // token đã xoá mà không test nào thấy, vì luật này chỉ đọc CSS.

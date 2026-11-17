@@ -22,7 +22,7 @@ export const DEFAULT_REPORT_TEMPLATES: ReportTemplateSettings = {
   sigma: { formCode: 'BM-SS-01', version: '1.0', effectiveDate: '' },
   reagent: { formCode: 'BM-HC-01', version: '1.0', effectiveDate: '' },
   review: { formCode: 'BM-XX-01', version: '1.0', effectiveDate: '' },
-  eqa: { formCode: 'BM-NGK-01', version: '1.0', effectiveDate: '' },
+  eqa: { formCode: 'BMQL 14-01-24', version: '1.0', effectiveDate: '' },
 };
 
 export interface ReportTemplateInput {

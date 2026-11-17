@@ -225,24 +225,26 @@ function parseChecklist(json: string): Record<string, { status: string; note: st
 
 export function QuickCheckSection(props: SectionProps) {
   const { record, can } = props.dossier;
-  const keys = checklistKeys(record.source);
+  const eqaLinked = !!record.eqa_result_id;
+  const labels: Record<string, string> = eqaLinked ? { ok: 'Đã loại trừ', abnormal: 'Nghi ngờ', root: 'Nguyên nhân gốc', na: 'Không áp dụng' } : CHECK_STATUS_LABEL;
+  const keys = checklistKeys(record.source, eqaLinked);
   const editor = useEditor(props, () => ({
     checklist: Object.fromEntries(keys.map((key) => [key, parseChecklist(record.checklist_json)[key] ?? { status: '', note: '' }])),
   }));
   const d = editor.draft;
   const checklist = d?.checklist ?? parseChecklist(record.checklist_json);
   const setCheck = (key: string, field: 'status' | 'note', value: string) => d && editor.set('checklist', { ...d.checklist, [key]: { ...d.checklist[key], [field]: value } });
-  const assessed = keys.filter((key) => CHECK_STATUS_LABEL[checklist[key]?.status]).length;
+  const assessed = keys.filter((key) => labels[checklist[key]?.status]).length;
   const abnormal = keys.filter((key) => checklist[key]?.status === 'abnormal').length;
-  const remaining = keys.filter((key) => !CHECK_STATUS_LABEL[checklist[key]?.status]);
+  const remaining = keys.filter((key) => !labels[checklist[key]?.status]);
   const hints = props.dossier.checklist_hints ?? {};
   // Chỉ đánh dấu Đạt cho mục CHƯA đánh giá; mục đã chọn Bất thường/Không áp
   // dụng giữ nguyên. Mục có lời nhắc từ dữ liệu cũng bỏ qua để người rà soát
   // tự xem trước khi kết luận.
-  const quickOk = remaining.filter((key) => !hints[key]);
+  const quickOk = eqaLinked ? [] : remaining.filter((key) => !hints[key]);
   const markRemainingOk = () => d && editor.set('checklist', { ...d.checklist, ...Object.fromEntries(quickOk.map((key) => [key, { ...d.checklist[key], status: 'ok' }])) });
   return (
-    <Section title="Kiểm tra nhanh các yếu tố thường gặp" actions={keys.length ? editor.actions(can.edit) : null}>
+    <Section title={eqaLinked ? 'Rà soát nguyên nhân ngoại kiểm' : 'Kiểm tra nhanh các yếu tố thường gặp'} actions={keys.length ? editor.actions(can.edit) : null}>
       {!keys.length && <p className="hint-inline">Nguồn này chưa có checklist định sẵn. Ghi nội dung kiểm tra phù hợp ở phần xử lý tức thời và điều tra nguyên nhân.</p>}
       {keys.length > 0 && (
         <>
@@ -267,7 +269,7 @@ export function QuickCheckSection(props: SectionProps) {
               const detail = parts?.[2];
               const detailText = detail ? detail.charAt(0).toLocaleUpperCase('vi') + detail.slice(1) : '';
               const tone = item.status === 'ok' ? 'ok' : item.status === 'abnormal' ? 'rej' : item.status === 'na' ? 'warn' : 'none';
-              const needsNote = item.status === 'abnormal' || item.status === 'na';
+              const needsNote = eqaLinked || item.status === 'abnormal' || item.status === 'na';
               return (
                 <li className={`nce-checklist-row is-${item.status || 'empty'}`} key={key}>
                   <div className="nce-checklist-row-main">
@@ -278,12 +280,12 @@ export function QuickCheckSection(props: SectionProps) {
                     </div>
                     {d
                       ? <div className="dayseg nce-checklist-choice" role="group" aria-label={`Kết quả: ${label}`}>
-                        {Object.entries(CHECK_STATUS_LABEL).map(([value, text]) => (
+                        {Object.entries(labels).map(([value, text]) => (
                           <button type="button" key={value} className={item.status === value ? 'on' : ''} aria-pressed={item.status === value}
                             onClick={() => setCheck(key, 'status', value)}>{text}</button>
                         ))}
                       </div>
-                      : <span className={`tag ${tone}`}>{CHECK_STATUS_LABEL[item.status] ?? 'Chưa đánh giá'}</span>}
+                      : <span className={`tag ${tone}`}>{labels[item.status] ?? 'Chưa đánh giá'}</span>}
                   </div>
                   {d
                     ? (needsNote || item.note) && <textarea className="nce-checklist-note-input" aria-label={`Bằng chứng: ${label}`} rows={2} maxLength={2000}
@@ -304,18 +306,19 @@ export function QuickCheckSection(props: SectionProps) {
 
 export function InvestigationSection(props: SectionProps) {
   const { record, can } = props.dossier;
+  const causeLabels = Object.fromEntries(Object.entries(NCE_CAUSE_CATEGORY_LABEL).filter(([key]) => !key || (record.eqa_result_id ? key.startsWith('eqa_') : !key.startsWith('eqa_'))));
   const editor = useEditor(props, () => ({
     causeStatus: record.cause_status, causeCategory: record.cause_category, causeText: record.cause_text, causeCheckPlan: record.cause_check_plan,
   }), CAUSE_FIELD_ERRORS);
   const d = editor.draft;
   return (
     <Section title="Điều tra và nguyên nhân" actions={editor.actions(can.edit)} disclosure={props.disclosure} headingLevel={props.headingLevel}>
-      <div className="nce-capa-guidance" role="note"><p>Luật QC chỉ gợi ý kiểu sai số, không chứng minh nguyên nhân. Đối chiếu nhật ký máy, hiệu chuẩn, vật liệu QC và phương pháp; không hiệu chuẩn lại hay đổi Mean chỉ để hết cảnh báo.</p></div>
+      <div className="nce-capa-guidance" role="note"><p>{record.eqa_result_id ? 'Đối chiếu báo cáo nhà cung cấp, lỗi hành chính, sáu nhóm kỹ thuật và chương trình/mẫu. Ghi 5 Whys cùng bằng chứng; phân loại nguyên nhân hành chính, kỹ thuật, chương trình/mẫu hoặc chưa xác định kèm kế hoạch theo dõi.' : 'Luật QC chỉ gợi ý kiểu sai số, không chứng minh nguyên nhân. Đối chiếu nhật ký máy, hiệu chuẩn, vật liệu QC và phương pháp; không hiệu chuẩn lại hay đổi Mean chỉ để hết cảnh báo.'}</p></div>
       {d ? (
         <div className="nce-form-grid nce-capa-form" ref={editor.formRoot}>
           <FormErrorMessage rootRef={editor.formRoot} error={editor.fieldError} id={editor.errorId} />
           <Field label="Kết luận nguyên nhân" htmlFor="causeStatus"><OptionSelect id="causeStatus" value={d.causeStatus} options={NCE_CAUSE_STATUS_LABEL} placeholder="— Chưa kết luận —" onChange={(v) => editor.set('causeStatus', v as typeof d.causeStatus)} /></Field>
-          {d.causeStatus !== 'undetermined' && <Field label="Nhóm nguyên nhân" htmlFor="causeCat"><OptionSelect id="causeCat" value={d.causeCategory} options={NCE_CAUSE_CATEGORY_LABEL} placeholder="— Chọn nhóm —" onChange={(v) => editor.set('causeCategory', v)} /></Field>}
+          {d.causeStatus !== 'undetermined' && <Field label="Nhóm nguyên nhân" htmlFor="causeCat"><OptionSelect id="causeCat" value={d.causeCategory} options={causeLabels} placeholder="— Chọn nhóm —" onChange={(v) => editor.set('causeCategory', v)} /></Field>}
           {d.causeStatus !== 'undetermined'
             ? <Field label="Mô tả nguyên nhân (trực tiếp, góp phần, gốc)" htmlFor="causeText" wide><textarea id="causeText" rows={3} value={d.causeText} onChange={(e) => editor.set('causeText', e.target.value)} /></Field>
             : <Field label="Kế hoạch kiểm tra tiếp để xác định nguyên nhân" htmlFor="causePlan" wide><textarea id="causePlan" rows={3} value={d.causeCheckPlan} onChange={(e) => editor.set('causeCheckPlan', e.target.value)} /></Field>}

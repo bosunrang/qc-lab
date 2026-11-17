@@ -127,6 +127,14 @@ rộng hoặc chỉnh sửa mã nguồn.
   thiếu Mean hoặc SD không được coi là đủ dải QC. Tổng quan và Ngoại kiểm chỉ
   nhận dữ liệu/lỗi của lượt tải mới nhất; biên bản tháng phải mở lại nút tải
   khi đọc lỗi, không để trạng thái đang tổng hợp bị treo.
+- Nhắc hạn ngoại kiểm trên Tổng quan nằm trong Cần xử lý / Theo dõi, dùng
+  cùng dòng công việc với cảnh báo QC và hồ sơ quá hạn, không có dải riêng
+  phía trên. Mỗi lịch hiện loại mẫu, đợt, máy, hạn nộp và nút mở lịch; tối
+  đa bốn lịch kèm lối mở toàn bộ khi còn nhiều hơn. Đọc ngoại kiểm độc lập
+  với lượt tổng hợp QC, chỉ nhận phản hồi mới nhất; không báo hết việc khi
+  còn lịch cần nộp, đang tải hoặc đọc lịch lỗi. Nút mở từng lịch định vị theo
+  mã lịch riêng, chọn đúng tháng/ngày hạn nộp, bỏ lọc loại mẫu và đưa chi tiết
+  đợt vào tầm nhìn; các lịch cùng chương trình–đợt vẫn phân biệt theo nhóm máy.
 - Lịch sử dữ liệu giữ thứ tự mức QC; trong từng mức, lô đang dùng đứng đầu,
   các mốc lô cũ xếp theo ngày bắt đầu hiệu lực từ mới đến cũ. Mốc thiếu ngày
   đứng cuối; khi trùng hoặc cùng thiếu ngày thì mốc ghi sau đứng trước.
@@ -220,7 +228,7 @@ rộng hoặc chỉnh sửa mã nguồn.
 | Nhập QC | Ghi điểm, theo dõi lần chạy, ghi chú, huỷ điểm và dải vận hành |
 | Phân tích Westgard | Đánh giá luật, cảnh báo, lịch sử lô và biểu đồ |
 | Six Sigma & Sai số | Kỳ đánh giá, TEa, CV/Bias, MU, OPSpecs và xuất báo cáo |
-| Phân tích ngoại kiểm | Đợt ngoại kiểm nhập từ báo cáo PDF của trung tâm ngoại kiểm: ánh xạ sang xét nghiệm, z-score theo ISO 13528, đối chiếu z trên báo cáo, nhóm so sánh, bổ sung theo từng máy |
+| Phân tích ngoại kiểm | Tổng quan, lịch, báo cáo xem xét và khắc phục: nhập PDF, đối chiếu z/nhóm so sánh, liên kết kết quả cần điều tra với hồ sơ NCE và căn cứ đã chụp |
 | Khắc phục sự cố | Hồ sơ NCE theo lần chạy: kiểm soát, cho phép hoạt động trở lại, CAPA, hiệu lực và duyệt độc lập |
 | Báo cáo & Biểu mẫu | Báo cáo dữ liệu, báo cáo Sigma, PDF/Excel và mẫu biểu |
 | Cài đặt & Đám mây | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
@@ -265,11 +273,165 @@ Danh sách xét nghiệm giữ vị trí cuộn khi đổi xét nghiệm hoặc 
 lại; thay đổi cấu hình nạp lại cả chuỗi lẫn danh sách. Biểu đồ phần trăm có
 chú giải riêng cho điểm chưa có đối chiếu TEa, không coi là trong/vượt TEa.
 
+Thẻ Lịch ngoại kiểm chỉ giữ hai cách xem Lịch tháng và Danh sách ở bên trái
+thanh công cụ; bên phải lần lượt là tháng, năm, loại mẫu và Thêm đợt, dùng
+cùng kiểu nút chuyển và ô chọn của hệ thống. Hai cách xem giữ chung
+mốc năm và bộ lọc loại mẫu; bỏ tab Năm và dòng thời gian 12 tháng. Danh sách
+vẫn liệt kê các lịch theo năm đã chọn. Ở cách xem Lịch tháng, ô chọn tháng nằm
+ngay trước ô chọn năm trên thanh công cụ. Chỉ dùng hai ô này để chọn mốc
+thời gian, bỏ dòng tháng/năm và các nút trước/sau, Hôm nay bên dưới;
+không lọc danh sách cả năm theo tháng. Tháng thể hiện đủ ngày
+nhận mẫu, chạy mẫu và hạn nộp, kể cả khi trùng ngày; thu gọn còn hai mốc và
+báo số mốc còn lại. Chọn
+ngày hiện đủ công việc, gộp các mốc cùng đợt để không lặp thao tác nộp.
+Danh sách chiếm trọn chiều ngang, không dựng khung công việc ngày hoặc
+hướng dẫn ở bên phải. Khung chi tiết ngày chỉ hiện trong Lịch tháng, đổi
+cách xem vẫn giữ ngày đang chọn. Danh sách nhóm các lịch cùng mã chương trình thành các hàng liền nhau và
+gộp ô Chương trình theo chiều dọc, hiện tên và trung tâm một lần. Trong mỗi
+chương trình, nhóm tiếp theo số đợt chuẩn hoá và gộp ô Đợt, kể cả khi các
+hạn nộp xen kẽ đợt khác; không gộp cùng số đợt giữa các chương trình. Loại mẫu
+là cột riêng cho từng lịch; bỏ cột Nhận mẫu, giữ ngày chạy và hạn nộp riêng.
+Lọc loại mẫu tính lại số hàng gộp; máy, trạng thái và thao tác vẫn theo từng lịch.
+Ô gộp chạm đáy bảng bỏ đường kẻ cuối như các ô khác; nhóm ở giữa vẫn có
+đường phân cách. Rê chuột vào ngày cuối tuần vẫn dùng nền tương tác chung,
+còn ngày được chọn hoặc có hạn cảnh báo giữ nguyên màu trạng thái.
+Chú giải tháng chỉ có Chạy mẫu (chấm xanh dương) và Hạn nộp (chấm cam).
+Các ký hiệu công việc dùng chấm tròn đặc theo màu trạng thái, không kèm
+gạch dọc bên trái.
+Ô ngày có hạn nộp quá hạn dùng nền đỏ nhạt; hạn nộp chưa hoàn tất trong
+7 ngày tới dùng nền vàng nhạt. Khi có nhiều công việc, quá hạn ưu tiên cao
+nhất. Chọn ngày giữ nguyên nền cảnh báo và dùng viền xanh ngọc; ngày chạy
+đơn thuần hoặc hạn đã nộp/đã có báo cáo không tự tạo nền cảnh báo.
+Chỉ giữ lịch và chi tiết ngày, không có dải nhắc việc hoặc khung Cần xử lý.
+Cảnh báo gọn chỉ xuất hiện khi main trả đợt quá hạn, lấy từ mọi năm và mọi
+loại mẫu. Mở cảnh báo để chọn đợt, định vị đúng tháng/ngày và gỡ bộ lọc loại
+mẫu đang che đợt. Không cảnh báo cho đợt chỉ sắp đến hạn hoặc đã nộp chờ
+báo cáo; trạng thái vẫn hiện ở lịch và chi tiết. Tiến độ nộp theo máy và
+trạng thái lấy từ main; số đợt có báo cáo nằm trong tổng hợp năm.
+Từ schema 14, cùng chương trình–năm–số đợt có thể có nhiều lịch cho các nhóm
+máy không giao nhau, mỗi lịch có loại mẫu, ngày chạy và hạn nộp riêng.
+Đổi loại mẫu chỉ sửa lịch đang thao tác, không đổi nhãn các lịch khác hoặc
+phân loại chương trình. Máy đã có lịch trong đợt đó không được thêm vào
+lịch khác, kể cả đổi loại mẫu; lỗi chỉ rõ máy trùng ở phần chọn máy.
+Lịch không khai máy là lịch chung, không cùng tồn tại với lịch khác của
+đúng chương trình–năm–đợt. Chương trình gợi sẵn loại mẫu và máy từ cùng một
+lịch gần nhất; đổi loại mẫu khi thêm mới gỡ lựa chọn máy gợi từ loại cũ.
+Báo cáo và dấu nộp chỉ hoàn thành các lịch có đúng máy tương ứng. Lịch
+chưa nộp/chưa có báo cáo của máy mình vẫn xoá được khi máy khác cùng đợt
+đã có báo cáo. Bộ đếm danh sách tính số lịch theo nhóm máy, không gọi nhầm
+là số kỳ báo cáo. Nâng schema giữ
+toàn bộ mã lịch, dấu nộp, ngày giờ và loại mẫu hiện có của dữ liệu cũ.
+Chưa khai lịch vẫn hiện lịch tháng và hướng dẫn thêm đợt bên cạnh, không
+hiện bộ lọc loại mẫu chưa có dữ liệu. Chọn ngày
+có thể dùng làm hạn nộp gợi sẵn khi thêm đợt. Biểu mẫu chỉ có Ngày chạy mẫu
+và Hạn nộp kết quả, nằm cùng hàng theo lưới chung; đợt mới không khai ngày
+nhận mẫu, sửa đợt giữ nguyên ngày nhận mẫu đã lưu. Ràng buộc ngày của dữ
+liệu cũ vẫn được main kiểm tra và báo vào ô ngày đang nhập. Lỗi tải có nút thử lại riêng, dữ liệu
+cũ còn hiển thị phải kèm thông báo lỗi làm mới. Quyền ghi và hộp xác nhận
+xoá lịch giữ nguyên qua các cách xem.
+
 Quy trình quản lý khoá, cấp mã theo máy và phát hành cập nhật nằm tại
 `docs/SOFTWARE-LICENSE-AND-UPDATES.md`. Giấy phép là cấu hình riêng của máy,
 không đồng bộ đám mây và không bị thay bằng giấy phép trong bản sao lưu.
 
 ## 6. Kiểm chứng thay đổi
+
+Tab Khắc phục ngoại kiểm (17/11/2026) dùng bộ chọn năm/chương trình/đợt/máy,
+dải tổng hợp và danh sách theo trạng thái, kèm khung căn cứ. Bảng kết quả giữ
+lề hai bên và đáy theo khoảng đệm panel, thẳng với thanh lọc. Main phân biệt
+kết quả bắt buộc điều tra với cảnh báo đơn lẻ từ chính kết quả và tín hiệu
+chuỗi hiện có. Tạo hồ sơ qua quy trình NCE chung, không có bộ CAPA thứ hai;
+người có quyền ghi và quyền dùng Khắc phục sự cố được lập/mở hồ sơ ngay
+trong tab. Người chỉ xem được đọc danh sách và căn cứ, không ghi quyết định.
+Mặc định bảng chiếm trọn chiều rộng; khung căn cứ chỉ xuất hiện khi chọn
+Xem căn cứ hoặc tên xét nghiệm. Đóng khung để bảng mở rộng trở lại.
+Khi mở căn cứ, thanh chia dùng chung cho phép kéo chuột hoặc dùng bàn phím
+để chỉnh độ rộng; nhớ lựa chọn trên máy. Giới hạn theo bề ngang cửa sổ để
+hai khung còn đọc được; cửa sổ hẹp chuyển thành bố cục dọc và ẩn thanh kéo.
+Header căn cứ và các nút thao tác nằm ngoài vùng cuộn. Phần thân tự giới hạn
+theo khoảng cửa sổ còn lại, cuộn độc lập và không truyền cuộn sang trang.
+Bảng hồ sơ bên trái dùng cùng giới hạn chiều cao; tiêu đề khung và hàng
+lọc/tìm kiếm cố định, tiêu đề cột dính trong vùng cuộn của bảng. Hai khung
+cuộn độc lập; đổi bộ lọc đưa danh sách về đầu. Khi đặt cạnh nhau, hai khung
+giãn bằng chiều cao và thẳng mép dưới, kể cả khi một bên có ít nội dung.
+Khi xếp dọc ở cửa sổ hẹp, mỗi khung giữ chiều cao theo nội dung và giới hạn cuộn.
+Khung căn cứ chỉ mở sẵn kết quả, giá trị ấn định, z chính thức và lý do điều
+tra. Số liệu báo cáo, nhóm so sánh, kết quả liên quan và nội kiểm nằm trong
+các mục thu gọn riêng; dữ liệu chi tiết trình bày bằng bảng. Ngày chạy mẫu
+để đối chiếu nằm trong mục Nội kiểm, có trạng thái tóm tắt ngay khi thu gọn.
+Schema 15 thêm `eqa_result_id`, `eqa_source_key`, `eqa_snapshot_json` vào
+`nce_records`: chụp kết quả, tín hiệu, nhóm so sánh, đợt chấp nhận gần nhất,
+ngày chạy mẫu thật và QC cùng ngày. Không lấy ngày báo cáo thay ngày chạy.
+Hồ sơ trùng nội dung nguồn bị chặn kể cả khi bổ sung máy khác tạo phiên bản
+mới. Báo cáo đổi số liệu giữ nguyên hồ sơ/ảnh chụp cũ và tạo việc cần xem xét
+mới; không tự huỷ hồ sơ hay tự gắn hồ sơ cũ vào số liệu khác.
+
+NCE có liên kết EQA dùng checklist hành chính, giải thích nhà cung cấp, sáu
+nhóm kỹ thuật, chương trình/mẫu và 5 Whys; mỗi mục có trạng thái và bằng
+chứng. Kết luận phân loại hành chính/kỹ thuật/chương trình-mẫu hoặc chưa xác
+định kèm kế hoạch. Lỗi kỹ thuật không được chọn Không liên quan bệnh nhân;
+quyết định ảnh hưởng vẫn cần `nce.release`. Kết luận hiệu lực Hiệu quả chỉ
+được ghi khi đợt kế tiếp của cùng xét nghiệm/chương trình chấp nhận tất cả
+mẫu, không còn tín hiệu, mẫu chạy sau khi hoàn thành hành động và QC cùng
+ngày đủ mức, không có cảnh báo/loại bỏ. Thiếu ngày chạy hoặc QC thì yêu cầu
+bổ sung, không suy là đạt. Thay đổi căn cứ sau đánh giá chặn nộp/duyệt cho
+tới khi đánh giá lại; CAPA, hoàn thành hành động và duyệt độc lập giữ các
+cổng NCE hiện có. Hồ sơ EQA cũ chưa liên kết không bị tự đoán nguồn hay đổi
+checklist đã lưu.
+
+Bảng hồ sơ của Khắc phục sự cố hiển thị cột Nguồn / đợt báo cáo. Hồ sơ ngoại
+kiểm lấy đợt, năm và chương trình từ ảnh chụp khi lập hồ sơ; tìm kiếm bao gồm
+các thông tin này. Hồ sơ cũ chưa có căn cứ không tự suy đợt từ ngày phát hiện.
+Bộ lọc Nguồn nằm cùng hàng ô tìm kiếm ở đầu bảng, kết hợp với trạng thái và
+tìm kiếm; số đếm trạng thái
+theo nguồn đang chọn. Các thẻ tổng quan vẫn tính toàn bộ nguồn.
+
+Tab Báo cáo trong Ngoại kiểm dùng bộ chọn chung và phiếu BMQL một trang A4
+dọc theo mẫu đã duyệt. Chỉ giữ thông tin đợt/máy, kết quả sơ khởi, phân tích
+và kết luận, truyền đạt và đề xuất CAR; không lặp bảng kết quả, biểu đồ hoặc
+dải tổng hợp của Tổng quan. Không hiển thị nút Dữ liệu gốc và Tệp nguồn trong
+tab Báo cáo. Lịch sử phiếu xem xét nằm cạnh bản xem trước, hiển thị lần ký mới
+nhất trước, người ký, thời điểm và trạng thái căn cứ; bấm một lần ký để đọc
+nội dung đã lưu ngay trong khung xem trước, không mở hộp thoại. Phiếu lịch
+sử dùng đúng ảnh chụp số liệu và chữ ký tại thời điểm ký; nhận xét hay dữ
+liệu nhập sau không được ghép vào phiếu cũ. Dòng được chọn có dấu nhận diện,
+có nút trở về bản đang sửa và giữ nguyên bản nháp. Khi xem phiếu cũ, khung
+trái hiển thị đúng các trường của lần ký đó, tự chọn bước sơ khởi/phân tích/
+hệ thống tương ứng và chỉ cho xem; không lấy trường trống từ lần ký khác.
+Trong lúc tải hoặc lỗi không hiển thị nhầm dữ liệu bản nháp. Quay lại bản
+đang sửa khôi phục toàn bộ trường và bước đang nhập. PDF/Word xuất đúng phiếu đang xem. Cửa sổ vừa thu gọn lịch
+sử xuống dưới bản xem trước, cửa sổ
+hẹp xếp ba khung dọc. Không còn nút mở danh sách lịch sử phía trên phiếu.
+Mặc định mở đợt gần nhất; vẫn chọn được xem
+xét hệ thống cả năm. Bao phủ 12 tháng được ghi nhận trong hồ sơ xem xét hệ
+thống, không dựng lại bảng trên phiếu. Xem xét sơ khởi/phân tích/hệ thống lưu nối tiếp
+trong `eqa_decisions`, chụp số liệu cùng dấu vân tay, người ký từ phiên và
+quyền `nce.approve`. Nhập lại dữ liệu đã xem xét phải có lý do, tạo phiên bản
+mới; lần ký cũ được giữ nhưng báo cần xem xét lại. PDF và Word đọc lại dữ
+liệu cùng hồ sơ đơn vị/biểu mẫu tại thời điểm xuất. Word là `.docx` OOXML,
+cùng bố cục một trang với PDF. Nhận xét mới giới hạn theo từng mục để vừa
+phiếu; nhận xét cũ dài hơn vẫn giữ đầy đủ trong lịch sử, yêu cầu ghi xem xét
+ngắn gọn mới trước khi xuất một trang. Không cắt ngầm nội dung đã ký.
+
+Khung nhập thông tin bên trái, biểu mẫu xem trước ở giữa và lịch sử bên
+phải; toàn bộ bố cục trải hết chiều ngang và thẳng hai mép với bộ chọn báo
+cáo phía trên, cột xem trước nhận phần chiều rộng còn lại. Cả ba khung dùng
+cùng kiểu panel và tiêu đề thẳng hàng; nút xuất nằm trong tiêu đề khung xem
+trước, nhãn trạng thái nằm cạnh tên khung trên cùng một hàng. Khi xem lịch
+sử, thông tin lần ký và nút trở về bản đang sửa nằm phía dưới. Giấy báo cáo đặt trên nền nhẹ
+với khoảng đệm đều. Header không chừa thêm margin phía dưới; khung nhập
+dùng một nguồn khoảng cách là `--panel-padding` (20 px), tránh cộng dồn với
+khoảng chừa 16 px của header. Cửa sổ hẹp xếp
+khung nhập phía trên. Bản nháp cập nhật trực tiếp trên phiếu, ghi rõ chưa
+ký và giữ riêng theo người dùng, chương trình, năm, đợt, máy và bước xem xét.
+Hai nút Bỏ thay đổi/Ký xem xét nằm trên một hàng riêng cuối khung nhập,
+ngoài vùng nội dung cuộn và có đường phân cách. Nội dung giữ đủ chỗ để đọc
+và thao tác tới ô cuối, không bị hàng nút che; chế độ chỉ xem ẩn hàng nút.
+Bộ chọn báo cáo có Máy xét nghiệm, mặc định Tất cả máy hoặc chọn riêng từng
+máy. Số liệu, tín hiệu điều tra, bao phủ, hồ sơ xem xét và PDF/Word đều theo
+phạm vi máy đã chọn. Bản ký tất cả máy và từng máy độc lập; hồ sơ cũ không
+có phạm vi máy vẫn thuộc Tất cả máy. Máy chưa có kết quả hiện trạng thái
+trống, không tự chuyển sang dữ liệu máy khác.
 
 Với thay đổi mã nguồn, chạy đầy đủ:
 

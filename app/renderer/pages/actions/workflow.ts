@@ -24,7 +24,7 @@ export function stageForMissing(item: NceMissingItem): NceStage {
   if (['hold', 'hold-iqc', 'containment', 'containment-blank', 'owner', 'due-date'].includes(item.code)) return 'identity';
   if (item.code.startsWith('check-')) return 'check';
   if (item.code.startsWith('technical-')) return 'technical';
-  if (item.code.startsWith('patient-impact')) return 'impact';
+  if (item.code.startsWith('patient-')) return 'impact';
   if (item.code.includes('rerun') || ['release', 'no-trigger'].includes(item.code)) return 'release';
   return 'capa';
 }

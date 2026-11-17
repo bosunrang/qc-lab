@@ -35,7 +35,8 @@ export interface EqaSeriesInput {
 
 export interface EqaSeriesPoint extends EqaSeriesInput {
   cls: EqaClass;
-  /** Điểm J cộng dồn sau điểm này (trước khi đặt lại vì đạt ngưỡng). */
+  /** Điểm J cộng dồn sau đợt chứa điểm này (trước khi đặt lại vì đạt ngưỡng);
+   * các mẫu cùng đợt có cùng giá trị. */
   j: number;
   signals: EqaSignal[];
   /** Xét nghiệm "không thành công" tính tới đợt này (N-06). */
@@ -74,32 +75,45 @@ const roundKey = (point: EqaSeriesInput) => point.roundId || `${point.year}|${po
 /** Thứ tự in tín hiệu, dùng chung cho chuỗi và danh sách "Cần chú ý". */
 export const EQA_SIGNAL_ORDER: readonly EqaSignal[] = ['reject', 'two_of_three', 'six_same_side', 'j_score'];
 
-/** Tín hiệu của một chương trình. Theo N-07 các luật xu hướng đếm ĐỢT, không
- * đếm mẫu (N-06): một đợt thường có 2–5 mẫu ở nồng độ khác nhau, đếm mẫu thì
- * "2/3" và "6 liên tiếp" nổ ngay trong một đợt. Điểm J và |z| ≥ 3 vẫn theo
- * từng kết quả. */
+/** Điểm J của một đợt: điểm của mẫu lệch xa nhất, mang dấu của mẫu đó. Hai
+ * phía lệch ngang nhau thì đợt không có hướng (0). Một đợt chỉ góp một điểm,
+ * nên nhiều mẫu cùng lệch nhẹ trong một đợt không tự đạt ngưỡng J. */
+function roundJPoint(points: readonly EqaSeriesInput[]): number {
+  const pts = points.map((p) => eqaJPoint(p.z));
+  const pos = Math.max(0, ...pts), neg = -Math.min(0, ...pts);
+  return pos > neg ? pos : neg > pos ? -neg : 0;
+}
+
+/** Tín hiệu của một chương trình. Theo N-07 các luật xu hướng và điểm J đếm
+ * ĐỢT, không đếm mẫu (N-06): một đợt thường có 2–5 mẫu ở nồng độ khác nhau,
+ * đếm mẫu thì "2/3", "6 liên tiếp" và J nổ ngay trong một đợt (RSC AMC TB16
+ * cộng dồn J qua các vòng). Riêng |z| ≥ 3 vẫn theo từng kết quả. */
 function programSeries(input: readonly EqaSeriesInput[], config: EqaConfig, series: EqaSeriesConfig): { points: EqaSeriesPoint[]; rounds: number } {
   const sorted = [...input].sort(seriesOrder);
-  const points: EqaSeriesPoint[] = [];
-  let cum = 0;
-  for (const item of sorted) {
+  const points: EqaSeriesPoint[] = sorted.map((item) => {
     const z = r2(item.z);
     const cls = eqaClass(z, config);
-    const signals: EqaSignal[] = cls === 'rej' ? ['reject'] : [];
-    // J cộng dồn: đổi dấu thì đặt lại; đạt ngưỡng thì báo rồi đặt lại.
-    const jp = eqaJPoint(z);
-    if (jp !== 0 && cum !== 0 && Math.sign(jp) !== Math.sign(cum)) cum = 0;
-    cum += jp;
-    const j = cum;
-    if (Math.abs(cum) >= series.jLimit) { signals.push('j_score'); cum = 0; }
-    points.push({ ...item, z, cls, j, signals, unsuccessful: false });
-  }
+    return { ...item, z, cls, j: 0, signals: cls === 'rej' ? ['reject'] : [], unsuccessful: false };
+  });
 
   const rounds: { key: string; points: EqaSeriesPoint[] }[] = [];
   for (const point of points) {
     const last = rounds.at(-1);
     if (last && last.key === roundKey(point)) last.points.push(point);
     else rounds.push({ key: roundKey(point), points: [point] });
+  }
+  // J cộng dồn theo đợt: đổi dấu thì đặt lại; đạt ngưỡng thì báo trên các mẫu
+  // lệch cùng phía của đợt rồi đặt lại. Mọi mẫu của đợt mang cùng giá trị J.
+  let cum = 0;
+  for (const round of rounds) {
+    const jp = roundJPoint(round.points);
+    if (jp !== 0 && cum !== 0 && Math.sign(jp) !== Math.sign(cum)) cum = 0;
+    cum += jp;
+    for (const p of round.points) p.j = cum;
+    if (Math.abs(cum) >= series.jLimit) {
+      for (const p of round.points) if (Math.sign(eqaJPoint(p.z)) === Math.sign(cum)) p.signals.push('j_score');
+      cum = 0;
+    }
   }
   const beyond = (round: typeof rounds[number], sign: number) => round.points.some((p) => sign * p.z > config.zWarn);
   // Phía của một đợt: mọi mẫu cùng dấu; đợt có mẫu trái dấu hoặc z = 0 cắt chuỗi.

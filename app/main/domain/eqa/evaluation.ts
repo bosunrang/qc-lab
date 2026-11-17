@@ -13,8 +13,9 @@ export const EQA_DEFAULT_CONFIG: EqaConfig = { zWarn: 2, zReject: 3 };
 export const EQA_PROVIDER_Z_TOLERANCE = 0.02;
 
 export type EqaClass = 'ok' | 'warn' | 'rej';
-/** `match` khớp; `swapped` trùng độ lớn nhưng ngược dấu (kết quả và giá trị
- * ấn định bị đọc đổi chỗ, lỗi chặn khi nhập); `mismatch` lệch khác; `none`
+/** `match` khớp; `swapped` ngược dấu z trên báo cáo, dù trùng hay khác độ lớn
+ * (đọc nhầm hoặc báo cáo sai, lỗi chặn khi nhập theo E-14); `mismatch` cùng dấu
+ * nhưng lệch quá sai số làm tròn; `none`
  * không có z nhà cung cấp hoặc cả hai gần 0 nên không phân biệt được chiều. */
 export type EqaProviderCheck = 'match' | 'swapped' | 'mismatch' | 'none';
 
@@ -68,6 +69,9 @@ export function eqaProviderCheck(z: number | null, zProvider: number | null, tol
   if (z === null || zProvider === null) return 'none';
   if (Math.abs(z - zProvider) <= tolerance) return 'match';
   if (Math.abs(z + zProvider) <= tolerance) return Math.abs(zProvider) > tolerance ? 'swapped' : 'none';
+  // Cả hai rõ ràng khác 0 mà trái dấu: chiều lệch so với giá trị ấn định đã
+  // ngược với báo cáo, không chỉ là sai số đối chiếu (E-14).
+  if (Math.abs(z) > tolerance && Math.abs(zProvider) > tolerance && Math.sign(z) !== Math.sign(zProvider)) return 'swapped';
   return 'mismatch';
 }
 

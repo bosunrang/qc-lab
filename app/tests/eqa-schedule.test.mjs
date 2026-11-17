@@ -88,7 +88,7 @@ test('xoá đợt lập nhầm khi chưa nộp; sửa giữ nguyên thì không 
   assert.equal(eqa.listEqaSchedule().length, 0);
 });
 
-test('đợt có khai máy: loại mẫu ở chương trình, nộp theo từng máy, máy thiếu báo cáo theo lịch', () => {
+test('đợt có khai máy: loại mẫu của lịch, nộp từng máy, máy thiếu báo cáo theo lịch', () => {
   const { db, eqa, config, testId } = fixture();
   const c501 = must(config.saveInstrument({ data: { name: 'Cobas c501' } }, admin), 'máy 2');
   const au = db.prepare("SELECT id FROM instruments WHERE name='AU5800'").get().id;
@@ -116,7 +116,62 @@ test('đợt có khai máy: loại mẫu ở chương trình, nộp theo từng 
   assert.deepEqual([after.status, after.instruments.map((m) => m.reported)], ['submitted', [true, false]]);
   assert.deepEqual(eqa.listEqaRounds()[0].missing_instruments.map((m) => m.instrument_name), ['Cobas c501']);
 
-  // Đổi loại mẫu ở một đợt là đổi của chương trình.
+  // Loại mẫu sửa ở lịch này chỉ được gợi sẵn cho lần thêm lịch tiếp theo.
   must(eqa.saveEqaSchedule({ id: row.id, data: plan({ sampleType: 'Khí máu', instrumentIds: [au, c501.id] }).data }, tech), 'đổi loại mẫu');
   assert.equal(eqa.listEqaPrograms()[0].sample_type, 'Khí máu');
+  assert.equal(db.prepare('SELECT sample_type FROM eqa_programs WHERE id=?').get(row.program_id).sample_type, 'Sinh hóa');
+});
+
+test('cùng chương trình và đợt: nhóm máy có loại mẫu, ngày chạy, hạn nộp riêng; không đổi lịch khác', () => {
+  const { db, eqa, config } = fixture();
+  try {
+    const au = db.prepare("SELECT id FROM instruments WHERE name='AU5800'").get().id;
+    const easy = must(config.saveInstrument({ data: { name: 'EasyLyte Plus' } }, admin), 'máy điện giải').id;
+    const cobas = must(config.saveInstrument({ data: { name: 'Cobas c501' } }, admin), 'máy sinh hóa khác').id;
+    const chemistry = must(eqa.saveEqaSchedule(plan({ sampleType: 'Sinh hóa', instrumentIds: [au], runDate: isoLocalDate(), dueDate: isoLocalDateAfter(3) }), tech), 'sinh hóa');
+    const electrolyte = must(eqa.saveEqaSchedule(plan({ programId: chemistry.program_id, sampleType: 'Điện giải', instrumentIds: [easy], runDate: isoLocalDateAfter(1), dueDate: isoLocalDateAfter(5) }), tech), 'điện giải cùng đợt');
+    const secondChemistry = must(eqa.saveEqaSchedule(plan({ programId: chemistry.program_id, sampleType: 'Sinh hóa', instrumentIds: [cobas], dueDate: isoLocalDateAfter(7) }), tech), 'cùng loại mẫu nhưng máy/hạn khác');
+    assert.equal(eqa.listEqaSchedule().length, 3);
+    const get = id => eqa.listEqaSchedule().find(row => row.id === id);
+    assert.deepEqual([get(chemistry.id).sample_type, get(chemistry.id).due_date, get(electrolyte.id).sample_type, get(electrolyte.id).due_date], ['Sinh hóa', isoLocalDateAfter(3), 'Điện giải', isoLocalDateAfter(5)]);
+    const audits = () => db.prepare('SELECT COUNT(*) n FROM activity').get().n;
+    const count = audits();
+    const duplicate = eqa.saveEqaSchedule(plan({ programId: chemistry.program_id, sampleType: 'Khí máu', instrumentIds: [au], dueDate: isoLocalDateAfter(9) }), tech);
+    assert.equal(duplicate.error?.code, 'duplicate-instrument');
+    assert.match(duplicate.error.message, /AU5800/);
+    assert.equal(audits(), count, 'trùng máy không ghi dữ liệu hoặc nhật ký');
+    assert.equal(eqa.saveEqaSchedule(plan({ programId: chemistry.program_id }), tech).error?.code, 'duplicate-round', 'không trộn lịch chung và lịch theo máy');
+    must(eqa.saveEqaSchedule({ id: chemistry.id, data: { ...plan({ programId: chemistry.program_id, sampleType: 'Khí máu', instrumentIds: [au], dueDate: isoLocalDateAfter(4) }).data } }, tech), 'sửa riêng loại mẫu/hạn');
+    assert.deepEqual([get(electrolyte.id).sample_type, get(electrolyte.id).due_date, get(secondChemistry.id).sample_type, get(secondChemistry.id).due_date], ['Điện giải', isoLocalDateAfter(5), 'Sinh hóa', isoLocalDateAfter(7)]);
+    assert.equal(db.prepare('SELECT sample_type FROM eqa_programs WHERE id=?').get(chemistry.program_id).sample_type, 'Sinh hóa', 'không viết lại phân loại chung của chương trình');
+    const moved = eqa.saveEqaSchedule({ id: electrolyte.id, data: plan({ programId: chemistry.program_id, sampleType: 'Điện giải', instrumentIds: [easy, cobas] }).data }, tech);
+    assert.equal(moved.error?.code, 'duplicate-instrument', 'sửa lịch cũng chặn máy đã có ở lịch khác');
+    must(eqa.markEqaSubmitted({ data: { id: electrolyte.id, instrumentIds: [easy] } }, tech), 'nộp máy điện giải');
+    assert.equal(get(electrolyte.id).status, 'submitted');
+    assert.equal(get(chemistry.id).status, 'planned', 'nộp một lịch không hoàn thành lịch khác');
+    assert.equal(get(secondChemistry.id).status, 'planned');
+  } finally { db.close(); }
+});
+
+test('báo cáo và bảo vệ hồ sơ áp đúng máy khi cùng đợt có nhiều lịch', () => {
+  const { db, eqa, config, testId } = fixture();
+  try {
+    const au = db.prepare("SELECT id FROM instruments WHERE name='AU5800'").get().id;
+    const easy = must(config.saveInstrument({ data: { name: 'EasyLyte Plus' } }, admin), 'máy điện giải').id;
+    const chemistry = must(eqa.saveEqaSchedule(plan({ sampleType: 'Sinh hóa', instrumentIds: [au] }), tech), 'sinh hóa');
+    const electrolyte = must(eqa.saveEqaSchedule(plan({ programId: chemistry.program_id, sampleType: 'Điện giải', instrumentIds: [easy] }), tech), 'điện giải');
+    const round = { program: 'CHƯƠNG TRÌNH SINH HÓA', provider: 'TTKCXN TP. HCM', programCode: '', unitCode: '', year: 2026, round: 'ĐỢT 01', reportCode: '', reportDate: isoLocalDate(), assignedLevel: '' };
+    const rows = [{ ref: 'ALT@AU5800', code: 'ALT(GPT)', instrument: 'AU5800', sample: 'M1', unit: 'U/L', result: 55, assigned: 54.278, sigmaP: 4.917, zProvider: 0.15, method: '', peerGroup: '', peer: {} }];
+    must(eqa.importEqaRound({ data: { round, rows, source: 'pdf', sourceName: 'au.pdf', mappings: [{ code: 'ALT(GPT)', instrument: 'AU5800', testId }] } }, tech), 'báo cáo AU');
+    const all = eqa.listEqaSchedule();
+    assert.equal(all.find(r => r.id===chemistry.id).status, 'reported');
+    assert.equal(all.find(r => r.id===electrolyte.id).status, 'planned');
+    assert.equal(all.find(r => r.id===electrolyte.id).instruments[0].reported, false);
+    assert.deepEqual(eqa.listEqaRounds()[0].missing_instruments.map(m=>m.instrument_name), ['EasyLyte Plus']);
+    assert.equal(eqa.removeEqaSchedule({ data: { id: chemistry.id } }, tech).error?.code, 'locked');
+    assert.equal(eqa.saveEqaSchedule({ id: chemistry.id, data: plan({ programId: chemistry.program_id, sampleType: 'Sinh hóa', instrumentIds: [] }).data }, tech).ok, false);
+    must(eqa.removeEqaSchedule({ data: { id: electrolyte.id } }, tech), 'xoá lịch nhập nhầm của máy chưa nộp/chưa có báo cáo');
+    assert.equal(eqa.listEqaSchedule().length, 1);
+    assert.equal(eqa.listEqaSchedule()[0].status, 'reported');
+  } finally { db.close(); }
 });

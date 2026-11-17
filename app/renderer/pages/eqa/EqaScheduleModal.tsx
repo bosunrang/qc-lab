@@ -20,28 +20,29 @@ import type { EqaScheduleRow } from '../../../shared/qc-api';
 const NEW_PROGRAM = '__new__';
 const FIELD_ERRORS: FieldErrorMap = {
   'missing-program': 'programId', 'invalid-year': 'year', 'invalid-round': 'round', 'duplicate-round': 'round',
-  'invalid-due-date': 'dueDate', 'invalid-receive-date': 'receiveDate', 'invalid-run-date': 'runDate',
-  'run-after-due': 'runDate', 'receive-after-run': 'receiveDate', 'invalid-sample-type': 'sampleType',
-  'invalid-instrument': 'instrumentIds', locked: 'instrumentIds',
+  'invalid-due-date': 'dueDate', 'invalid-run-date': 'runDate',
+  'run-after-due': 'runDate', 'invalid-sample-type': 'sampleType',
+  'invalid-instrument': 'instrumentIds', 'duplicate-instrument': 'instrumentIds', locked: 'instrumentIds',
 };
 
-export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null; onClose: () => void }) {
+export function EqaScheduleModal({ row, initialDueDate = '', onClose }: { row: EqaScheduleRow | null; initialDueDate?: string; onClose: () => void }) {
   const { programs, saveSchedule } = useEqaStore(useShallow((s) => ({ programs: s.programs, saveSchedule: s.saveSchedule })));
   const instruments = useManageStore((s) => s.instruments);
   const initialProgram = programs.find((p) => p.id === row?.program_id) ?? (row ? undefined : programs[0]);
   const [programId, setProgramId] = useState(row?.program_id ?? (programs[0]?.id || NEW_PROGRAM));
   const [sampleType, setSampleType] = useState(row?.sample_type ?? initialProgram?.sample_type ?? '');
   const [machineIds, setMachineIds] = useState<Set<string>>(() => new Set(row ? row.instruments.map((m) => m.instrument_id) : initialProgram?.instrument_ids ?? []));
-  const [receiveDate, setReceiveDate] = useState(row?.receive_date ?? '');
+  // Biểu mẫu chỉ nhập ngày chạy và hạn nộp; giữ nguyên ngày nhận đã lưu của đợt cũ.
+  const receiveDate = row?.receive_date ?? '';
   const [runDate, setRunDate] = useState(row?.run_date ?? '');
-  const [dueDate, setDueDate] = useState(row?.due_date ?? '');
+  // Ngày chọn trên lịch chỉ gợi sẵn khi tạo mới; sửa đợt giữ ngày đã lưu.
+  const [dueDate, setDueDate] = useState(row?.due_date ?? initialDueDate);
   const [err, setErr] = useState<FormError | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const errorId = useInvalidField(formRef, err);
-  const program = programs.find((p) => p.id === programId);
   // Máy đã nộp không gỡ được ở đây (main cũng chặn); máy ngừng hoạt động chỉ
   // hiện khi đợt đang có nó.
-  const submittedIds = new Set(row?.instruments.filter((m) => m.submitted_at).map((m) => m.instrument_id) ?? []);
+  const submittedIds = new Set(row?.instruments.filter((m) => m.submitted_at || m.reported).map((m) => m.instrument_id) ?? []);
   const machines = instruments.filter((i) => i.active === 1 || machineIds.has(i.id));
 
   function pickProgram(id: string) {
@@ -63,7 +64,9 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
       assignee: String(fd.get('assignee') || ''), note: String(fd.get('note') || ''),
     }, row?.id);
     if (!result.ok) {
-      await reportFormError(isNew && result.error.code === 'missing-program' ? formError(result.error.message, 'programName') : formErrorFrom(result.error, FIELD_ERRORS), setErr);
+      await reportFormError(isNew && result.error.code === 'missing-program' ? formError(result.error.message, 'programName') : formErrorFrom(result.error, {
+        ...FIELD_ERRORS, 'receive-after-run': runDate ? 'runDate' : 'dueDate',
+      }), setErr);
       return;
     }
     showToast(row ? 'Đã lưu đợt trong lịch.' : 'Đã thêm đợt vào lịch.');
@@ -83,15 +86,17 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
               {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               <option value={NEW_PROGRAM}>Chương trình mới…</option>
             </select>
-            {program?.provider && <div className="hint eqa-field-hint">{program.provider}</div>}
           </div>
           <div className="field">
             <label htmlFor="eqa-s-sample">Loại mẫu</label>
-            <select id="eqa-s-sample" name="sampleType" value={sampleType} onChange={(e) => setSampleType(e.target.value)}>
+            <select id="eqa-s-sample" name="sampleType" value={sampleType} onChange={(e) => {
+              setSampleType(e.target.value);
+              // Đổi loại mẫu khi thêm lịch không mang nhầm máy gợi sẵn của loại cũ.
+              if (!row) setMachineIds(new Set());
+            }}>
               <option value="">Chưa chọn</option>
               {EQA_SAMPLE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-            <div className="hint eqa-field-hint">Dùng chung cho mọi đợt của chương trình.</div>
           </div>
         </div>
         {programId === NEW_PROGRAM && (
@@ -102,10 +107,9 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
         )}
         <div className="grid2">
           <div className="field"><label htmlFor="eqa-s-round">Đợt</label><input id="eqa-s-round" name="round" defaultValue={row?.round ?? ''} placeholder="Ví dụ: ĐỢT 11" /></div>
-          <div className="field"><label htmlFor="eqa-s-year">Năm</label><input id="eqa-s-year" name="year" type="number" defaultValue={row?.year ?? Number(isoLocalDate().slice(0, 4))} /></div>
+          <div className="field"><label htmlFor="eqa-s-year">Năm</label><input id="eqa-s-year" name="year" type="number" defaultValue={row?.year ?? Number((initialDueDate || isoLocalDate()).slice(0, 4))} /></div>
         </div>
-        <div className="eqa-form-dates">
-          <DateField id="eqa-s-receive" name="receiveDate" label="Ngày nhận mẫu" value={receiveDate} onChange={setReceiveDate} />
+        <div className="grid2">
           <DateField id="eqa-s-run" name="runDate" label="Ngày chạy mẫu" value={runDate} onChange={setRunDate} />
           <DateField id="eqa-s-due" name="dueDate" label="Hạn nộp kết quả" value={dueDate} onChange={setDueDate} />
         </div>
@@ -118,11 +122,10 @@ export function EqaScheduleModal({ row, onClose }: { row: EqaScheduleRow | null;
                 <input type="checkbox" data-field="instrumentIds" checked={machineIds.has(m.id)} disabled={submittedIds.has(m.id)} onChange={(e) => {
                   setMachineIds((prev) => { const next = new Set(prev); if (e.target.checked) next.add(m.id); else next.delete(m.id); return next; });
                 }} />
-                <span><b>{m.name}</b><small>{submittedIds.has(m.id) ? 'Đã nộp kết quả' : [m.manufacturer, m.model].filter(Boolean).join(' · ') || m.section || '—'}</small></span>
+                <span><b>{m.name}</b><small>{row?.instruments.some((item) => item.instrument_id === m.id && item.reported) ? 'Đã có báo cáo' : submittedIds.has(m.id) ? 'Đã nộp kết quả' : [m.manufacturer, m.model].filter(Boolean).join(' · ') || m.section || '—'}</small></span>
               </label>
             ))}
           </div>
-          <div className="hint eqa-field-hint">Mỗi máy nộp phiếu kết quả riêng; đợt tính đã nộp khi đủ máy. Không chọn máy thì đánh dấu nộp cho cả đợt.</div>
         </div>
         <div className="field"><label htmlFor="eqa-s-assignee">Người phụ trách</label><input id="eqa-s-assignee" name="assignee" defaultValue={row?.assignee ?? ''} /></div>
         <div className="field"><label htmlFor="eqa-s-note">Ghi chú</label><input id="eqa-s-note" name="note" defaultValue={row?.note ?? ''} /></div>

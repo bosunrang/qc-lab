@@ -113,7 +113,7 @@ export function toDossier(row: RecordColumns, runs: readonly NceRunRow[], action
   const effectivenessReviews: NceEffectivenessReview[] = of<Omit<NceEffectivenessReview, 'reviewerUserId'>>('effectiveness')
     .map(({ decision, payload }) => ({ ...payload, reviewerUserId: decision.actor_user_id }));
   return {
-    status: row.status, source: row.source, testId: row.test_id,
+    status: row.status, source: row.source, testId: row.test_id, eqaLinked: !!row.eqa_result_id,
     reportedByUserId: row.reported_by_user_id, ownerUserId: row.owner_user_id, detectedAt: row.detected_at, dueDate: row.due_date,
     description: row.description, correction: row.correction, holdResults: row.hold_results === null ? null : !!row.hold_results,
     containmentNote: row.containment_note, occurredNote: row.occurred_note,

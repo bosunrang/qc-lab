@@ -8,6 +8,7 @@ import {
   EQA_DEFAULT_CONFIG, EQA_PEER_LEVELS, eqaClass, eqaNormalize, eqaPct, eqaProviderCheck, eqaRoundNumber, eqaSuggestTests, eqaZ,
   type EqaCatalogTest, type EqaClass, type EqaConfig, type EqaPeer, type EqaProviderCheck,
 } from './evaluation';
+import type { EqaSourceFileDraft } from '../../../shared/qc-api';
 
 export interface EqaRoundInput {
   program: string; provider: string; programCode: string; unitCode: string;
@@ -25,7 +26,7 @@ export interface EqaRowInput {
 }
 
 /** `errors` chặn ghi (đọc sai/thiếu, file khác đợt); `warnings` chỉ để người dùng kiểm lại. */
-export interface EqaParsedSource { round: EqaRoundInput; rows: EqaRowInput[]; errors: string[]; warnings?: string[] }
+export interface EqaParsedSource { round: EqaRoundInput; rows: EqaRowInput[]; errors: string[]; warnings?: string[]; files?: EqaSourceFileDraft[] }
 
 // ------------------------------------------------------------ ép kiểu
 
@@ -86,7 +87,8 @@ export function mergeEqaSources(sources: readonly EqaParsedSource[], names: read
     }
     rows.push(...source.rows);
   });
-  return { round: base.round, rows, errors, warnings };
+  const files = sources.flatMap((s) => s.files || []);
+  return { round: base.round, rows, errors, warnings, ...(files.length ? { files } : {}) };
 }
 
 // ------------------------------------------------ kiểm tra tại main

@@ -39,8 +39,8 @@ const CHANNEL_PAGES: Readonly<Record<string, readonly string[]>> = {
   'westgard:saveRuleAction': ['manage'], 'westgard:saveRuleSetting': ['westgard'], 'westgard:resetRuleSettings': ['westgard'],
   // Tổng quan và Báo cáo đọc tóm tắt NCE; Cài đặt sửa cấu hình NCE.
   'nce:list': [], 'nce:getConfig': ['settings'], 'nce:saveConfig': ['settings'],
-  // Six Sigma in báo cáo theo mẫu của trang Báo cáo.
-  'report:getTemplateSettings': ['report', 'sigma'],
+  // Six Sigma và Ngoại kiểm in báo cáo theo biểu mẫu dùng chung.
+  'report:getTemplateSettings': ['report', 'sigma', 'eqa'],
   // Tổng quan nhắc hạn nộp ngoại kiểm.
   'eqa:listSchedule': ['eqa', 'dash'],
   'settings:saveLabProfile': ['settings'], 'settings:enableOperationMode': ['settings'],

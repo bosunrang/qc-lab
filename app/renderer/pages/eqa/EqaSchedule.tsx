@@ -1,6 +1,6 @@
-// Thẻ "Lịch" của trang Phân tích ngoại kiểm: đợt cần nộp, lịch tháng và lịch cả
-// năm. Trạng thái và số ngày còn lại do main tính (`domain/eqa/schedule.ts`).
-import { useMemo, useState } from 'react';
+// Lịch ngoại kiểm: lịch tháng, danh sách theo năm và chi tiết ngày được chọn.
+// Trạng thái, số ngày còn lại và tiến độ từng máy lấy từ main.
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useEqaStore } from '../../store/eqa-store';
 import { useAuthStore } from '../../store/auth-store';
@@ -11,14 +11,14 @@ import { RowActionButton } from '../../components/RowActionButton';
 import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
 import { isoLocalDate } from '../../../main/domain/local-date';
-import { EQA_DUE_SOON_DAYS, EQA_SAMPLE_TYPES, needsAction } from '../../../main/domain/eqa/schedule';
+import { EQA_DUE_SOON_DAYS, EQA_SAMPLE_TYPES } from '../../../main/domain/eqa/schedule';
 import type { EqaScheduleRow } from '../../../shared/qc-api';
-import { StatCard } from './shared';
 import { EqaScheduleModal } from './EqaScheduleModal';
 import { EqaSubmitModal } from './EqaSubmitModal';
-import { EqaTimeline } from './EqaTimeline';
 
-const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const WEEKDAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ nhật'];
+const EVENT_LABELS = { receive: 'Nhận mẫu', run: 'Chạy mẫu', due: 'Hạn nộp' };
+type EventKind = keyof typeof EVENT_LABELS;
 
 function statusLabel(row: EqaScheduleRow): string {
   if (row.status === 'reported') return 'Đã có báo cáo';
@@ -27,31 +27,27 @@ function statusLabel(row: EqaScheduleRow): string {
   return row.days_left <= EQA_DUE_SOON_DAYS ? 'Sắp đến hạn' : 'Chưa nộp';
 }
 
-export function ScheduleStatusTag({ row }: { row: EqaScheduleRow }) {
+function ScheduleStatusTag({ row }: { row: EqaScheduleRow }) {
   const tone = row.status === 'reported' || row.status === 'submitted' ? 'ok' : row.status === 'overdue' ? 'rej' : row.days_left <= EQA_DUE_SOON_DAYS ? 'warn' : 'none';
   return <span className={`tag ${tone}`}>{statusLabel(row)}</span>;
 }
 
-/** Số máy đã nộp (gồm máy đã có trong báo cáo) trên tổng số máy của đợt. */
-function machineProgress(row: EqaScheduleRow): { done: number; total: number } {
+function machineProgress(row: EqaScheduleRow) {
   return { done: row.instruments.filter((m) => m.submitted_at || m.reported).length, total: row.instruments.length };
 }
 
-/** Dòng phụ dưới trạng thái: lần nộp, hoặc tiến độ nộp theo máy khi chưa đủ. */
 function submittedText(row: EqaScheduleRow): string {
   const { done, total } = machineProgress(row);
-  if (total && done < total) return done ? `Đã nộp ${done}/${total} máy` : '';
+  if (total) return `Đã nộp ${done}/${total} máy`;
   return row.submitted_at ? `Nộp ${vnDate(row.submitted_at.slice(0, 10))}${row.submitted_by ? ` · ${row.submitted_by}` : ''}` : '';
 }
 
-/** Tên chương trình kèm loại mẫu; dòng phụ do nơi gọi chọn. */
 function ProgramCell({ row, sub }: { row: EqaScheduleRow; sub: string }) {
   return <><b className="eqa-strong">{row.program_name}{row.sample_type && <span className="pill eqa-sample-type">{row.sample_type}</span>}</b><span className="eqa-sub">{sub}</span></>;
 }
 
-/** Máy của đợt: xanh là đã nộp hoặc đã có trong báo cáo. */
 function MachineTags({ row }: { row: EqaScheduleRow }) {
-  if (!row.instruments.length) return <>—</>;
+  if (!row.instruments.length) return null;
   return <span className="eqa-machine-tags">{row.instruments.map((m) => (
     <span key={m.instrument_id} className={`tag ${m.submitted_at || m.reported ? 'ok' : 'none'}`} title={m.reported ? 'Đã có trong báo cáo' : m.submitted_at ? 'Đã nộp' : 'Chưa nộp'}>{m.instrument_name}</span>
   ))}</span>;
@@ -63,62 +59,118 @@ export function daysLeftText(row: EqaScheduleRow): string {
   return row.days_left > 0 ? `Còn ${row.days_left} ngày` : `Quá ${-row.days_left} ngày`;
 }
 
-/** Màu chấm trên lịch theo trạng thái của đợt. */
 function dotTone(row: EqaScheduleRow): string {
   if (row.status === 'overdue') return 'is-overdue';
   if (row.status === 'planned') return row.days_left <= EQA_DUE_SOON_DAYS ? 'is-soon' : 'is-planned';
   return 'is-done';
 }
 
-/** Các ô của lịch tháng, tuần bắt đầu từ thứ Hai. */
+/** Chỉ dựng số tuần cần thiết, vẫn giữ đủ những ngày liền kề ngoài tháng. */
 function monthCells(ym: string): { date: string; inMonth: boolean }[] {
   const [y, m] = ym.split('-').map(Number);
-  const first = new Date(Date.UTC(y, m - 1, 1));
-  const offset = (first.getUTCDay() + 6) % 7;
+  const offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+  const count = Math.ceil((offset + new Date(Date.UTC(y, m, 0)).getUTCDate()) / 7) * 7;
   const start = Date.UTC(y, m - 1, 1 - offset);
-  return Array.from({ length: 42 }, (_, i) => {
+  return Array.from({ length: count }, (_, i) => {
     const date = new Date(start + i * 86_400_000).toISOString().slice(0, 10);
     return { date, inMonth: date.slice(0, 7) === ym };
   });
 }
 
-function shiftMonth(ym: string, delta: number): string {
-  const [y, m] = ym.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return d.toISOString().slice(0, 7);
+function dueOrder(a: EqaScheduleRow, b: EqaScheduleRow): number {
+  return a.due_date.localeCompare(b.due_date) || a.program_name.localeCompare(b.program_name, 'vi') || a.round_no - b.round_no;
 }
 
-export function EqaSchedule({ onOpenRound }: { onOpenRound: (id: string) => void }) {
-  const { schedule, markSubmitted, removeSchedule } = useEqaStore(useShallow((s) => ({ schedule: s.schedule, markSubmitted: s.markSubmitted, removeSchedule: s.removeSchedule })));
+export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRound: (id: string) => void; targetScheduleId?: string }) {
+  const { schedule, loading, loaded, error, load, markSubmitted, removeSchedule } = useEqaStore(useShallow((s) => ({
+    schedule: s.schedule, loading: s.loading, loaded: s.loaded, error: s.error, load: s.load, markSubmitted: s.markSubmitted, removeSchedule: s.removeSchedule,
+  })));
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const today = isoLocalDate();
+  // Tháng là mốc thời gian duy nhất; chuyển cách xem không làm mất năm đang xem.
   const [month, setMonth] = useState(today.slice(0, 7));
-  const [selectedDay, setSelectedDay] = useState('');
-  const [year, setYear] = useState(Number(today.slice(0, 4)));
-  const [editing, setEditing] = useState<EqaScheduleRow | 'new' | null>(null);
-  const [submitting, setSubmitting] = useState<EqaScheduleRow | null>(null);
+  const year = Number(month.slice(0, 4));
+  const [selectedDay, setSelectedDay] = useState(today);
+  const [layout, setLayout] = useState<'month' | 'list'>('month');
   const [sampleFilter, setSampleFilter] = useState('');
-  const [layout, setLayout] = useState<'timeline' | 'table'>('timeline');
+  const [editing, setEditing] = useState<EqaScheduleRow | 'new' | null>(null);
+  const [newDueDate, setNewDueDate] = useState('');
+  const [submitting, setSubmitting] = useState<EqaScheduleRow | null>(null);
+  const locatedSchedule = useRef('');
+  const targetTask = useRef<HTMLLIElement>(null);
+  const [revealedSchedule, setRevealedSchedule] = useState('');
 
-  const actionRows = useMemo(() => schedule.filter(needsAction), [schedule]);
-  const stats = useMemo(() => ({
-    soon: schedule.filter((r) => r.status === 'planned' && r.days_left <= EQA_DUE_SOON_DAYS).length,
-    overdue: schedule.filter((r) => r.status === 'overdue').length,
-    waiting: schedule.filter((r) => r.status === 'submitted').length,
-    reported: schedule.filter((r) => r.status === 'reported' && r.year === year).length,
-  }), [schedule, year]);
+  // Chờ lịch được nạp rồi định vị theo mã riêng, tránh nhầm các máy cùng đợt.
+  // Chỉ làm một lần cho mỗi đường dẫn, để tải lại dữ liệu không kéo người dùng về ngày cũ.
+  useEffect(() => {
+    if (!targetScheduleId) { locatedSchedule.current = ''; setRevealedSchedule(''); return; }
+    if (locatedSchedule.current === targetScheduleId) return;
+    const row = schedule.find((item) => item.id === targetScheduleId);
+    if (!row) return;
+    locatedSchedule.current = targetScheduleId;
+    setSampleFilter('');
+    setMonth(row.due_date.slice(0, 7));
+    setSelectedDay(row.due_date);
+    setLayout('month');
+    setRevealedSchedule(row.id);
+  }, [schedule, targetScheduleId]);
+  useEffect(() => {
+    if (!revealedSchedule) return;
+    targetTask.current?.scrollIntoView({ block: 'nearest' });
+    targetTask.current?.focus({ preventScroll: true });
+  }, [revealedSchedule]);
+
+  // Chỉ cảnh báo các đợt main xác định quá hạn; không để bộ lọc che nợ năm cũ.
+  const overdueRows = useMemo(() => schedule.filter((r) => r.status === 'overdue').sort(dueOrder), [schedule]);
+  const filtered = useMemo(() => schedule.filter((r) => !sampleFilter || r.sample_type === sampleFilter), [schedule, sampleFilter]);
+  const yearRows = useMemo(() => filtered.filter((r) => r.year === year).sort(dueOrder), [filtered, year]);
+  // Gộp theo mã chương trình rồi số đợt chuẩn hoá; mỗi nhóm giữ thứ tự hạn nộp.
+  const listRows = useMemo(() => {
+    const programGroups = new Map<string, EqaScheduleRow[]>();
+    for (const row of yearRows) {
+      const group = programGroups.get(row.program_id) ?? [];
+      group.push(row);
+      programGroups.set(row.program_id, group);
+    }
+    return [...programGroups.values()].flatMap((programRows) => {
+      const rounds = new Map<number, EqaScheduleRow[]>();
+      for (const row of programRows) {
+        const group = rounds.get(row.round_no) ?? [];
+        group.push(row);
+        rounds.set(row.round_no, group);
+      }
+      return [...rounds.values()].flatMap((rows, roundIndex) => rows.map((row, index) => ({
+        row,
+        programRowSpan: roundIndex === 0 && index === 0 ? programRows.length : 0,
+        roundRowSpan: index === 0 ? rows.length : 0,
+      })));
+    });
+  }, [yearRows]);
   const byDate = useMemo(() => {
-    const map = new Map<string, { row: EqaScheduleRow; kind: 'due' | 'run' }[]>();
-    const add = (date: string, row: EqaScheduleRow, kind: 'due' | 'run') => { if (date) map.set(date, [...(map.get(date) ?? []), { row, kind }]); };
-    for (const row of schedule) { add(row.due_date, row, 'due'); if (row.run_date !== row.due_date) add(row.run_date, row, 'run'); }
+    const map = new Map<string, { row: EqaScheduleRow; kind: EventKind }[]>();
+    for (const row of [...filtered].sort(dueOrder)) {
+      // Hai mốc cùng ngày vẫn là hai công việc; không bỏ ngày chạy trùng hạn nộp.
+      for (const [kind, date] of [['due', row.due_date], ['run', row.run_date], ['receive', row.receive_date]] as const) {
+        if (date) map.set(date, [...(map.get(date) ?? []), { row, kind }]);
+      }
+    }
     return map;
-  }, [schedule]);
-  const years = useMemo(() => [...new Set([Number(today.slice(0, 4)), ...schedule.map((r) => r.year)])].sort((a, b) => b - a), [schedule, today]);
-  const yearRows = schedule.filter((r) => r.year === year && (!sampleFilter || r.sample_type === sampleFilter));
-  const dayItems = selectedDay ? byDate.get(selectedDay) ?? [] : [];
+  }, [filtered]);
+  const years = [...new Set([year, Number(today.slice(0, 4)), ...schedule.flatMap((r) => [r.year, ...[r.receive_date, r.run_date, r.due_date].filter(Boolean).map((d) => Number(d.slice(0, 4)))])])].sort((a, b) => b - a);
+  // Gộp các mốc cùng đợt thành một mục để không lặp thao tác ghi dữ liệu.
+  const dayRows = [...(byDate.get(selectedDay) ?? []).reduce((map, { row, kind }) => {
+    const item = map.get(row.id) ?? { row, kinds: [] as EventKind[] };
+    item.kinds.push(kind);
+    return map.set(row.id, item);
+  }, new Map<string, { row: EqaScheduleRow; kinds: EventKind[] }>()).values()];
+  const cells = monthCells(month);
+  const monthHasEvents = [...byDate.keys()].some((d) => d.startsWith(month));
 
+  function selectDay(date: string) { setSelectedDay(date); setMonth(date.slice(0, 7)); }
+  function startNew(dueDate = '') { setNewDueDate(dueDate); setEditing('new'); }
+  function changeMonth(value: string) { setMonth(value); setSelectedDay(`${value}-01`); }
+  function locate(row: EqaScheduleRow) { setSampleFilter(''); selectDay(row.due_date); setLayout('month'); }
   async function submitted(row: EqaScheduleRow, value: boolean) {
-    // Đợt có khai máy: chọn máy đã nộp trong hộp riêng.
     if (row.instruments.length) { setSubmitting(row); return; }
     const result = await markSubmitted(row.id, value);
     if (!result.ok) { await errorDialog(result.error.message); return; }
@@ -129,150 +181,134 @@ export function EqaSchedule({ onOpenRound }: { onOpenRound: (id: string) => void
     const result = await removeSchedule(row.id);
     if (!result.ok) await errorDialog(result.error.message);
   }
+  function actions(row: EqaScheduleRow) {
+    return <div className="eqa-row-actions">
+      {row.round_id && <button type="button" className="btn ghost sm" onClick={() => onOpenRound(row.round_id!)}>Mở kỳ báo cáo</button>}
+      {writable && <>
+        {row.status !== 'reported' && <button type="button" className="btn ghost sm" onClick={() => void submitted(row, row.status !== 'submitted')}>
+          {row.status === 'submitted' ? row.instruments.length ? 'Sửa đã nộp' : 'Bỏ đã nộp' : 'Ghi nhận nộp'}
+        </button>}
+        <RowActionButton kind="edit" label={`Sửa ${row.program_name} ${row.round}`} onClick={() => setEditing(row)} />
+        {(row.status === 'planned' || row.status === 'overdue') && !row.instruments.some((m) => m.submitted_at || m.reported) &&
+          <RowActionButton kind="delete" label={`Xoá ${row.program_name} ${row.round}`} onClick={() => void remove(row)} />}
+      </>}
+    </div>;
+  }
+  function task(row: EqaScheduleRow, kinds: EventKind[]) {
+    return <li key={row.id} className="eqa-schedule-task" ref={row.id === revealedSchedule ? targetTask : undefined} tabIndex={-1}>
+      <ProgramCell row={row} sub={`${row.round}/${row.year}${row.assignee ? ` · ${row.assignee}` : ''}`} />
+      <span className="eqa-sub">{kinds.map((kind) => EVENT_LABELS[kind]).join(' · ')}</span>
+      <div className="eqa-schedule-task-meta"><ScheduleStatusTag row={row} /><span className="eqa-note">Hạn {vnDate(row.due_date)}{daysLeftText(row) !== '—' ? ` · ${daysLeftText(row)}` : ''}</span></div>
+      {submittedText(row) && <span className="eqa-sub">{submittedText(row)}</span>}
+      <MachineTags row={row} />
+      {row.note && <span className="eqa-sub">{row.note}</span>}
+      {actions(row)}
+    </li>;
+  }
 
-  return (
-    <div className="eqa-schedule">
-      <div className="eqa-intro">
-        <div>
-          <h2>Lịch ngoại kiểm</h2>
-          <p>Ngày nhận mẫu, ngày chạy và hạn nộp kết quả cho trung tâm. Nộp trễ hạn thì đợt bị tính không đạt.</p>
-        </div>
-        {writable && <div className="eqa-intro-actions"><button type="button" className="btn" onClick={() => setEditing('new')}>Thêm đợt</button></div>}
-      </div>
+  // Giữ hộp thoại đang nhập khi tải lại; lỗi đọc không được hiện như lịch rỗng.
+  const idle = !editing && !submitting;
+  if (idle && !schedule.length && (!loaded || loading)) return <section className="panel"><EmptyState title="Đang tải lịch ngoại kiểm…" /></section>;
+  if (idle && !schedule.length && error) return <section className="panel"><EmptyState title="Không tải được lịch ngoại kiểm" action={<button type="button" className="btn" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState></section>;
 
-      <div className="eqa-stats">
-        <StatCard tone="warning" label="Sắp đến hạn" value={stats.soon} detail={`Chưa nộp, còn ≤ ${EQA_DUE_SOON_DAYS} ngày`} />
-        <StatCard tone="danger" label="Quá hạn" value={stats.overdue} detail="Chưa đánh dấu đã nộp" />
-        <StatCard tone="info" label="Chờ báo cáo" value={stats.waiting} detail="Đã nộp, chưa nhập báo cáo PDF" />
-        <StatCard tone="success" label={`Có báo cáo năm ${year}`} value={stats.reported} detail="Đợt đã nhập báo cáo của trung tâm" />
-      </div>
-
-      <div className="eqa-schedule-grid">
-        <section className="panel" aria-label="Lịch tháng">
-          <div className="panel-head">
-            <h2>Tháng {month.slice(5, 7)}/{month.slice(0, 4)}</h2>
-            <div className="eqa-cal-nav">
-              <button type="button" className="btn ghost sm" aria-label="Tháng trước" onClick={() => setMonth(shiftMonth(month, -1))}>‹</button>
-              <button type="button" className="btn ghost sm" onClick={() => { setMonth(today.slice(0, 7)); setSelectedDay(today); }}>Hôm nay</button>
-              <button type="button" className="btn ghost sm" aria-label="Tháng sau" onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
-            </div>
-          </div>
-          <div className="eqa-section-body">
-            <div className="eqa-cal" role="grid" aria-label={`Lịch tháng ${month.slice(5, 7)}/${month.slice(0, 4)}`}>
-              {WEEKDAYS.map((d) => <span key={d} className="eqa-cal-head" role="columnheader">{d}</span>)}
-              {monthCells(month).map(({ date, inMonth }) => {
-                const items = byDate.get(date) ?? [];
-                const classes = ['eqa-cal-day', inMonth ? '' : 'is-out', date === today ? 'is-today' : '', date === selectedDay ? 'is-selected' : ''].filter(Boolean).join(' ');
-                return (
-                  <button key={date} type="button" role="gridcell" className={classes} aria-pressed={date === selectedDay}
-                    aria-label={`${vnDate(date)}${items.length ? `: ${items.length} việc` : ''}`} onClick={() => setSelectedDay(date === selectedDay ? '' : date)}>
-                    <span>{Number(date.slice(8, 10))}</span>
-                    {items.length > 0 && <span className="eqa-cal-dots">{items.slice(0, 3).map(({ row, kind }) => <i key={`${row.id}-${kind}`} className={`eqa-cal-dot ${kind === 'run' ? 'is-run' : dotTone(row)}`} />)}</span>}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="eqa-note">Chấm đỏ: quá hạn · cam: sắp đến hạn · xám: chưa nộp · xanh lá: đã nộp hoặc có báo cáo · xanh dương: ngày chạy mẫu.</p>
-          </div>
-        </section>
-
-        <section className="panel" aria-label="Đợt cần nộp">
-          <div className="panel-head"><h2>{selectedDay ? `Công việc ngày ${vnDate(selectedDay)}` : 'Cần nộp'} <span className="count">{selectedDay ? dayItems.length : actionRows.length}</span></h2>{selectedDay && <button className="btn ghost sm" onClick={() => setSelectedDay('')}>Xem cần nộp</button>}</div>
-          <div className="eqa-section-body">
-            {selectedDay ? (!dayItems.length ? <EmptyState size="compact" title="Không có công việc trong ngày này" /> : <ul className="eqa-history">{dayItems.map(({ row, kind }) => <li key={`${row.id}-${kind}`}>
-              <ProgramCell row={row} sub={`${row.round}/${row.year} · ${kind === 'due' ? 'Hạn nộp kết quả' : 'Chạy mẫu'}${row.assignee ? ` · ${row.assignee}` : ''}`} />
-              <span><ScheduleStatusTag row={row} /></span><MachineTags row={row} />
-              <div className="eqa-intro-actions">{row.round_id && <button className="btn ghost sm" onClick={() => onOpenRound(row.round_id!)}>Mở kỳ báo cáo</button>}{writable && <button className="btn ghost sm" onClick={() => setEditing(row)}>Sửa lịch</button>}{writable && row.status !== 'reported' && <button className="btn ghost sm" onClick={() => void submitted(row, true)}>Ghi nhận nộp</button>}</div>
-            </li>)}</ul>) : !actionRows.length ? <EmptyState size="compact" title="Không có đợt nào cần nộp">Các đợt quá hạn hoặc đến hạn trong {EQA_DUE_SOON_DAYS} ngày tới hiện ở đây.</EmptyState> : (
-              <div className="eqa-table-wrap">
-                <table className="eqa-table eqa-center-rest">
-                  <thead><tr><th>Chương trình</th><th>Đợt</th><th>Hạn nộp</th><th>Còn</th><th aria-label="Thao tác" /></tr></thead>
-                  <tbody>
-                    {actionRows.map((row) => (
-                      <tr key={row.id} className={row.status === 'overdue' ? 'is-rej' : 'is-warn'}>
-                        <td><ProgramCell row={row} sub={row.assignee ? `Phụ trách: ${row.assignee}` : row.provider || '—'} /></td>
-                        <td>{row.round} / {row.year}</td>
-                        <td>{vnDate(row.due_date, '—')}</td>
-                        <td><ScheduleStatusTag row={row} /><span className="eqa-sub">{[daysLeftText(row), submittedText(row)].filter(Boolean).join(' · ')}</span></td>
-                        <td>{writable && <button type="button" className="btn ghost sm" onClick={() => void submitted(row, true)}>Đã nộp</button>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      <section className="panel" aria-label="Lịch cả năm">
+  return <div className={`eqa-schedule${schedule.length ? '' : ' is-unplanned'}`}>
+    {error && <div className="alert rej eqa-schedule-error" role="alert"><div>Không tải được lịch mới. Dữ liệu đang hiển thị là lần tải trước.<span className="eqa-sub">{error}</span></div><button type="button" className="btn ghost sm" disabled={loading} onClick={() => void load()}>Thử lại</button></div>}
+    {overdueRows.length > 0 && <div className="alert warn eqa-action-alert" role="status">
+      <details>
+        <summary className="eqa-overdue-summary">Có <b>{overdueRows.length} lịch quá hạn</b> chưa nộp đủ kết quả (mọi năm). Xem các lịch</summary>
+        <ul className="eqa-action-list eqa-overdue-list">{overdueRows.map((row) => <li key={row.id}>
+          <div><b>{row.program_name} · {row.round}/{row.year}</b><span className="eqa-sub">{[row.sample_type, row.instruments.map((m) => m.instrument_name).join(', '), `Hạn ${vnDate(row.due_date)}`, daysLeftText(row), submittedText(row)].filter(Boolean).join(' · ')}</span></div>
+          <button type="button" className="btn ghost sm" onClick={(event) => {
+            locate(row);
+            event.currentTarget.closest('details')?.removeAttribute('open');
+          }}>Xem trong lịch</button>
+        </li>)}</ul>
+      </details>
+    </div>}
+    <div className={`eqa-schedule-workspace${layout === 'list' ? ' is-list' : ''}`}>
+      <section className="panel eqa-schedule-main" aria-label="Lịch và danh sách đợt">
         <div className="panel-head">
-          <h2>Lịch năm {year} <span className="count">{yearRows.length}</span></h2>
-          <div className="eqa-cal-nav">
-            <div className="dayseg eqa-year-view" role="group" aria-label="Cách xem lịch năm">
-              <button type="button" aria-pressed={layout === 'timeline'} className={layout === 'timeline' ? 'on' : ''} onClick={() => setLayout('timeline')}>Dòng thời gian</button>
-              <button type="button" aria-pressed={layout === 'table'} className={layout === 'table' ? 'on' : ''} onClick={() => setLayout('table')}>Bảng</button>
-            </div>
-            <select className="eqa-year-select" aria-label="Loại mẫu" value={sampleFilter} onChange={(e) => setSampleFilter(e.target.value)}>
-              <option value="">Mọi loại mẫu</option>
-              {EQA_SAMPLE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select className="eqa-year-select" aria-label="Năm" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
+          <div className="dayseg eqa-schedule-view" role="group" aria-label="Cách xem lịch">
+            {([['month', 'Lịch tháng'], ['list', 'Danh sách']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={layout === value} className={layout === value ? 'on' : ''} onClick={() => setLayout(value)}>{label}</button>)}
+          </div>
+          <div className="eqa-schedule-controls">
+            {layout === 'month' && <select className="eqa-schedule-select" aria-label="Tháng trong lịch" value={month.slice(5, 7)} onChange={(e) => changeMonth(`${year}-${e.target.value}`)}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={String(i + 1).padStart(2, '0')}>Tháng {i + 1}</option>)}</select>}
+            <select className="eqa-schedule-select" aria-label="Năm trong lịch" value={year} onChange={(e) => changeMonth(`${e.target.value}${month.slice(4)}`)}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+            {schedule.length > 0 && <select className="eqa-schedule-select" aria-label="Loại mẫu trong lịch" value={sampleFilter} onChange={(e) => setSampleFilter(e.target.value)}><option value="">Mọi loại mẫu</option>{EQA_SAMPLE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>}
+            {writable && <button type="button" className="btn" onClick={() => startNew()}>Thêm đợt</button>}
           </div>
         </div>
         <div className="eqa-section-body">
-          {!yearRows.length ? (
-            <EmptyState title={sampleFilter ? `Không có đợt ${sampleFilter} trong năm ${year}` : `Chưa có đợt nào trong năm ${year}`}
-              action={writable ? <button type="button" className="btn sm" onClick={() => setEditing('new')}>Thêm đợt</button> : undefined}>
-              Khai lịch các đợt theo lịch của trung tâm ngoại kiểm để app nhắc hạn nộp.
-            </EmptyState>
-          ) : layout === 'timeline' ? (
-            <>
-              <EqaTimeline rows={yearRows} year={year} today={today} tone={dotTone} statusText={statusLabel} onPick={writable ? setEditing : undefined} />
-              <div className="eqa-zmap-legend">
-                <span className="tag rej">Quá hạn</span><span className="tag warn">Sắp đến hạn</span><span className="tag none">Chưa nộp</span><span className="tag ok">Đã nộp / có báo cáo</span>
-                <span className="eqa-note">Số trên mốc là số đợt. Vạch: từ ngày nhận mẫu tới hạn nộp; chấm xanh dương: ngày chạy mẫu; đường dọc: hôm nay.</span>
-              </div>
-            </>
-          ) : (
-            <div className="eqa-table-wrap">
-              <table className="eqa-table eqa-center-rest">
-                <thead><tr><th>Chương trình</th><th>Đợt</th><th>Nhận mẫu</th><th>Chạy mẫu</th><th>Hạn nộp</th><th>Máy</th><th>Phụ trách</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
-                <tbody>
-                  {yearRows.map((row) => (
-                    <tr key={row.id} className={row.status === 'overdue' ? 'is-rej' : undefined}>
-                      <td><ProgramCell row={row} sub={row.provider || '—'} /></td>
-                      <td>{row.round}</td>
-                      <td>{vnDate(row.receive_date, '—')}</td>
-                      <td>{vnDate(row.run_date, '—')}</td>
-                      <td>{vnDate(row.due_date, '—')}<span className="eqa-sub">{daysLeftText(row)}</span></td>
-                      <td><MachineTags row={row} /></td>
-                      <td>{row.assignee || '—'}</td>
-                      <td><ScheduleStatusTag row={row} />{submittedText(row) && <span className="eqa-sub">{submittedText(row)}</span>}</td>
-                      <td>
-                        {writable && (
-                          <div className="eqa-row-actions">
-                            {row.status === 'planned' || row.status === 'overdue'
-                              ? <button type="button" className="btn ghost sm" onClick={() => void submitted(row, true)}>Đã nộp</button>
-                              : row.status === 'submitted' ? <button type="button" className="btn ghost sm" onClick={() => void submitted(row, false)}>{row.instruments.length ? 'Sửa đã nộp' : 'Bỏ đã nộp'}</button> : null}
-                            <RowActionButton kind="edit" label={`Sửa ${row.program_name} ${row.round}`} onClick={() => setEditing(row)} />
-                            {(row.status === 'planned' || row.status === 'overdue') && !row.instruments.some((m) => m.submitted_at) && <RowActionButton kind="delete" label={`Xoá ${row.program_name} ${row.round}`} onClick={() => void remove(row)} />}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {sampleFilter && !filtered.length ? <EmptyState title="Không có đợt thuộc loại mẫu đã chọn" action={<button type="button" className="btn ghost sm" onClick={() => setSampleFilter('')}>Xem mọi loại mẫu</button>} />
+          : layout === 'month' ? <>
+            <div className="eqa-cal" role="grid" aria-label={`Lịch tháng ${month.slice(5, 7)}/${year}`} onKeyDown={(event) => {
+              if (!(event.target instanceof HTMLButtonElement)) return;
+              const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[event.key];
+              if (!delta) return;
+              const index = cells.findIndex((cell) => cell.date === (event.target as HTMLButtonElement).dataset.date);
+              const next = cells[index + delta];
+              if (index < 0 || !next) return;
+              event.preventDefault();
+              event.currentTarget.querySelector<HTMLButtonElement>(`button[data-date="${next.date}"]`)?.focus();
+            }}>
+              <div className="eqa-cal-week" role="row">{WEEKDAYS.map((d) => <span key={d} className="eqa-cal-head" role="columnheader">{d}</span>)}</div>
+              {Array.from({ length: cells.length / 7 }, (_, week) => <div className="eqa-cal-week" role="row" key={week}>{cells.slice(week * 7, week * 7 + 7).map(({ date, inMonth }, weekday) => {
+                const items = byDate.get(date) ?? [];
+                // Nền ô chỉ theo hạn nộp chưa hoàn tất; ngày chạy không tự
+                // thành cảnh báo. Quá hạn được ưu tiên khi có nhiều công việc.
+                const dayTone = items.some(({ row, kind }) => kind === 'due' && row.status === 'overdue') ? ' is-overdue'
+                  : items.some(({ row, kind }) => kind === 'due' && row.status === 'planned' && row.days_left <= EQA_DUE_SOON_DAYS) ? ' is-soon' : '';
+                return <div key={date} role="gridcell" aria-label={`${vnDate(date)}${items.length ? `: ${items.length} việc` : ''}`}>
+                  <button type="button" data-date={date} className={`eqa-cal-day${dayTone}${weekday >= 5 ? ' is-weekend' : ''}${inMonth ? '' : ' is-out'}${date === today ? ' is-today' : ''}${date === selectedDay ? ' is-selected' : ''}`} aria-current={date === today ? 'date' : undefined} aria-pressed={date === selectedDay} aria-label={`${vnDate(date)}${items.length ? `: ${items.length} việc` : ''}`} onClick={() => selectDay(date)}>
+                    <span className="eqa-cal-date"><span>{Number(date.slice(8, 10))}</span>{items.length > 2 && <small>+{items.length - 2}</small>}</span>
+                    {items.slice(0, 2).map(({ row, kind }) => <span key={`${row.id}-${kind}`} className={`eqa-cal-event ${kind === 'due' ? dotTone(row) : `is-${kind}`}`} title={[EVENT_LABELS[kind], row.program_name, row.sample_type, `${row.round}/${row.year}`, row.instruments.map((m) => m.instrument_name).join(', ')].filter(Boolean).join(' · ')}><span aria-hidden="true">●</span> {kind === 'due' ? 'Nộp' : kind === 'run' ? 'Chạy' : 'Nhận'} · {row.sample_type || row.program_name}</span>)}
+                  </button>
+                </div>;
+              })}</div>)}
             </div>
-          )}
+            <div className="eqa-calendar-key"><span><span className="eqa-legend-run" aria-hidden="true">●</span> Chạy mẫu</span><span><span className="eqa-legend-due" aria-hidden="true">●</span> Hạn nộp</span><span className="eqa-note">Chọn ngày để xem đủ công việc.</span></div>
+            {schedule.length > 0 && !monthHasEvents && <span className="eqa-note">Không có công việc trong tháng này{sampleFilter ? ` với loại mẫu ${sampleFilter}` : ''}.</span>}
+          </> : <>
+            <p className="eqa-note">{yearRows.length} lịch · {yearRows.filter((r) => r.status === 'reported').length} đã có báo cáo · Theo năm chương trình {year}</p>
+            {!yearRows.length ? <EmptyState title={`Không có đợt trong năm ${year}`} action={sampleFilter ? <button type="button" className="btn ghost sm" onClick={() => setSampleFilter('')}>Xem mọi loại mẫu</button> : undefined} />
+            : <div className="eqa-table-wrap"><table className="eqa-table eqa-schedule-list">
+              <thead><tr><th>Chương trình</th><th>Loại mẫu</th><th>Đợt</th><th>Chạy mẫu</th><th>Hạn nộp</th><th>Máy</th><th>Phụ trách</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+              <tbody>{listRows.map(({ row, programRowSpan, roundRowSpan }, index) => <tr key={row.id} data-schedule-id={row.id}>
+                {programRowSpan > 0 && <td rowSpan={programRowSpan} className={`eqa-schedule-program${index + programRowSpan === listRows.length ? ' is-last-span' : ''}`}><b className="eqa-strong">{row.program_name}</b><span className="eqa-sub">{row.provider || '—'}</span></td>}
+                <td>{row.sample_type || '—'}</td>
+                {roundRowSpan > 0 && <td rowSpan={roundRowSpan} className={`eqa-schedule-round${index + roundRowSpan === listRows.length ? ' is-last-span' : ''}`}>{row.round}</td>}
+                <td>{vnDate(row.run_date, '—')}</td>
+                <td>{vnDate(row.due_date)}<span className="eqa-sub">{daysLeftText(row)}</span></td>
+                <td>{row.instruments.length ? <MachineTags row={row} /> : '—'}</td>
+                <td>{row.assignee || '—'}</td>
+                <td><ScheduleStatusTag row={row} /><span className="eqa-sub">{submittedText(row)}</span></td>
+                <td>{actions(row)}</td>
+              </tr>)}</tbody>
+            </table></div>}
+          </>}
         </div>
       </section>
-
-      {editing && <EqaScheduleModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-      {submitting && <EqaSubmitModal row={submitting} onClose={() => setSubmitting(null)} />}
+      {layout === 'month' && <div className="eqa-schedule-rail">
+        {!schedule.length ? <section className="panel" aria-label="Bắt đầu lập lịch">
+          <div className="panel-head"><h2>Bắt đầu lập lịch</h2></div>
+          <div className="eqa-section-body">
+            <EmptyState size="compact" title="Chưa khai lịch ngoại kiểm" action={writable ? <button type="button" className="btn" onClick={() => startNew()}>Thêm đợt đầu tiên</button> : undefined}>Thêm đợt đầu tiên, hoặc chọn ngày trên lịch để đặt hạn nộp.</EmptyState>
+            <ol className="eqa-schedule-steps">
+              <li><span className="step-number" aria-hidden="true">1</span><div><b>Chọn chương trình và đợt</b><span className="eqa-sub">Kèm loại mẫu và máy tham gia.</span></div></li>
+              <li><span className="step-number" aria-hidden="true">2</span><div><b>Đặt các mốc thời gian</b><span className="eqa-sub">Ngày chạy mẫu → Hạn nộp kết quả.</span></div></li>
+              <li><span className="step-number" aria-hidden="true">3</span><div><b>Theo dõi ngay trên lịch</b><span className="eqa-sub">Xem việc đến hạn và ghi nhận nộp từng máy.</span></div></li>
+            </ol>
+            <div className="eqa-schedule-picked-date" aria-live="polite"><span className="eqa-note">Ngày đang chọn trên lịch</span><b>{vnDate(selectedDay)}</b>{writable && <button type="button" className="btn ghost sm" onClick={() => startNew(selectedDay)}>Dùng làm hạn nộp</button>}</div>
+          </div>
+        </section> :
+        <section className="panel" aria-label="Công việc ngày được chọn">
+          <div className="panel-head"><h2>Công việc ngày {vnDate(selectedDay)}</h2></div>
+          <div className="eqa-section-body" aria-live="polite">{dayRows.length ? <ul className="eqa-schedule-tasks">{dayRows.map(({ row, kinds }) => task(row, kinds))}</ul> : <EmptyState size="compact" title="Không có công việc trong ngày này" action={writable ? <button type="button" className="btn ghost sm" onClick={() => startNew(selectedDay)}>Dùng làm hạn nộp</button> : undefined}>{sampleFilter ? `Đang lọc loại mẫu ${sampleFilter}.` : 'Chọn ngày có mốc để xem công việc, hoặc lập đợt với hạn nộp ngày này.'}</EmptyState>}</div>
+        </section>
+        }
+      </div>}
     </div>
-  );
+    {editing && <EqaScheduleModal row={editing === 'new' ? null : editing} initialDueDate={newDueDate} onClose={() => setEditing(null)} />}
+    {submitting && <EqaSubmitModal row={submitting} onClose={() => setSubmitting(null)} />}
+  </div>;
 }

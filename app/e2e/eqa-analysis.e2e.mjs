@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { bootstrapAndLogin, launchApp, openPage } from './helpers.mjs';
+import { bootstrapAndLogin, launchApp, openPage, showEqaCalendarMonth } from './helpers.mjs';
 
 async function seed(page) {
   return page.evaluate(async () => {
@@ -350,19 +350,17 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await page.getByText(/Đang xem năm 2026/).waitFor();
     await page.getByRole('button', { name: 'Quay lại', exact: false }).click();
     await page.getByRole('button', { name: 'Lịch', exact: true }).click();
-    await page.locator('.eqa-year-view').waitFor();
+    await page.locator('.eqa-schedule-view').waitFor();
     const yearToolbarHeights = await page.evaluate(() => ({
-      view: document.querySelector('.eqa-year-view')?.getBoundingClientRect().height,
-      selects: [...document.querySelectorAll('.eqa-cal-nav .eqa-year-select')].map((node) => node.getBoundingClientRect().height),
+      view: document.querySelector('.eqa-schedule-view')?.getBoundingClientRect().height,
+      selects: [...document.querySelectorAll('.eqa-schedule-controls .eqa-schedule-select')].map((node) => node.getBoundingClientRect().height),
     }));
     assert.equal(yearToolbarHeights.view, 36, 'bộ chuyển cách xem dùng chiều cao control chuẩn');
-    assert.deepEqual(yearToolbarHeights.selects, [36, 36], 'hai select cùng hàng cao bằng bộ chuyển cách xem');
-    const month = await page.evaluate(() => new Date().getFullYear() * 12 + new Date().getMonth());
-    const targetMonth = 2026 * 12 + 8;
-    for (let i = 0; i < Math.abs(month - targetMonth); i++) await page.getByRole('button', { name: month > targetMonth ? 'Tháng trước' : 'Tháng sau' }).click();
+    assert.deepEqual(yearToolbarHeights.selects, [36, 36, 36], 'ba ô tháng, năm, loại mẫu cao bằng bộ chuyển cách xem');
+    await showEqaCalendarMonth(page, '2026-09-15');
     await page.getByRole('gridcell', { name: '15/09/2026: 1 việc', exact: true }).click();
     await page.getByRole('heading', { name: /Công việc ngày 15\/09\/2026/ }).waitFor();
-    await page.getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
+    await page.getByRole('region', { name: 'Công việc ngày được chọn', exact: true }).getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
     await page.getByRole('heading', { name: /Sinh hóa · ĐỢT 09/ }).waitFor();
     assert.deepEqual(errors, []);
     console.log(`Ảnh kiểm tra ngoại kiểm: ${shots}`);

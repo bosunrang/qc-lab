@@ -11,8 +11,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type EqaScheduleStatus = 'planned' | 'overdue' | 'submitted' | 'reported';
 
-/** Loại mẫu của chương trình ngoại kiểm. Danh sách cố định để lọc và thống kê
- * được; chương trình chưa khai để rỗng. */
+/** Loại mẫu của từng lịch ngoại kiểm. Danh sách cố định để lọc và thống kê;
+ * lịch chưa khai loại mẫu để rỗng. */
 export const EQA_SAMPLE_TYPES = ['Sinh hóa', 'Khí máu', 'Điện giải', 'Miễn dịch', 'Huyết học', 'Đông máu', 'Nước tiểu', 'Vi sinh', 'Khác'] as const;
 
 /** Đợt sắp đến hạn được nhắc trong khoảng này (ngày). */
@@ -23,7 +23,7 @@ export interface EqaScheduleInput {
   year?: unknown; round?: unknown;
   receiveDate?: unknown; runDate?: unknown; dueDate?: unknown;
   assignee?: unknown; note?: unknown;
-  /** Loại mẫu, lưu ở chương trình (mọi đợt của chương trình dùng chung). */
+  /** Loại mẫu của riêng lịch này, không sửa loại mẫu của các lịch khác. */
   sampleType?: unknown;
   /** Máy chạy mẫu của đợt; mỗi máy nộp kết quả riêng. */
   instrumentIds?: unknown;

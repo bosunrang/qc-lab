@@ -133,7 +133,7 @@ const DATA_API_NAMES = [
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
-  'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'getEqaRound', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'getEqaRound', 'getEqaReport', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'listEqaCorrective', 'getEqaCorrectiveEvidence', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
@@ -273,6 +273,10 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     // Ngoại kiểm: đọc mở cho mọi vai trò đã đăng nhập; xem trước là bước của luồng nhập nên cần quyền ghi.
     listEqaRounds: { channel: 'eqa:listRounds', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaRounds(); } },
     getEqaRound: { channel: 'eqa:getRound', lan: true, run: (ctx, id) => { ctx.actor(); return eqa.getEqaRound(id); } },
+    listEqaCorrective: { channel: 'eqa:listCorrective', lan: true, run: (ctx, scope) => { ctx.actor(); return eqa.listEqaCorrective(scope); } },
+    getEqaCorrectiveEvidence: { channel: 'eqa:getCorrectiveEvidence', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.getEqaCorrectiveEvidence(input); } },
+    getEqaReport: { channel: 'eqa:getReport', lan: true, run: (ctx, scope, reviewId) => { ctx.actor(); return eqa.getEqaReport(scope, reviewId); } },
+    reviewEqaReport: { channel: 'eqa:reviewReport', lan: true, run: (ctx, input) => eqa.reviewEqaReport(input, ctx.actor()) },
     getEqaSeries: { channel: 'eqa:getSeries', lan: true, run: (ctx, testId) => { ctx.actor(); return eqa.getEqaSeries(testId); } },
     listEqaAttention: { channel: 'eqa:listAttention', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.listEqaAttention(input); } },
     getEqaInstrumentGrid: { channel: 'eqa:getInstrumentGrid', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.getEqaInstrumentGrid(input); } },

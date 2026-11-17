@@ -7,6 +7,9 @@
 // Mọi lệnh sửa một hồ sơ gửi `expectedVersion`; lệch `row_version` thì trả
 // `stale` thay vì ghi đè thay đổi của người khác (sửa R-09).
 import type { Db } from '../db/sqlite-like';
+import { createEqaHandlers } from './eqa-handlers';
+import { eqaNceSourceKey } from './eqa-corrective-reader';
+import { sha256Hex } from '../domain/sha256';
 import type {
   NceConfigView, NceDossierView, NceQueueRowView, NceRecordRow, NceReleasePreview, NceUserOption,
 } from '../../shared/qc-api';
@@ -50,6 +53,7 @@ function runKeyInput(value: unknown): NceRunKey | null {
 }
 
 export function createNceHandlers(db: Db) {
+  const eqa = createEqaHandlers(db);
   const config = (): NceConfig => readNceConfig(db);
 
   /** Quyền NCE của người thực hiện đọc từ CSDL mỗi lần, để cấp/thu quyền có
@@ -79,7 +83,8 @@ export function createNceHandlers(db: Db) {
     const editable = row.status === 'open' || row.status === 'released';
     return {
       record: row, runs: loaded.runs, actions: loaded.actions, decisions: loaded.decisions, revisions: loaded.revisions,
-      missing: nceNextStep(dossier, null, suspect).missing, capa_triggers: nceCapaTriggers(dossier), recurrence: dossier.recurrence,
+      missing: [...nceNextStep(dossier, null, suspect).missing, ...eqaClosureMissing(loaded)], capa_triggers: nceCapaTriggers(dossier), recurrence: dossier.recurrence,
+      eqa_followup: eqaFollowup(loaded),
       suspect_window: suspect ? {
         last_accepted: suspect.lastAccepted, onset: suspect.onset, onset_rules: suspect.onsetRules,
         trigger: { date: suspect.trigger.date, runId: suspect.trigger.runId },
@@ -149,6 +154,57 @@ export function createNceHandlers(db: Db) {
   function getNce(id: unknown, actor: Actor): NceDossierView | null {
     const loaded = load(cleanId(id));
     return loaded ? view(loaded, actor) : null;
+  }
+
+  function eqaFollowup(loaded: NceLoaded): NonNullable<NceDossierView['eqa_followup']> | null {
+    if (!loaded.row.eqa_result_id) return null;
+    let source: import('../../shared/qc-api').EqaNceEvidence;
+    try { source = JSON.parse(loaded.row.eqa_snapshot_json); } catch { return { evidence: null, missing: ['Thiếu căn cứ ngoại kiểm đã lưu.'], fingerprint: '' }; }
+    if (!source?.round?.id || !source?.result?.test_id) return { evidence: null, missing: ['Căn cứ ngoại kiểm đã lưu không hợp lệ.'], fingerprint: '' };
+    const missing: string[] = [];
+    const rounds = eqa.listEqaRounds().filter(r => r.status === 'open' && r.program_id === source.round.program_id
+      && (r.year > source.round.year || r.year === source.round.year && r.round_no > source.round.round_no)).sort((a, b) => a.year - b.year || a.round_no - b.round_no);
+    const completed = loaded.actions.filter(a => a.status === 'done').map(a => a.done_at.slice(0, 10)).sort().at(-1);
+    const candidates = rounds.map(r => eqa.getEqaRound(r.id)!).filter(r => r.results.some(p => p.test_id === source.result.test_id));
+    // Đợt đã chạy trước khi hoàn tất hành động không thể chứng minh hiệu lực;
+    // đợt thiếu ngày vẫn cần bổ sung, không tự bỏ qua để chọn một đợt đạt.
+    const next = candidates.find(r => {
+      if (!completed) return true;
+      try { const date = eqa.getEqaCorrectiveEvidence({ resultId: r.results.find(p => p.test_id === source.result.test_id)!.id }).run_date; return !date || date > completed; }
+      catch { return true; }
+    }) || candidates.at(-1);
+    let evidence: typeof source | null = null;
+    if (!next) missing.push('Chưa có kết quả ở đợt ngoại kiểm kế tiếp của xét nghiệm.');
+    else {
+      const samples = next.results.filter(r => r.test_id === source.result.test_id);
+      if (samples.some(r => r.class !== 'ok' || r.trend?.unsuccessful || r.trend?.signals.length)) missing.push('Đợt ngoại kiểm kế tiếp chưa chấp nhận toàn bộ mẫu hoặc còn tín hiệu chuỗi.');
+      try { evidence = eqa.getEqaCorrectiveEvidence({ resultId: samples[0].id }); }
+      catch { missing.push('Ngày chạy của đợt kế tiếp chưa hợp lệ. Kiểm tra Lịch ngoại kiểm.'); }
+      if (evidence) {
+        if (!evidence.run_date) missing.push('Ghi ngày chạy mẫu thực tế của đợt kế tiếp trong Lịch ngoại kiểm.');
+        if (!completed) missing.push('Chưa có hành động đã hoàn thành để đối chiếu hiệu lực.');
+        else if (evidence.run_date && evidence.run_date <= completed) missing.push('Cần mẫu của đợt kế tiếp chạy sau ngày hoàn thành hành động.');
+        const points = evidence.iqc_runs.flatMap(r => r.points).filter(p => !p.voided);
+        if (!evidence.iqc_runs.length || evidence.iqc_runs.some(r => !r.complete) || !points.length || points.some(p => p.verdict !== 'ok')) missing.push('Nội kiểm cùng ngày chạy đợt kế tiếp chưa đủ mức, chưa có dữ liệu hoặc còn tín hiệu.');
+      }
+    }
+    // Băm nội dung kết quả (khoá nguồn), không băm mã dòng hay phiên bản đợt:
+    // bổ sung máy khác vào đợt kế tiếp sinh lại mã dòng và tăng phiên bản, còn
+    // `trend.enough`/TEa đổi theo dữ liệu ngoài; cả hai không đổi bằng chứng hiệu lực (N-13).
+    const fingerprint = sha256Hex(JSON.stringify([evidence && { source: eqaNceSourceKey(evidence), run_date: evidence.run_date, iqc: evidence.iqc_runs },
+      next?.results.filter(r => r.test_id === source.result.test_id).map(result => eqaNceSourceKey({ round: next.round, result })), loaded.row.checklist_json, loaded.decisions.filter(d => d.type === 'patient_impact').at(-1)?.payload_json]));
+    return { evidence, missing, fingerprint };
+  }
+
+  function eqaClosureMissing(loaded: NceLoaded): NceMissing[] {
+    if (!loaded.row.eqa_result_id || !['released', 'pending_approval'].includes(loaded.row.status)) return [];
+    const latest = loaded.decisions.filter(d => d.type === 'effectiveness').at(-1);
+    if (!latest) return [];
+    const payload = JSON.parse(latest.payload_json) as { result: string; eqa_basis?: string };
+    if (payload.result !== 'effective') return [];
+    const followup = eqaFollowup(loaded)!;
+    return [...followup.missing.map(message => ({ code: 'effectiveness-eqa', message })),
+      ...(payload.eqa_basis === followup.fingerprint ? [] : [{ code: 'effectiveness-eqa-stale', message: 'Bằng chứng ngoại kiểm/nội kiểm hoặc điều tra đã thay đổi: đánh giá lại hiệu lực.' }])];
   }
 
   function listNce(): NceRecordRow[] { return listNceRows(db, isoLocalDate()); }
@@ -259,7 +315,20 @@ export function createNceHandlers(db: Db) {
 
   const createNce = writeCommand(db, 'createNce', 'write', (w, input: unknown): IpcResult<NceDossierView> => {
     const today = isoLocalDate();
-    const checked = validateNceCreate(objectInput(objectInput(input).data), today);
+    const raw = objectInput(objectInput(input).data);
+    let eqaEvidence: ReturnType<typeof eqa.getEqaCorrectiveEvidence> | null = null;
+    if (raw.eqaResultId !== undefined) {
+      if (raw.source !== 'eqa') return fail('eqa-source', 'Kết quả ngoại kiểm chỉ gắn vào hồ sơ nguồn ngoại kiểm.');
+      try { eqaEvidence = eqa.getEqaCorrectiveEvidence({ resultId: raw.eqaResultId, runDate: raw.eqaRunDate }); }
+      catch (error) { return fail('eqa-result', error instanceof Error ? error.message : 'Không đọc được kết quả ngoại kiểm.'); }
+      if (raw.expectedEqaFingerprint !== eqaEvidence.fingerprint) return fail('eqa-stale', 'Báo cáo ngoại kiểm đã thay đổi. Tải lại căn cứ trước khi lập hồ sơ.');
+      if (!eqaEvidence.reasons.length) return fail('eqa-no-trigger', 'Kết quả này chưa có cảnh báo hoặc tín hiệu cần điều tra.');
+      if (!eqaEvidence.run_date) return fail('eqa-run-date', 'Ghi ngày chạy mẫu ngoại kiểm thực tế để đối chiếu nội kiểm.');
+      if (eqaEvidence.run_date > String(raw.detectedAt || '')) return fail('eqa-run-date', 'Ngày chạy mẫu không được sau ngày phát hiện.');
+      const existing = db.prepare("SELECT nce_id FROM nce_records WHERE eqa_source_key=? AND status<>'cancelled'").get(eqaNceSourceKey(eqaEvidence)) as { nce_id: string } | undefined;
+      if (existing) return fail('eqa-has-record', `Kết quả này đã thuộc hồ sơ ${existing.nce_id}. Mở hồ sơ hiện có để tiếp tục xử lý.`);
+    }
+    const checked = validateNceCreate({ ...raw, ...(eqaEvidence ? { testId: eqaEvidence.result.test_id, phase: 'exam' } : {}) }, today);
     if (!checked.ok) return fail(checked.code, checked.message);
     const draft = checked.data;
     if (!activeWriter(draft.ownerUserId)) return fail('invalid-owner', 'Người phụ trách phải là tài khoản đang hoạt động có quyền ghi.');
@@ -279,8 +348,10 @@ export function createNceHandlers(db: Db) {
         id, nceId, source: draft.source, phase: draft.phase, testId: draft.testId, detectedAt: draft.detectedAt,
         description: draft.description, correction: draft.correction, holdResults: draft.holdResults,
         ownerUserId: draft.ownerUserId, dueDate: draft.dueDate || defaultNceDueDate(draft.detectedAt, '', config()),
-        errorClass, checklistJson: JSON.stringify(emptyChecklist(draft.source)),
+        errorClass, checklistJson: JSON.stringify(emptyChecklist(draft.source, !!eqaEvidence)),
       }, w.actor, now);
+      if (eqaEvidence) db.prepare("UPDATE nce_records SET eqa_result_id=?,eqa_source_key=?,eqa_snapshot_json=?,tier='capa',due_date=? WHERE id=?")
+        .run(eqaEvidence.result.id, eqaNceSourceKey(eqaEvidence), JSON.stringify(eqaEvidence), draft.dueDate || defaultNceDueDate(draft.detectedAt, 'capa', config()), id);
       if (snapshot) insertNceRun(db, id, 'trigger', snapshot, w.actor, now);
       tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId}${snapshot ? ` · lần chạy ${runLabel(snapshot)}` : ''}`, draft.testId || '');
       tx.changed(['nce_records'], draft.testId ? [draft.testId] : []);
@@ -424,7 +495,7 @@ export function createNceHandlers(db: Db) {
     const { loaded, version } = opened;
     const allowed = canReleaseNce(actorLike(w.actor));
     if (!allowed.ok) return fail('forbidden-patient-impact', 'Quyết định ảnh hưởng kết quả bệnh nhân cần người có thẩm quyền (quyền nce.release).');
-    const impact = validateNcePatientImpact(data.impact, loaded.dossier.source);
+    const impact = validateNcePatientImpact(data.impact, loaded.dossier.source, loaded.dossier);
     if (!impact.ok) return fail(impact.code, impact.message);
     // Main tự chụp phạm vi đã rà soát; không nhận khoảng do client gửi.
     const suspect = suspectOf(loaded.dossier);
@@ -439,8 +510,13 @@ export function createNceHandlers(db: Db) {
     const { loaded, version } = opened;
     const review = validateNceEffectivenessReview(data.review, loaded.dossier, isoLocalDate());
     if (!review.ok) return fail(review.code, review.message);
+    const followup = eqaFollowup(loaded);
+    if (followup && review.data.result === 'effective') {
+      if (followup.missing.length) return fail('effectiveness-eqa', followup.missing.join(' '));
+      if (followup.evidence && review.data.reviewedAt < [followup.evidence.run_date, followup.evidence.round.report_date].sort().at(-1)!) return fail('effectiveness-eqa-date', 'Ngày đánh giá không được trước ngày chạy mẫu hoặc ngày phát hành báo cáo ngoại kiểm kế tiếp.');
+    }
     return commitEdit(w, loaded, version, ['Đánh giá hiệu lực NCE', `${review.data.result} · ${review.data.reviewedAt}`], {},
-      (_tx, now) => insertNceDecision(db, loaded.row.id, 'effectiveness', { ...review.data, basis: nceEffectivenessBasis(loaded.dossier) }, w.actor, now));
+      (_tx, now) => insertNceDecision(db, loaded.row.id, 'effectiveness', { ...review.data, basis: nceEffectivenessBasis(loaded.dossier), ...(followup ? { eqa_basis: followup.fingerprint, eqa_evidence: followup.evidence } : {}) }, w.actor, now));
   });
 
   // Chuyển trạng thái
@@ -490,7 +566,7 @@ export function createNceHandlers(db: Db) {
     const target = transitionTo(loaded, 'submit');
     if (!target) return fail('status', 'Chỉ nộp duyệt hồ sơ đã cho chạy lại.');
     const allowed = canSubmitNce(actorLike(w.actor), loaded.dossier); if (!allowed.ok) return fail(allowed.code, allowed.message);
-    const missing = nceSubmitMissing(loaded.dossier, suspectOf(loaded.dossier));
+    const missing = [...nceSubmitMissing(loaded.dossier, suspectOf(loaded.dossier)), ...eqaClosureMissing(loaded)];
     if (missing.length) return fail('gate', `Hồ sơ chưa đủ điều kiện nộp duyệt: ${missingText(missing)}.`);
     return commitEdit(w, loaded, version, ['Nộp duyệt hồ sơ NCE', 'chờ duyệt'], { status: target },
       (_tx, now) => insertNceDecision(db, loaded.row.id, 'submit', {}, w.actor, now));
@@ -513,7 +589,7 @@ export function createNceHandlers(db: Db) {
     const exception = config().separationException;
     const allowed = canApproveNce(actorLike(w.actor), loaded.dossier, exception);
     if (!allowed.ok) return fail(allowed.code, allowed.message);
-    const missing = nceApproveMissing(loaded.dossier, recheckRelease(loaded.dossier), suspectOf(loaded.dossier));
+    const missing = [...nceApproveMissing(loaded.dossier, recheckRelease(loaded.dossier), suspectOf(loaded.dossier)), ...eqaClosureMissing(loaded)];
     if (missing.length) return fail('gate', `Hồ sơ chưa đủ điều kiện đóng: ${missingText(missing)}.`);
     const note = String(data.note ?? '').trim().slice(0, 2000);
     return commitEdit(w, loaded, version, ['Duyệt đóng hồ sơ NCE', allowed.usedException ? `ngoại lệ phân tách theo ${exception.sopRef}` : 'người duyệt độc lập'],

@@ -21,6 +21,11 @@ export const NCE_CHECK_LABELS: Readonly<Record<string, string>> = {
   storage: 'Điều kiện bảo quản',
   calibrator: 'Calibrator (lô, hạn dùng, giá trị gán)',
   environment: 'Môi trường (nhiệt độ phòng, điện, nước cấp)',
+  providerReport: 'Báo cáo nhà cung cấp (giải thích, đánh giá và trao đổi với nhà cung cấp)',
+  eqaAdministrative: 'Lỗi hành chính (máy/LIS so với kết quả gửi, đơn vị, dấu thập phân, mẫu/đợt, nhóm so sánh, pha loãng)',
+  eqaMeasurement: 'Đo lường và nội kiểm (hiệu chuẩn, X, σp, nội kiểm và xu hướng qua các đợt)',
+  eqaProgram: 'Chương trình và mẫu ngoại kiểm (độ chắc chắn giá trị ấn định, tính tương đương, vận chuyển và bảo quản)',
+  fiveWhys: '5 Whys (ghi chuỗi Vì sao từ sự kiện tới nguyên nhân gốc và bằng chứng)',
 };
 
 const BY_SOURCE: Readonly<Record<NceSource, readonly string[]>> = {
@@ -32,16 +37,18 @@ const BY_SOURCE: Readonly<Record<NceSource, readonly string[]>> = {
   other: [],
 };
 
-export function checklistKeys(source: NceSource): readonly string[] { return BY_SOURCE[source] ?? []; }
+export function checklistKeys(source: NceSource, eqaLinked = false): readonly string[] {
+  return source === 'eqa' && eqaLinked ? ['providerReport', 'eqaAdministrative', 'operator', 'method', 'instrument', 'sampleHandling', 'environment', 'eqaMeasurement', 'eqaProgram', 'fiveWhys'] : BY_SOURCE[source] ?? [];
+}
 
 /** Chỉ giữ các mục thuộc nguồn và giá trị hợp lệ; mục lạ bị bỏ. */
-export function prepareChecklist(source: NceSource, raw: unknown): Record<string, NceChecklistItem> {
+export function prepareChecklist(source: NceSource, raw: unknown, eqaLinked = false): Record<string, NceChecklistItem> {
   const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const out: Record<string, NceChecklistItem> = {};
-  for (const key of checklistKeys(source)) {
+  for (const key of checklistKeys(source, eqaLinked)) {
     const item = input[key] && typeof input[key] === 'object' ? input[key] as Record<string, unknown> : {};
     out[key] = {
-      status: isOneOf(NCE_CHECK_STATUSES, item.status) ? item.status : '',
+      status: isOneOf(NCE_CHECK_STATUSES, item.status) && (item.status !== 'root' || eqaLinked) ? item.status : '',
       note: String(item.note ?? '').trim().slice(0, 2000),
     };
   }
@@ -50,12 +57,12 @@ export function prepareChecklist(source: NceSource, raw: unknown): Record<string
 
 /** Mọi mục phải được đánh giá; "bất thường" hoặc "không áp dụng" phải ghi
  * bằng chứng/lý do. */
-export function checklistMissing(source: NceSource, checklist: Readonly<Record<string, NceChecklistItem>>): NceMissing[] {
+export function checklistMissing(source: NceSource, checklist: Readonly<Record<string, NceChecklistItem>>, eqaLinked = false): NceMissing[] {
   const missing: NceMissing[] = [];
-  for (const key of checklistKeys(source)) {
+  for (const key of checklistKeys(source, eqaLinked)) {
     const item = checklist[key], label = NCE_CHECK_LABELS[key] ?? key;
     if (!item?.status) missing.push({ code: `check-${key}`, message: `Chưa đánh giá mục checklist "${label}".` });
-    else if (item.status !== 'ok' && textLength(item.note) < 3) missing.push({ code: `check-note-${key}`, message: `Mục "${label}" bất thường hoặc không áp dụng phải ghi bằng chứng/lý do.` });
+    else if ((item.status !== 'ok' || eqaLinked) && textLength(item.note) < 3) missing.push({ code: `check-note-${key}`, message: `Mục "${label}" phải ghi bằng chứng/lý do.` });
   }
   return missing;
 }

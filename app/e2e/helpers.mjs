@@ -113,6 +113,15 @@ export async function openPage(page, label) {
   await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: label }).click();
 }
 
+/** Mở tháng bằng hai ô chọn trên lịch ngoại kiểm như người dùng. */
+export async function showEqaCalendarMonth(page, date) {
+  const main = page.getByRole('region', { name: 'Lịch và danh sách đợt', exact: true });
+  await main.getByRole('button', { name: 'Lịch tháng', exact: true }).click();
+  await main.getByRole('combobox', { name: 'Năm trong lịch', exact: true }).selectOption(date.slice(0, 4));
+  await main.getByRole('combobox', { name: 'Tháng trong lịch', exact: true }).selectOption(date.slice(5, 7));
+  await main.getByRole('grid', { name: `Lịch tháng ${date.slice(5, 7)}/${Number(date.slice(0, 4))}`, exact: true }).waitFor();
+}
+
 /** Ô nhập của một mức trong ngày trên bảng Nhập QC. */
 export function entryCell(page, date, level) {
   return page.locator(`.qc-sheet input.qc-inline-input[data-focus-date="${date}"][data-focus-level="${level}"]`).first();

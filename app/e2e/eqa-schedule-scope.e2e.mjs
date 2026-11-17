@@ -1,0 +1,132 @@
+// Cùng chương trình/đợt nhưng khác máy: nhập lịch có loại mẫu và hạn riêng.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import path from 'node:path';
+import {mkdirSync} from 'node:fs';
+import {bootstrapAndLogin,launchApp,openPage} from './helpers.mjs';
+
+test('lịch ngoại kiểm: cùng đợt thêm điện giải, hạn theo máy, không đổi lịch sinh hóa', {timeout:150_000}, async()=>{
+  const {app,page,errors}=await launchApp();
+  const shots=path.resolve('.cache/eqa-schedule-scope');
+  mkdirSync(shots,{recursive:true});
+  try {
+    await bootstrapAndLogin(page);
+    const seed=await page.evaluate(async()=>{
+      const api=window.qcApi;
+      const must=r=>{if(!r.ok)throw new Error(JSON.stringify(r.error));return r.data;};
+      const now=new Date();
+      const at=n=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+      const au=must(await api.saveInstrument({data:{name:'DxC 700 AU'}}));
+      const easy=must(await api.saveInstrument({data:{name:'EasyLyte Plus'}}));
+      const chemistry=must(await api.saveEqaSchedule({data:{programName:'CHƯƠNG TRÌNH NGOẠI KIỂM TRA SINH HÓA',provider:'Trung tâm',sampleType:'Sinh hóa',instrumentIds:[au.id],year:now.getFullYear(),round:'ĐỢT 11',runDate:at(0),dueDate:at(3)}}));
+      return {chemistry,au,easy,run:at(1),due:at(5),otherDue:at(7)};
+    });
+    await page.setViewportSize({width:1630,height:1000});
+    await openPage(page,'Phân tích ngoại kiểm');
+    await page.getByRole('button',{name:'Lịch',exact:true}).click();
+    const main=page.getByRole('region',{name:'Lịch và danh sách đợt',exact:true});
+    const modal=page.getByRole('dialog',{name:'Thêm đợt ngoại kiểm',exact:true});
+    await main.getByRole('button',{name:'Thêm đợt',exact:true}).click();
+    assert.equal(await modal.getByLabel('DxC 700 AU',{exact:false}).isChecked(),true);
+    await modal.locator('#eqa-s-sample').selectOption('Điện giải');
+    assert.equal(await modal.getByLabel('DxC 700 AU',{exact:false}).isChecked(),false,'đổi loại mẫu không giữ nhầm máy gợi sẵn');
+    await modal.getByLabel('EasyLyte Plus',{exact:false}).check();
+    await modal.locator('#eqa-s-round').fill('11');
+    await modal.locator('#eqa-s-run').fill(seed.run);
+    await modal.locator('#eqa-s-due').fill(seed.due);
+    await modal.locator('#eqa-s-due').press('Tab');
+    await modal.getByRole('button',{name:'Thêm vào lịch',exact:true}).click();
+    await modal.waitFor({state:'hidden'});
+    await main.getByRole('button',{name:'Danh sách',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.eqa-schedule-main tbody tr').length===2);
+    const chemistryRow=main.locator(`tbody tr[data-schedule-id="${seed.chemistry.id}"]`);
+    const electrolyteRow=main.locator('tbody tr').filter({hasText:'EasyLyte Plus'});
+    await chemistryRow.getByText('Sinh hóa',{exact:true}).waitFor();
+    await electrolyteRow.getByText('Điện giải',{exact:true}).waitFor();
+    assert.deepEqual(await main.locator('thead th').allTextContents(),['Chương trình','Loại mẫu','Đợt','Chạy mẫu','Hạn nộp','Máy','Phụ trách','Trạng thái','']);
+    assert.equal(await main.locator('.eqa-schedule-program').count(),1,'cùng chương trình chỉ hiện một ô tên');
+    assert.equal(await main.locator('.eqa-schedule-program').getAttribute('rowspan'),'2');
+    assert.equal(await main.locator('.eqa-schedule-round').count(),1,'cùng số đợt của một chương trình chỉ hiện một ô');
+    assert.equal(await main.locator('.eqa-schedule-round').getAttribute('rowspan'),'2');
+    assert.equal(await main.locator('.eqa-schedule-round').innerText(),'ĐỢT 11','gộp theo số đợt dù nhãn là ĐỢT 11 hay 11');
+    assert.deepEqual(await main.locator('td[rowspan]').evaluateAll(cells=>cells.map(cell=>getComputedStyle(cell).borderBottomWidth)),['0px','0px'],'hai ô gộp chạm đáy có cùng viền với hàng cuối');
+    const records=await page.evaluate(()=>window.qcApi.listEqaSchedule());
+    assert.equal(records.find(r=>r.id===seed.chemistry.id).due_date,seed.chemistry.due_date);
+    assert.equal(records.find(r=>r.id===seed.chemistry.id).sample_type,'Sinh hóa');
+    const electric=records.find(r=>r.id!==seed.chemistry.id);
+    assert.equal(electric.program_id,seed.chemistry.program_id);
+    assert.equal(electric.round_no,11);
+    assert.equal(electric.run_date,seed.run);
+    assert.equal(electric.due_date,seed.due);
+    await page.screenshot({path:path.join(shots,'separate-deadlines.png'),fullPage:true});
+    assert.deepEqual(await main.getByRole('group',{name:'Cách xem lịch',exact:true}).getByRole('button').allTextContents(),['Lịch tháng','Danh sách']);
+
+    // Trùng đúng máy phải báo ở phần chọn máy, không báo số đợt không hợp lệ.
+    await main.getByRole('button',{name:'Thêm đợt',exact:true}).click();
+    await modal.locator('#eqa-s-sample').selectOption('Sinh hóa');
+    await modal.getByLabel('DxC 700 AU',{exact:false}).check();
+    await modal.getByLabel('EasyLyte Plus',{exact:false}).uncheck();
+    await modal.locator('#eqa-s-round').fill('11');
+    await modal.locator('#eqa-s-due').fill(seed.otherDue);
+    await modal.locator('#eqa-s-due').press('Tab');
+    await modal.getByRole('button',{name:'Thêm vào lịch',exact:true}).click();
+    await modal.locator('.field:has(.eqa-machine-picker) .field-error').waitFor();
+    assert.equal(await modal.locator('#eqa-s-round').getAttribute('aria-invalid'),null);
+    await modal.getByRole('button',{name:'Huỷ',exact:true}).click();
+    await modal.waitFor({state:'hidden'});
+
+    await main.getByRole('button',{name:'Danh sách',exact:true}).click();
+    await electrolyteRow.getByRole('button',{name:'Sửa CHƯƠNG TRÌNH NGOẠI KIỂM TRA SINH HÓA 11',exact:true}).click();
+    const edit=page.getByRole('dialog',{name:'Sửa đợt ngoại kiểm',exact:true});
+    await edit.locator('#eqa-s-due').fill(seed.otherDue);
+    await edit.locator('#eqa-s-due').press('Tab');
+    await edit.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+    await edit.waitFor({state:'hidden'});
+    const after=await page.evaluate(()=>window.qcApi.listEqaSchedule());
+    assert.equal(after.find(r=>r.id===electric.id).due_date,seed.otherDue);
+    assert.equal(after.find(r=>r.id===seed.chemistry.id).due_date,seed.chemistry.due_date);
+    assert.equal(after.find(r=>r.id===seed.chemistry.id).sample_type,'Sinh hóa');
+    await electrolyteRow.getByRole('button',{name:'Ghi nhận nộp',exact:true}).click();
+    const submission=page.getByRole('dialog',{name:'Đánh dấu đã nộp',exact:true});
+    await submission.getByLabel('EasyLyte Plus',{exact:false}).check();
+    await submission.getByRole('button',{name:'Lưu',exact:true}).click();
+    await electrolyteRow.getByRole('button',{name:'Sửa đã nộp',exact:true}).waitFor();
+    await chemistryRow.getByRole('button',{name:'Ghi nhận nộp',exact:true}).waitFor();
+    // Hạn xen giữa của đợt/chương trình khác không được tách nhóm hoặc gộp nhầm ô.
+    await page.evaluate(async data=>{
+      const next=await window.qcApi.saveEqaSchedule({data:{programId:data.program,sampleType:'Sinh hóa',instrumentIds:[data.machine],year:data.year,round:'ĐỢT 12',dueDate:data.due}});
+      if(!next.ok)throw new Error(next.error.message);
+      const r=await window.qcApi.saveEqaSchedule({data:{programName:'CHƯƠNG TRÌNH NGOẠI KIỂM HUYẾT HỌC',sampleType:'Huyết học',year:data.year,round:'11',dueDate:data.due}});
+      if(!r.ok)throw new Error(r.error.message);
+    },{program:seed.chemistry.program_id,machine:seed.au.id,year:seed.chemistry.year,due:seed.due});
+    await page.waitForFunction(()=>document.querySelectorAll('.eqa-schedule-main tbody tr').length===4);
+    assert.equal(await main.locator('.eqa-schedule-program').count(),2);
+    assert.equal(await main.locator('.eqa-schedule-program').first().getAttribute('rowspan'),'3');
+    assert.equal(await main.locator('.eqa-schedule-program').first().evaluate(cell=>getComputedStyle(cell).borderBottomWidth),'1px','nhóm chưa ở đáy vẫn giữ đường phân cách');
+    assert.deepEqual(await main.locator('.eqa-schedule-round').evaluateAll(cells=>cells.map(cell=>[cell.textContent,cell.rowSpan])),[['ĐỢT 11',2],['ĐỢT 12',1],['11',1]]);
+    assert.deepEqual(await main.locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.dataset.scheduleId).slice(0,2)),[seed.chemistry.id,electric.id]);
+    await main.locator('.eqa-table-wrap').evaluate(node=>{node.scrollLeft=0;});
+    await page.screenshot({path:path.join(shots,'grouped-program-list.png'),fullPage:true});
+    await page.setViewportSize({width:1050,height:1000});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'bảng chỉ cuộn trong khung khi màn hình hẹp');
+    await main.locator('.eqa-table-wrap').evaluate(node=>{node.scrollLeft=0;});
+    await page.screenshot({path:path.join(shots,'grouped-program-list-narrow.png'),fullPage:true});
+    await page.setViewportSize({width:1630,height:1000});
+    await main.getByRole('combobox',{name:'Loại mẫu trong lịch'}).selectOption('Sinh hóa');
+    assert.equal(await main.locator('tbody tr').count(),2);
+    await chemistryRow.waitFor();
+    assert.equal(await main.locator('.eqa-schedule-program').getAttribute('rowspan'),'2','lọc loại mẫu tính lại ô gộp');
+    assert.deepEqual(await main.locator('.eqa-schedule-round').evaluateAll(cells=>cells.map(cell=>cell.rowSpan)),[1,1]);
+    assert.equal(await main.locator('.eqa-schedule-program').evaluate(cell=>getComputedStyle(cell).borderBottomWidth),'0px','ô chương trình gộp nhiều hàng chạm đáy sau khi lọc');
+    await main.getByRole('combobox',{name:'Loại mẫu trong lịch'}).selectOption('Điện giải');
+    await electrolyteRow.waitFor();
+    assert.equal(await main.locator('.eqa-schedule-program').getAttribute('rowspan'),'1');
+    assert.equal(await main.locator('.eqa-schedule-round').getAttribute('rowspan'),'1');
+    assert.match(await main.locator('.eqa-schedule-program').innerText(),/CHƯƠNG TRÌNH NGOẠI KIỂM TRA SINH HÓA/);
+    assert.deepEqual(errors,[]);
+  }catch(error){
+    await page.screenshot({path:path.join(shots,'failure.png'),fullPage:true});
+    console.error(await page.locator('body').innerText());
+    throw error;
+  }finally{await app.close();}
+});

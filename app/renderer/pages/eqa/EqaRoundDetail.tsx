@@ -20,6 +20,7 @@ import type { EqaNavigationContext } from './useEqaScope';
 
 const DECISION_LABEL: Readonly<Record<string, string>> = {
   import: 'Nhập đợt', append: 'Bổ sung máy vào đợt', reimport: 'Nhập lại (phiên bản mới)', cancel: 'Huỷ đợt',
+  preliminary_review: 'Xem xét sơ khởi', analysis_review: 'Xem xét phân tích', system_review: 'Xem xét hệ thống',
 };
 const SOURCE_LABEL: Readonly<Record<string, string>> = { pdf: 'Báo cáo PDF của trung tâm ngoại kiểm' };
 
@@ -27,6 +28,7 @@ function decisionDetail(type: string, payloadJson: string): string {
   let p: Record<string, unknown> = {};
   try { p = JSON.parse(payloadJson || '{}') as Record<string, unknown>; } catch { /* hiển thị trống */ }
   if (type === 'cancel') return String(p.reason ?? '');
+  if (type.endsWith('_review')) return String((p.draft as Record<string, unknown> | undefined)?.conclusion ?? '');
   const replaced = Array.isArray(p.replaces) && p.replaces.length ? ` · thay kết quả ${p.replaces.join(', ')}` : '';
   const head = `${String(p.rows ?? 0)} kết quả nhập, phiên bản ${String(p.version ?? 1)}${replaced}`;
   return p.reason ? `${head} · ${String(p.reason)}` : head;

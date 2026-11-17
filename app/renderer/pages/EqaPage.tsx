@@ -1,5 +1,5 @@
 // Trang Phân tích ngoại kiểm (docs/EQA-PLAN-2026-10-28.md).
-// `#/eqa` là tổng quan; `#/eqa?view=lich` là lịch đợt và hạn nộp;
+// `#/eqa` là tổng quan; `#/eqa?view=lich&schedule=…` định vị một lịch theo hạn nộp;
 // `#/eqa?id=…` là một kỳ; `#/eqa?test=…` là chuỗi của một xét nghiệm. Dùng tham số truy vấn như
 // trang Khắc phục sự cố để không phải đổi bảng route dùng chung `PAGE_DEFS`.
 import { useEffect } from 'react';
@@ -12,6 +12,8 @@ import { EqaOverview } from './eqa/EqaOverview';
 import { EqaRoundDetail } from './eqa/EqaRoundDetail';
 import { EqaSchedule } from './eqa/EqaSchedule';
 import { EqaTestDetail } from './eqa/EqaTestDetail';
+import { EqaReports } from './eqa/EqaReports';
+import { EqaCorrective } from './eqa/EqaCorrective';
 import { eqaContextParams, type EqaNavigationContext } from './eqa/useEqaScope';
 
 export function EqaPage() {
@@ -34,12 +36,14 @@ export function EqaPage() {
     query.set('id', roundId);
     setParams(query);
   };
-  const switchView = (schedule = false) => {
+  const switchView = (next: 'overview' | 'schedule' | 'reports' | 'corrective' = 'overview') => {
     const query = eqaContextParams(params);
-    if (schedule) query.set('view', 'lich');
+    for (const key of ['reportRound', 'reportMachine', 'fixRound', 'fixMachine']) if (params.has(key)) query.set(key, params.get(key)!);
+    query.delete('view');
+    if (next !== 'overview') query.set('view', next === 'schedule' ? 'lich' : next === 'corrective' ? 'khacphuc' : 'baocao');
     setParams(query);
   };
-  const view = params.get('view') === 'lich' ? 'schedule' : 'overview';
+  const view = params.get('view') === 'lich' ? 'schedule' : params.get('view') === 'baocao' ? 'reports' : params.get('view') === 'khacphuc' ? 'corrective' : 'overview';
 
   useEffect(() => { void load(); }, [load]);
   useCatalog(['tests', 'instruments']);
@@ -56,11 +60,15 @@ export function EqaPage() {
         : <>
           <div className="dayseg eqa-view-switch" role="group" aria-label="Chế độ xem ngoại kiểm">
             <button type="button" aria-pressed={view === 'overview'} className={view === 'overview' ? 'on' : ''} onClick={() => switchView()}>Tổng quan</button>
-            <button type="button" aria-pressed={view === 'schedule'} className={view === 'schedule' ? 'on' : ''} onClick={() => switchView(true)}>Lịch</button>
+            <button type="button" aria-pressed={view === 'schedule'} className={view === 'schedule' ? 'on' : ''} onClick={() => switchView('schedule')}>Lịch</button>
+            <button type="button" aria-pressed={view === 'reports'} className={view === 'reports' ? 'on' : ''} onClick={() => switchView('reports')}>Báo cáo</button>
+            <button type="button" aria-pressed={view === 'corrective'} className={view === 'corrective' ? 'on' : ''} onClick={() => switchView('corrective')}>Khắc phục</button>
           </div>
           {view === 'schedule'
-            ? <EqaSchedule onOpenRound={openRound} />
-            : <EqaOverview onOpen={openRound} onOpenSchedule={() => switchView(true)} onOpenTest={openTest} />}
+            ? <EqaSchedule targetScheduleId={params.get('schedule') || ''} onOpenRound={openRound} />
+            : view === 'reports' ? <EqaReports />
+            : view === 'corrective' ? <EqaCorrective />
+            : <EqaOverview onOpen={openRound} onOpenSchedule={() => switchView('schedule')} onOpenTest={openTest} />}
         </>}
     </div>
   );

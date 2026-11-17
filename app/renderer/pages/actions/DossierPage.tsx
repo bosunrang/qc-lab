@@ -10,6 +10,7 @@ import { NCE_SOURCE_LABEL, NCE_TIER_LABEL } from '../../../main/domain/nce/label
 import { IdentitySection, QuickCheckSection } from './DossierContent';
 import { PatientImpactSection, ReleaseSection, TechnicalAssessmentSection } from './DossierDecisions';
 import { CapaWorkflow } from './CapaWorkflow';
+import { EqaDossierEvidence } from './EqaDossierEvidence';
 import { ReviewSection } from './DossierReview';
 import { dateText, Facts, holdText, Section, timeText, useDossier } from './shared';
 import { confirmDialog, errorDialog } from '../../state/dialog-store';
@@ -111,6 +112,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
         </div>
       </div>
 
+      <EqaDossierEvidence dossier={dossier} />
       {error && (error.kind !== 'write' || error.stale) && <div className="alert rej nce-dossier-error" role="alert"><div>{error.message}{error.stale && <p className="nce-note">Bản nháp chưa được lưu. Tải dữ liệu mới để xem thay đổi của người khác.</p>}</div>{error.stale || error.kind === 'uncertain' ? <button type="button" className="btn ghost sm" disabled={loading} onClick={() => void reloadDrafts()}>Tải dữ liệu mới</button> : <button type="button" className="btn ghost sm" disabled={loading} onClick={() => void reload()}>Thử lại</button>}</div>}
 
       <div className="nce-workspace" ref={workspace}>

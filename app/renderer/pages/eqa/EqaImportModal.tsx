@@ -20,7 +20,8 @@ import type { EqaImportInput, EqaImportPreview, Instrument, IpcResult } from '..
 import { eqaNormalize } from '../../../main/domain/eqa/evaluation';
 import { eqaPairKey, groupEqaSources, mergeEqaSources, type EqaParsedSource } from '../../../main/domain/eqa/import';
 import type { EqaPdfReport } from '../../../main/domain/eqa/pdf-report';
-import { Facts, pctText, roundLabel, StatCard } from './shared';
+import { Facts, roundLabel } from './shared';
+import { EqaResultsSummary } from './EqaResultsSummary';
 import { errorDialog } from '../../state/dialog-store';
 
 const TITLE = 'Nhập báo cáo ngoại kiểm';
@@ -84,7 +85,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
     return {
       round: { ...report.round, year: yearOf(i) || null },
       rows: report.rows.map((row) => ({ ...row, instrument: instrument?.name ?? row.instrument })),
-      errors: fileErrors[i],
+      errors: fileErrors[i], files: report.files,
       warnings: withoutYearNotice(report.warnings),
     };
   });
@@ -145,7 +146,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
           <>
             <p className="eqa-note">{reports.length} tệp thuộc {groups.length} đợt. Kiểm tra năm của từng tệp trước khi tiếp tục; năm là một phần của đợt nên sửa năm sẽ chuyển tệp sang đợt khác.</p>
             <div className="eqa-table-wrap">
-              <table className="eqa-table">
+              <table className="eqa-table eqa-center-rest eqa-import-files">
                 <thead><tr><th>File</th><th>Nhóm thiết bị trên báo cáo</th><th>Chương trình · đợt</th><th>Năm</th><th className="num">Thông số</th><th>Máy của PXN</th><th>Đọc file</th></tr></thead>
                 <tbody>
                   {reports.map((report, index) => (
@@ -201,7 +202,7 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
   }, [tests, instruments]);
 
   const previewInput = useMemo<EqaImportInput>(() => ({
-    round: source.round, rows: source.rows, source: 'pdf', sourceName,
+    round: source.round, rows: source.rows, source: 'pdf', sourceName, sourceFiles: source.files,
     mappings: Object.values(mappings).filter((m) => m.testId),
   }), [mappings, source, sourceName]);
 
@@ -285,19 +286,14 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
           <>
             {preview.round_errors.length > 0 && <div className="alert rej" role="alert"><ul className="eqa-list">{preview.round_errors.map((m) => <li key={m}>{m}</li>)}</ul></div>}
 
-            <div className="eqa-stats is-five">
-              <StatCard tone="neutral" label="Kết quả" value={preview.counts.total} />
-              <StatCard tone="success" label="Chấp nhận" value={preview.counts.ok} />
-              <StatCard tone="warning" label="Cảnh báo" value={preview.counts.warn} />
-              <StatCard tone="danger" label="Không chấp nhận" value={preview.counts.rej} detail={`Tỷ lệ chấp nhận ${pctText(preview.counts.accept_pct)}`} />
-              <StatCard tone={preview.blocking ? 'danger' : 'success'} label="Lỗi chặn" value={preview.blocking} detail={preview.blocking ? 'Phải xử lý trước khi ghi' : 'Có thể ghi'} />
-            </div>
+            <EqaResultsSummary totals={{ ...preview.counts, acceptPct: preview.counts.accept_pct }}
+              description="Theo báo cáo PDF" loading={loading} />
 
             <section className="eqa-import-block" aria-label="Ánh xạ xét nghiệm">
               <h3>Ánh xạ sang xét nghiệm trong danh mục</h3>
-              <p className="eqa-note">Mỗi cặp mã thông số × máy ứng với một xét nghiệm (thông số trên một máy) của Cấu hình chung. Ánh xạ được lưu để dùng lại cho các đợt sau của chương trình.</p>
+              {preview.blocking > 0 && <div className="alert rej" role="alert">Còn {preview.blocking} lỗi cần xử lý trước khi nhập.</div>}
               <div className="eqa-table-wrap eqa-map-table-wrap">
-                <table className="eqa-table">
+                <table className="eqa-table eqa-center-rest">
                   <thead><tr><th>Mã thông số</th><th>Máy</th><th className="num">Dòng</th><th>Xét nghiệm trong danh mục</th></tr></thead>
                   <tbody>
                     {preview.pairs.map((pair) => {
@@ -326,7 +322,7 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
               <section className="eqa-import-block" aria-label="Dòng lỗi">
                 <h3>Dòng lỗi ({errorRows.length})</h3>
                 <div className="eqa-table-wrap">
-                  <table className="eqa-table">
+                  <table className="eqa-table eqa-center-rest">
                     <thead><tr><th>Vị trí</th><th>Mã thông số</th><th>Máy</th><th>Lỗi</th></tr></thead>
                     <tbody>{errorRows.slice(0, ERROR_ROW_LIMIT).map((r) => <tr key={r.ref}><td>{r.ref}</td><td>{r.code || '—'}</td><td>{r.instrument || '—'}</td><td className="eqa-wrap">{r.errors.join('; ')}</td></tr>)}</tbody>
                   </table>
@@ -365,7 +361,7 @@ function EqaImportBatch({ items, onClose, onBack }: { items: readonly EqaBatchIt
   const [progress, setProgress] = useState('');
   const [check, setCheck] = useState(0);
 
-  const inputOf = (item: EqaBatchItem): EqaImportInput => ({ round: item.source.round, rows: item.source.rows, source: 'pdf', sourceName: item.sourceName, mappings: [] });
+  const inputOf = (item: EqaBatchItem): EqaImportInput => ({ round: item.source.round, rows: item.source.rows, source: 'pdf', sourceName: item.sourceName, sourceFiles: item.source.files, mappings: [] });
 
   useEffect(() => {
     let alive = true;

@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { bootstrapAndLogin, launchApp, openPage } from './helpers.mjs';
 
 const RIQAS = JSON.parse(readFileSync(new URL('../tests/fixtures/riqas-mc-cycle23-sample7.json', import.meta.url), 'utf8'));
@@ -95,6 +96,16 @@ test('nhập nhiều đợt một lần: ánh xạ ở đợt đầu, các đợ
     await modal.getByRole('button', { name: 'Nhập 2 đợt sẵn sàng', exact: true }).click();
     await modal.getByRole('button', { name: 'Xong', exact: true }).waitFor();
     assert.equal(await modal.getByText('Đã nhập', { exact: true }).count(), 3);
+    const sources = await page.evaluate(async () => {
+      const views = await Promise.all((await window.qcApi.listEqaRounds()).map((r) => window.qcApi.getEqaRound(r.id)));
+      return views.flatMap((view) => view.decisions.filter((d) => d.type === 'import').flatMap((d) => JSON.parse(d.payload_json).sourceFiles || []));
+    });
+    assert.equal(sources.length, 3, 'mỗi báo cáo PDF giữ mã băm của đúng tệp gốc');
+    for (const file of sources) {
+      const sample = Number(file.fileName.match(/_S(\d+)\.pdf$/)[1]);
+      assert.equal(file.sha256, createHash('sha256').update(riqasPdf(sample)).digest('hex'));
+      assert.equal(file.creationDate, '', 'không tự đoán ngày tạo khi PDF không có siêu dữ liệu');
+    }
     const rounds = await page.evaluate(() => window.qcApi.listEqaRounds());
     assert.deepEqual(rounds.map((r) => r.round).sort(), ['CYCLE 23 SAMPLE 1', 'CYCLE 23 SAMPLE 2', 'CYCLE 23 SAMPLE 3']);
     assert.deepEqual(errors, []);

@@ -1,0 +1,24 @@
+/* Phiếu A4 dọc. Chỉ nạp vào HTML bản in, không đưa vào cascade màn hình. */
+@page{size:A4 portrait;margin:12mm;}
+*{box-sizing:border-box;}
+body{margin:0;color:#172f3b;background:#fff;font:10pt/1.35 Arial,sans-serif;}
+.eqa-paper{display:flex;flex-direction:column;min-height:268mm;}
+.eqa-paper-header{display:flex;justify-content:space-between;gap:8mm;padding-bottom:3mm;border-bottom:1pt solid #087c83;}
+.eqa-paper-header>div{display:grid;gap:1mm;max-width:65%;}
+.eqa-paper-header>div:last-child{text-align:right;max-width:35%;font-size:9pt;}
+.eqa-paper-header span,.eqa-paper-sign,.eqa-paper-note,.eqa-paper-footer{color:#526975;}
+.eqa-paper-title{margin:4mm 0;font-size:14pt;line-height:1.25;text-align:center;}
+.eqa-paper-meta{display:grid;grid-template-columns:1.1fr 1fr;gap:1.5mm 4mm;margin:0 0 4mm;}
+.eqa-paper-meta>div{display:flex;gap:1.5mm;align-items:baseline;}
+.eqa-paper-meta dt{font-weight:bold;flex:none;}
+.eqa-paper-meta dd{margin:0;overflow-wrap:anywhere;}
+.eqa-paper-section{margin-bottom:3mm;border:0.5pt solid #ccd7dc;break-inside:avoid;}
+.eqa-paper-section h3{margin:0;padding:2mm 3mm;background:#edf3f5;font-size:10.5pt;}
+.eqa-paper-section>div{padding:2mm 3mm;}
+.eqa-paper-section p{margin:0 0 1.5mm;overflow-wrap:anywhere;}
+.eqa-paper-section p:last-child{margin-bottom:0;}
+.eqa-paper-choices{display:flex;flex-wrap:wrap;gap:3mm;margin:2mm 0;}
+.eqa-paper-choices>span{display:flex;align-items:center;gap:1.5mm;}
+.eqa-paper-choices i{width:3mm;height:3mm;border:0.5pt solid #526975;font:bold 8pt/3mm Arial,sans-serif;text-align:center;font-style:normal;}
+.eqa-paper-sign,.eqa-paper-note{font-size:9pt;}
+.eqa-paper-footer{display:flex;justify-content:space-between;gap:4mm;margin-top:auto;padding-top:2mm;border-top:0.5pt solid #ccd7dc;font-size:8pt;}

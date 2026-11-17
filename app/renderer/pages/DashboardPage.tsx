@@ -2,7 +2,7 @@
 // `view-models/dashboard-view-model.ts` (đọc ghi chú
 // đầu file đó: báo động theo ĐIỂM CUỐI, 1 dòng cho mỗi MỨC, % hoàn tất theo
 // XÉT NGHIỆM) — file này chỉ dựng JSX.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { SUMMARY_TABLES } from '../lib/useCatalog';
 import { Link, useNavigate } from 'react-router-dom';
@@ -78,11 +78,41 @@ function alertMeta(item: DashboardAlertItem) {
   return <>{dateText(item.point.date)} · {pointValue(item.point.val, item.test.decimalPlaces)} {item.test.unit || ''} · {item.rules.join(', ') || '—'}</>;
 }
 
+/** Đọc riêng lịch ngoại kiểm để thay đổi hạn/nộp không chạy lại toàn bộ QC.
+ * Phản hồi cũ hoặc phản hồi sau khi rời trang không được thay dữ liệu mới. */
+function useEqaFollowup() {
+  const [state, setState] = useState<{ rows: EqaScheduleRow[]; loading: boolean; error: string }>({ rows: [], loading: true, error: '' });
+  const revision = useRef(0);
+  const reload = useCallback(() => {
+    const request = ++revision.current;
+    setState((previous) => ({ ...previous, loading: true, error: '' }));
+    void window.qcApi.listEqaSchedule().then((rows) => {
+      if (request === revision.current) setState({ rows: rows.filter(needsAction), loading: false, error: '' });
+    }).catch((error: unknown) => {
+      if (request === revision.current) setState((previous) => ({ ...previous, loading: false, error: error instanceof Error ? error.message : 'Không đọc được lịch ngoại kiểm.' }));
+    });
+  }, []);
+  const cancelPending = useCallback(() => { revision.current++; }, []);
+  useEffect(() => { reload(); return cancelPending; }, [reload, cancelPending]);
+  useStoreInvalidation(['eqa_schedule', 'eqa_rounds'], undefined, reload);
+  return { ...state, reload };
+}
+
 function FollowupPanel({ model }: { model: Model }) {
   const navigate = useNavigate();
+  const eqa = useEqaFollowup();
   const urgent = model.urgent.slice(0, 5), watch = model.watch.slice(0, 4);
   const overdue = model.overdueActions.slice(0, 4), noTarget = model.noTarget.slice(0, 4);
-  if (!urgent.length && !watch.length && !overdue.length && !noTarget.length) {
+  const dueRows = eqa.rows.slice(0, 4);
+  function eqaItem(row: EqaScheduleRow) {
+    const remaining = row.status === 'overdue' ? `Quá ${-row.days_left} ngày` : row.days_left === 0 ? 'Hôm nay' : `Còn ${row.days_left} ngày`;
+    const progress = row.instruments.length ? `Đã nộp ${row.instruments.filter((m) => m.submitted_at || m.reported).length}/${row.instruments.length} máy` : '';
+    return <ShiftItem key={`eqa${row.id}`} tone={row.status === 'overdue' ? 'rej' : 'warn'}
+      title={<>Ngoại kiểm · {row.sample_type || row.program_name} · {row.round}/{row.year}</>}
+      meta={<>{row.sample_type && <>{row.program_name}<br /></>}{[row.instruments.map((m) => m.instrument_name).join(', '), `Hạn ${dateText(row.due_date)}`, remaining, progress].filter(Boolean).join(' · ')}</>}
+      action={<Link className="btn ghost sm" to={`/eqa?view=lich&schedule=${encodeURIComponent(row.id)}`}>Mở lịch ngoại kiểm</Link>} />;
+  }
+  if (!urgent.length && !watch.length && !overdue.length && !noTarget.length && !eqa.rows.length && !eqa.loading && !eqa.error) {
     return <div className="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>;
   }
   return (
@@ -99,6 +129,7 @@ function FollowupPanel({ model }: { model: Model }) {
           meta={<>{record.overdueLabel} · hạn {dateText(record.due_date)} · phụ trách {record.owner || '—'}</>}
           action={<button className="btn ghost sm" onClick={() => navigate(`/actions?id=${encodeURIComponent(record.id)}`)}>Mở hồ sơ</button>} />
       ))}
+      {dueRows.filter((row) => row.status === 'overdue').map(eqaItem)}
       {noTarget.map((item) => (
         <ShiftItem key={`m${item.key}`} tone="warn"
           title={<>{item.test.testName} · M{item.level.level}</>}
@@ -111,6 +142,11 @@ function FollowupPanel({ model }: { model: Model }) {
           meta={alertMeta(item)}
           action={<button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: item.test.testId, level: item.level.level } })}>Xem</button>} />
       ))}
+      {dueRows.filter((row) => row.status !== 'overdue').map(eqaItem)}
+      {eqa.rows.length > dueRows.length && <Link className="btn ghost sm" to="/eqa?view=lich">Xem tất cả {eqa.rows.length} lịch ngoại kiểm cần nộp</Link>}
+      {eqa.loading && !eqa.rows.length && <EmptyState size="compact" title="Đang tải công việc ngoại kiểm…" />}
+      {eqa.error && <ShiftItem tone="warn" title="Không tải được lịch ngoại kiểm" meta={eqa.error}
+        action={<button type="button" className="btn ghost sm" disabled={eqa.loading} onClick={eqa.reload}>Thử lại</button>} />}
     </div>
   );
 }
@@ -179,21 +215,6 @@ function LoadingView({ subtitle }: { subtitle: string }) {
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <StatCard key={label} label={label} value="—" />)}</div></div></>;
 }
 
-/** Nhắc hạn nộp ngoại kiểm ngay trên Tổng quan: nộp trễ thì đợt bị tính không
- * đạt. Tự nạp khi lịch hoặc đợt ngoại kiểm đổi; không có đợt cần nộp thì ẩn. */
-function EqaDueAlert() {
-  const [rows, setRows] = useState<EqaScheduleRow[]>([]);
-  const reload = () => { void window.qcApi.listEqaSchedule().then((all) => setRows(all.filter(needsAction))).catch(() => setRows([])); };
-  useEffect(reload, []);
-  useStoreInvalidation(['eqa_schedule', 'eqa_rounds'], undefined, reload);
-  if (!rows.length) return null;
-  const overdue = rows.filter((r) => r.status === 'overdue').length;
-  return <div className={`alert ${overdue ? 'rej' : 'warn'} dash-eqa-alert`} role="status">
-    <span><b>Ngoại kiểm:</b> {rows.length} đợt cần nộp kết quả{overdue ? `, ${overdue} đợt đã quá hạn` : ''} — {rows.slice(0, 3).map((r) => `${r.program_name} ${r.round}/${r.year}`).join('; ')}{rows.length > 3 ? '; …' : ''}</span>
-    <Link className="btn ghost sm" to="/eqa?view=lich">Mở lịch ngoại kiểm</Link>
-  </div>;
-}
-
 export function DashboardPage() {
   const { testSummaries, overdueActions, lots, loading, error, load } = useDashboardStore(useShallow((s) => ({ testSummaries: s.testSummaries, overdueActions: s.overdueActions, lots: s.lots, loading: s.loading, error: s.error, load: s.load })));
   const { profile, load: loadProfile } = useSettingsStore(useShallow((s) => ({ profile: s.profile, load: s.load })));
@@ -212,7 +233,7 @@ export function DashboardPage() {
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{([
     ['Xét nghiệm', model.tests.length], ['Điểm QC', model.kpi.totalPoints], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'accent'],
-  ] as [string, number, StatTone?][]).map(([label, value, tone]) => <StatCard key={label} label={label} value={value} tone={tone} />)}</div></div><EqaDueAlert /><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
+  ] as [string, number, StatTone?][]).map(([label, value, tone]) => <StatCard key={label} label={label} value={value} tone={tone} />)}</div></div><div className="dash-main"><div className="panel" role="region" aria-label="Cần xử lý / Theo dõi"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
 }
 
 

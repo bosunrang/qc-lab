@@ -113,7 +113,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 162);
+  assert.equal(handlers.size, 166);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -134,11 +134,11 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
   assert.deepEqual(open, [
     'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
     'attachNceRun', 'backupStatus', 'cancelEqaRound', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
-    'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaInstrumentGrid', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
+    'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaCorrectiveEvidence', 'getEqaInstrumentGrid', 'getEqaReport', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
     'getLicenseStatus', 'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
     // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
     'getReportTemplateSettings', 'getSoftwareUpdateStatus', 'getStorageInfo', 'getVoidPointAssessment', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
-    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAttention', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
+    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAttention', 'listEqaCorrective', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
     'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
     'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
     'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listReagentComparisons',
@@ -146,7 +146,8 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
     'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
     'listVoidedEntryPoints', 'markEqaSubmitted', 'previewEqaImport', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
     'queryReport', 'recordNcePatientImpact', 'recordNceTechnicalAssessment', 'rejectLisResult', 'releaseNce', 'removeEqaSchedule', 'removeReagentQuickValue',
-    'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewNceEffectiveness',
+    // Xem xét ngoại kiểm là nghiệp vụ ký có cổng nce.approve ở main, dùng được tại máy trạm.
+    'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewEqaReport', 'reviewNceEffectiveness',
     'saveEqaSchedule', 'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',
     'setDayNote', 'submitNce', 'updateNce', 'updateNceAction', 'verifyOwnPassword', 'voidPoint',
   ]);

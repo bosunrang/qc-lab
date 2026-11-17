@@ -27,6 +27,9 @@ test('E-03: đối chiếu z với z trên báo cáo', () => {
   assert.equal(eqaProviderCheck(0.147, 0.15), 'match', 'lệch do làm tròn của nhà cung cấp');
   assert.equal(eqaProviderCheck(-0.147, 0.15), 'swapped');
   assert.equal(eqaProviderCheck(0.5, 1.2), 'mismatch');
+  // E-14: trái dấu dù khác độ lớn vẫn là ngược chiều báo cáo, chặn dòng.
+  assert.equal(eqaProviderCheck(1.5, -1), 'swapped');
+  assert.equal(eqaProviderCheck(0.01, -0.5), 'mismatch', 'z tính lại gần 0 thì không xác định được chiều');
   assert.equal(eqaProviderCheck(0.01, -0.01), 'match');
   assert.equal(eqaProviderCheck(0.3, null), 'none');
 });

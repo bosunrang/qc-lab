@@ -104,11 +104,12 @@ export const NCE_PATIENT_OUTCOME_LABEL: Readonly<Record<string, string>> = {
 
 export type NcePatientImpactInput = Pick<NcePatientImpact, 'outcome' | 'description' | 'resultCount' | 'reference' | 'notified'>;
 
-export function validateNcePatientImpact(raw: unknown, source: NceSource): NceValidation<NcePatientImpactInput> {
+export function validateNcePatientImpact(raw: unknown, source: NceSource, context?: { eqaLinked?: boolean; causeCategory?: string }): NceValidation<NcePatientImpactInput> {
   const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   if (!isOneOf(NCE_PATIENT_OUTCOMES, input.outcome)) return { ok: false, code: 'invalid-outcome', message: 'Chọn kết luận ảnh hưởng kết quả bệnh nhân.' };
   // Sự cố IQC luôn có thể chạm tới kết quả bệnh nhân của khoảng nghi ngờ.
   if (input.outcome === 'not_applicable' && source === 'iqc') return { ok: false, code: 'outcome-not-applicable', message: 'Sự cố nội kiểm không được kết luận "không liên quan kết quả bệnh nhân".' };
+  if (input.outcome === 'not_applicable' && context?.eqaLinked && context.causeCategory === 'eqa_technical') return { ok: false, code: 'outcome-not-applicable', message: 'Lỗi kỹ thuật phải rà soát kết quả bệnh nhân; không được chọn Không liên quan.' };
   const description = String(input.description ?? '').trim().slice(0, 4000);
   if (description.length < 5) return { ok: false, code: 'missing-description', message: 'Ghi căn cứ/cách rà soát kết quả (ít nhất 5 ký tự).' };
   let resultCount: number | null = null;
@@ -118,6 +119,7 @@ export function validateNcePatientImpact(raw: unknown, source: NceSource): NceVa
     resultCount = n;
   }
   if (source === 'iqc' && resultCount === null) return { ok: false, code: 'missing-count', message: 'Ghi số kết quả bệnh nhân đã rà soát trong khoảng nghi ngờ.' };
+  if (context?.eqaLinked && input.outcome !== 'not_applicable' && resultCount === null) return { ok: false, code: 'missing-count', message: 'Ghi số kết quả bệnh nhân đã rà soát đối với sự cố ngoại kiểm.' };
   const reference = String(input.reference ?? '').trim().slice(0, 200);
   const notified = String(input.notified ?? '').trim().slice(0, 1000);
   if (input.outcome === 'reported_corrected') {
@@ -129,10 +131,10 @@ export function validateNcePatientImpact(raw: unknown, source: NceSource): NceVa
 }
 
 /** Quyết định ảnh hưởng hiện hành có đủ để cho chạy lại không. */
-export function ncePatientImpactMissing(impacts: readonly NcePatientImpact[], source: NceSource): NceMissing[] {
+export function ncePatientImpactMissing(impacts: readonly NcePatientImpact[], source: NceSource, context?: { eqaLinked?: boolean; causeCategory?: string }): NceMissing[] {
   const latest = impacts.at(-1);
   if (!latest) return [{ code: 'patient-impact', message: 'Chưa có quyết định ảnh hưởng kết quả bệnh nhân cho khoảng nghi ngờ.' }];
-  const checked = validateNcePatientImpact(latest, source);
+  const checked = validateNcePatientImpact(latest, source, context);
   return checked.ok ? [] : [{ code: 'patient-impact-invalid', message: checked.message }];
 }
 

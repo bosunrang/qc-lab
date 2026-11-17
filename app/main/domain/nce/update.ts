@@ -26,7 +26,7 @@ function scale(value: unknown): number | null {
 }
 
 /** Kiểm bản nháp sửa hồ sơ. `context.detectedAt` để chặn hạn trước ngày phát hiện. */
-export function prepareNcePatch(raw: unknown, context: Pick<NceDossier, 'source' | 'detectedAt'>): NceValidation<NcePatch> {
+export function prepareNcePatch(raw: unknown, context: Pick<NceDossier, 'source' | 'detectedAt' | 'eqaLinked'>): NceValidation<NcePatch> {
   const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const unknown = Object.keys(input).filter((key) => !(NCE_EDITABLE_FIELDS as readonly string[]).includes(key));
   if (unknown.length) return { ok: false, code: 'field-not-editable', message: `Không sửa được trường ${unknown.join(', ')} qua thao tác này.` };
@@ -56,7 +56,7 @@ export function prepareNcePatch(raw: unknown, context: Pick<NceDossier, 'source'
   }
   if (has('riskLevel')) { if (input.riskLevel !== '' && !isOneOf(NCE_RISK_LEVELS, input.riskLevel)) return fail('invalid-risk-level', 'Phân loại nguy cơ không hợp lệ.'); out.riskLevel = input.riskLevel as NcePatch['riskLevel']; }
   if (has('riskBasis')) out.riskBasis = text(input.riskBasis, 2000);
-  if (has('checklist')) out.checklist = prepareChecklist(context.source, input.checklist);
+  if (has('checklist')) out.checklist = prepareChecklist(context.source, input.checklist, context.eqaLinked);
   if (has('causeStatus')) { if (input.causeStatus !== '' && !isOneOf(NCE_CAUSE_STATUSES, input.causeStatus)) return fail('invalid-cause-status', 'Kết luận nguyên nhân không hợp lệ.'); out.causeStatus = input.causeStatus as NcePatch['causeStatus']; }
   if (has('causeCategory')) { if (input.causeCategory !== '' && !isOneOf(NCE_CAUSE_CATEGORIES, input.causeCategory)) return fail('invalid-cause-category', 'Nhóm nguyên nhân không hợp lệ.'); out.causeCategory = input.causeCategory as NcePatch['causeCategory']; }
   if (has('causeText')) out.causeText = text(input.causeText, 4000);
@@ -85,7 +85,7 @@ export function nceFieldChanges(current: Partial<NceEditable>, patch: NcePatch):
 }
 
 /** Checklist rỗng theo nguồn, dùng khi lập hồ sơ. */
-export function emptyChecklist(source: NceDossier['source']): Record<string, NceChecklistItem> { return prepareChecklist(source, {}); }
+export function emptyChecklist(source: NceDossier['source'], eqaLinked = false): Record<string, NceChecklistItem> { return prepareChecklist(source, {}, eqaLinked); }
 
 /** Đính chính hành chính riêng, không cho sửa ngày qua patch nội dung chung.
  * Thời điểm lập/quyết định và ngày QC gốc tuyệt đối không đổi. */

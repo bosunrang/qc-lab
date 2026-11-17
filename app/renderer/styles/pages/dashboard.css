@@ -52,6 +52,3 @@
 @media(max-width:1280px){.dash-hero{grid-template-columns:minmax(0,1fr) minmax(260px,.82fr);}}
 @media(max-width:1150px){.dash-hero{grid-template-columns:1fr;}}
 @media(prefers-reduced-motion:reduce){.dash-loading-bar span{animation:none}}
-
-/* Nhắc hạn nộp ngoại kiểm, nằm giữa phần trạng thái ca và các panel. */
-.dash-eqa-alert{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-4);}

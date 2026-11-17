@@ -23,7 +23,7 @@ const DEFAULT_FORMS = {
   sigma: { formCode: 'BM-SS-01', version: '1.0', effectiveDate: '' },
   reagent: { formCode: 'BM-HC-01', version: '1.0', effectiveDate: '' },
   review: { formCode: 'BM-XX-01', version: '1.0', effectiveDate: '' },
-  eqa: { formCode: 'BM-NGK-01', version: '1.0', effectiveDate: '' },
+  eqa: { formCode: 'BMQL 14-01-24', version: '1.0', effectiveDate: '' },
 };
 assert.deepEqual(report.getReportTemplateSettings(), DEFAULT_FORMS);
 assert.equal(report.saveReportTemplateSettings({ data: { kind: 'sigma', formCode: 'BM-SS-02', version: '2.0' } }, { ...actor, role: 'staff' }).ok, false);

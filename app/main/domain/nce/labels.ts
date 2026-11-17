@@ -20,6 +20,7 @@ export const NCE_RISK_LEVEL_LABEL: Readonly<Record<string, string>> = { low: 'Th
 export const NCE_CAUSE_STATUS_LABEL: Readonly<Record<string, string>> = { identified: 'Đã xác định', suspected: 'Nghi ngờ', undetermined: 'Chưa xác định', '': '—' };
 
 export const NCE_CAUSE_CATEGORY_LABEL: Readonly<Record<string, string>> = {
+  eqa_administrative: 'Lỗi hành chính', eqa_technical: 'Lỗi kỹ thuật', eqa_program: 'Vấn đề chương trình / mẫu ngoại kiểm',
   qc_material: 'Vật liệu QC', operator: 'Thao tác', instrument: 'Thiết bị', reagent: 'Hoá chất / calibrator', calibration: 'Hiệu chuẩn',
   environment: 'Môi trường', method: 'Phương pháp', sample: 'Mẫu', information_system: 'Hệ thống thông tin / LIS', other: 'Khác', '': '—',
 };

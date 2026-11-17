@@ -1,7 +1,6 @@
-// Thanh kéo đổi độ rộng cột danh sách bên trái, dùng chung cho Phân tích ngoại
-// kiểm và cây danh mục ở Nhập QC. Thanh chỉ đo vị trí con trỏ so với mép trái
-// của khung cần đổi rồi báo độ rộng mong muốn; trang gọi tự giới hạn khoảng
-// cho phép và áp độ rộng. Phím ← → đổi mỗi lần 20px, Home/End về hẹp/rộng nhất.
+// Thanh kéo đổi độ rộng khung, dùng chung cho Phân tích ngoại kiểm và cây
+// danh mục ở Nhập QC. Trang gọi tự giới hạn khoảng cho phép và áp độ rộng.
+// Phím ← → dịch đường chia mỗi lần 20px, Home/End về khung hẹp/rộng nhất.
 //
 // Đánh giá giao diện 09/11/2026 (U27, P18): trình đọc màn hình luôn đọc được
 // độ rộng hiện tại (cả khi khung còn tự co giãn, chưa kéo lần nào) và giới hạn
@@ -12,9 +11,11 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 
 const KEY_STEP = 20;
 
-export function ResizeHandle({ targetRef, label, value, min, max, maxNow, onResize, className }: {
-  /** Khung bị đổi độ rộng; mép trái của nó là gốc để tính độ rộng mới. */
+export function ResizeHandle({ targetRef, label, value, min, max, maxNow, onResize, className, edge = 'right' }: {
+  /** Khung bị đổi độ rộng. */
   targetRef: RefObject<HTMLElement | null>;
+  /** Mép đặt thanh kéo: khung bên phải được kéo từ mép trái. */
+  edge?: 'left' | 'right';
   label: string;
   /** Độ rộng đang áp; bỏ trống khi khung còn tự co giãn theo nội dung. */
   value?: number;
@@ -28,44 +29,62 @@ export function ResizeHandle({ targetRef, label, value, min, max, maxNow, onResi
   const rect = () => targetRef.current?.getBoundingClientRect();
   // Độ rộng đo được của khung — dùng cho `aria-valuenow` khi chưa có `value`,
   // và để tính lại trần khi cửa sổ đổi cỡ.
-  const [measured, setMeasured] = useState<number>();
+  const [measured, setMeasured] = useState<{ width: number }>();
   useEffect(() => {
     const target = targetRef.current;
     if (!target) return;
     // Đo ngay một lần: ResizeObserver chỉ báo theo khung hình, cửa sổ đang ẩn
     // thì chưa báo gì và thanh kéo không có giá trị cho trình đọc màn hình.
-    setMeasured(Math.round(target.getBoundingClientRect().width));
+    const measure = () => setMeasured({ width: Math.round(target.getBoundingClientRect().width) });
+    measure();
     if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => setMeasured(Math.round(target.getBoundingClientRect().width)));
+    const observer = new ResizeObserver(measure);
     observer.observe(target);
+    // Trần có thể đổi khi khung bao co lại, dù khung con vẫn giữ cùng độ rộng.
+    if (target.parentElement) observer.observe(target.parentElement);
     return () => observer.disconnect();
   }, [targetRef]);
   const limit = Math.round(Math.max(min, Math.min(max, maxNow ? maxNow() : max)));
-  const now = value ?? measured;
+  const now = value ?? measured?.width;
 
   const frame = useRef(0);
   const pendingX = useRef(0);
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  const direction = edge === 'right' ? 1 : -1;
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  const finishDrag = () => { cancelAnimationFrame(frame.current); frame.current = 0; drag.current = null; };
   const scheduleResize = (clientX: number) => {
     pendingX.current = clientX;
     if (frame.current) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
-      onResize(pendingX.current - (rect()?.left ?? 0));
+      if (drag.current) onResize(drag.current.width + (pendingX.current - drag.current.x) * direction);
     });
   };
 
   return (
     <div className={className ? `resize-handle ${className}` : 'resize-handle'} role="separator" aria-label={label}
       aria-orientation="vertical" tabIndex={0} aria-valuemin={min} aria-valuemax={limit}
-      aria-valuenow={now == null ? undefined : Math.min(now, limit)}
-      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); }}
+      aria-valuenow={now == null ? undefined : Math.max(min, Math.min(now, limit))}
+      onPointerDown={(e) => {
+        const width = rect()?.width;
+        if (e.button !== 0 || width == null) return;
+        e.preventDefault();
+        drag.current = { x: e.clientX, width };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
       onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) scheduleResize(e.clientX); }}
-      onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+      onPointerUp={(e) => {
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+        if (drag.current) onResize(drag.current.width + (e.clientX - drag.current.x) * direction);
+        finishDrag();
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }}
+      onPointerCancel={finishDrag} onLostPointerCapture={finishDrag}
       onKeyDown={(e) => {
         const current = rect()?.width ?? min;
-        const next = e.key === 'ArrowRight' ? current + KEY_STEP
-          : e.key === 'ArrowLeft' ? current - KEY_STEP
+        const next = e.key === 'ArrowRight' ? current + KEY_STEP * direction
+          : e.key === 'ArrowLeft' ? current - KEY_STEP * direction
           : e.key === 'Home' ? min
           : e.key === 'End' ? limit
           : null;

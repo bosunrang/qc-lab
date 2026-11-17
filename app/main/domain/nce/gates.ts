@@ -84,14 +84,14 @@ export function validateNceReleaseInput(raw: unknown, source: NceSource): NceVal
  * bao phủ đúng khoảng đó (`undefined` chỉ dùng trong test thuần không có dữ
  * liệu QC). Không đòi hành động khắc phục đã xong (D-02, sửa R-01). */
 export function nceReleaseMissing(
-  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'checklist'>,
+  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'checklist' | 'eqaLinked' | 'causeCategory'>,
   rerun: NceRerunResult | null,
   suspect?: NceSuspectWindow | null,
 ): NceMissing[] {
   if (dossier.status !== 'open') return [{ code: 'status', message: 'Chỉ cho chạy lại hồ sơ đang xử lý.' }];
   const missing: NceMissing[] = [];
   if (dossier.holdResults === null) missing.push({ code: 'hold', message: 'Chưa ghi có dừng/giữ kết quả liên quan hay không.' });
-  missing.push(...checklistMissing(dossier.source, dossier.checklist));
+  missing.push(...checklistMissing(dossier.source, dossier.checklist, dossier.eqaLinked));
   if (dossier.source === 'iqc') {
     if (dossier.holdResults === false) missing.push({ code: 'hold-iqc', message: 'Nội kiểm ngoài kiểm soát phải dừng/giữ kết quả liên quan cho đến khi đánh giá xong.' });
     if (textLength(dossier.containmentNote) < 10) missing.push({ code: 'containment', message: 'Ghi phạm vi kết quả đã giữ, thiết bị/khu vực bị ảnh hưởng và người đã được thông báo.' });
@@ -103,7 +103,7 @@ export function nceReleaseMissing(
     if (!rerun) missing.push({ code: 'missing-rerun', message: 'Chưa chốt bằng chứng QC rerun bằng quyết định cho hoạt động trở lại.' });
     else missing.push(...rerun.problems);
   } else if (rerun) missing.push(...rerun.problems);
-  missing.push(...ncePatientImpactMissing(dossier.patientImpacts, dossier.source));
+  missing.push(...ncePatientImpactMissing(dossier.patientImpacts, dossier.source, dossier));
   missing.push(...ncePatientImpactCoverageMissing(dossier.patientImpacts.at(-1), suspect ?? null));
   return missing;
 }
@@ -122,7 +122,11 @@ export function nceContentMissing(dossier: NceDossier, suspect?: NceSuspectWindo
   if (!dossier.release) add('release', 'Chưa có quyết định cho phép hoạt động trở lại.');
   if (!nceRiskScore(dossier.riskSeverity, dossier.riskProbability) || !dossier.riskLevel) add('risk', 'Chưa đánh giá nguy cơ ban đầu (mức độ, khả năng xảy ra, phân loại).');
   else if (textLength(dossier.riskBasis) < 5) add('risk-basis', 'Ghi căn cứ phân loại nguy cơ theo SOP.');
-  missing.push(...checklistMissing(dossier.source, dossier.checklist));
+  missing.push(...checklistMissing(dossier.source, dossier.checklist, dossier.eqaLinked));
+  if (dossier.eqaLinked) {
+    if (dossier.causeStatus !== 'undetermined' && !['eqa_administrative', 'eqa_technical', 'eqa_program'].includes(dossier.causeCategory)) add('cause-eqa-category', 'Phân loại nguyên nhân ngoại kiểm: hành chính, kỹ thuật hoặc chương trình/mẫu.');
+    missing.push(...ncePatientImpactMissing(dossier.patientImpacts, dossier.source, dossier));
+  }
   missing.push(...nceTechnicalAssessmentMissing(dossier));
   missing.push(...nceTierMissing(dossier));
   missing.push(...ncePatientImpactCoverageMissing(dossier.patientImpacts.at(-1), suspect ?? null));

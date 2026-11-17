@@ -445,6 +445,7 @@ export type NceNextStepName = 'release' | 'submit' | 'approve' | null;
 
 export interface NceRecordRow {
   id: string; nce_id: string; source: NceSource; phase: 'pre' | 'exam' | 'post';
+  eqa_result_id: string | null; eqa_source_key: string; eqa_snapshot_json: string;
   test_id: string | null; detected_at: string; description: string; correction: string;
   containment_note: string; occurred_note: string;
   /** 1 có giữ kết quả, 0 không, null chưa xác định. */
@@ -488,6 +489,7 @@ export interface NceMissingItem { code: string; message: string }
 export interface NceRunKeyView { date: string; runId: string }
 
 export interface NceDossierView {
+  eqa_followup?: { evidence: EqaNceEvidence | null; missing: string[]; fingerprint: string } | null;
   record: NceRecordRow;
   runs: NceRunRow[]; actions: NceActionRow[]; decisions: NceDecisionRow[]; revisions: NceRevisionRow[];
   /** Bước kế tiếp còn thiếu gì (main tính bằng `domain/nce/gates.ts`). */
@@ -696,8 +698,10 @@ export interface EqaCheckedRowDraft extends EqaRowDraft {
   testId: string | null; z: number | null; pct: number | null; zOfficial: number | null; cls: EqaClassView | null;
   providerCheck: EqaProviderCheckView; errors: string[]; warnings: string[];
 }
+export interface EqaSourceFileDraft { fileName: string; sha256: string; creationDate: string }
 export interface EqaImportInput {
   round: EqaRoundDraft; rows: EqaRowDraft[]; source: 'pdf'; sourceName?: string;
+  sourceFiles?: EqaSourceFileDraft[];
   /** Ánh xạ người dùng chọn cho cặp mã thông số × tên máy chưa có. */
   mappings?: { code: string; instrument: string; testId: string }[];
   /** Bắt buộc khi thay kết quả của máy đã có trong kỳ hoặc mở lại kỳ đã huỷ. */
@@ -781,6 +785,7 @@ export interface EqaScheduleInstrument {
   reported: boolean;
 }
 export interface EqaScheduleRow {
+  /** Mỗi lịch có loại mẫu và ngày riêng cho nhóm máy đã chọn của đợt. */
   id: string; program_id: string; program_name: string; provider: string; sample_type: string;
   year: number; round: string; round_no: number;
   receive_date: string; run_date: string; due_date: string; assignee: string; note: string;
@@ -793,8 +798,9 @@ export interface EqaScheduleRow {
   status: EqaScheduleStatus; days_left: number;
 }
 export interface EqaProgramOption {
+  /** Loại mẫu gợi sẵn từ lịch gần nhất; không phải phân loại chung của chương trình. */
   id: string; name: string; provider: string; sample_type: string;
-  /** Máy gợi sẵn cho đợt mới: máy của đợt gần nhất trong lịch, nếu chưa có thì
+  /** Máy gợi sẵn cho đợt mới: máy của lịch gần nhất, nếu chưa có lịch thì
    * máy có kết quả ở báo cáo gần nhất của chương trình. */
   instrument_ids: string[];
 }
@@ -804,6 +810,46 @@ export interface EqaScheduleInput {
   sampleType?: string; instrumentIds?: string[];
 }
 export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
+/** Không truyền instrumentId khi xem tất cả máy trong phạm vi. */
+export interface EqaReportScope { programId: string; year: number; roundId?: string; instrumentId?: string }
+export interface EqaNceSource {
+  round: EqaRoundRow; result: EqaResultRow; fingerprint: string;
+  required: boolean; reasons: string[];
+}
+export interface EqaCorrectiveRow extends EqaNceSource {
+  current: boolean;
+  evidence: EqaNceEvidence | null;
+  record: Pick<NceRecordRow, 'id' | 'nce_id' | 'status' | 'owner_name' | 'due_date' | 'overdue_days' | 'open_actions' | 'overdue_actions'> | null;
+}
+export interface EqaNceEvidence extends EqaNceSource {
+  run_date: string; captured_at: string;
+  last_accepted: { round_id: string; round: string; year: number; report_date: string } | null;
+  related_results: EqaResultRow[];
+  iqc_runs: { date: string; run_id: string; complete: boolean; points: { level: number; lot: string; value: number; z: number | null; verdict: string; rules: string[]; voided: boolean }[] }[];
+}
+export type EqaReviewKind = 'preliminary_review' | 'analysis_review' | 'system_review';
+export type EqaReviewAssessment = 'pending' | 'appropriate' | 'not_appropriate';
+export type EqaCarDecision = 'pending' | 'not_required' | 'proposed' | 'recorded';
+export interface EqaCoverageAlternative { testId: string; method: string; reason: string; result: string }
+export interface EqaReviewDraft {
+  scope: EqaReportScope; expectedFingerprint: string; kind: EqaReviewKind;
+  conclusion: string; communication: string; warningNote: string; receivedDate: string; nextReviewDate: string;
+  alternatives: EqaCoverageAlternative[];
+  assessment?: EqaReviewAssessment; carDecision?: EqaCarDecision; carReference?: string; communicationDate?: string;
+}
+export interface EqaReportReview {
+  id: string; kind: EqaReviewKind; conclusion: string; communication: string; warning_note: string;
+  received_date: string; next_review_date: string; actor_name: string; decided_at: string;
+  fingerprint: string; current: boolean; alternatives: EqaCoverageAlternative[];
+  assessment: EqaReviewAssessment; car_decision: EqaCarDecision; car_reference: string; communication_date: string;
+}
+export interface EqaReportView {
+  scope: EqaReportScope; program_name: string; fingerprint: string;
+  rounds: EqaRoundView[]; totals: { total: number; ok: number; warn: number; rej: number; accept_pct: number | null };
+  tests: { test_id: string; test_name: string; instrument_name: string; total: number; ok: number; warn: number; rej: number }[];
+  requires_investigation: boolean; reviews: EqaReportReview[];
+  coverage: { start_date: string; end_date: string; missing: { test_id: string; test_name: string; instrument_name: string }[] };
+}
 export interface EqaRoundView {
   round: EqaRoundRow; results: EqaResultRow[]; decisions: EqaDecisionRow[];
   instruments: EqaInstrumentSummary[];
@@ -981,6 +1027,11 @@ export interface QcApi {
   // Ngoại kiểm
   listEqaRounds(): Promise<EqaRoundRow[]>;
   getEqaRound(id: string): Promise<EqaRoundView | null>;
+  /** Có reviewId: đọc số liệu và chữ ký đã chụp tại thời điểm ký phiếu đó. */
+  getEqaReport(scope: EqaReportScope, reviewId?: string): Promise<EqaReportView>;
+  listEqaCorrective(scope: EqaReportScope): Promise<EqaCorrectiveRow[]>;
+  getEqaCorrectiveEvidence(input: { resultId: string; runDate?: string }): Promise<EqaNceEvidence>;
+  reviewEqaReport(input: { data: EqaReviewDraft }): Promise<IpcResult<EqaReportView>>;
   /** Chuỗi z/J của một xét nghiệm qua các đợt. */
   getEqaSeries(testId: string): Promise<EqaSeriesView | null>;
   /** Xét nghiệm đang có tín hiệu hoặc không thành công ở đợt mới nhất. */
@@ -998,7 +1049,7 @@ export interface QcApi {
   importEqaRound(input: { data: EqaImportInput }): Promise<IpcResult<EqaRoundView>>;
   cancelEqaRound(input: { data: { id: string; expectedVersion: number; reason: string } }): Promise<IpcResult<EqaRoundView>>;
   /** IQC chỉ gửi khoá lần chạy; main tự đọc xét nghiệm, mức, lô, luật, verdict. */
-  createNce(input: { data: { source: NceSource; phase?: 'pre' | 'exam' | 'post'; testId?: string; trigger?: NceRunKeyView; description: string; correction: string; holdResults: boolean; detectedAt: string; ownerUserId: string; dueDate?: string } }): Promise<IpcResult<NceDossierView>>;
+  createNce(input: { data: { source: NceSource; phase?: 'pre' | 'exam' | 'post'; testId?: string; trigger?: NceRunKeyView; eqaResultId?: string; expectedEqaFingerprint?: string; eqaRunDate?: string; description: string; correction: string; holdResults: boolean; detectedAt: string; ownerUserId: string; dueDate?: string } }): Promise<IpcResult<NceDossierView>>;
   attachNceRun(input: { data: NceWriteBase & { run: NceRunKeyView } }): Promise<IpcResult<NceDossierView>>;
   /** Đính chính ngày lưu riêng, cần nce.release, chỉ khi open; giữ lịch sử và lý do. */
   updateNce(input: { data: NceWriteBase & { patch: Record<string, unknown>; detectedAtCorrection?: { detectedAt: string; reason: string } } }): Promise<IpcResult<NceDossierView>>;

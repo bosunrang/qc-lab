@@ -90,6 +90,8 @@ test('quyền theo trang được chặn ở main, không chỉ ẩn menu', () =
   // Một kênh dùng ở hai trang: vào được một trong hai là đủ.
   db.prepare('UPDATE users SET page_perms_json=? WHERE id=?').run(JSON.stringify(['sigma']), 'ktv');
   assert.doesNotThrow(() => gate.guard('report:getTemplateSettings', ktv));
+  db.prepare('UPDATE users SET page_perms_json=? WHERE id=?').run(JSON.stringify(['eqa']), 'ktv');
+  assert.doesNotThrow(() => gate.guard('report:getTemplateSettings', ktv));
 });
 
 test('bảng quy tắc khớp đúng kênh và trang đang có', () => {
