@@ -154,7 +154,7 @@ test('khắc phục ngoại kiểm: hàng chờ, phạm vi máy, lập NCE và q
     await nav.getByRole('button', { name: /Kiểm tra nhanh/ }).click();
     const checks = page.getByRole('region', { name: 'Rà soát nguyên nhân ngoại kiểm', exact: true });
     await checks.getByRole('button', { name: 'Sửa', exact: true }).click();
-    assert.equal(await checks.getByRole('button', { name: 'Nguyên nhân gốc', exact: true }).count(), 10);
+    assert.equal(await checks.getByRole('button', { name: 'Nguyên nhân gốc', exact: true }).count(), 11);
     assert.equal(await checks.getByRole('button', { name: /Đánh dấu.*Đạt/ }).count(), 0);
     await checks.getByRole('button', { name: 'Nghi ngờ', exact: true }).first().click();
     await checks.locator('textarea').first().fill('Đã gửi yêu cầu đối chiếu đánh giá cho nhà cung cấp.');

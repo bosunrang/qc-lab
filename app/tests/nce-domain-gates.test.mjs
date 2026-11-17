@@ -16,7 +16,7 @@ const {
   validateNceActionDraft, validateNceActionCompletion, validateNceActionCancel, validateNceEffectivenessReview,
   nceEffectivenessBasis,
 } = require('../../app-dist/main/domain/nce/actions.js');
-const { checklistMissing, prepareChecklist, checklistKeys } = require('../../app-dist/main/domain/nce/checklist.js');
+const { checklistMissing, prepareChecklist, checklistKeys, checklistLabel } = require('../../app-dist/main/domain/nce/checklist.js');
 
 const codes = (missing) => missing.map((m) => m.code);
 const createInput = (over = {}) => ({
@@ -138,6 +138,22 @@ test('loại sai số đọc từ luật của điểm bị loại trong lần c
   const se = run('2026-10-01', '1', [point(1, { verdict: 'warn', rules: ['1-2s'] }), point(2, { verdict: 'rej', rules: ['2-2s', '4-1s'] })]);
   assert.equal(nceErrorClass([{ role: 'trigger', snapshot: se }]), 'SE');
   assert.equal(nceErrorClass([]), '');
+});
+
+test('N-10: rà soát nguyên nhân ngoại kiểm theo trình tự Eurachem, giữ mục cũ và thêm hoá chất/calibrator', () => {
+  assert.deepEqual(checklistKeys('eqa', true), ['providerReport', 'eqaAdministrative', 'eqaMeasurement', 'operator', 'method', 'instrument', 'reagent',
+    'sampleHandling', 'environment', 'eqaProgram', 'fiveWhys']);
+  assert.match(checklistLabel('sampleHandling', 'eqa', true), /chạy lại mẫu lưu/);
+  assert.match(checklistLabel('eqaMeasurement', 'eqa', true), /hiệu năng chung của nhóm/);
+  assert.match(checklistLabel('reagent', 'eqa', true), /calibrator/);
+  assert.doesNotMatch(checklistLabel('method', 'eqa', true), /nhóm so sánh/, 'nhóm so sánh thuộc lỗi hành chính và chương trình');
+  assert.equal(checklistLabel('reagent', 'iqc'), 'Hoá chất (lô, hạn dùng, bảo quản)', 'checklist nội kiểm giữ nhãn cũ');
+  // Hồ sơ lập trước khi đổi danh mục: mục đã đánh giá giữ nguyên, mục mới chờ đánh giá.
+  const old = { operator: { status: 'ok', note: 'Đã kiểm sổ thao tác.' }, method: { status: 'abnormal', note: 'Nghi nhiễu do huyết thanh đục.' } };
+  const prepared = prepareChecklist('eqa', old, true);
+  assert.deepEqual([prepared.operator, prepared.method], [old.operator, old.method]);
+  assert.deepEqual(prepared.reagent, { status: '', note: '' });
+  assert.ok(checklistMissing('eqa', prepared, true).some((m) => m.code === 'check-reagent' && /Hoá chất và calibrator/.test(m.message)));
 });
 
 test('checklist theo nguồn; bất thường/không áp dụng phải ghi chú', () => {

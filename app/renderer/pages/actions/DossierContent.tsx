@@ -8,9 +8,9 @@ import { useNceStore } from '../../store/nce-store';
 import { controlValue, findFieldControl, formErrorFrom, pickField, type FieldErrorMap, type FormError } from '../../lib/field-error';
 import { useInvalidField } from '../../lib/useInvalidField';
 import type { NceDossierView, NceUserOption } from '../../../shared/qc-api';
-import { checklistKeys } from '../../../main/domain/nce/checklist';
+import { checklistKeys, checklistLabel } from '../../../main/domain/nce/checklist';
 import {
-  NCE_CAUSE_CATEGORY_LABEL, NCE_CAUSE_STATUS_LABEL, NCE_CHECK_LABELS, NCE_PHASE_LABEL, NCE_RISK_LEVEL_LABEL, NCE_TIER_LABEL,
+  NCE_CAUSE_CATEGORY_LABEL, NCE_CAUSE_STATUS_LABEL, NCE_PHASE_LABEL, NCE_RISK_LEVEL_LABEL, NCE_TIER_LABEL,
 } from '../../../main/domain/nce/labels';
 import { nceRiskText } from '../../../main/domain/nce/presentation';
 import { NCE_DRAFT_BLANK } from '../../../main/domain/nce/containment-draft';
@@ -262,7 +262,7 @@ export function QuickCheckSection(props: SectionProps) {
           <ul className="nce-checklist-list" aria-label="Danh sách kiểm tra nhanh">
             {keys.map((key) => {
               const item = checklist[key] ?? { status: '', note: '' };
-              const label = NCE_CHECK_LABELS[key] ?? key;
+              const label = checklistLabel(key, record.source, eqaLinked);
               // Chỉ tách phần mô tả để trình bày; nhãn chuẩn của nghiệp vụ
               // vẫn được giữ nguyên cho API, báo cáo và tên truy cập ô nhập.
               const parts = /^(.+?) \((.+)\)$/.exec(label);

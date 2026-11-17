@@ -60,7 +60,7 @@ test('lập hồ sơ EQA: quyền trước dữ liệu, chụp đúng nguồn, k
     assert.equal(d.record.test_id, f.assay.id); assert.equal(d.record.eqa_result_id, f.result.id); assert.equal(d.record.tier, 'capa');
     assert.equal(JSON.parse(d.record.eqa_snapshot_json).result.result, 8.5);
     assert.equal(d.record.eqa_source_key.length, 64);
-    assert.equal(Object.keys(JSON.parse(d.record.checklist_json)).length, 10);
+    assert.equal(Object.keys(JSON.parse(d.record.checklist_json)).length, 11);
     assert.equal(f.create().error.code, 'eqa-has-record');
     const row = f.eqa.listEqaCorrective(f.scope)[0];
     assert.equal(row.record.id, d.record.id);
