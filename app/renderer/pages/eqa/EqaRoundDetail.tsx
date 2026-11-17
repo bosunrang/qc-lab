@@ -253,12 +253,13 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
         <div className="panel-head"><h2>Lịch sử</h2></div>
         <div className="eqa-section-body">
           <ol className="eqa-history">
-            {view.decisions.map((d) => (
-              <li key={d.id}>
-                <div><b>{DECISION_LABEL[d.type] ?? d.type}{reviewScope(d.type, d.payload_json, view) && ` · ${reviewScope(d.type, d.payload_json, view)}`}</b><span className="eqa-sub">{d.actor_name} · {new Date(d.decided_at).toLocaleString('vi-VN')}</span></div>
+            {view.decisions.map((d) => {
+              const scope = reviewScope(d.type, d.payload_json, view);
+              return <li key={d.id}>
+                <div><b>{DECISION_LABEL[d.type] ?? d.type}{scope && ` · ${scope}`}</b><span className="eqa-sub">{d.actor_name} · {new Date(d.decided_at).toLocaleString('vi-VN')}</span></div>
                 <p>{decisionDetail(d.type, d.payload_json)}</p>
-              </li>
-            ))}
+              </li>;
+            })}
           </ol>
         </div>
       </section>
@@ -317,14 +318,15 @@ function CancelRoundModal({ view, onClose }: { view: EqaRoundView; onClose: () =
   const [busy, setBusy] = useState(false);
   async function submit() {
     setBusy(true);
+    let message: string;
     try {
       const result = await cancel(view.round.id, view.round.row_version, reason);
-      setBusy(false);
-      if (result.ok) onClose(); else await errorDialog(result.error.message, { title: 'Chưa huỷ được đợt ngoại kiểm' });
+      if (result.ok) { onClose(); return; }
+      message = result.error.message;
     } catch (e) {
-      setBusy(false);
-      await errorDialog(e instanceof Error ? e.message : 'Không huỷ được đợt ngoại kiểm.', { title: 'Chưa huỷ được đợt ngoại kiểm' });
-    }
+      message = e instanceof Error ? e.message : 'Không huỷ được đợt ngoại kiểm.';
+    } finally { setBusy(false); }
+    await errorDialog(message, { title: 'Chưa huỷ được đợt ngoại kiểm' });
   }
   return (
     <Modal title="Huỷ đợt ngoại kiểm" size="sm" busy={busy} onClose={onClose}

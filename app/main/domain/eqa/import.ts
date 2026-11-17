@@ -54,7 +54,7 @@ function year(value: unknown): number | null {
 /** Gộp các báo cáo của CÙNG một đợt (mỗi máy một file). File khác đợt bị từ chối. */
 /** Khoá nhận diện một đợt: chương trình, đơn vị, tên đợt, năm. Cùng khoá thì
  * là các máy của cùng một đợt (mỗi máy một PDF). */
-export function eqaRoundSignature(r: EqaRoundInput): string {
+function eqaRoundSignature(r: EqaRoundInput): string {
   return [eqaNormalize(r.programCode || r.program), eqaNormalize(r.unitCode), eqaNormalize(r.round), r.year ?? ''].join('|');
 }
 

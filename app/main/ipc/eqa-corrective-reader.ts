@@ -8,7 +8,7 @@ import { sha256Hex } from '../domain/sha256';
 import { isoLocalDate } from '../domain/local-date';
 import { eqaNceSourceKey } from '../domain/eqa/source-key';
 
-export function eqaInvestigationReasons(result: EqaResultRow): { required: boolean; reasons: string[] } {
+function eqaInvestigationReasons(result: EqaResultRow): { required: boolean; reasons: string[] } {
   const reasons: string[] = [];
   if (result.class === 'rej') reasons.push('Kết quả không chấp nhận');
   if (result.trend?.unsuccessful) reasons.push('Không thành công qua các đợt');

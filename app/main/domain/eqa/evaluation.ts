@@ -10,7 +10,7 @@ export const EQA_DEFAULT_CONFIG: EqaConfig = { zWarn: 2, zReject: 3 };
 
 /** Sai lệch cho phép khi so z của app với z nhà cung cấp: nhà cung cấp làm
  * tròn z tới 2 chữ số (sai số ≤ 0,005), cộng thêm làm tròn X và σp. */
-export const EQA_PROVIDER_Z_TOLERANCE = 0.02;
+const EQA_PROVIDER_Z_TOLERANCE = 0.02;
 
 export type EqaClass = 'ok' | 'warn' | 'rej';
 /** `match` khớp; `swapped` ngược dấu z trên báo cáo, dù trùng hay khác độ lớn

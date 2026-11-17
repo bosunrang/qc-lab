@@ -7,7 +7,7 @@ export const EQA_PAPER_LIMITS = { conclusion: 500, communication: 250, warningNo
 export const EQA_ASSESSMENT_LABELS = { pending: 'Chưa kết luận', appropriate: 'Phù hợp', not_appropriate: 'Không phù hợp' } as const;
 export const EQA_CAR_LABELS = { pending: 'Chưa ghi nhận đề xuất CAR', not_required: 'Không đề xuất CAR', proposed: 'Đề xuất CAR', recorded: 'Đã ghi nhận hồ sơ CAR / NCE' } as const;
 const plain = (text: string | undefined) => (text || '').replace(/\s+/g, ' ').trim();
-export function eqaPaperDate(value: string): string {
+function eqaPaperDate(value: string): string {
   if (value.includes('T') && Number.isFinite(Date.parse(value))) return new Date(value).toLocaleDateString('vi-VN');
   return /^\d{4}-\d{2}-\d{2}/.test(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : 'Chưa ghi nhận';
 }

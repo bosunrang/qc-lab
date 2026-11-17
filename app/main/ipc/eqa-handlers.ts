@@ -36,7 +36,7 @@ interface RoundRecord {
   report_code: string; report_date: string; assigned_level: string;
 }
 
-export function readEqaConfig(db: Db): EqaConfig {
+function readEqaConfig(db: Db): EqaConfig {
   const row = db.prepare("SELECT value FROM app_meta WHERE key='eqaConfig'").get() as { value: string } | undefined;
   const raw = parseJson<Record<string, unknown>>(row?.value ?? '', {});
   const pick = (key: keyof EqaConfig, min: number, max: number) => {

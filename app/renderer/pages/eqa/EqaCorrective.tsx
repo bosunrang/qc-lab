@@ -1,3 +1,5 @@
+// Tab Khắc phục của Phân tích ngoại kiểm: kết quả cần xem xét theo phạm vi,
+// thẻ tổng hợp kiểu Khắc phục sự cố, khung căn cứ điều tra và hồ sơ NCE.
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { EqaNceEvidence } from '../../../shared/qc-api';
@@ -66,10 +68,16 @@ export function EqaCorrective() {
   const [creating, setCreating] = useState<EqaNceEvidence | null>(null);
   const rows = view.data || [];
   const keyOf = (r: typeof rows[number]) => r.record?.id || r.result.id;
-  const counts = { required: rows.filter(r => r.required && !r.record).length, ongoing: rows.filter(r => r.record && r.record.status !== 'closed').length,
-    closed: rows.filter(r => r.record?.status === 'closed').length, warning: rows.filter(r => !r.required && !r.record).length };
-  const filtered = rows.filter(r => (filter === 'all' || (filter === 'required' ? r.required && !r.record : filter === 'ongoing' ? r.record && r.record.status !== 'closed'
-    : filter === 'closed' ? r.record?.status === 'closed' : filter === 'warning' ? !r.required && !r.record : r.record?.status !== 'closed'))
+  // Một định nghĩa cho cả số đếm trên thẻ và bộ lọc danh sách.
+  const inFilter = (r: typeof rows[number], f: Filter): boolean => f === 'all' ? true
+    : f === 'required' ? r.required && !r.record
+    : f === 'ongoing' ? !!r.record && r.record.status !== 'closed'
+    : f === 'closed' ? r.record?.status === 'closed'
+    : f === 'warning' ? !r.required && !r.record
+    : r.record?.status !== 'closed';
+  const counts = Object.fromEntries((['required', 'ongoing', 'closed', 'warning'] as const)
+    .map(f => [f, rows.filter(r => inFilter(r, f)).length])) as Record<'required' | 'ongoing' | 'closed' | 'warning', number>;
+  const filtered = rows.filter(r => inFilter(r, filter)
     && nceSearchText(`${r.result.test_name} ${r.result.instrument_name} ${r.round.round} ${r.record?.nce_id || ''} ${r.record?.owner_name || ''}`).includes(nceSearchText(query)));
   const selected = selection?.scope === scopeKey ? filtered.find(r => keyOf(r) === selection.id) : undefined;
   function showEvidence(id: string, trigger: HTMLButtonElement) {
