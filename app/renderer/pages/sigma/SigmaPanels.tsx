@@ -34,14 +34,14 @@ export function SigmaStatusPanel({ period, testName, teaText }: { period: SigmaP
                 );
               })}
             </div></div>
-            <ImprovementCard levels={period.levels.map((lv) => ({ level: lv.level, result: lv, tea: lv.tea }))} />
+            <ImprovementCard levels={period.levels} />
           </>
         )}
     </div>
   );
 }
 
-export function SigmaOpspecsPanel({ period, governingLevel, hasSingleOperationalLevel }: {
+export function SigmaQcDesignPanel({ period, governingLevel, hasSingleOperationalLevel }: {
   period: SigmaPeriodView; governingLevel: SigmaLevelResult | null | undefined; hasSingleOperationalLevel: boolean;
 }) {
   return (
@@ -49,7 +49,7 @@ export function SigmaOpspecsPanel({ period, governingLevel, hasSingleOperational
       <summary className="sg-collapse-summary"><span role="heading" aria-level={2}>Thiết kế QC theo Westgard Sigma Rules</span></summary>
       <div className="sg-collapse-body">
         <div className="hint sg-selected-period-hint">Kỳ đang xem: <b>{vnPeriod(period.period)}</b>. Gợi ý không tự thay đổi luật Westgard đang áp dụng.</div>
-        <div className="sg-opspec-table-wrap"><table className="sg-opspec-table"><thead><tr><th>Mức</th><th>Sigma</th><th>Bộ quy tắc QC gợi ý</th><th>Mức nguy cơ tham khảo</th><th>Hành động</th></tr></thead><tbody>
+        <div className="sg-design-table-wrap"><table className="sg-design-table"><thead><tr><th>Mức</th><th>Sigma</th><th>Bộ quy tắc QC gợi ý</th><th>Mức nguy cơ tham khảo</th><th>Hành động</th></tr></thead><tbody>
           {period.levels.map((lv) => {
             const eligible = sigmaDesignEligible(lv);
             const design = eligible ? lv.qualityDesign : null;
@@ -68,7 +68,7 @@ export function SigmaOpspecsPanel({ period, governingLevel, hasSingleOperational
             <div>Mức quyết định: Mức {governingLevel.level} · Sigma {governingLevel.sigma?.sigma.toFixed(2)}. Áp dụng tham khảo: <b>{governingLevel.qualityDesign.rules.join(' / ')}</b> · {designRunText(governingLevel.qualityDesign)} · theo bảng Westgard Sigma Rules cho <b>{governingLevel.qualityDesign.levels} mức QC</b> (xét nghiệm đang có {governingLevel.qualityDesign.levelCount} mức).</div>
           </div>
         ) : <div className="hint sg-governing-rule">{hasSingleOperationalLevel ? 'Chưa đề xuất QC dùng chung: cần tối thiểu 2 mức QC đang vận hành để áp dụng bảng Westgard Sigma Rules.' : 'Chưa đề xuất QC dùng chung: cần đủ đầu vào và xác nhận rà soát IQC cho tất cả mức; không bỏ qua mức thiếu dữ liệu hoặc mất kiểm soát.'}</div>}
-        <div className="alert info sg-opspec-note">Gợi ý theo <b>Westgard Sigma Rules</b> chỉ là điểm khởi đầu. Người phụ trách phải rà soát nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng trước khi tự cấu hình luật Westgard.</div>
+        <div className="alert info sg-design-note">Gợi ý theo <b>Westgard Sigma Rules</b> chỉ là điểm khởi đầu. Người phụ trách phải rà soát nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng trước khi tự cấu hình luật Westgard.</div>
       </div>
     </details>
   );

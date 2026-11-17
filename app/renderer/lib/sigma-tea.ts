@@ -1,6 +1,6 @@
 import type { TeaRef, Test } from '../../shared/qc-api';
 import { TEA_CATALOG_WITH_CLIA_ABSOLUTE, type TeaCatalogItem } from '../../main/domain/tea-catalog';
-import { hasLabTea, labLevelTeas, operationalTeaSource, operationalTeaSummary, resolveTea, type ResolvedTeaCore, type SigmaTeaSourceCore } from '../../main/domain/sigma-tea-core';
+import { labLevelTeas, operationalTeaSource, operationalTeaSummary, resolveTea, type ResolvedTeaCore, type SigmaTeaSourceCore } from '../../main/domain/sigma-tea-core';
 
 export { teaCriterionText } from '../../main/domain/sigma-tea-core';
 
@@ -25,11 +25,6 @@ export function sigmaLabLevelTeas(test: Test, refs: TeaRef[]) {
   return labLevelTeas(test, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE);
 }
 
-/** Xét nghiệm đã có hồ sơ TEa của PXN — khi đó TEa PXN là nguồn mặc định. */
-export function sigmaHasLabTea(test: Pick<Test, 'name' | 'tea_ref_key'>, refs: TeaRef[]) {
-  return hasLabTea(test, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE);
-}
-
 export function sigmaOperationalTeaSource(test: Test, refs: TeaRef[]) {
   return operationalTeaSource(test, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE);
 }
@@ -39,6 +34,3 @@ export function sigmaOperationalTeaSource(test: Test, refs: TeaRef[]) {
 export function operationalTeaText(test: Pick<Test, 'name' | 'tea_ref_key' | 'unit' | 'tea' | 'tea_source' | 'operational_tea_source' | 'eflm_tea' | 'eflm_analyte' | 'eflm_ref' | 'eflm_lookup_date'>, refs: TeaRef[]) {
   return operationalTeaSummary(test, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE);
 }
-
-
-

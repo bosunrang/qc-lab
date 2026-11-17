@@ -33,7 +33,7 @@ import { AddSigmaPeriodModal } from './sigma/AddSigmaPeriodModal';
 import { BiasModal } from './sigma/BiasModal';
 import { CohortModal } from './sigma/CohortModal';
 import { MuModal } from './sigma/MuModal';
-import { SigmaChartsPanel, SigmaMuPanel, SigmaOpspecsPanel, SigmaStatusPanel } from './sigma/SigmaPanels';
+import { SigmaChartsPanel, SigmaMuPanel, SigmaQcDesignPanel, SigmaStatusPanel } from './sigma/SigmaPanels';
 import { TEA_SOURCES, editablePercent, isKnownTeaSource, missingSigmaInputs, sigmaZone, vnDate, vnPeriod } from './sigma/shared';
 
 const HISTORY_MIN_WIDTH = 180, HISTORY_MAX_WIDTH = 480;
@@ -67,13 +67,16 @@ export function SigmaPage() {
   function resizeHistory(width: number) {
     setHistoryWidth(Math.round(Math.max(HISTORY_MIN_WIDTH, Math.min(width, historyMaxNow()))));
   }
-  useEffect(() => { setSelectedPeriodId(null); setHistoryMonthFilter(''); setHistoryYearFilter(''); }, [testId]);
   const [biasModal, setBiasModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [muModal, setMuModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [cohortModal, setCohortModal] = useState<{ period: SigmaPeriodView; cohorts: SigmaCohortView[] } | null>(null);
   const [addPeriodOpen, setAddPeriodOpen] = useState(false);
   const [teaSaving, setTeaSaving] = useState(false);
-  useEffect(() => { setBiasModal(null); setMuModal(null); setCohortModal(null); setAddPeriodOpen(false); }, [testId]);
+  // Đổi xét nghiệm: bỏ lựa chọn kỳ, bộ lọc lịch sử và mọi hộp thoại đang mở.
+  useEffect(() => {
+    setSelectedPeriodId(null); setHistoryMonthFilter(''); setHistoryYearFilter('');
+    setBiasModal(null); setMuModal(null); setCohortModal(null); setAddPeriodOpen(false);
+  }, [testId]);
   const navigate = useNavigate();
 
   useCatalog(['tests', 'teaRefs', 'instruments']);
@@ -92,7 +95,6 @@ export function SigmaPage() {
     if (testId) loadPeriods(testId);
   });
 
-  const sigmaTests = tests;
   const test = tests.find((t) => t.id === testId);
   // Cả hai màn hình đọc cùng nguồn đã lưu; không giữ lựa chọn so sánh riêng.
   const savedTeaSource = useMemo(() => test ? sigmaOperationalTeaSource(test, teaRefs) : '', [test, teaRefs]);
@@ -102,7 +104,7 @@ export function SigmaPage() {
     () => test ? resolveSigmaTea(test, teaRefs, teaSource as SigmaTeaSource, sourceTargetMean) : null,
     [test, teaRefs, teaSource, sourceTargetMean],
   );
-  const admin = isAdmin(useAuthStore((s) => s.user)?.role);
+  const admin = isAdmin(currentUser?.role);
   const instrumentName = instruments.find((i) => i.id === test?.instrument_id)?.name || '';
   // Cùng một analyte có thể được khai trên nhiều máy. `tests` giữ từng tổ
   // hợp xét nghiệm–máy riêng, nên nhãn selector phải nêu máy để không chọn
@@ -113,9 +115,9 @@ export function SigmaPage() {
   };
   // Ô chọn xét nghiệm có tìm kiếm (`SearchSelect`, cùng ô ở Westgard và Ngoại
   // kiểm): gõ tên, máy, đơn vị hoặc nhóm, không cần dấu.
-  const testOptions = useMemo(() => sigmaTests.map((item): SearchSelectOption => ({
+  const testOptions = useMemo(() => tests.map((item): SearchSelectOption => ({
     value: item.id, label: sigmaTestLabel(item), keywords: [item.unit, item.section].filter(Boolean).join(' '),
-  })), [sigmaTests, instruments]); // eslint-disable-line react-hooks/exhaustive-deps -- `sigmaTestLabel` chỉ đọc `instruments`
+  })), [tests, instruments]); // eslint-disable-line react-hooks/exhaustive-deps -- `sigmaTestLabel` chỉ đọc `instruments`
   // Chỉ xét hồ sơ TEa PXN khớp ĐÚNG xét nghiệm đang xem, không phải cả bảng.
   const labTeaByLevel = useMemo(() => test ? sigmaLabLevelTeas(test, teaRefs) : [], [test, teaRefs]);
   const teaSourceValueText = (source: string): string => {
@@ -140,7 +142,6 @@ export function SigmaPage() {
     ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`
     : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`;
   const configuredTea = teaResolution?.value ?? null;
-  const configuredTeaSource = teaSource;
   const targetMeanForLevel = (levelNumber: number) => (levelsByTestId[testId] || []).find((level) => level.level === levelNumber)?.mean ?? null;
   const teaForLevel = (levelNumber: number) => {
     return test ? resolveSigmaTea(test, teaRefs, teaSource as SigmaTeaSource, targetMeanForLevel(levelNumber), levelNumber).value : null;
@@ -213,8 +214,8 @@ export function SigmaPage() {
     // Nếu mã nguồn TEa đã lưu không còn hợp lệ, dùng nguồn cấu hình hiện hành
     // để tiếp tục sửa kỳ. Snapshot TEa hợp lệ của kỳ vẫn được giữ nguyên.
     const saved = period.savedTea ?? { tea: period.tea, source: period.teaSource };
-    const teaSource = isKnownTeaSource(saved.source) ? saved.source : configuredTeaSource;
-    return savePeriod(period.testId, period.period, saved.tea ?? undefined, teaSource, levels, false, sharedEqaRounds, eqaWindowMonths);
+    const periodSource = isKnownTeaSource(saved.source) ? saved.source : teaSource;
+    return savePeriod(period.testId, period.period, saved.tea ?? undefined, periodSource, levels, false, sharedEqaRounds, eqaWindowMonths);
   }
 
   function periodTeaText(period: SigmaPeriodView): string {
@@ -294,7 +295,7 @@ export function SigmaPage() {
       testId,
       period,
       configuredTea ?? undefined,
-      configuredTeaSource || undefined,
+      teaSource,
       operationalLevels.map((level) => ({ level, tea: teaForLevel(level) ?? undefined, targetMean: targetMeanForLevel(level) ?? undefined })),
       true,
     );
@@ -313,7 +314,7 @@ export function SigmaPage() {
     return true;
   }
 
-  if (!sigmaTests.length) {
+  if (!tests.length) {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       <div className="panel"><EmptyState
@@ -362,7 +363,7 @@ export function SigmaPage() {
               <SearchSelect id="sgTestSelect" ariaLabel="Chọn xét nghiệm" placeholder="Gõ tên xét nghiệm…" value={testId} options={testOptions} onChange={setTestId} />
             </div>
             <div className="field sg-unit-field"><label htmlFor="sg-unit">Đơn vị</label><input id="sg-unit" value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
-            <div className="field sg-instrument-field"><label htmlFor="sg-instrument">Thiết bị</label><input id="sg-instrument" value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
+            <div className="field sg-instrument-field"><label htmlFor="sg-instrument">Thiết bị</label><input id="sg-instrument" value={instrumentName} readOnly placeholder="Chưa gán thiết bị" /></div>
           </div>
           <div className="sg-setup-fields">
             <div className="field sg-tea-source">
@@ -424,7 +425,8 @@ export function SigmaPage() {
                 </select>
               </div>
               <div className="sg-period-history-list">
-                {filteredPeriods.map((p) => {
+                {/* Lịch sử hiện kỳ mới nhất trước; giữ thứ tự gốc cho biểu đồ và kỳ mặc định. */}
+                {[...filteredPeriods].reverse().map((p) => {
                   const complete = p.levels.length > 0 && p.levels.every((lv) => lv.sigma != null);
                   return <button type="button" key={p.id} className={`sg-period-history-item${p.id === displayPeriod.id ? ' is-selected' : ''}`}
                     aria-pressed={p.id === displayPeriod.id} onClick={() => setSelectedPeriodId(p.id)}>
@@ -498,7 +500,7 @@ export function SigmaPage() {
         </div>
       )}
 
-      {testId && displayPeriod && <SigmaOpspecsPanel period={displayPeriod} governingLevel={governingLevel} hasSingleOperationalLevel={hasSingleOperationalLevel} />}
+      {testId && displayPeriod && <SigmaQcDesignPanel period={displayPeriod} governingLevel={governingLevel} hasSingleOperationalLevel={hasSingleOperationalLevel} />}
 
       {testId && displayPeriod && <SigmaMuPanel period={displayPeriod} unit={test?.unit || ''} writable={writable} onEdit={(level) => setMuModal({ period: displayPeriod, level })} />}
 

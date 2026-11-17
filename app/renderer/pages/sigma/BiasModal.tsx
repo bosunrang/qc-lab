@@ -106,7 +106,7 @@ export function BiasModal({ initialRounds, initialWindowMonths, source, onClose,
           <tbody>
             {rounds.map((v, i) => {
               const lab = Number(v.lab), target = Number(v.target);
-              const bias = v.lab.trim() !== '' && v.target.trim() !== '' && Number.isFinite(lab) && Number.isFinite(target) && target !== 0 ? (lab - target) / Math.abs(target) * 100 : null;
+              const bias = v.lab.trim() !== '' && v.target.trim() !== '' && Number.isFinite(lab) && Number.isFinite(target) && target !== 0 ? eqaRoundBias(lab, target) : null;
               return (
                 <tr key={i}>
                   <td className="sg-eqa-index">{i + 1}</td>

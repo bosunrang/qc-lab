@@ -174,8 +174,8 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   assert.match(manage, /\.config-shell input[^}]*height:var\(--control-h\)[^}]*min-height:var\(--control-h\)/,
     'toàn bộ control trong Cấu hình dùng mật độ 36px, không kéo theo modal');
   assert.match(manage, /\.target-head\{[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
-  assert.match(sigma, /\.sg-opspec-table th\{[^}]*height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
-  assert.match(sigma, /\.sg-opspec-table td\{[^}]*height:var\(--table-row-h\)[^}]*vertical-align:middle/);
+  assert.match(sigma, /\.sg-design-table th\{[^}]*height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
+  assert.match(sigma, /\.sg-design-table td\{[^}]*height:var\(--table-row-h\)[^}]*vertical-align:middle/);
   assert.match(sigma, /\.sg-level-matrix-head\{[^}]*min-height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/,
     'workspace kỳ dùng header dữ liệu chuẩn 40px/13px');
   assert.match(sigma, /\.sg-period-history-item\.is-selected\{[^}]*border-color:var\(--accent-border\)[^}]*border-left:3px solid var\(--accent\)[^}]*background:var\(--accent-surface\)[^}]*color:var\(--text-accent\);\}/,
@@ -276,7 +276,7 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
   const sigmaPage = readSigmaPageSources();
   const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
 
-  assert.match(sigmaPage, /const sigmaTests = tests;/,
+  assert.match(sigmaPage, /const testOptions = useMemo\(\(\) => tests\.map\(/,
     'tất cả xét nghiệm từ Cấu hình chung đều hiện trong Six Sigma');
   assert.doesNotMatch(sigmaPage, /SigmaTrackingModal|trackingPickerOpen|setTracking\(/,
     'không còn luồng thêm hoặc gỡ xét nghiệm riêng trong Six Sigma');
@@ -599,7 +599,7 @@ test('ghi chú OPSpecs chảy như một đoạn văn, không tách text node th
   const sigma = readFileSync(join(STYLE_DIR, 'pages', 'sigma.css'), 'utf8');
   assert.match(
     sigma,
-    /\.sg-opspec-note\{display:block;width:100%;margin:var\(--space-3\) 0 0;\}/,
+    /\.sg-design-note\{display:block;width:100%;margin:var\(--space-3\) 0 0;\}/,
     'ghi chú Sigma có chữ đậm xen giữa phải bỏ flex của alert',
   );
 });

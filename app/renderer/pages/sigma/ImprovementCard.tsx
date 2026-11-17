@@ -24,10 +24,10 @@ interface LevelImprovement { level: number; sigma: number; fail: boolean; estima
 
 const ESTIMATE_NOTE = 'Ước tính tham khảo — dữ liệu IQC chưa đủ điều kiện hoặc chưa được xác nhận rà soát.';
 
-function levelImprovement(level: number, result: SigmaLevelResult, tea: number | null): LevelImprovement | null {
+function levelImprovement(result: SigmaLevelResult): LevelImprovement | null {
   const sigma = result.sigma?.sigma;
   if (sigma == null || !Number.isFinite(sigma) || sigma >= 4) return null;
-  const teaN = Number(tea ?? result.sigma?.tea ?? 0);
+  const teaN = Number(result.tea ?? result.sigma?.tea ?? 0);
   const cv = Number(result.cv ?? 0);
   const bias = Math.abs(Number(result.biasEqa ?? 0));
   const fail = sigma < 3;
@@ -38,7 +38,7 @@ function levelImprovement(level: number, result: SigmaLevelResult, tea: number |
   if (plan.cvTarget > 0) parts.push(`giảm CV ≤ ${plan.cvTarget.toFixed(2)}% (hiện ${cv.toFixed(2)}%)`);
   if (plan.biasTarget > 0) parts.push(`giảm |Bias| ≤ ${plan.biasTarget.toFixed(2)}% (hiện ${bias.toFixed(2)}%)`);
   return {
-    level, sigma, fail, estimate: !sigmaDesignEligible(result),
+    level: result.level, sigma, fail, estimate: !sigmaDesignEligible(result),
     status: fail ? 'Phương pháp chưa đạt năng lực — cần khắc phục trước khi tin cậy kết quả.' : 'Hiệu năng cận biên — nên cải thiện để vượt 4σ.',
     cause: `Nguyên nhân chủ yếu do ${driver}${plan.qgi != null ? ` (QGI ${plan.qgi.toFixed(2)})` : ''}.`,
     target: parts.length ? `Để đạt ≥ 4σ: ${parts.join(' hoặc ')}.` : 'Độ chệch đã vượt mức cho phép — phải giảm bias trước.',
@@ -50,8 +50,8 @@ function levelImprovement(level: number, result: SigmaLevelResult, tea: number |
  * thẻ lặp lại gần như nguyên văn cùng danh sách hành động, làm cột Tình trạng
  * rất dài. Nay mỗi mức một đoạn chẩn đoán và mục tiêu riêng, danh sách hành
  * động gộp các mức và chỉ in một lần. Màu viền theo mức có Sigma thấp nhất. */
-export function ImprovementCard({ levels }: { levels: readonly { level: number; result: SigmaLevelResult; tea: number | null }[] }) {
-  const items = levels.map(({ level, result, tea }) => levelImprovement(level, result, tea)).filter((item): item is LevelImprovement => !!item);
+export function ImprovementCard({ levels }: { levels: readonly SigmaLevelResult[] }) {
+  const items = levels.map(levelImprovement).filter((item): item is LevelImprovement => !!item);
   if (!items.length) return null;
   const worst = items.reduce((low, item) => (item.sigma < low.sigma ? item : low));
   const acts = [...new Set(items.flatMap((item) => item.acts))];

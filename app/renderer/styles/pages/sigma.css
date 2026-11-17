@@ -69,15 +69,15 @@
    giữ các bảng thiết kế QC/MU thẳng với viền panel. */
 .sg-collapse-body{margin:var(--panel-content-gap) var(--space-4) var(--space-4);padding:0;border:0;}
 .sg-selected-period-hint{margin:0 0 var(--space-2-5);}
-.sg-opspec-table-wrap,.sg-cohort-table-wrap,.sg-mu-table-wrap{max-width:100%;overflow-x:auto;}
+.sg-design-table-wrap,.sg-cohort-table-wrap,.sg-mu-table-wrap{max-width:100%;overflow-x:auto;}
 /* Thiết kế QC là bảng quyết định chính của thẻ Sigma, không phải bảng tham chiếu
    gọn. Dùng đúng nhịp chung 13px / header 40px / hàng 44px như các bảng dữ
    liệu khác; nếu màn hình hẹp thì cuộn ngang thay vì ép header xuống hai dòng. */
-.sg-opspec-table{width:100%;min-width:960px;table-layout:fixed;}
-.sg-opspec-table th{height:var(--table-header-h);padding:0 var(--table-cell-px);font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);text-align:center;white-space:nowrap;}
-.sg-opspec-table td{height:var(--table-row-h);vertical-align:middle;text-align:center;}
-.sg-opspec-table th:nth-child(1){width:9%}.sg-opspec-table th:nth-child(2){width:11%}.sg-opspec-table th:nth-child(3){width:28%}.sg-opspec-table th:nth-child(4){width:27%}.sg-opspec-table th:nth-child(5){width:25%}
-.sg-opspec-table th:first-child,.sg-opspec-table td:first-child{text-align:left;}
+.sg-design-table{width:100%;min-width:960px;table-layout:fixed;}
+.sg-design-table th{height:var(--table-header-h);padding:0 var(--table-cell-px);font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);text-align:center;white-space:nowrap;}
+.sg-design-table td{height:var(--table-row-h);vertical-align:middle;text-align:center;}
+.sg-design-table th:nth-child(1){width:9%}.sg-design-table th:nth-child(2){width:11%}.sg-design-table th:nth-child(3){width:28%}.sg-design-table th:nth-child(4){width:27%}.sg-design-table th:nth-child(5){width:25%}
+.sg-design-table th:first-child,.sg-design-table td:first-child{text-align:left;}
 /* Cohort là bảng dữ liệu chọn nguồn CV: dùng nguyên nhịp bảng chuẩn để phần
    header, số liệu và trạng thái đồng nhất với các bảng cấu hình khác. */
 .sg-cohort-table{width:100%;min-width:760px;table-layout:fixed;}
@@ -86,7 +86,7 @@
 .sg-cohort-excluded{display:block;font-size:var(--text-2xs);}
 /* Nội dung là một câu có `<b>` ở giữa; không dùng flex của `.alert`, nếu
    không text node trước/sau thẻ đậm bị tách thành các cột và rơi dòng giả. */
-.sg-opspec-note{display:block;width:100%;margin:var(--space-3) 0 0;}
+.sg-design-note{display:block;width:100%;margin:var(--space-3) 0 0;}
 .sg-chart-grid{display:grid;grid-template-columns:1fr;gap:var(--space-4);align-items:start;margin:var(--panel-content-gap);}
 .sg-chart-box{overflow:hidden;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--panel-shadow);}
 .sg-chart-box>h3{margin:0;min-height:var(--subpanel-header-h);display:flex;align-items:center;padding:var(--space-2-5) var(--space-3);background:var(--surface-section-header);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);font-size:var(--title-sub);font-weight:var(--title-sub-weight);line-height:var(--leading-heading);}

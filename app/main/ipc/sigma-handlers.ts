@@ -612,7 +612,3 @@ export function createSigmaHandlers(db: Db) {
 
   return { listPeriods, listCohorts, saveTeaConfig, savePeriod, renamePeriod, removePeriod, eqaBias };
 }
-
-export type SigmaHandlers = ReturnType<typeof createSigmaHandlers>;
-
-

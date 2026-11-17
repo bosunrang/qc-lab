@@ -43,10 +43,9 @@ function scenario(t) {
 
 test('SG01: actual Add period sends an enum for each TEa source, with per-level snapshot', async () => {
   const add = section(page, '  async function addPeriod(', '  async function commitBias(');
-  const assignment = section(page, '  const configuredTeaSource =', '  const targetMeanForLevel');
   for (const teaSource of ['lab', 'eflm', 'clia', 'ricos']) {
     let payload;
-    const fn = evaluate(assignment + add + '\naddPeriod', {
+    const fn = evaluate(add + '\naddPeriod', {
       teaSource, teaResolution: { criterion: 'Descriptive source, not an enum' }, periods: [], testId: 'A', currentTest: { current: 'A' },
       configuredTea: 4, operationalLevels: [1, 2], teaForLevel: level => 4 / level, targetMeanForLevel: level => 100 * level,
       savePeriod: async (...args) => { payload = args; return { ok: true, data: { id: 'A:2026-08' } }; }, setSelectedPeriodId() {},
@@ -65,7 +64,7 @@ test('SG01b: sửa kỳ dùng nguồn TEa hiện hành nếu mã snapshot không
   const saveOwned = section(page, '  function saveOwnedPeriod(', '  function periodTeaText(');
   let payload;
   const save = evaluate(teaSources + saveOwned + '\nsaveOwnedPeriod', {
-    configuredTeaSource: 'eflm',
+    teaSource: 'eflm',
     currentTest: { current: 'A' },
     useSigmaStore: { getState: () => ({ loading: false }) },
     savePeriod: async (...args) => { payload = args; return { ok: true }; },
@@ -93,7 +92,7 @@ test('SG02/11: actual blur handlers preserve unchanged values; switching test re
   period.levels[0].cvSource = 'iqc-cohort';
   const payload = section(page, '  function levelPayload(', '  function periodTeaText(');
   const cv = section(page, '  async function commitCv(', '  /** Kỳ mới');
-  const bias = section(page, '  async function commitBias(', '  if (!sigmaTests.length)');
+  const bias = section(page, '  async function commitBias(', '  if (!tests.length)');
   let calls = 0, confirmations = 0, accept = false;
   const currentTest = { current: period.testId };
   const methods = evaluate(payload + cv + bias + '\n({commitCv,commitBias})', {
@@ -341,7 +340,7 @@ test('actual MU modal renders the edited draft, not stored MU, and marks incompl
       Modal: ({ children }) => React.createElement('section', null, children),
       AsyncButton: ({ children }) => React.createElement('button', null, children),
     });
-    return renderToStaticMarkup(React.createElement(MuModal, { level: { cv: 1, biasEqa: 0, tea: 10, mu: { U: 2 } } }));
+    return renderToStaticMarkup(React.createElement(MuModal, { level: { cv: 1, biasEqa: 0, eqaRounds: [], tea: 10, mu: { U: 2 } } }));
   }
   assert.match(render(['0', '5', false, null]), /10\.198/);
   assert.match(render(['', '', true, null]), /Tạm tính chưa đầy đủ/);
