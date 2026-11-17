@@ -8,6 +8,10 @@
 // - DPMO theo quy ước dịch chuyển 1,5σ: (1 − Φ(σ − 1,5)) × 10^6.
 // - Bias nhiều vòng EQA cho Sigma: trung bình có dấu; RMS chỉ cho ngân sách MU,
 //   theo quyết định SB-1 ở docs/SIGMA-REVIEW-2026-11-17.md.
+// - TEa CLIA dạng tuyệt đối: TEa% = |giới hạn / Mean| × 100; tiêu chí "lớn hơn
+//   giữa" lấy số lớn hơn của giới hạn % và giới hạn tuyệt đối đã quy đổi.
+// - Độ không đảm bảo đo theo Nordtest TR 537: u(bias) = √(Bias_RMS² + u(Cref)²),
+//   u_c = √(u(Rw)² + u(bias)² + u(cal)²), U = k · u_c với k = 2.
 // - Chỉ số mục tiêu chất lượng QGI = |Bias| / (1,5 × CV) (theo Parry).
 // - CUSUM dạng bảng: C+ = max(0, C+ + z − k), C− = min(0, C− + z + k),
 //   tín hiệu khi C+ ≥ h hoặc C− ≤ −h (Montgomery, Introduction to SQC).
@@ -59,6 +63,18 @@ export function eqaBiasPercent(lab, target) {
 
 export function rms(values) {
   return Math.sqrt(values.reduce((sum, v) => sum + v * v, 0) / values.length);
+}
+
+export function cliaTeaPercent({ percent, absolute, mean }) {
+  const absolutePct = Math.abs(absolute / mean) * 100;
+  return percent == null ? absolutePct : Math.max(percent, absolutePct);
+}
+
+/** Ngân sách MU; thành phần vắng mặt không góp vào u_c. */
+export function muBudget({ cv, bias, uCref, uCal, includeBias = true, k = 2 }) {
+  const uBias = includeBias ? Math.sqrt(bias ** 2 + (uCref ?? 0) ** 2) : null;
+  const uc = Math.sqrt(cv ** 2 + (uBias ?? 0) ** 2 + (uCal ?? 0) ** 2);
+  return { uBias, uc, U: k * uc };
 }
 
 export function qgi(bias, cv) {

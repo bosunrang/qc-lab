@@ -34,27 +34,44 @@ test('đáp án thống kê tái lập được bằng bộ tính tham chiếu',
   }
 });
 
-test('đáp án Sigma, DPMO, Bias EQA và QGI tái lập được bằng bộ tính tham chiếu', () => {
+test('đáp án Sigma, DPMO, Bias EQA, TEa CLIA, MU và QGI tái lập được bằng bộ tính tham chiếu', () => {
   for (const item of SIGMA_CASES) {
-    const want = item.expect[1];
-    let bias, cv, tea;
-    if (item.cohort) {
-      const values = item.runs.map((run) => run.val[1]);
-      ({ tea, biasEqa: bias } = item.cohort);
-      cv = ref.cvPercent(values);
-      assert.ok(close(cv, want.cv), `${item.id} CV`);
-    } else {
-      const level = item.sigma.levels[0];
-      tea = item.sigma.tea; cv = level.cv;
-      const rounds = level.eqaRounds?.map((r) => ref.eqaBiasPercent(r.lab, r.target));
-      bias = rounds ? ref.mean(rounds) : level.biasEqa;
-      if ('biasEqa' in want) assert.ok(close(bias, want.biasEqa), `${item.id} Bias trung bình có dấu`);
-      if ('biasRms' in want) assert.ok(close(ref.rms(rounds), want.biasRms), `${item.id} Bias RMS cho MU`);
+    // Ca trọn đường chỉ có mức 1; ca nhập tay kiểm mọi mức có đáp án.
+    const rows = item.cohort ? [{ level: 1 }] : item.sigma.levels.filter((level) => item.expect[level.level]);
+    for (const level of rows) {
+      const want = item.expect[level.level];
+      const label = `${item.id} mức ${level.level}`;
+      let bias, cv, tea, rounds;
+      if (item.cohort) {
+        const values = item.runs.map((run) => run.val[1]);
+        ({ tea, biasEqa: bias } = item.cohort);
+        cv = ref.cvPercent(values);
+        assert.ok(close(cv, want.cv), `${label} CV`);
+      } else {
+        const mean = item.levels.find((l) => l.level === level.level).mean;
+        tea = item.sigma.clia ? ref.cliaTeaPercent({ ...item.sigma.clia, mean }) : item.sigma.tea;
+        cv = level.cv;
+        rounds = level.eqaRounds?.map((r) => ref.eqaBiasPercent(r.lab, r.target));
+        bias = rounds ? ref.mean(rounds) : level.biasEqa;
+        if ('tea' in want) assert.ok(close(tea, want.tea), `${label} TEa% ${tea}`);
+        if ('biasEqa' in want) assert.ok(close(bias, want.biasEqa), `${label} Bias trung bình có dấu`);
+        if ('biasRms' in want) assert.ok(close(ref.rms(rounds), want.biasRms), `${label} Bias RMS cho MU`);
+        if (want.mu) {
+          const mu = ref.muBudget({ cv, bias: rounds ? ref.rms(rounds) : bias, uCref: level.uCref, uCal: level.uCal, includeBias: level.muBiasMode !== 'exclude' });
+          for (const key of ['uBias', 'uc', 'U']) {
+            if (key in want.mu) assert.ok(close(mu[key], want.mu[key]), `${label} MU ${key} ${mu[key]}`);
+          }
+          if ('teaRatio' in want.mu) assert.ok(close(mu.U / tea, want.mu.teaRatio), `${label} U/TEa`);
+          if (want.mu.withinTea != null) assert.equal(mu.U <= tea, want.mu.withinTea, `${label} U ≤ TEa`);
+          if ('absoluteU' in want.mu) assert.ok(close(mu.U * mean / 100, want.mu.absoluteU), `${label} U theo đơn vị`);
+        }
+      }
+      if (!('sigma' in want)) continue;
+      if (want.sigma === null) { assert.equal(bias, undefined, `${label} không có Bias`); continue; }
+      const sigma = ref.sigmaMetric(tea, bias, cv);
+      assert.ok(close(sigma, want.sigma), `${label} Sigma ${sigma}`);
+      if ('dpmo' in want) assert.ok(Math.abs(ref.dpmo(sigma) - want.dpmo) <= 0.01, `${label} DPMO ${ref.dpmo(sigma)}`);
     }
-    if (want.sigma === null) { assert.equal(bias, undefined, `${item.id} không có Bias`); continue; }
-    const sigma = ref.sigmaMetric(tea, bias, cv);
-    assert.ok(close(sigma, want.sigma), `${item.id} Sigma ${sigma}`);
-    if ('dpmo' in want) assert.ok(Math.abs(ref.dpmo(sigma) - want.dpmo) <= 0.01, `${item.id} DPMO ${ref.dpmo(sigma)}`);
   }
   for (const item of QGI_CASES) assert.ok(close(ref.qgi(item.bias, item.cv), item.expect.qgi), item.id);
 });

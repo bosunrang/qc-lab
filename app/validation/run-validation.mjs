@@ -45,6 +45,8 @@ function createCaseTest(ctx, item) {
   const { config, westgard } = ctx;
   const test = must(config.saveTest({ data: {
     name: `${item.id} ${item.title}`.slice(0, 120), instrumentId: ctx.instrumentId, unit: 'mmol/L', decimalPlaces: 3,
+    // Ca TEa theo CLIA gắn xét nghiệm với đúng dòng danh mục, như khi chọn ở Cấu hình chung.
+    ...(item.sigma?.teaRefKey ? { teaRefKey: item.sigma.teaRefKey } : {}),
     ...(item.cusum ? { cusumOn: true, cusumK: item.cusum.k, cusumH: item.cusum.h } : {}),
   } }, ADMIN), `${item.id} tạo xét nghiệm`);
   const lots = {};
@@ -185,10 +187,15 @@ function sigmaChecks(ctx, item, created) {
     }));
     if (!levels.length) throw new Error('Không có nhóm IQC nào cho kỳ ' + period);
   } else {
-    // TEa ghi ngay ở mức (ưu tiên cao nhất), để kết quả không phụ thuộc danh mục TEa.
-    levels = item.sigma.levels.map((level) => ({ ...level, tea: item.sigma.tea }));
+    // TEa % ghi ngay ở mức (ưu tiên cao nhất), để kết quả không phụ thuộc danh
+    // mục TEa. Ca CLIA không ghi TEa: main tự giải theo Mean của từng mức như
+    // khi trang Six Sigma tạo kỳ mới. Mean mục tiêu gửi kèm như trang Sigma.
+    levels = item.sigma.levels.map((level) => ({
+      ...level, targetMean: created.targets[level.level].mean, ...(item.sigma.tea != null ? { tea: item.sigma.tea } : {}),
+    }));
   }
-  must(ctx.sigma.savePeriod({ testId: created.testId, period, tea: cohort ? cohort.tea : item.sigma.tea, levels }, ADMIN), `${item.id} lưu kỳ Sigma`);
+  const teaSource = cohort ? undefined : item.sigma.teaSource;
+  must(ctx.sigma.savePeriod({ testId: created.testId, period, tea: cohort ? cohort.tea : item.sigma.tea, ...(teaSource ? { teaSource } : {}), levels }, ADMIN), `${item.id} lưu kỳ Sigma`);
   // Trang Six Sigma nạp lại kỳ bằng `listSigmaPeriods` sau khi lưu.
   const view = ctx.sigma.listPeriods(created.testId).find((row) => row.period === period);
   const checks = [];
@@ -202,6 +209,7 @@ function sigmaChecks(ctx, item, created) {
     const add = (label, expected, actual, pass) => checks.push({ check: `Mức ${level}: ${label}`, expected, actual, pass });
     if ('cohortN' in want) add('Số điểm IQC của nhóm', fmt(want.cohortN), fmt(got?.cohortN), got?.cohortN === want.cohortN);
     if ('cohortStatus' in want) add('Trạng thái nhóm IQC', want.cohortStatus, got?.cohortStatus || '—', got?.cohortStatus === want.cohortStatus);
+    if ('tea' in want) add('TEa% của mức', fmt(want.tea), fmt(got?.tea), sameNumber(got?.tea, want.tea));
     if ('cv' in want) add('CV% dùng cho Sigma', fmt(want.cv), fmt(got?.cv), sameNumber(got?.cv, want.cv));
     if ('sigma' in want) add('Sigma', fmt(want.sigma), fmt(sigma), sameNumber(sigma, want.sigma));
     if ('dpmo' in want) {
@@ -212,6 +220,8 @@ function sigmaChecks(ctx, item, created) {
     if ('biasRms' in want) add('Bias% RMS (chỉ cho MU)', fmt(want.biasRms), fmt(got?.biasRms), sameNumber(got?.biasRms, want.biasRms));
     if ('biasMean' in want) add('Bias% trung bình có dấu', fmt(want.biasMean), fmt(got?.biasMean), sameNumber(got?.biasMean, want.biasMean));
     if ('mixedSigns' in want) add('Cảnh báo vòng EQA trái dấu', want.mixedSigns ? 'Có' : 'Không', got?.mixedSigns ? 'Có' : 'Không', got?.mixedSigns === want.mixedSigns);
+    if (want.noTable) add(`Bảng gợi ý thiết kế QC${designSource}`, 'Không có (Westgard chỉ công bố bảng 2 và 3 mức)', design ? `Có (bậc ${design.tier})` : 'Không có', design === null);
+    if (want.mu) checks.push(...muChecks(level, want.mu, got?.mu));
     if ('tier' in want) add(`Bậc Sigma${designSource}`, want.tier, design?.tier ?? '—', design?.tier === want.tier);
     if ('capable' in want) add(`Đủ năng lực${designSource}`, want.capable ? 'Có' : 'Không', design ? (design.capable ? 'Có' : 'Không') : '—', design?.capable === want.capable);
     if ('rules' in want) add(`Bộ luật gợi ý${designSource}`, fmt(want.rules), fmt(design?.rules ?? []), sameSet(design?.rules ?? [], want.rules));
@@ -221,6 +231,22 @@ function sigmaChecks(ctx, item, created) {
     const wantShown = want.designShown === true;
     add('Trang Sigma hiện gợi ý thiết kế', wantShown ? 'Có' : 'Không (CV nhập tay, chưa từ nhóm IQC đã rà soát)', shown ? 'Có' : 'Không', shown === wantShown);
   }
+  return checks;
+}
+
+/** Ngân sách MU mà hộp thoại MU của trang Six Sigma hiển thị cho một mức. */
+function muChecks(level, want, got) {
+  const checks = [];
+  const add = (label, expected, actual, pass) => checks.push({ check: `Mức ${level}: MU ${label}`, expected, actual, pass });
+  const yesNo = (value) => (value == null ? 'Chưa kết luận' : value ? 'Có' : 'Không');
+  for (const [key, label] of [['uRw', 'u(Rw)%'], ['uBias', 'u(bias)%'], ['uCal', 'u(cal)%'], ['uc', 'u_c%'], ['U', 'U% (k = 2)'], ['absoluteU', 'U theo đơn vị'], ['teaRatio', 'U / TEa']]) {
+    if (!(key in want)) continue;
+    const value = got?.[key] ?? null;
+    add(label, fmt(want[key]), fmt(value), sameNumber(value, want[key]));
+  }
+  if ('complete' in want) add('ngân sách đủ thành phần', want.complete ? 'Có' : 'Không', got ? (got.complete ? 'Có' : 'Không') : '—', got?.complete === want.complete);
+  if ('missing' in want) add('thành phần còn thiếu', fmt(want.missing), fmt(got?.missing ?? []), sameSet(got?.missing ?? [], want.missing));
+  if ('withinTea' in want) add('U ≤ TEa', yesNo(want.withinTea), got ? yesNo(got.withinTea) : '—', (got?.withinTea ?? null) === want.withinTea);
   return checks;
 }
 
@@ -255,7 +281,20 @@ function cusumChecks(item, analyses) {
 
 function describeInput(item) {
   if (item.cohort) return `30 điểm IQC mức 1 (Mean/SD 100/2), kỳ ${item.cohort.period}; TEa ${fmt(item.cohort.tea)}%, Bias ${fmt(item.cohort.biasEqa)}%; CV lấy từ nhóm IQC, người phụ trách xác nhận đã rà soát`;
-  if (item.sigma) return `TEa ${fmt(item.sigma.tea)}%; ` + item.sigma.levels.map((l) => `mức ${l.level}: CV ${fmt(l.cv)}%` + (l.biasEqa != null ? `, Bias ${fmt(l.biasEqa)}%` : l.eqaRounds ? `, EQA ${l.eqaRounds.map((r) => `${fmt(r.lab)}/${fmt(r.target)}`).join(', ')}` : ', chưa có Bias')).join('; ');
+  if (item.sigma) {
+    const { clia } = item.sigma;
+    const tea = clia
+      ? `TEa theo CLIA ${clia.percent != null ? `lớn hơn giữa ±${fmt(clia.percent)}% và ` : ''}±${fmt(clia.absolute)} ${clia.unit}`
+      : `TEa ${fmt(item.sigma.tea)}%`;
+    const mean = (level) => item.levels.find((l) => l.level === level)?.mean;
+    const mu = (l) => [
+      l.uCref != null ? `u(Cref) ${fmt(l.uCref)}%` : '', l.uCal != null ? `u(cal) ${fmt(l.uCal)}%` : '',
+      l.muBiasMode === 'exclude' ? 'MU không cộng u(bias)' : '',
+    ].filter(Boolean).map((text) => `, ${text}`).join('');
+    return `${tea}; ` + item.sigma.levels.map((l) => `mức ${l.level} (Mean ${fmt(mean(l.level))}): CV ${fmt(l.cv)}%`
+      + (l.biasEqa != null ? `, Bias ${fmt(l.biasEqa)}%` : l.eqaRounds ? `, EQA ${l.eqaRounds.map((r) => `${fmt(r.lab)}/${fmt(r.target)}`).join(', ')}` : ', chưa có Bias')
+      + mu(l)).join('; ') + `; ${item.levels.length} mức QC`;
+  }
   if ('bias' in item && 'cv' in item) return `TEa ${fmt(item.tea)}%, Bias ${fmt(item.bias)}%, CV ${fmt(item.cv)}%`;
   const levels = item.levels.map((l) => `M${l.level} ${fmt(l.mean)}/${fmt(l.sd)}`).join(', ');
   const steps = (item.runs || []).map((step) => {

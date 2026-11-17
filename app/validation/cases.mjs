@@ -36,6 +36,8 @@ const REF = {
   sigma: 'Sigma = (TEa − |Bias|) / CV; DPMO với dịch chuyển 1,5σ',
   qgi: 'Parry DM. "Quality Goal Index" — QGI < 0,8 do độ chụm, 0,8–1,2 cả hai, > 1,2 do độ chệch',
   eqa: 'Bias nhiều vòng EQA lấy trung bình có dấu cho Sigma (docs/SIGMA-REVIEW-2026-11-17.md SB-1); RMS chỉ cho MU (Nordtest TR 537)',
+  clia: 'CLIA PT (CMS-3355-F, 2024): giới hạn tuyệt đối quy đổi TEa% = |giới hạn / Mean của mức| × 100; tiêu chí "lớn hơn giữa" lấy số lớn hơn của giới hạn % và giới hạn tuyệt đối đã quy đổi',
+  mu: 'Nordtest TR 537: u(bias) = √(Bias_RMS² + u(Cref)²), u_c = √(u(Rw)² + u(bias)² + u(cal)²), U = 2·u_c; ISO/TS 20914: bias đã hiệu chỉnh thì không cộng u(bias)',
   cusum: 'CUSUM dạng bảng: C+ = max(0, C+ + z − k), C− = min(0, C− + z + k); tín hiệu khi |C| ≥ h',
 };
 
@@ -377,6 +379,118 @@ export const SIGMA_CASES = [
     ].map((val) => ({ val: { 1: val } })),
     expect: { 1: { cohortN: 30, cohortStatus: 'eligible', cv: 1.360781, sigma: 5.144106, dpmo: 134.161, tier: '5–6', rules: ['1-3s', '2-2s', 'R4s'], n: 2, r: 1, capable: true, designShown: true } },
     basis: `CV lấy từ mọi điểm IQC của lô trong kỳ (không tự loại điểm, tránh CV "đẹp giả"); đủ 30 điểm thì nhóm "đủ điều kiện" (ISO/TS 20914). ${REF.sigma}. ${REF.sigmaRules}.`,
+  },
+
+  // --- Biên giữa các bậc Sigma: số đúng bằng ranh giới thuộc bậc trên, số sát
+  // dưới ranh giới thuộc bậc dưới. SG-03 và SG-04 đã giữ biên 3σ và 6σ.
+  {
+    id: 'SG-11a', title: 'Sigma đúng bằng 4 (2 mức QC) thuộc bậc 4–5: thêm 4-1s, N=4 R=1',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 2 }] },
+    expect: { 1: { sigma: 4, dpmo: 6209.665, tier: '4–5', rules: ['1-3s', '2-2s', 'R4s', '4-1s'], n: 4, r: 1, capable: true } },
+    basis: `${REF.sigmaRules}: ranh giới 4σ thuộc bậc trên (≥ 4).`,
+  },
+  {
+    id: 'SG-11b', title: 'Sigma 3,99 (sát dưới 4) vẫn thuộc bậc 3–4: thêm 8x, N=4 R=2',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 2.02 }] },
+    expect: { 1: { sigma: 3.99, tier: '3–4', rules: ['1-3s', '2-2s', 'R4s', '4-1s', '8x'], n: 4, r: 2, capable: true } },
+    basis: `${REF.sigmaRules}: chưa chạm 4σ thì chưa được nới bộ luật.`,
+  },
+  {
+    id: 'SG-11c', title: 'Sigma đúng bằng 5 (2 mức QC) thuộc bậc 5–6: 1-3s/2-2s/R4s, N=2',
+    levels: [L1, L2], sigma: { tea: 12, levels: [{ level: 1, cv: 2, biasEqa: 2 }] },
+    expect: { 1: { sigma: 5, dpmo: 232.629, tier: '5–6', rules: ['1-3s', '2-2s', 'R4s'], n: 2, r: 1, capable: true } },
+    basis: `${REF.sigmaRules}: ranh giới 5σ thuộc bậc trên (≥ 5).`,
+  },
+  {
+    id: 'SG-11d', title: 'Sigma 4,99 (sát dưới 5) vẫn thuộc bậc 4–5: giữ 4-1s, N=4',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 0.02 }] },
+    expect: { 1: { sigma: 4.99, tier: '4–5', rules: ['1-3s', '2-2s', 'R4s', '4-1s'], n: 4, r: 1, capable: true } },
+    basis: `${REF.sigmaRules}: chưa chạm 5σ thì chưa được bỏ 4-1s.`,
+  },
+  {
+    id: 'SG-11e', title: '3 mức QC, Sigma đúng bằng 5 → bảng 3 mức: 1-3s/2of3-2s/R4s, N=3',
+    levels: [L1, L2, L3], sigma: { tea: 12, levels: [{ level: 1, cv: 2, biasEqa: 2 }] },
+    expect: { 1: { sigma: 5, tier: '5–6', rules: ['1-3s', '2of3-2s', 'R4s'], n: 3, r: 1, capable: true } },
+    basis: `${REF.sigmaRules}: bảng riêng cho 3 mức QC, ranh giới 5σ thuộc bậc trên.`,
+  },
+  {
+    id: 'SG-11f', title: '3 mức QC, Sigma đúng bằng 3 → thêm 3-1s và 6x, N=6 R=1',
+    levels: [L1, L2, L3], sigma: { tea: 10, levels: [{ level: 1, cv: 3, biasEqa: 1 }] },
+    expect: { 1: { sigma: 3, tier: '3–4', rules: ['1-3s', '2of3-2s', 'R4s', '3-1s', '6x'], n: 6, r: 1, capable: true } },
+    basis: `${REF.sigmaRules}: bảng 3 mức dùng 6x (không phải 8x) và N=6 ở bậc 3–4.`,
+  },
+  {
+    id: 'SG-11g', title: '1 mức QC: vẫn tính Sigma nhưng không đưa bảng gợi ý thiết kế QC',
+    levels: [L1], sigma: { tea: 12, levels: [{ level: 1, cv: 2, biasEqa: 2 }] },
+    expect: { 1: { sigma: 5, noTable: true } },
+    basis: `${REF.sigmaRules}: Westgard chỉ công bố bảng cho 2 và 3 mức QC; app không coi 1 mức là thiết kế 2 mức (quyết định SG13b).`,
+  },
+
+  // --- TEa theo CLIA dạng tuyệt đối: mỗi mức ra một TEa% khác nhau theo Mean.
+  {
+    id: 'SG-12a', title: 'CLIA chỉ có giới hạn tuyệt đối (Sodium ±4 mmol/L): TEa% khác nhau theo Mean từng mức',
+    levels: [{ level: 1, mean: 140, sd: 1 }, { level: 2, mean: 100, sd: 1 }],
+    sigma: {
+      teaSource: 'clia', teaRefKey: 'qclab-sodium', clia: { percent: null, absolute: 4, unit: 'mmol/L' },
+      levels: [{ level: 1, cv: 0.5, biasEqa: 0.5 }, { level: 2, cv: 0.5, biasEqa: 0.5 }],
+    },
+    expect: {
+      1: { tea: 2.857143, sigma: 4.714286, tier: '4–5' },
+      2: { tea: 4, sigma: 7, tier: '≥6' },
+    },
+    basis: `${REF.clia}. ${REF.sigma}. Dùng một TEa% chung cho cả kỳ chỉ đúng tại một Mean.`,
+  },
+  {
+    id: 'SG-12b', title: 'CLIA "lớn hơn giữa" ±8% và ±0,3331 mmol/L (Glucose): Mean thấp lấy giới hạn tuyệt đối, Mean cao lấy 8%',
+    levels: [{ level: 1, mean: 3, sd: 0.05 }, { level: 2, mean: 10, sd: 0.2 }],
+    sigma: {
+      teaSource: 'clia', teaRefKey: 'qclab-glucose', clia: { percent: 8, absolute: 0.3331, unit: 'mmol/L' },
+      levels: [{ level: 1, cv: 2, biasEqa: 1 }, { level: 2, cv: 2, biasEqa: 1 }],
+    },
+    expect: {
+      1: { tea: 11.103333, sigma: 5.051667, tier: '5–6' },
+      2: { tea: 8, sigma: 3.5, tier: '3–4' },
+    },
+    basis: `${REF.clia}. Mean 3 mmol/L: 0,3331 / 3 = 11,10% > 8%; Mean 10 mmol/L: 3,33% < 8%.`,
+  },
+
+  // --- Độ không đảm bảo đo (MU) từ dữ liệu QC, mức 1 có Mean 100.
+  {
+    id: 'SG-13a', title: 'MU đủ thành phần (Nordtest): u(bias) = 2, u_c = 3, U = 6% ≤ TEa',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 1.2, uCref: 1.6, uCal: 1 }] },
+    expect: { 1: { sigma: 4.4, mu: { uRw: 2, uBias: 2, uCal: 1, uc: 3, U: 6, complete: true, missing: [], absoluteU: 6, teaRatio: 0.6, withinTea: true } } },
+    basis: `${REF.mu}. U% đổi ra đơn vị tại Mean của mức: 6% × 100 = 6.`,
+  },
+  {
+    id: 'SG-13b', title: 'MU dùng Bias RMS của các vòng EQA, Sigma dùng trung bình có dấu',
+    levels: [L1, L2],
+    sigma: { tea: 10, levels: [{ level: 1, cv: 2, uCref: 1, uCal: 1, eqaRounds: [{ lab: 102, target: 100 }, { lab: 99, target: 100 }, { lab: 102, target: 100 }] }] },
+    expect: { 1: { biasEqa: 1, biasRms: 1.732051, sigma: 4.5, mu: { uBias: 2, uc: 3, U: 6, complete: true } } },
+    basis: `${REF.eqa}. ${REF.mu}. Bias RMS √3 cộng u(Cref) 1 cho u(bias) = 2; nếu lấy trung bình (1) thì u(bias) chỉ còn √2.`,
+  },
+  {
+    id: 'SG-13c', title: 'MU theo ISO/TS 20914 (bias đã hiệu chỉnh): không cộng u(bias), không đòi u(Cref)',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 1.2, uCal: 1.5, muBiasMode: 'exclude' }] },
+    expect: { 1: { mu: { uBias: null, uc: 2.5, U: 5, complete: true, missing: [], withinTea: true } } },
+    basis: `${REF.mu}. Bật hay tắt nhánh bias là quyết định của người phụ trách, phần mềm không tự chọn.`,
+  },
+  {
+    id: 'SG-13d', title: 'Thiếu u(cal): ngân sách chưa đủ, không kết luận U so với TEa',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 1.2, uCref: 1.6 }] },
+    expect: { 1: { mu: { uc: 2.828427, U: 5.656854, complete: false, missing: ['u(cal)'], withinTea: null } } },
+    basis: `${REF.mu}. Thiếu chứng nhận chất hiệu chuẩn thì u(cal) vắng mặt, không được coi bằng 0 để kết luận đạt.`,
+  },
+  {
+    id: 'SG-13e', title: 'Cộng u(bias) mà thiếu u(Cref): ngân sách chưa đủ',
+    levels: [L1, L2], sigma: { tea: 10, levels: [{ level: 1, cv: 2, biasEqa: 1.2, uCal: 1 }] },
+    expect: { 1: { mu: { complete: false, missing: ['u(Cref)'], withinTea: null } } },
+    basis: `${REF.mu}. u(Cref) là độ không đảm bảo của giá trị gán do nhà cung cấp EQA/CRM công bố, không suy từ chuỗi bias.`,
+  },
+  {
+    id: 'SG-13f', title: 'U vượt TEa: U = 9,17% > TEa 8%',
+    levels: [L1, L2], sigma: { tea: 8, levels: [{ level: 1, cv: 4, biasEqa: 1.2, uCref: 1.6, uCal: 1 }] },
+    expect: { 1: { mu: { uc: 4.582576, U: 9.165151, complete: true, teaRatio: 1.145644, withinTea: false } } },
+    basis: `${REF.mu}. So sánh U với TEa là phép tính tham khảo của app; tiêu chí chấp nhận MU do phòng xét nghiệm quyết định.`,
   },
 ];
 
