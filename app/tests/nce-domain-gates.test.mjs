@@ -156,6 +156,16 @@ test('N-10: rà soát nguyên nhân ngoại kiểm theo trình tự Eurachem, gi
   assert.ok(checklistMissing('eqa', prepared, true).some((m) => m.code === 'check-reagent' && /Hoá chất và calibrator/.test(m.message)));
 });
 
+test('N-11/N-12: hồ sơ ngoại kiểm phải phân loại nguyên nhân trước khi cho hoạt động trở lại', () => {
+  const checklist = Object.fromEntries(checklistKeys('eqa', true).map((key) => [key, { status: 'ok', note: 'Đã đối chiếu bằng chứng.' }]));
+  const impact = { outcome: 'reported_no_impact', description: 'Rà soát kết quả từ đợt đạt gần nhất.', resultCount: 12, reference: '', notified: '' };
+  const eqa = (extra) => dossier({ status: 'open', source: 'eqa', eqaLinked: true, holdResults: false, runs: [], checklist, patientImpacts: [impact], ...extra });
+  assert.deepEqual(codes(nceReleaseMissing(eqa({ causeStatus: '', causeCategory: '' }), null)), ['cause-eqa-status']);
+  assert.deepEqual(codes(nceReleaseMissing(eqa({ causeStatus: 'suspected', causeCategory: '' }), null)), ['cause-eqa-category']);
+  assert.deepEqual(codes(nceReleaseMissing(eqa({ causeStatus: 'identified', causeCategory: 'eqa_technical' }), null)), []);
+  assert.deepEqual(codes(nceReleaseMissing(eqa({ causeStatus: 'undetermined', causeCategory: '' }), null)), [], 'chưa xác định vẫn cho tiếp tục khi đã rà soát bệnh nhân');
+});
+
 test('checklist theo nguồn; bất thường/không áp dụng phải ghi chú', () => {
   assert.deepEqual(checklistKeys('other'), []);
   assert.ok(checklistKeys('eqa').includes('transcription'));

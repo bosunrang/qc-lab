@@ -7,14 +7,14 @@ import { useNceStore } from '../../store/nce-store';
 import { EmptyState } from '../../components/EmptyState';
 import { nceStatusBadge } from '../../lib/nce-labels';
 import { NCE_SOURCE_LABEL, NCE_TIER_LABEL } from '../../../main/domain/nce/labels';
-import { IdentitySection, QuickCheckSection } from './DossierContent';
+import { IdentitySection, InvestigationSection, QuickCheckSection } from './DossierContent';
 import { PatientImpactSection, ReleaseSection, TechnicalAssessmentSection } from './DossierDecisions';
 import { CapaWorkflow } from './CapaWorkflow';
 import { EqaDossierEvidence } from './EqaDossierEvidence';
 import { ReviewSection } from './DossierReview';
 import { dateText, Facts, holdText, Section, timeText, useDossier } from './shared';
 import { confirmDialog, errorDialog } from '../../state/dialog-store';
-import { nextStage, NCE_STAGES, stageForMissing, type NceStage } from './workflow';
+import { nextStage, nceStages, stageForMissing, type NceStage } from './workflow';
 
 function LegacySection({ json }: { json: string }) {
   let detail: Record<string, unknown> = {};
@@ -68,6 +68,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
   const badge = nceStatusBadge(record);
   const props = { dossier, users, busy, pending, run, error, onIdentity: () => openStage('identity') };
   const terminal = record.status === 'closed' || record.status === 'cancelled';
+  const eqaLinked = !!record.eqa_result_id;
   const currentStage = nextStage(record, missing);
   const activeStage = selectedStage ?? currentStage;
 
@@ -75,7 +76,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
   // đã hoàn tất chỉ từ vị trí của nó trong thanh điều hướng.
   const missingByStage = new Map<NceStage, typeof missing>();
   for (const item of missing) {
-    const stage = stageForMissing(item);
+    const stage = stageForMissing(item, eqaLinked);
     missingByStage.set(stage, [...(missingByStage.get(stage) ?? []), item]);
   }
 
@@ -118,7 +119,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
       <div className="nce-workspace" ref={workspace}>
         <nav className="nce-workflow-nav" aria-label="Các bước xử lý hồ sơ">
           <p className="nce-eyebrow">{record.nce_id}</p>
-          <ol className="nce-steps">{NCE_STAGES.map((stage, index) => {
+          <ol className="nce-steps">{nceStages(eqaLinked).map((stage, index) => {
             const stageMissing = missingByStage.get(stage.id)?.length ?? 0;
             const isCurrent = !showAll && activeStage === stage.id;
             const readyLabel = !terminal && stage.id === currentStage && !missing.length
@@ -136,7 +137,7 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
           })}</ol>
           {missing.length > 0 && <details className="nce-workflow-missing" key={`${record.next_step}-${record.updated_at}`}>
             <summary><span><b>{missing.length}</b> điều kiện còn thiếu</span><span className="nce-workflow-missing-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="m4 6 4 4 4-4" /></svg></span></summary>
-            <ul className="nce-workflow-missing-list">{missing.map((item) => <li key={item.code}><button type="button" onClick={() => openStage(stageForMissing(item))}>{item.message}<span aria-hidden="true">→</span></button></li>)}</ul>
+            <ul className="nce-workflow-missing-list">{missing.map((item) => <li key={item.code}><button type="button" onClick={() => openStage(stageForMissing(item, eqaLinked))}>{item.message}<span aria-hidden="true">→</span></button></li>)}</ul>
           </details>}
           <button type="button" className={`btn ghost sm nce-view-all${showAll ? ' on' : ''}`} aria-pressed={showAll} onClick={() => { setShowAll((value) => !value); workspace.current?.scrollIntoView({ block: 'start' }); }}>{showAll ? 'Quay về từng bước' : 'Xem toàn bộ hồ sơ'}</button>
           <p className="nce-note">{record.status === 'pending_approval' ? 'Hồ sơ đang khoá sửa để người duyệt rà soát.' : terminal ? 'Hồ sơ chỉ đọc, giữ nguyên nội dung và lịch sử.' : 'Nội dung đã lưu được giữ khi chuyển bước.'}</p>
@@ -145,13 +146,13 @@ export function DossierPage({ id, onBack }: { id: string; onBack: () => void }) 
             nháp. Chỉ tải lại có xác nhận mới đặt lại các form đang mở. */}
         <div className="nce-stage-content" key={editorEpoch}>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'identity'}><IdentitySection {...props} /></div>
-          <div className="nce-stage" hidden={!showAll && activeStage !== 'check'}><QuickCheckSection {...props} /></div>
-          <div className="nce-stage" hidden={!showAll && activeStage !== 'technical'}><TechnicalAssessmentSection {...props} /></div>
+          <div className="nce-stage" hidden={!showAll && activeStage !== 'check'}><QuickCheckSection {...props} />{eqaLinked && <InvestigationSection {...props} />}</div>
+          {!eqaLinked && <div className="nce-stage" hidden={!showAll && activeStage !== 'technical'}><TechnicalAssessmentSection {...props} /></div>}
           <div className="nce-stage" hidden={!showAll && activeStage !== 'impact'}><PatientImpactSection {...props} /></div>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'release'}><ReleaseSection {...props} /></div>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'capa'}><CapaWorkflow {...props} showAll={showAll} /><div className="nce-stage-footer"><button type="button" className="btn ghost" onClick={() => openStage('review')}>Đến bước phê duyệt →</button></div></div>
           <div className="nce-stage" hidden={!showAll && activeStage !== 'review'}>
-            <ReviewSection {...props} onViewEvidence={!showAll ? () => setShowAll(true) : undefined} onMissing={(item) => openStage(stageForMissing(item))} />
+            <ReviewSection {...props} onViewEvidence={!showAll ? () => setShowAll(true) : undefined} onMissing={(item) => openStage(stageForMissing(item, eqaLinked))} />
             {record.protocol_version < 4 && <LegacySection json={record.legacy_json} />}
           </div>
         </div>

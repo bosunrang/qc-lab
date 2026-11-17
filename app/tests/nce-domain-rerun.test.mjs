@@ -144,6 +144,12 @@ test('quyết định ảnh hưởng bệnh nhân phải bao phủ khoảng nghi
 test('quyết định ảnh hưởng bệnh nhân', () => {
   assert.equal(validateNcePatientImpact({ outcome: 'not_applicable', description: 'Không liên quan' }, 'iqc').ok, false, 'sự cố IQC luôn có thể chạm kết quả bệnh nhân');
   assert.equal(validateNcePatientImpact({ outcome: 'not_applicable', description: 'Lỗi hồ sơ đào tạo' }, 'other').ok, true);
+  // N-12: ngoại kiểm chỉ được "Không liên quan" khi nguyên nhân là hành chính hoặc chương trình/mẫu.
+  const na = { outcome: 'not_applicable', description: 'Lỗi chỉ ở khâu gửi kết quả ngoại kiểm' };
+  assert.equal(validateNcePatientImpact(na, 'eqa', { eqaLinked: true, causeStatus: 'identified', causeCategory: 'eqa_administrative' }).ok, true);
+  assert.equal(validateNcePatientImpact(na, 'eqa', { eqaLinked: true, causeStatus: 'identified', causeCategory: 'eqa_program' }).ok, true);
+  assert.equal(validateNcePatientImpact(na, 'eqa', { eqaLinked: true, causeStatus: '', causeCategory: '' }).code, 'outcome-not-applicable', 'chưa phân loại nguyên nhân');
+  assert.equal(validateNcePatientImpact(na, 'eqa', { eqaLinked: true, causeStatus: 'undetermined', causeCategory: '' }).code, 'outcome-not-applicable', 'chưa xác định được nguyên nhân');
   const corrected = { outcome: 'reported_corrected', description: 'Đã rà 12 kết quả', resultCount: 12 };
   assert.equal(validateNcePatientImpact(corrected, 'iqc').code, 'missing-reference');
   assert.equal(validateNcePatientImpact({ ...corrected, reference: 'PSBC-07' }, 'iqc').code, 'missing-notified');

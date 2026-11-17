@@ -469,7 +469,10 @@ export function ReleaseSection(props: SectionProps) {
   return (
     <Section title="Cho phép hoạt động trở lại">
       <div className="nce-release-intro">
-        <p>Chỉ cho phép hoạt động trở lại khi QC xác minh sau xử lý đạt yêu cầu và đủ các mức theo SOP.</p>
+        {/* Ngoại kiểm phát hiện muộn so với ngày chạy mẫu: căn cứ là hiệu năng hiện tại. */}
+        <p>{record.eqa_result_id
+          ? 'Ngoại kiểm phản ánh lần chạy mẫu đã qua: chỉ cho tiếp tục khi nội kiểm hiện tại đạt đủ các mức theo SOP; ghi kết quả chạy lại mẫu lưu nếu còn.'
+          : 'Chỉ cho phép hoạt động trở lại khi QC xác minh sau xử lý đạt yêu cầu và đủ các mức theo SOP.'}</p>
         <p>Quyết định này không đồng nghĩa cho trả các kết quả cũ đang giữ hoặc đóng hồ sơ CAPA.</p>
       </div>
       {!can.release ? <p className="hint-inline">Bạn cần được cấp quyền cho phép hoạt động trở lại. Liên hệ quản trị viên để cấp quyền.</p> : (

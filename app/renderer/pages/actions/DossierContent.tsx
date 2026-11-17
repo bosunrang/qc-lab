@@ -312,7 +312,7 @@ export function InvestigationSection(props: SectionProps) {
   }), CAUSE_FIELD_ERRORS);
   const d = editor.draft;
   return (
-    <Section title="Điều tra và nguyên nhân" actions={editor.actions(can.edit)} disclosure={props.disclosure} headingLevel={props.headingLevel}>
+    <Section title={record.eqa_result_id ? 'Phân loại nguyên nhân ngoại kiểm' : 'Điều tra và nguyên nhân'} actions={editor.actions(can.edit)} disclosure={props.disclosure} headingLevel={props.headingLevel}>
       <div className="nce-capa-guidance" role="note"><p>{record.eqa_result_id ? 'Đối chiếu báo cáo nhà cung cấp, lỗi hành chính, sáu nhóm kỹ thuật và chương trình/mẫu. Ghi 5 Whys cùng bằng chứng; phân loại nguyên nhân hành chính, kỹ thuật, chương trình/mẫu hoặc chưa xác định kèm kế hoạch theo dõi.' : 'Luật QC chỉ gợi ý kiểu sai số, không chứng minh nguyên nhân. Đối chiếu nhật ký máy, hiệu chuẩn, vật liệu QC và phương pháp; không hiệu chuẩn lại hay đổi Mean chỉ để hết cảnh báo.'}</p></div>
       {d ? (
         <div className="nce-form-grid nce-capa-form" ref={editor.formRoot}>

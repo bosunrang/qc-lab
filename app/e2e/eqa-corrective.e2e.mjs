@@ -151,7 +151,7 @@ test('khắc phục ngoại kiểm: hàng chờ, phạm vi máy, lập NCE và q
     assert.equal(await context.getByRole('table', { name: 'Kết quả ngoại kiểm liên quan', exact: true }).locator('tbody tr').count(), 2);
     assert.match(await context.innerText(), /Chưa có dữ liệu nội kiểm/);
     const nav = page.getByRole('navigation', { name: 'Các bước xử lý hồ sơ' });
-    await nav.getByRole('button', { name: /Kiểm tra nhanh/ }).click();
+    await nav.getByRole('button', { name: /Rà soát & phân loại nguyên nhân/ }).click();
     const checks = page.getByRole('region', { name: 'Rà soát nguyên nhân ngoại kiểm', exact: true });
     await checks.getByRole('button', { name: 'Sửa', exact: true }).click();
     assert.equal(await checks.getByRole('button', { name: 'Nguyên nhân gốc', exact: true }).count(), 11);

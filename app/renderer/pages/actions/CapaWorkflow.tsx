@@ -15,6 +15,8 @@ export function CapaWorkflow(props: SectionProps & { showAll: boolean }) {
   const [selected, setSelected] = useState<Part | null | undefined>(undefined);
   const [showExtra, setShowExtra] = useState(false);
   const full = record.tier === 'capa';
+  // Hồ sơ ngoại kiểm phân loại nguyên nhân ở bước Rà soát (trước ảnh hưởng bệnh nhân, N-12).
+  const eqaLinked = !!record.eqa_result_id;
   const hasMissing = (prefix: string) => missing.some((item) => item.code.startsWith(prefix));
   const openActions = actions.filter((action) => action.status === 'open').length;
   const liveActions = actions.filter((action) => action.status !== 'cancelled');
@@ -26,7 +28,7 @@ export function CapaWorkflow(props: SectionProps & { showAll: boolean }) {
   // mở lại phần cần rà soát, kể cả khi phần đó đã từng được ghi.
   const recommended: Part | null = !full && openActions > 0 ? 'actions'
     : !record.tier || !record.risk_level || hasMissing('tier') || hasMissing('risk') ? 'tier'
-    : full && (!record.cause_status || hasMissing('cause')) ? 'cause'
+    : full && !eqaLinked && (!record.cause_status || hasMissing('cause')) ? 'cause'
       : openActions > 0 || (full && (!liveActions.length || hasMissing('corrective'))) ? 'actions'
         : full && (!lastReview || result !== 'effective' || effectivenessMissing) ? 'effectiveness' : null;
   const active = selected === undefined ? recommended : selected;
@@ -53,8 +55,9 @@ export function CapaWorkflow(props: SectionProps & { showAll: boolean }) {
       },
     };
   }
-  return <section className="panel nce-capa-shell" aria-label="Điều tra & CAPA">
-    <div className="panel-head"><h2>Điều tra &amp; CAPA</h2></div>
+  const title = eqaLinked ? 'Hành động khắc phục' : 'Điều tra & CAPA';
+  return <section className="panel nce-capa-shell" aria-label={title}>
+    <div className="panel-head"><h2>{title}</h2></div>
     <div className="nce-capa-workflow">
     <TierRiskSection {...group('tier')} />
     {!showAll && !full && <div className="nce-capa-extra-toggle">
@@ -62,7 +65,7 @@ export function CapaWorkflow(props: SectionProps & { showAll: boolean }) {
       {openActions > 0 && <span className="nce-note">Còn {openActions} hành động đang theo dõi cần hoàn tất.</span>}
     </div>}
     <div className="nce-capa-steps" hidden={!extraVisible}>
-      <InvestigationSection {...group('cause')} />
+      {!eqaLinked && <InvestigationSection {...group('cause')} />}
       <ActionsSection {...group('actions')} />
       <EffectivenessSection {...group('effectiveness')} />
     </div>

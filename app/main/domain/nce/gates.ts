@@ -78,13 +78,21 @@ export function validateNceReleaseInput(raw: unknown, source: NceSource): NceVal
   return { ok: true, data: { notApplicable: !rerun && input.notApplicable === true, reason, rerun, lotChangeNote: '' } };
 }
 
+/** Kết luận và nhóm nguyên nhân của hồ sơ ngoại kiểm (N-11). Khi nộp duyệt, cổng
+ * CAPA chung đã báo thiếu kết luận nên chỉ kiểm nhóm để không lặp thông báo. */
+function nceEqaCauseMissing(dossier: Pick<NceDossier, 'causeStatus' | 'causeCategory'>, requireStatus = true): NceMissing[] {
+  if (!dossier.causeStatus) return !requireStatus ? [] : [{ code: 'cause-eqa-status', message: 'Kết luận nguyên nhân ngoại kiểm: đã xác định, nghi ngờ hoặc chưa xác định.' }];
+  if (dossier.causeStatus !== 'undetermined' && !['eqa_administrative', 'eqa_technical', 'eqa_program'].includes(dossier.causeCategory)) return [{ code: 'cause-eqa-category', message: 'Phân loại nguyên nhân ngoại kiểm: hành chính, kỹ thuật hoặc chương trình/mẫu.' }];
+  return [];
+}
+
 /** Còn thiếu gì để cho chạy lại. `rerun` là kết quả `checkNceRerun()` cho lần
  * chạy ứng viên (chỉ với IQC; `null` khi chưa chọn). `suspect` là khoảng nghi
  * ngờ main tính tới lần rerun ứng viên, để kiểm quyết định ảnh hưởng bệnh nhân
  * bao phủ đúng khoảng đó (`undefined` chỉ dùng trong test thuần không có dữ
  * liệu QC). Không đòi hành động khắc phục đã xong (D-02, sửa R-01). */
 export function nceReleaseMissing(
-  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'checklist' | 'eqaLinked' | 'causeCategory'>,
+  dossier: Pick<NceDossier, 'status' | 'source' | 'patientImpacts' | 'technicalAssessments' | 'runs' | 'holdResults' | 'containmentNote' | 'checklist' | 'eqaLinked' | 'causeCategory' | 'causeStatus'>,
   rerun: NceRerunResult | null,
   suspect?: NceSuspectWindow | null,
 ): NceMissing[] {
@@ -92,6 +100,8 @@ export function nceReleaseMissing(
   const missing: NceMissing[] = [];
   if (dossier.holdResults === null) missing.push({ code: 'hold', message: 'Chưa ghi có dừng/giữ kết quả liên quan hay không.' });
   missing.push(...checklistMissing(dossier.source, dossier.checklist, dossier.eqaLinked));
+  // Ngoại kiểm: phân loại nguyên nhân là căn cứ của phạm vi rà soát bệnh nhân (N-12).
+  if (dossier.eqaLinked) missing.push(...nceEqaCauseMissing(dossier));
   if (dossier.source === 'iqc') {
     if (dossier.holdResults === false) missing.push({ code: 'hold-iqc', message: 'Nội kiểm ngoài kiểm soát phải dừng/giữ kết quả liên quan cho đến khi đánh giá xong.' });
     if (textLength(dossier.containmentNote) < 10) missing.push({ code: 'containment', message: 'Ghi phạm vi kết quả đã giữ, thiết bị/khu vực bị ảnh hưởng và người đã được thông báo.' });
@@ -124,7 +134,7 @@ export function nceContentMissing(dossier: NceDossier, suspect?: NceSuspectWindo
   else if (textLength(dossier.riskBasis) < 5) add('risk-basis', 'Ghi căn cứ phân loại nguy cơ theo SOP.');
   missing.push(...checklistMissing(dossier.source, dossier.checklist, dossier.eqaLinked));
   if (dossier.eqaLinked) {
-    if (dossier.causeStatus !== 'undetermined' && !['eqa_administrative', 'eqa_technical', 'eqa_program'].includes(dossier.causeCategory)) add('cause-eqa-category', 'Phân loại nguyên nhân ngoại kiểm: hành chính, kỹ thuật hoặc chương trình/mẫu.');
+    missing.push(...nceEqaCauseMissing(dossier, false));
     missing.push(...ncePatientImpactMissing(dossier.patientImpacts, dossier.source, dossier));
   }
   missing.push(...nceTechnicalAssessmentMissing(dossier));
