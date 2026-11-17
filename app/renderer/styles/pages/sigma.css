@@ -181,6 +181,7 @@
 .sg-mu-summary-table{min-width:1200px;margin:0;table-layout:fixed;}
 .sg-mu-summary-table th:not(:first-child):not(:last-child),
 .sg-mu-summary-table td:not(:first-child):not(:last-child){text-align:center;}
+.sg-mu-estimate{display:block;white-space:nowrap;}
 .sg-mu-within{color:var(--accent-active);}
 .sg-mu-over{color:var(--danger-text);}
 .sg-mu-detail-table{width:100%;margin-bottom:var(--space-2-5);table-layout:fixed;}.sg-mu-detail-table th:first-child,.sg-mu-detail-table td:first-child{width:65%;}.sg-mu-detail-table th:nth-child(2),.sg-mu-detail-table td:nth-child(2){width:35%;text-align:center;}

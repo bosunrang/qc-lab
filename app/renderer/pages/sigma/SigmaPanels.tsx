@@ -93,8 +93,8 @@ export function SigmaMuPanel({ period, unit, writable, onEdit }: {
                   <td className="num">{lv.mu?.uCref != null ? lv.mu.uCref.toFixed(4) : '—'}</td>
                   <td className="num">{lv.mu?.uBias != null ? lv.mu.uBias.toFixed(4) : '—'}</td>
                   <td className="num">{lv.mu?.uCal != null ? lv.mu.uCal.toFixed(4) : '—'}</td>
-                  <td className="num">{lv.mu?.uc != null ? <>{lv.mu.uc.toFixed(4)}{!lv.mu.complete && <small className="hint"> · tạm tính</small>}</> : '—'}</td>
-                  <td className="num">{lv.mu?.U != null ? <>{lv.mu.U.toFixed(4)}{!lv.mu.complete && <small className="hint"> · tạm tính</small>}</> : '—'}</td>
+                  <td className="num">{lv.mu?.uc != null ? <>{lv.mu.uc.toFixed(4)}{!lv.mu.complete && <small className="hint sg-mu-estimate">tạm tính</small>}</> : '—'}</td>
+                  <td className="num">{lv.mu?.U != null ? <>{lv.mu.U.toFixed(4)}{!lv.mu.complete && <small className="hint sg-mu-estimate">tạm tính</small>}</> : '—'}</td>
                   <td className="num">{lv.mu?.complete && lv.mu.absoluteU != null ? `${lv.mu.absoluteU.toFixed(4)}${unit ? ` ${unit}` : ''}` : '—'}</td>
                   <td className="num">{lv.mu?.teaRatio != null ? <b className={lv.mu.withinTea ? 'sg-mu-within' : 'sg-mu-over'}>{(lv.mu.teaRatio * 100).toFixed(0)}%</b> : '—'}</td>
                   <td>{!lv.mu ? <span className="hint">Chưa có CV IQC</span> : !lv.mu.complete ? <span className="tag warn">Chưa đủ</span> : lv.mu.withinTea === false ? <span className="tag rej">U vượt TEa</span> : <span className="tag ok">Đủ thành phần</span>}</td>
