@@ -69,7 +69,7 @@ test('nhập lại sau xem xét cần lý do; snapshot cũ giữ nguyên, chữ 
   try {
     const first = eqa.getEqaReport(scope);
     must(eqa.reviewEqaReport({ data: draft(first) }, admin));
-    assert.equal(eqa.importEqaRound({ data: input }, admin).error.code, 'replace-reason');
+    assert.equal(eqa.importEqaRound({ data: { ...input, rows: [{ ...input.rows[0], result: 6, zProvider: 1 }] } }, admin).error.code, 'replace-reason');
     must(eqa.importEqaRound({ data: { ...input, replaceReason: 'Trung tâm phát hành báo cáo thay thế.', rows: [{ ...input.rows[0], result: 6, zProvider: 1 }] } }, admin));
     const current = eqa.getEqaReport(scope);
     assert.equal(current.reviews[0].current, false);
@@ -86,7 +86,7 @@ test('nhập lại sau xem xét cần lý do; snapshot cũ giữ nguyên, chữ 
 test('dấu vết tệp: main chặn metadata sai, giữ SHA-256 cùng quyết định nhập', () => {
   const { db, eqa, input, scope } = setup();
   try {
-    const data = { ...input, replaceReason: 'Bổ sung dấu vết tệp báo cáo của trung tâm.', sourceFiles: [{ fileName: 'veqas.pdf', sha256: 'không phải hash', creationDate: '' }] };
+    const data = { ...input, rows: [{ ...input.rows[0], result: 5.6, zProvider: 0.6 }], replaceReason: 'Bổ sung dấu vết tệp báo cáo của trung tâm.', sourceFiles: [{ fileName: 'veqas.pdf', sha256: 'không phải hash', creationDate: '' }] };
     assert.equal(eqa.importEqaRound({ data }, admin).error.code, 'source-files');
     data.sourceFiles[0].sha256 = 'ab'.repeat(32);
     const saved = must(eqa.importEqaRound({ data }, admin));
@@ -158,6 +158,70 @@ test('đủ số đợt tối thiểu hoặc sửa TEa không làm chữ ký đ�
   } finally { db.close(); }
 });
 
+test('S1: bổ sung máy vào đợt đã ký không cần lý do; bản ký riêng máy cũ giữ hiệu lực và mã báo cáo của chính máy đó', () => {
+  const { db, c, eqa, input, round, machine, draft } = setup();
+  try {
+    const other = must(c.saveInstrument({ data: { name: 'Máy B' } }, admin));
+    const otherTest = must(c.saveTest({ data: { name: 'Glucose', instrumentId: other.id } }, admin));
+    // Ký lại lần nhập đầu với mã báo cáo riêng của máy A.
+    must(eqa.importEqaRound({ data: { ...input, round: { ...input.round, reportCode: 'BC-A' }, rows: [{ ...input.rows[0], result: 5.6, zProvider: 0.6 }], replaceReason: 'Ghi mã báo cáo của máy A.' } }, admin));
+    const scopeA = { programId: round.program_id, year: round.year, roundId: round.id, instrumentId: machine.id };
+    const scopeAll = { programId: round.program_id, year: round.year, roundId: round.id };
+    must(eqa.reviewEqaReport({ data: draft(eqa.getEqaReport(scopeA)) }, admin));
+    must(eqa.reviewEqaReport({ data: draft(eqa.getEqaReport(scopeAll)) }, admin));
+
+    const bInput = { ...input, round: { ...input.round, reportCode: 'BC-B' }, rows: input.rows.map((r) => ({ ...r, instrument: 'Máy B' })), mappings: [{ code: 'GLUC', instrument: 'Máy B', testId: otherTest.id }] };
+    const preview = must(eqa.previewEqaImport({ data: bInput }));
+    assert.deepEqual([preview.existing.needs_reason, preview.existing.reviewed_all], [false, true]);
+    const appended = must(eqa.importEqaRound({ data: bInput }, admin));
+    assert.equal(appended.decisions[0].type, 'append');
+
+    const a = eqa.getEqaReport(scopeA);
+    assert.equal(a.reviews[0].current, true, 'bản ký riêng máy A giữ hiệu lực');
+    assert.equal(a.rounds[0].round.report_code, 'BC-A', 'phiếu máy A giữ mã báo cáo của máy A');
+    assert.equal(eqa.getEqaReport(scopeAll).reviews[0].current, false, 'phiếu tất cả máy cần ký lại để gồm máy B');
+
+    // Thay số liệu máy A thì bản ký máy A hết hiệu lực, cần lý do.
+    const changedA = { ...input, round: { ...input.round, reportCode: 'BC-A2' }, rows: [{ ...input.rows[0], result: 5.8, zProvider: 0.8 }] };
+    assert.equal(eqa.importEqaRound({ data: changedA }, admin).error.code, 'replace-reason');
+    must(eqa.importEqaRound({ data: { ...changedA, replaceReason: 'Trung tâm phát hành lại báo cáo máy A.' } }, admin));
+    assert.equal(eqa.getEqaReport(scopeA).reviews[0].current, false);
+  } finally { db.close(); }
+});
+
+test('S7: nhập lại đúng PDF cũ không tạo phiên bản mới, không cần lý do, giữ chữ ký', () => {
+  const { db, eqa, scope, input, draft } = setup();
+  try {
+    must(eqa.reviewEqaReport({ data: draft(eqa.getEqaReport(scope)) }, admin));
+    const preview = must(eqa.previewEqaImport({ data: input }));
+    assert.deepEqual([preview.existing.unchanged, preview.existing.needs_reason], [true, false]);
+    const decisions = () => db.prepare("SELECT COUNT(*) n FROM eqa_decisions WHERE type IN ('import','append','reimport')").get().n;
+    const before = decisions();
+    const same = must(eqa.importEqaRound({ data: input }, admin));
+    assert.equal(same.round.version, 1);
+    assert.equal(decisions(), before, 'không ghi lần nhập mới');
+    assert.equal(eqa.getEqaReport(scope).reviews[0].current, true);
+    const changed = { ...input, rows: input.rows.map((r) => ({ ...r, result: 5.6, zProvider: 0.6 })) };
+    assert.equal(eqa.importEqaRound({ data: changed }, admin).error.code, 'replace-reason', 'số liệu đổi vẫn cần lý do');
+  } finally { db.close(); }
+});
+
+test('S6: mở lại đợt đã huỷ bằng PDF một máy giữ kết quả của máy khác', () => {
+  const { db, c, eqa, input } = setup();
+  try {
+    const other = must(c.saveInstrument({ data: { name: 'Máy B' } }, admin));
+    const otherTest = must(c.saveTest({ data: { name: 'Glucose', instrumentId: other.id } }, admin));
+    const round = must(eqa.importEqaRound({ data: { ...input, rows: input.rows.map((r) => ({ ...r, instrument: 'Máy B' })), mappings: [{ code: 'GLUC', instrument: 'Máy B', testId: otherTest.id }] } }, admin)).round;
+    must(eqa.cancelEqaRound({ data: { id: round.id, expectedVersion: round.row_version, reason: 'Huỷ thử để kiểm tra mở lại.' } }, admin));
+    const preview = must(eqa.previewEqaImport({ data: input }));
+    assert.equal(preview.existing.needs_reason, true);
+    assert.deepEqual(preview.existing.instruments, ['Máy A', 'Máy B']);
+    const reopened = must(eqa.importEqaRound({ data: { ...input, replaceReason: 'Mở lại đợt sau khi đối chiếu báo cáo.' } }, admin));
+    assert.equal(reopened.round.status, 'open');
+    assert.deepEqual(reopened.results.map((r) => r.instrument_name).sort(), ['Máy A', 'Máy B']);
+  } finally { db.close(); }
+});
+
 test('phiếu gọn: không tự kết luận phù hợp từ 100%; tách hai lần xem xét và giữ đề xuất CAR', () => {
   const { db, eqa, scope, draft } = setup();
   try {
@@ -200,7 +264,7 @@ test('phiếu gọn: không cắt kết luận cũ quá dài và không in chữ
     const long = eqa.getEqaReport(scope);
     assert.equal(eqaPaperModel(long).preliminary.conclusion, stored.draft.conclusion.trim());
     assert.throws(() => assertCompactEqaPaper(long), /quá dài/);
-    must(eqa.importEqaRound({ data: { ...input, replaceReason: 'Nhập lại theo báo cáo mới từ nhà cung cấp.' } }, admin));
+    must(eqa.importEqaRound({ data: { ...input, rows: [{ ...input.rows[0], result: 5.6, zProvider: 0.6 }], replaceReason: 'Nhập lại theo báo cáo mới từ nhà cung cấp.' } }, admin));
     const current = eqa.getEqaReport(scope), model = eqaPaperModel(current);
     assert.equal(current.reviews[0].conclusion, stored.draft.conclusion);
     assert.equal(model.preliminary.signed, false);

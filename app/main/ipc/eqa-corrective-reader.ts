@@ -6,6 +6,7 @@ import { nceRunOutcomes, nceRunSnapshot } from '../db/nce-evaluation';
 import { cleanId } from '../domain/text-utils';
 import { sha256Hex } from '../domain/sha256';
 import { isoLocalDate } from '../domain/local-date';
+import { eqaNceSourceKey } from '../domain/eqa/source-key';
 
 export function eqaInvestigationReasons(result: EqaResultRow): { required: boolean; reasons: string[] } {
   const reasons: string[] = [];
@@ -18,22 +19,21 @@ export function eqaInvestigationReasons(result: EqaResultRow): { required: boole
   return { required, reasons };
 }
 
-/** Khoá theo nội dung để bổ sung máy khác không tạo hồ sơ trùng cho kết quả được sao sang phiên bản mới. */
-export function eqaNceSourceKey(source: Pick<EqaNceSource, 'round' | 'result'>): string {
-  const r = source.result;
-  return sha256Hex(JSON.stringify([source.round.id, r.test_id, r.sample, r.code, r.unit, r.result, r.assigned, r.sigma_p,
-    r.z_provider, r.z_official, r.class, r.method, r.peer_group, r.peer, r.trend?.signals || [], !!r.trend?.unsuccessful]));
-}
+export { eqaNceSourceKey } from '../domain/eqa/source-key';
 
 export function createEqaCorrectiveReader(db: Db, list: () => EqaRoundRow[], get: (id: unknown) => EqaRoundView | null) {
   function sourceOf(round: EqaRoundRow, result: EqaResultRow): EqaNceSource {
     return { round, result, ...eqaInvestigationReasons(result),
       fingerprint: sha256Hex(JSON.stringify([round.id, round.version, result.id, eqaNceSourceKey({ round, result })])) };
   }
+  /** Ngày chạy theo lịch của đúng máy; lịch cũ chưa khai máy áp dụng cho mọi máy của đợt. */
   function scheduledDate(round: EqaRoundRow, instrumentId: string): string {
-    return (db.prepare(`SELECT s.run_date FROM eqa_schedule s JOIN eqa_schedule_instruments m ON m.schedule_id=s.id
-      WHERE s.program_id=? AND s.year=? AND s.round_no=? AND m.instrument_id=? ORDER BY s.updated_at DESC LIMIT 1`)
-      .get(round.program_id, round.year, round.round_no, instrumentId) as { run_date: string } | undefined)?.run_date || '';
+    return (db.prepare(`SELECT s.run_date FROM eqa_schedule s
+      WHERE s.program_id=? AND s.year=? AND s.round_no=? AND (
+        EXISTS (SELECT 1 FROM eqa_schedule_instruments m WHERE m.schedule_id=s.id AND m.instrument_id=?)
+        OR NOT EXISTS (SELECT 1 FROM eqa_schedule_instruments m WHERE m.schedule_id=s.id))
+      ORDER BY EXISTS (SELECT 1 FROM eqa_schedule_instruments m WHERE m.schedule_id=s.id AND m.instrument_id=?) DESC, s.updated_at DESC LIMIT 1`)
+      .get(round.program_id, round.year, round.round_no, instrumentId, instrumentId) as { run_date: string } | undefined)?.run_date || '';
   }
   function listEqaCorrective(raw: unknown): EqaCorrectiveRow[] {
     const scope = raw as EqaReportScope;

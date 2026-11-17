@@ -10,9 +10,10 @@ import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-vali
 import { quoteIdent } from './sql-ident';
 import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
 import { eqaRoundNumber } from '../domain/eqa/evaluation';
+import { eqaNceSourceKey, type EqaSourceKeyInput } from '../domain/eqa/source-key';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 const LIS_IMPORTS_SQL = `
 CREATE TABLE IF NOT EXISTS lis_imports (
@@ -917,7 +918,27 @@ const MIGRATIONS: Migration[] = [
       db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_nce_eqa_source ON nce_records(eqa_source_key) WHERE eqa_source_key<>'' AND status<>'cancelled'");
     },
   },
+  {
+    version: 16,
+    name: 'Khoá nguồn hồ sơ ngoại kiểm không phụ thuộc tín hiệu chuỗi',
+    up(db) { rekeyEqaNceSources(db); },
+  },
 ];
+
+/** Tính lại khoá nguồn từ ảnh chụp đã lưu. Hai hồ sơ trùng khoá mới (đã bị tạo
+ * trùng trước khi sửa) thì giữ khoá cũ cho hồ sơ sau, không tự huỷ hồ sơ nào. */
+function rekeyEqaNceSources(db: SqliteLike): void {
+  const rows = db.prepare("SELECT id, status, eqa_snapshot_json FROM nce_records WHERE eqa_source_key<>'' ORDER BY created_at, id").all() as { id: string; status: string; eqa_snapshot_json: string }[];
+  const taken = new Set<string>();
+  for (const row of rows) {
+    let snapshot: EqaSourceKeyInput;
+    try { snapshot = JSON.parse(row.eqa_snapshot_json) as EqaSourceKeyInput; } catch { continue; }
+    if (!snapshot?.round?.id || !snapshot.result?.test_id) continue;
+    const key = eqaNceSourceKey(snapshot);
+    if (row.status !== 'cancelled') { if (taken.has(key)) continue; taken.add(key); }
+    db.prepare('UPDATE nce_records SET eqa_source_key=? WHERE id=?').run(key, row.id);
+  }
+}
 
 function splitRiqasCycleRounds(db: SqliteLike): void {
   const rounds = db.prepare(`SELECT r.id, r.program_id, r.year, r.round FROM eqa_rounds r JOIN eqa_programs p ON p.id=r.program_id

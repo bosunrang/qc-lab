@@ -95,6 +95,12 @@ Lịch công việc vì vậy tách theo nhóm máy không giao nhau, có loại
 đánh giá kết quả. Trùng đúng máy của cùng chương trình–năm–số đợt phải sửa
 lịch hiện có; đổi loại mẫu không tự tạo một công việc mới cho chính máy đó.
 Dấu nộp và báo cáo hoàn thành theo đúng máy, không lan sang các lịch khác.
+Chốt 17/11/2026 (N-08 theo máy): bổ sung máy hoặc mẫu mới vào đợt đã ký là
+bổ sung, không cần lý do; bản ký riêng từng máy giữ hiệu lực vì số liệu của máy
+đó không đổi, phiếu "Tất cả máy" phải ký lại để bao gồm máy mới. Chỉ thay số
+liệu của máy + mẫu đã có (hoặc mở lại đợt đã huỷ) mới cần lý do và làm hết hiệu
+lực các bản ký có phạm vi chứa máy đó. Mỗi lần nhập ghi máy, mã và ngày báo cáo
+của chính nó; phiếu một máy dùng mã báo cáo của máy đó.
 
 | Mục kế hoạch | Thay đổi theo tài liệu này |
 | --- | --- |

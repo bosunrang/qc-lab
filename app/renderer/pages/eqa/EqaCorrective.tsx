@@ -104,9 +104,17 @@ export function EqaCorrective() {
     </div>
     {view.error ? <EmptyState title="Không tải được danh sách khắc phục" action={<button className="btn ghost" onClick={view.retry}>Thử lại</button>}>{view.error}</EmptyState>
       : view.data === undefined ? <EmptyState title="Đang tổng hợp kết quả cần xem xét…" /> : <>
-        <div className="eqa-corrective-summary" role="group" aria-label="Tổng hợp khắc phục ngoại kiểm">{[
-          ['Cần lập hồ sơ', counts.required, 'required'], ['Đang xử lý', counts.ongoing, 'ongoing'], ['Đã đóng', counts.closed, 'closed'], ['Cảnh báo chưa lập hồ sơ', counts.warning, 'warning'],
-        ].map(([label, count, value]) => <button type="button" key={value} className={filter === value ? 'is-active' : ''} aria-pressed={filter === value} onClick={() => setFilter(value as Filter)}><span>{label}</span><b>{count}</b></button>)}</div>
+        {/* Cùng kiểu thẻ với trang Khắc phục sự cố; bấm thẻ để lọc danh sách. */}
+        <div className="nce-summary eqa-corrective-summary" role="group" aria-label="Tổng hợp khắc phục ngoại kiểm">{([
+          ['required', 'danger', 'Cần lập hồ sơ', counts.required, 'Bắt buộc điều tra, chưa có hồ sơ'],
+          ['ongoing', 'warning', 'Đang xử lý', counts.ongoing, 'Hồ sơ chưa đóng'],
+          ['closed', 'success', 'Đã đóng', counts.closed, 'Hồ sơ đã duyệt đóng'],
+          ['warning', 'info', 'Cảnh báo chưa lập hồ sơ', counts.warning, 'Cảnh báo đơn lẻ, ghi nhận khi xem xét đợt'],
+        ] as const).map(([value, tone, label, count, detail]) => <button type="button" key={value}
+          className={`nce-summary-card is-${tone}${value === 'required' && count > 0 ? ' is-urgent' : ''}${filter === value ? ' is-active' : ''}`}
+          aria-pressed={filter === value} onClick={() => setFilter(filter === value ? 'pending' : value)}>
+          <span>{label}</span><b>{count}</b><small>{detail}</small>
+        </button>)}</div>
         {!canManage && <p className="eqa-note">Bạn có thể xem danh sách và căn cứ ngoại kiểm. Lập hoặc mở hồ sơ cần quyền ghi và quyền dùng phần Khắc phục sự cố.</p>}
         {nceError && canManage && <div className="alert rej" role="alert">{nceError}<button className="btn ghost sm" onClick={() => void loadNce()}>Thử tải thông tin hồ sơ</button></div>}
         <div ref={workspaceRef} className={`eqa-corrective-workspace${selected ? ' has-evidence' : ''}`} style={{ '--eqa-evidence-width': `${evidenceWidth}px` } as CSSProperties}>

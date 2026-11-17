@@ -716,7 +716,11 @@ export interface EqaImportPreview {
   counts: { total: number; ok: number; warn: number; rej: number; accept_pct: number | null };
   /** Kỳ cùng chương trình/năm/đợt đã có trong CSDL: máy đang có kết quả,
    * máy mà lần nhập này thay kết quả, và có cần lý do nhập lại không. */
-  existing: { id: string; version: number; row_version: number; status: string; instruments: string[]; replaces: string[]; needs_reason: boolean } | null;
+  existing: { id: string; version: number; row_version: number; status: string; instruments: string[]; replaces: string[]; needs_reason: boolean;
+    /** Mọi dòng trùng khớp kết quả đang lưu: ghi sẽ không tạo phiên bản mới. */
+    unchanged: boolean;
+    /** Đợt có phiếu "Tất cả máy" đã ký trên phiên bản hiện hành: sau khi bổ sung cần ký lại phiếu đó. */
+    reviewed_all: boolean } | null;
 }
 export interface EqaRoundRow {
   id: string; program_id: string; program_name: string; provider: string; program_code: string; unit_code: string;

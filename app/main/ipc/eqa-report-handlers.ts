@@ -14,6 +14,15 @@ const object = (v: unknown): Record<string, unknown> => v && typeof v === 'objec
 const validDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
 const fail = (code: string, message: string): IpcResult<EqaReportView> => ({ ok: false, error: { code, message } });
 const kinds: readonly EqaReviewKind[] = ['preliminary_review', 'analysis_review', 'system_review'];
+const SOURCE_TYPES = ['import', 'append', 'reimport'];
+type SourcePayload = { instrumentIds?: string[]; reportCode?: string; reportDate?: string; sourceName?: string };
+const sourcePayload = (d: { payload_json: string }): SourcePayload => { try { return JSON.parse(d.payload_json) as SourcePayload; } catch { return {}; } };
+/** Lần nhập có chạm tới máy này không. Lần nhập cũ chưa ghi danh sách máy được
+ * coi là có, để không bỏ sót nguồn của hồ sơ trước khi sửa (17/11/2026). */
+const touches = (d: { payload_json: string }, instrumentId: string) => {
+  const ids = sourcePayload(d).instrumentIds;
+  return !Array.isArray(ids) || ids.includes(instrumentId);
+};
 type ReviewDecision = { id: string; type: EqaReviewKind; payload_json: string; actor_name: string; decided_at: string };
 type ReviewPayload = { scope: EqaReportScope; fingerprint: string; draft: EqaReviewDraft; snapshot?: EqaReportView };
 const sameScope = (a: EqaReportScope, b: EqaReportScope) => a.programId === b.programId && a.year === b.year
@@ -64,11 +73,18 @@ export function createEqaReportHandlers(db: Db, list: () => EqaRoundRow[], get: 
       .sort((a, b) => a.round_no - b.round_no).map((r) => get(r.id)!);
     if (scope.roundId && rounds.length !== 1) throw new Error('Đợt báo cáo đã bị huỷ hoặc không thuộc phạm vi đang chọn.');
     // Lọc tại main để bản xem trước, hồ sơ ký và tệp xuất cùng một phạm vi máy.
+    // Phiếu một máy lấy mã/ngày báo cáo và tệp nguồn của chính máy đó: nhập máy
+    // khác sau không đổi phiếu đã ký của máy này.
     if (scope.instrumentId) rounds = rounds.map((view) => {
+      const instrumentId = scope.instrumentId!;
+      const decisions = view.decisions.filter((d) => !SOURCE_TYPES.includes(d.type) || touches(d, instrumentId));
+      const own = view.decisions.find((d) => SOURCE_TYPES.includes(d.type) && Array.isArray(sourcePayload(d).instrumentIds) && sourcePayload(d).instrumentIds!.includes(instrumentId));
+      const source = own ? sourcePayload(own) : null;
       const results = view.results.filter((r) => r.instrument_id === scope.instrumentId);
       const count = eqaCounts(results.map((r) => r.class));
       const instruments = view.instruments.filter((i) => i.instrument_id === scope.instrumentId);
-      return { ...view, results, instruments, round: { ...view.round,
+      return { ...view, results, instruments, decisions, round: { ...view.round,
+        ...(source ? { report_code: source.reportCode ?? view.round.report_code, report_date: source.reportDate ?? view.round.report_date, source_name: source.sourceName ?? view.round.source_name } : {}),
         total: count.total, ok: count.ok, warn: count.warn, rej: count.rej, accept_pct: count.acceptPct,
         instruments: instruments.map((i) => i.instrument_name), by_instrument: instruments,
         missing_instruments: view.round.missing_instruments.filter((i) => i.instrument_id === scope.instrumentId) } };
@@ -98,9 +114,11 @@ export function createEqaReportHandlers(db: Db, list: () => EqaRoundRow[], get: 
     // Bỏ các trường dẫn xuất không thuộc số liệu của đợt: `trend.enough` đổi khi
     // chương trình đủ số đợt tối thiểu, TEa đổi theo cấu hình danh mục (N-05 chỉ
     // là thông tin nội bộ). Giữ tín hiệu chuỗi vì nó quyết định việc điều tra.
-    const stable = (r: EqaReportView['rounds'][number]['results'][number]) => ({ ...r, tea_pct: undefined, within_tea: undefined,
+    // Mã dòng và số phiên bản đợt đổi mỗi lần bổ sung máy khác dù số liệu của
+    // phạm vi đã ký không đổi, nên cũng không đưa vào dấu vân tay.
+    const stable = (r: EqaReportView['rounds'][number]['results'][number]) => ({ ...r, id: undefined, tea_pct: undefined, within_tea: undefined,
       trend: r.trend ? { signals: r.trend.signals, unsuccessful: r.trend.unsuccessful, j: r.trend.j } : null });
-    const snapshot = { scope, rounds: rounds.map(({ round, results, config, decisions }) => ({ round: { ...round, row_version: undefined, updated_at: undefined, missing_instruments: undefined }, results: results.map(stable), config,
+    const snapshot = { scope, rounds: rounds.map(({ round, results, config, decisions }) => ({ round: { ...round, version: undefined, row_version: undefined, updated_at: undefined, missing_instruments: undefined }, results: results.map(stable), config,
       sources: decisions.filter((d) => ['import', 'append', 'reimport'].includes(d.type)).map((d) => d.payload_json) })), coverage: scope.roundId ? undefined : { missing: coverage.missing } };
     const fingerprint = sha256Hex(JSON.stringify(snapshot));
     const decisions = db.prepare(`SELECT d.* FROM eqa_decisions d JOIN eqa_rounds r ON r.id=d.round_id

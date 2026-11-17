@@ -11,6 +11,7 @@ const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js')
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
 const { applySchema, SCHEMA_VERSION } = require('../../app-dist/main/db/schema.js');
 const { checklistKeys } = require('../../app-dist/main/domain/nce/checklist.js');
+const { eqaNceSourceKey } = require('../../app-dist/main/domain/eqa/source-key.js');
 const { dumpAllTables, restoreAllTables } = require('../../app-dist/main/db/table-io.js');
 const admin = { userId: 'admin', username: 'admin', name: 'Quản trị', role: 'admin', clientId: 'test' };
 const viewer = { ...admin, userId: 'viewer', role: 'viewer' };
@@ -199,7 +200,7 @@ test('schema 15 nâng từ 14 giữ hồ sơ cũ và tạo cột liên kết đ�
     db.prepare("INSERT INTO nce_records(id,nce_id,source,description) VALUES ('old','NCE-OLD','other','Hồ sơ cũ cần giữ nguyên')").run();
     db.prepare("UPDATE app_meta SET value='14' WHERE key='schemaVersion'").run();
     applySchema(db);
-    assert.equal(SCHEMA_VERSION, 15);
+    assert.ok(SCHEMA_VERSION >= 15);
     const old = db.prepare("SELECT * FROM nce_records WHERE id='old'").get();
     assert.equal(old.nce_id, 'NCE-OLD'); assert.equal(old.eqa_result_id, null); assert.equal(old.eqa_snapshot_json, '');
     assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
@@ -216,6 +217,29 @@ test('sao lưu/khôi phục giữ khoá ngoại và ảnh chụp của hồ sơ 
     assert.equal(saved.record.eqa_snapshot_json, d.record.eqa_snapshot_json);
     assert.equal(target.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally { target.close(); f.db.close(); }
+});
+
+test('S4: lịch cũ chưa khai máy vẫn cho ngày chạy của mọi máy trong đợt', () => {
+  const f = setup();
+  try {
+    must(f.eqa.saveEqaSchedule({ data: { programId: f.scope.programId, year: 2026, round: 'ĐỢT 01', runDate: '2026-08-28', dueDate: '2026-09-05' } }, admin));
+    assert.equal(f.eqa.getEqaCorrectiveEvidence({ resultId: f.result.id }).run_date, '2026-08-28');
+  } finally { f.db.close(); }
+});
+
+test('S5: nhập bù đợt cũ làm đổi tín hiệu chuỗi không tách hồ sơ NCE đã lập', () => {
+  const f = setup(3.5);
+  try {
+    const d = must(f.create());
+    const keyBefore = f.db.prepare('SELECT eqa_source_key k FROM nce_records WHERE id=?').get(d.record.id).k;
+    // Đợt 00 nhập muộn, cũng không chấp nhận: đợt 01 thành "không thành công" (tín hiệu mới).
+    must(f.eqa.importEqaRound({ data: { ...f.input, round: { ...f.input.round, round: 'ĐỢT 00', reportDate: '2026-08-01' }, rows: [{ ...f.input.rows[0], result: 8.4, zProvider: 3.4 }] } }, admin));
+    const rows = f.eqa.listEqaCorrective(f.scope).filter((r) => r.round.round === 'ĐỢT 01');
+    assert.equal(rows.length, 1, 'không sinh dòng trùng');
+    assert.ok(rows[0].result.trend.unsuccessful);
+    assert.deepEqual([rows[0].current, rows[0].record?.id], [true, d.record.id]);
+    assert.equal(eqaNceSourceKey(rows[0]), keyBefore);
+  } finally { f.db.close(); }
 });
 
 test('tín hiệu chuỗi ở kết quả đang chấp nhận vẫn vào hàng chờ bắt buộc điều tra', () => {

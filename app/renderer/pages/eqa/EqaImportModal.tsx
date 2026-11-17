@@ -51,6 +51,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
   const [reports, setReports] = useState<EqaPdfReport[]>([]);
   const [instrumentFor, setInstrumentFor] = useState<Record<number, string>>({});
   const [yearFor, setYearFor] = useState<Record<number, string>>({});
+  const [sampleFor, setSampleFor] = useState<Record<number, string>>({});
   const [fileError, setFileError] = useState('');
   const [parsing, setParsing] = useState(false);
   const [review, setReview] = useState<EqaParsedSource | null>(null);
@@ -61,7 +62,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
   async function pick(files: FileList | readonly File[] | null) {
     const list = files ? [...files] : [];
     if (!list.length) return;
-    setParsing(true); setFileError(''); setReports([]); setInstrumentFor({}); setYearFor({});
+    setParsing(true); setFileError(''); setReports([]); setInstrumentFor({}); setYearFor({}); setSampleFor({});
     try {
       const read = await readEqaPdfFiles(list);
       setReports(read);
@@ -69,6 +70,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
       // File không ghi năm (VEQAS) lấy năm của file khác trong lần chọn; người dùng vẫn sửa được.
       const fallback = read.find((r) => r.round.year)?.round.year;
       setYearFor(Object.fromEntries(read.map((report, i) => [i, String(report.round.year ?? fallback ?? '')])));
+      setSampleFor(Object.fromEntries(read.map((report, i) => [i, String(report.rows[0]?.sample ?? '')])));
     } catch (error) {
       setFileError(error instanceof Error ? error.message : 'Không đọc được file.');
     } finally { setParsing(false); }
@@ -78,13 +80,16 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
   const yearOf = (i: number) => Number(yearFor[i] ?? '');
   const yearValid = reports.every((_, i) => Number.isInteger(yearOf(i)) && yearOf(i) >= 2000 && yearOf(i) <= 2100);
   const chosen = reports.map((_, i) => instrumentFor[i] ?? '');
+  // Báo cáo mỗi tệp một mẫu (VEQAS) phải có mã mẫu: thiếu thì hai mẫu cùng máy sẽ ghi đè nhau.
+  const sampleOf = (i: number) => (sampleFor[i] ?? '').trim();
+  const sampleValid = reports.every((report, i) => !report.samplePerFile || (sampleOf(i).length > 0 && sampleOf(i).length <= 20));
   const fileErrors = reports.map((r) => withoutYearNotice(r.errors));
   const readErrors = fileErrors.flat();
   const named = reports.map((report, i): EqaParsedSource => {
     const instrument = instruments.find((item) => item.id === chosen[i]);
     return {
       round: { ...report.round, year: yearOf(i) || null },
-      rows: report.rows.map((row) => ({ ...row, instrument: instrument?.name ?? row.instrument })),
+      rows: report.rows.map((row) => ({ ...row, instrument: instrument?.name ?? row.instrument, ...(report.samplePerFile ? { sample: sampleOf(i) } : {}) })),
       errors: fileErrors[i], files: report.files,
       warnings: withoutYearNotice(report.warnings),
     };
@@ -92,10 +97,10 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
   const groups = groupEqaSources(named);
   // Một đợt VEQAS phát hành mỗi mẫu một tệp, nên hai tệp cùng máy là hợp lệ
   // khi khác mẫu; chỉ chặn khi cùng máy lại trùng mẫu (một kết quả hai nguồn).
-  const samplesOf = (i: number) => new Set(reports[i].rows.map((row) => String(row.sample ?? '').trim().toLowerCase()));
+  const samplesOf = (i: number) => new Set(named[i].rows.map((row) => String(row.sample ?? '').trim().toLowerCase()));
   const duplicateInstrument = groups.some((g) => g.indices.some((i, k) => chosen[i] && g.indices.some((j, m) => m > k && chosen[j] === chosen[i]
     && [...samplesOf(i)].some((sample) => samplesOf(j).has(sample)))));
-  const ready = reports.length > 0 && yearValid && chosen.every(Boolean) && !duplicateInstrument;
+  const ready = reports.length > 0 && yearValid && sampleValid && chosen.every(Boolean) && !duplicateInstrument;
 
   function startReview() {
     const items = groups.map((g): EqaBatchItem => ({
@@ -147,7 +152,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
             <p className="eqa-note">{reports.length} tệp thuộc {groups.length} đợt. Kiểm tra năm của từng tệp trước khi tiếp tục; năm là một phần của đợt nên sửa năm sẽ chuyển tệp sang đợt khác.</p>
             <div className="eqa-table-wrap">
               <table className="eqa-table eqa-center-rest eqa-import-files">
-                <thead><tr><th>File</th><th>Nhóm thiết bị trên báo cáo</th><th>Chương trình · đợt</th><th>Năm</th><th className="num">Thông số</th><th>Máy của PXN</th><th>Đọc file</th></tr></thead>
+                <thead><tr><th>File</th><th>Nhóm thiết bị trên báo cáo</th><th>Chương trình · đợt</th><th>Năm</th><th>Mẫu</th><th className="num">Thông số</th><th>Máy của PXN</th><th>Đọc file</th></tr></thead>
                 <tbody>
                   {reports.map((report, index) => (
                     <tr key={report.fileName + index}>
@@ -156,6 +161,10 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
                       <td>{report.round.programCode || report.round.program || '—'} · {report.round.round || '—'}</td>
                       <td><input className="eqa-import-year" type="number" min={2000} max={2100} aria-label={`Năm của đợt cho ${report.fileName}`}
                         value={yearFor[index] ?? ''} onChange={(e) => setYearFor((m) => ({ ...m, [index]: e.target.value }))} /></td>
+                      <td>{report.samplePerFile
+                        ? <input className="eqa-import-year" maxLength={20} placeholder="vd. 09-01" aria-label={`Mã mẫu cho ${report.fileName}`} aria-invalid={!sampleOf(index) || undefined}
+                          value={sampleFor[index] ?? ''} onChange={(e) => setSampleFor((m) => ({ ...m, [index]: e.target.value }))} />
+                        : '—'}</td>
                       <td className="num">{report.rows.length}</td>
                       <td>
                         <select aria-label={`Máy của PXN cho ${report.fileName}`} value={instrumentFor[index] ?? ''} onChange={(e) => setInstrumentFor((m) => ({ ...m, [index]: e.target.value }))}>
@@ -169,6 +178,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
                 </tbody>
               </table>
             </div>
+            {!sampleValid && <div className="alert warn">Báo cáo VEQAS không ghi mã mẫu trong nội dung; app đọc mã mẫu từ tên tệp gốc của trung tâm (dạng 09-01). Ghi mã mẫu cho tệp còn trống để hai mẫu của cùng máy không ghi đè nhau.</div>}
             {duplicateInstrument && <div className="alert warn">Hai file của cùng một đợt đang chọn cùng một máy cho cùng một mẫu. Mỗi báo cáo PDF là kết quả của một máy, một mẫu.</div>}
             {readErrors.length > 0 && <div className="alert rej eqa-pre" role="alert">{readErrors.join('\n')}</div>}
           </>
@@ -249,7 +259,7 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
     <Modal title={TITLE} size="xl" busy={busy} onClose={onClose}
       footer={<>
         <button type="button" className="btn ghost" disabled={busy} onClick={onBack}>{backLabel}</button>
-        <button type="button" className="btn teal" disabled={!canImport} onClick={() => void submit()}>{busy ? 'Đang ghi…' : preview?.existing?.needs_reason ? 'Nhập lại đợt này' : preview?.existing ? 'Bổ sung vào đợt' : 'Ghi đợt ngoại kiểm'}</button>
+        <button type="button" className="btn teal" disabled={!canImport} onClick={() => void submit()}>{busy ? 'Đang ghi…' : preview?.existing?.unchanged ? 'Giữ nguyên đợt' : preview?.existing?.needs_reason ? 'Nhập lại đợt này' : preview?.existing ? 'Bổ sung vào đợt' : 'Ghi đợt ngoại kiểm'}</button>
       </>}>
       <div className="eqa-import-review">
         <section className="eqa-import-block" aria-label="Thông tin đợt trong báo cáo">
@@ -262,14 +272,16 @@ function EqaImportReview({ source, sourceName, onClose, onBack, onImported, back
           {!!source.warnings?.length && <div className="alert warn eqa-pre">{source.warnings.join('\n')}</div>}
           {preview?.existing && (
             <div className="eqa-replace">
-              {preview.existing.needs_reason ? (
+              {preview.existing.unchanged ? (
+                <div className="alert info">Số liệu trùng khớp kết quả đang lưu của đợt này. Ghi sẽ không tạo phiên bản mới và không làm thay đổi phiếu xem xét đã ký.</div>
+              ) : preview.existing.needs_reason ? (
                 <div className="alert warn">
                   {preview.existing.status === 'cancelled'
-                    ? `Đợt này đã có trong app nhưng đã huỷ. Nhập lại sẽ mở lại đợt với phiên bản ${preview.existing.version + 1}.`
+                    ? `Đợt này đã có trong app nhưng đã huỷ. Nhập lại sẽ mở lại đợt với phiên bản ${preview.existing.version + 1}${preview.existing.instruments.length ? `; kết quả cũ của ${preview.existing.instruments.join(', ')} được giữ, trừ đúng máy và mẫu có trong lần nhập này` : ''}.`
                     : `Đợt này đã có kết quả của ${preview.existing.replaces.join(', ')}. Nhập lại thay kết quả của đúng máy và mẫu đó bằng phiên bản ${preview.existing.version + 1}; phiên bản cũ vẫn được giữ trong CSDL.`}
                 </div>
               ) : (
-                <div className="alert info">Đợt này đã có trong app (đang có: {preview.existing.instruments.join(', ') || 'chưa có máy nào'}). Lần nhập này bổ sung máy mới, kết quả của các máy đã có giữ nguyên.</div>
+                <div className="alert info">Đợt này đã có trong app (đang có: {preview.existing.instruments.join(', ') || 'chưa có máy nào'}). Lần nhập này bổ sung máy mới, kết quả của các máy đã có giữ nguyên.{preview.existing.reviewed_all && ' Phiếu xem xét "Tất cả máy" đã ký của đợt sẽ cần ký lại để bao gồm máy mới; phiếu đã ký riêng từng máy vẫn giữ hiệu lực.'}</div>
               )}
               {preview.existing.needs_reason && (
                 <div className="field">
@@ -426,6 +438,7 @@ function EqaImportBatch({ items, onClose, onBack }: { items: readonly EqaBatchIt
     if (!result) return '';
     if (!result.ok) return result.error.message;
     const p = result.data;
+    if (p.existing?.unchanged) return 'Trùng khớp kết quả đang lưu; không tạo phiên bản mới.';
     if (p.existing?.needs_reason) return `Đợt đã có kết quả của ${p.existing.replaces.join(', ')}; cần lý do nhập lại.`;
     if (p.blocking > 0) return `${p.blocking} lỗi chặn (thường là chưa ánh xạ xét nghiệm).`;
     return `${p.counts.ok} chấp nhận · ${p.counts.warn} cảnh báo · ${p.counts.rej} không chấp nhận`;

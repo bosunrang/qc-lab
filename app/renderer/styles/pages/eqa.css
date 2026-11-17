@@ -109,11 +109,9 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-import-review .eqa-overview-summary{margin-bottom:0;}
 .eqa-report-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
 .eqa-corrective{min-width:0;}
-.eqa-corrective-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:var(--space-4);border:1px solid var(--surface-divider);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
-.eqa-corrective-summary>button{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-4);border:0;border-left:1px solid var(--surface-divider);background:transparent;color:var(--text-secondary);text-align:left;font:inherit;cursor:pointer;}
-.eqa-corrective-summary>button:first-child{border-left:0;}
-.eqa-corrective-summary>button.is-active,.eqa-corrective-summary>button:hover{background:var(--accent-surface-tint);color:var(--accent-text);}
-.eqa-corrective-summary b{font-size:var(--text-2xl);color:var(--text-primary);}
+/* Thẻ tổng hợp dùng kiểu .nce-summary-card; thẻ đang lọc giữ nền nhấn. */
+.eqa-corrective-summary{margin-bottom:var(--space-4);}
+.eqa-corrective-summary>.nce-summary-card.is-active{background:var(--accent-surface-tint);border-top-color:var(--accent-border);border-right-color:var(--accent-border);border-bottom-color:var(--accent-border);}
 .eqa-corrective-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-5);align-items:start;}
 .eqa-corrective-workspace.has-evidence{grid-template-columns:minmax(0,1fr) var(--space-2) clamp(340px,var(--eqa-evidence-width,420px),min(640px,calc(100% - 480px - var(--space-6))));gap:var(--space-2);align-items:stretch;}
 .eqa-corrective-list,.eqa-corrective-inspector{min-width:0;margin-bottom:0;position:sticky;top:calc(var(--page-header-h) + var(--space-4));display:flex;flex-direction:column;max-height:calc(100dvh - var(--page-header-h) - var(--space-6));}
@@ -428,7 +426,6 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
   .eqa-facts{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:850px){
-  .eqa-corrective-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
   .eqa-overview-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
   .eqa-accept-summary{grid-column:1/-1;border-bottom:1px solid var(--surface-divider);}
   .eqa-summary-count.is-rej{border-left:0;}

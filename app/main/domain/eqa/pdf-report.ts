@@ -31,6 +31,10 @@ export interface EqaPdfReport extends EqaParsedSource {
   fileName: string;
   /** Nhóm thiết bị đồng đẳng ghi trên báo cáo (không phải tên máy của PXN). */
   instrumentGroup: string;
+  /** VEQAS: mỗi tệp là một mẫu nhưng nội dung báo cáo không ghi mã mẫu, chỉ tên
+   * tệp gốc của trung tâm có (dạng `_09-01_`). Người dùng kiểm/sửa mã mẫu khi
+   * nhập để hai mẫu cùng máy không ghi đè nhau (rà soát 17/11/2026, S3). */
+  samplePerFile?: boolean;
 }
 
 interface Line { y: number; items: EqaPdfTextItem[]; text: string }
@@ -249,7 +253,7 @@ export function parseVeqasReport(doc: EqaPdfDocument): EqaPdfReport {
     method: row.methodGroup, peerGroup: instrumentGroup, peer: row.peer,
   }));
   return {
-    fileName: doc.fileName, instrumentGroup,
+    fileName: doc.fileName, instrumentGroup, samplePerFile: true,
     round: {
       program, provider, programCode, unitCode, year: year && year >= 2000 ? year : null, round: roundNo ? `ĐỢT ${roundNo.padStart(2, '0')}` : '',
       reportCode, reportDate: doc.creationDate, assignedLevel,

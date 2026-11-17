@@ -77,6 +77,16 @@ test('lập lịch, đánh dấu đã nộp, rồi nhận ra đợt đã có bá
   assert.equal(needsAction(reported), false);
 });
 
+test('S8: lịch đã có dấu nộp không chuyển sang đợt khác; vẫn sửa được ngày, người phụ trách', () => {
+  const { eqa } = fixture();
+  const row = must(eqa.saveEqaSchedule(plan(), tech), 'lập lịch');
+  must(eqa.markEqaSubmitted({ data: { id: row.id, submitted: true } }, tech), 'đã nộp');
+  assert.equal(eqa.saveEqaSchedule({ id: row.id, data: { ...plan().data, round: 'ĐỢT 02' } }, tech).error?.code, 'locked');
+  assert.equal(eqa.saveEqaSchedule({ id: row.id, data: { ...plan().data, year: 2027 } }, tech).error?.code, 'locked');
+  const edited = must(eqa.saveEqaSchedule({ id: row.id, data: { ...plan().data, assignee: 'KTV B' } }, tech), 'sửa người phụ trách');
+  assert.deepEqual([edited.round, edited.assignee, edited.status], ['ĐỢT 01', 'KTV B', 'submitted']);
+});
+
 test('xoá đợt lập nhầm khi chưa nộp; sửa giữ nguyên thì không ghi nhật ký', () => {
   const { db, eqa } = fixture();
   const row = must(eqa.saveEqaSchedule(plan(), tech), 'lập lịch');

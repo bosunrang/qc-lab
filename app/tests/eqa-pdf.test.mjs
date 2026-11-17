@@ -24,6 +24,7 @@ test('đọc báo cáo thật: thông tin đợt, 16 thông số, nhóm so sánh
   const report = parseVeqasReport(FIXTURE);
   assert.deepEqual(report.errors, []);
   assert.equal(report.instrumentGroup, 'Beckman DxC 700 AU');
+  assert.equal(report.samplePerFile, true, 'VEQAS: mã mẫu lấy từ tên tệp, người dùng kiểm khi nhập (S3)');
   assert.deepEqual(report.round, {
     program: 'CHƯƠNG TRÌNH NGOẠI KIỂM TRA SINH HÓA', provider: 'TRUNG TÂM KIỂM CHUẨN XÉT NGHIỆM TP.HCM', programCode: 'BC20C', unitCode: '10026',
     year: 2026, round: 'ĐỢT 09', reportCode: '200900161510', reportDate: '2026-10-15', assignedLevel: 'Nhóm thiết bị',

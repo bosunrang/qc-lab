@@ -33,6 +33,7 @@ const EQA_TABLES = ['eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results',
 
 interface RoundRecord {
   id: string; program_id: string; year: number; round: string; status: string; version: number; row_version: number;
+  report_code: string; report_date: string; assigned_level: string;
 }
 
 export function readEqaConfig(db: Db): EqaConfig {
@@ -89,7 +90,7 @@ export function createEqaHandlers(db: Db) {
 
   function findRound(programId: string | undefined, year: number | null, round: string): RoundRecord | undefined {
     if (!programId || year === null) return undefined;
-    const rows = db.prepare('SELECT id, program_id, year, round, status, version, row_version FROM eqa_rounds WHERE program_id=? AND year=?').all(programId, year) as unknown as RoundRecord[];
+    const rows = db.prepare('SELECT id, program_id, year, round, status, version, row_version, report_code, report_date, assigned_level FROM eqa_rounds WHERE program_id=? AND year=?').all(programId, year) as unknown as RoundRecord[];
     return rows.find((row) => eqaNormalize(row.round) === eqaNormalize(round));
   }
 
@@ -110,7 +111,14 @@ export function createEqaHandlers(db: Db) {
     present: Map<string, string>; replaces: string[];
     /** Máy + mẫu (`slotKey`) của các dòng trong lần nhập này. */
     incoming: Set<string>;
+    /** Máy của các dòng trong lần nhập này. */
+    incomingInstruments: string[];
+    /** Đợt đang dùng và mọi dòng nhập trùng khớp kết quả hiện hành: lưu lại không tạo phiên bản mới. */
+    unchanged: boolean;
   }
+
+  /** Nội dung số liệu của một dòng, để so lần nhập lại với kết quả đang lưu. */
+  const rowContent = (r: readonly unknown[]) => JSON.stringify(r.map((v) => (typeof v === 'string' ? v.trim() : v ?? null)));
 
   function prepare(raw: unknown): Prepared {
     const input = objectInput(objectInput(raw).data) as unknown as EqaImportInput;
@@ -121,23 +129,47 @@ export function createEqaHandlers(db: Db) {
     const existing = findRound(programId, check.round.year, check.round.round);
     // Một kỳ gom kết quả của nhiều máy và nhiều mẫu (báo cáo PDF: mỗi máy, mỗi
     // mẫu một file). Nhập máy hoặc mẫu mới là bổ sung; chỉ kết quả của đúng
-    // máy + mẫu đã có mới bị thay.
-    const openRound = existing && existing.status === 'open' ? existing : undefined;
-    const present = openRound ? currentInstruments(openRound) : new Map<string, string>();
-    const slots = openRound ? currentSlots(openRound) : new Map<string, string>();
+    // máy + mẫu đã có mới bị thay. Mở lại đợt đã huỷ cũng giữ kết quả các máy
+    // khác của phiên bản cuối (E-13), lần nhập chỉ thay đúng máy + mẫu của nó.
+    const present = existing ? currentInstruments(existing) : new Map<string, string>();
+    const slots = existing ? currentSlots(existing) : new Map<string, string>();
     const instrumentOf = new Map(tests.map((t) => [t.id, t.instrument_id]));
+    const incomingInstruments = [...new Set(check.rows.flatMap((row) => {
+      const instrumentId = row.testId ? instrumentOf.get(row.testId) : undefined;
+      return instrumentId ? [instrumentId] : [];
+    }))].sort();
     const incoming = new Set(check.rows.flatMap((row) => {
       const instrumentId = row.testId ? instrumentOf.get(row.testId) : undefined;
       return instrumentId ? [slotKey(instrumentId, row.sample)] : [];
     }));
     const replaces = [...slots].filter(([key]) => incoming.has(key)).map(([, label]) => label);
-    return { input, check, programId, existing, present, replaces, incoming };
+    let unchanged = false;
+    if (existing?.status === 'open' && check.rows.length && [...incoming].every((key) => slots.has(key))
+      && existing.report_code === check.round.reportCode && existing.report_date === check.round.reportDate && existing.assigned_level === check.round.assignedLevel) {
+      const stored = (db.prepare(`SELECT e.test_id,e.code,e.instrument_label,e.sample,e.unit,e.result,e.assigned,e.sigma_p,e.z_provider,e.method,e.peer_group,e.peer_json,t.instrument_id
+        FROM eqa_results e JOIN tests t ON t.id=e.test_id WHERE e.round_id=? AND e.version=?`).all(existing.id, existing.version) as Record<string, unknown>[])
+        .filter((r) => incoming.has(slotKey(String(r.instrument_id), r.sample)))
+        .map((r) => rowContent([r.test_id, r.code, r.instrument_label, r.sample, r.unit, r.result, r.assigned, r.sigma_p, r.z_provider, r.method, r.peer_group, r.peer_json])).sort();
+      const next = check.rows.map((r) => rowContent([r.testId, r.code, r.instrument, r.sample, r.unit, r.result, r.assigned, r.sigmaP, r.zProvider, r.method, r.peerGroup, JSON.stringify(r.peer)])).sort();
+      unchanged = stored.length === next.length && stored.every((v, i) => v === next[i]);
+    }
+    return { input, check, programId, existing, present, replaces, incoming, incomingInstruments, unchanged };
   }
 
   /** Nhập vào kỳ đã có cần lý do khi thay kết quả của máy đã có hoặc mở lại kỳ đã huỷ. */
-  const needsReason = (p: Prepared) => !!p.existing && (p.existing.status !== 'open' || p.replaces.length > 0
-    || (db.prepare("SELECT payload_json FROM eqa_decisions WHERE round_id=? AND type IN ('preliminary_review','analysis_review')").all(p.existing.id) as { payload_json: string }[])
-      .some((d) => parseJson<{ snapshot?: { rounds?: EqaRoundView[] } }>(d.payload_json, {}).snapshot?.rounds?.some((r) => r.round.id === p.existing!.id && r.round.version === p.existing!.version)));
+  // Chỉ thay số liệu của máy + mẫu đã có hoặc mở lại đợt đã huỷ mới cần lý do.
+  // Bổ sung máy/mẫu mới vào đợt đã ký không sửa số liệu đã xem xét (N-08, kế
+  // hoạch 2c, chốt 17/11/2026): bản ký riêng từng máy giữ hiệu lực.
+  const needsReason = (p: Prepared) => !!p.existing && !p.unchanged && (p.existing.status !== 'open' || p.replaces.length > 0);
+
+  /** Đợt đang có phiếu sơ khởi/phân tích "Tất cả máy" ký trên phiên bản hiện hành:
+   * bổ sung máy làm phiếu đó cần ký lại để bao gồm máy mới. */
+  const reviewedAllMachines = (p: Prepared) => !!p.existing && p.existing.status === 'open'
+    && (db.prepare("SELECT payload_json FROM eqa_decisions WHERE round_id=? AND type IN ('preliminary_review','analysis_review')").all(p.existing.id) as { payload_json: string }[])
+      .some((d) => {
+        const payload = parseJson<{ scope?: { instrumentId?: string }; snapshot?: { rounds?: EqaRoundView[] } }>(d.payload_json, {});
+        return !payload.scope?.instrumentId && !!payload.snapshot?.rounds?.some((r) => r.round.id === p.existing!.id && r.round.version === p.existing!.version);
+      });
 
   function previewEqaImport(raw: unknown): IpcResult<EqaImportPreview> {
     const prepared = prepare(raw);
@@ -149,7 +181,8 @@ export function createEqaHandlers(db: Db) {
       counts: { total: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej, accept_pct: counts.acceptPct },
       existing: existing ? {
         id: existing.id, version: existing.version, row_version: existing.row_version, status: existing.status,
-        instruments: [...prepared.present.values()].sort((a, b) => a.localeCompare(b, 'vi')), replaces: prepared.replaces, needs_reason: needsReason(prepared),
+        instruments: [...prepared.present.values()].sort((a, b) => a.localeCompare(b, 'vi')), replaces: prepared.replaces, needs_reason: needsReason(prepared), unchanged: prepared.unchanged,
+        reviewed_all: !prepared.unchanged && reviewedAllMachines(prepared),
       } : null,
     } };
   }
@@ -163,6 +196,8 @@ export function createEqaHandlers(db: Db) {
         && typeof f.sha256 === 'string' && /^[a-f0-9]{64}$/i.test(f.sha256)
         && typeof f.creationDate === 'string' && (f.creationDate === '' || /^\d{4}-\d{2}-\d{2}$/.test(f.creationDate))))) return fail('source-files', 'Dấu vết tệp PDF không hợp lệ. Chọn lại tệp trước khi nhập.');
     const sourceFiles = input.sourceFiles?.map((f) => ({ fileName: f.fileName.trim(), sha256: f.sha256.toLowerCase(), creationDate: f.creationDate }));
+    // Nhập lại đúng số liệu đang lưu: không tạo phiên bản mới, không làm chữ ký mất hiệu lực.
+    if (prepared.unchanged && existing) return w.noChange(getEqaRound(existing.id)!);
     const replaceReason = text(input.replaceReason, 1000);
     const replacing = needsReason(prepared);
     if (existing) {
@@ -222,9 +257,12 @@ export function createEqaHandlers(db: Db) {
       const decide = db.prepare('INSERT INTO eqa_decisions(id,round_id,type,payload_json,actor_user_id,actor_name,decided_at) VALUES (?,?,?,?,?,?,?)');
       const actorName = w.actor.name || w.actor.username;
       const kind = !existing ? 'import' : replacing ? 'reimport' : 'append';
+      // Máy, mã và ngày báo cáo của chính lần nhập: phiếu xem xét theo máy lấy
+      // nguồn của đúng máy đó, không lấy báo cáo của máy nhập sau.
       decide.run(uid(), roundId, kind, JSON.stringify({
         source, sourceName, sourceFiles, version, rows: counts.total, ok: counts.ok, warn: counts.warn, rej: counts.rej,
         replaces: prepared.replaces, reason: replacing ? replaceReason : '',
+        instrumentIds: prepared.incomingInstruments, reportCode: round.reportCode, reportDate: round.reportDate,
       }), w.actor.userId, actorName, now);
       const label = `${round.program} · ${round.round}/${round.year}`;
       tx.audit(kind === 'import' ? 'Nhập kỳ ngoại kiểm' : kind === 'append' ? 'Bổ sung kết quả vào kỳ ngoại kiểm' : 'Nhập lại kỳ ngoại kiểm',
@@ -621,6 +659,12 @@ export function createEqaHandlers(db: Db) {
     // Dấu nộp/báo cáo thuộc đúng máy của lịch; không được gỡ để làm mất hồ sơ.
     const removedRecorded = (id ? scheduleById(id)!.instruments : []).filter((m) => (m.submitted_at || m.reported) && !d.instrumentIds.includes(m.instrument_id));
     if (removedRecorded.length) return fail('locked', `${instrumentNames(removedRecorded.map((m) => m.instrument_id)).join(', ')} đã nộp hoặc có báo cáo; không thể gỡ máy khỏi lịch này.`);
+    // Dấu nộp gắn với đúng chương trình–năm–đợt của lịch (EQA-REVIEW mục 5): không
+    // chuyển lịch đã có dấu nộp/báo cáo sang đợt khác, vì dấu nộp sẽ đi theo sai đợt.
+    const recorded = !!existing && (!!existing.submitted_at || scheduleById(id)!.instruments.some((m) => m.submitted_at || m.reported));
+    if (recorded && (existing!.program_id !== programId || existing!.year !== d.year || existing!.round_no !== d.roundNo)) {
+      return fail('locked', 'Lịch đã có dấu nộp hoặc báo cáo; không thể chuyển sang chương trình, năm hoặc đợt khác. Thêm lịch mới cho đợt đó.');
+    }
     const sameInstruments = before.length === d.instrumentIds.length && before.every((m) => d.instrumentIds.includes(m.instrument_id));
     const fields = [d.year, d.round, d.roundNo, d.sampleType, d.receiveDate, d.runDate, d.dueDate, d.assignee, d.note];
     if (existing && existing.program_id === programId && sameInstruments
