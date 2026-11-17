@@ -88,7 +88,7 @@ test('ngoại kiểm: chi tiết xét nghiệm cập nhật cả chuỗi và dan
     await app.evaluate(({ ipcMain }) => { ipcMain._invokeHandlers.set('eqa:getSeries', ipcMain.__eqaReviewSeries); });
     await main.getByRole('button', { name: 'Thử lại', exact: true }).click();
     await page.getByRole('heading', { name: 'Xét nghiệm cập nhật lần hai · Máy rà soát', exact: true }).waitFor();
-    await main.getByRole('region', { name: 'Kết quả từng đợt', exact: true }).getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).first().waitFor();
+    await main.getByRole('region', { name: 'Kết quả từng đợt', exact: true }).getByRole('button', { name: 'Mở đợt báo cáo', exact: true }).first().waitFor();
     assert.deepEqual(errors, []);
   } finally { await app.close(); }
 });
@@ -115,7 +115,7 @@ test('ngoại kiểm: chi tiết kỳ bỏ phản hồi cũ, thử lại đúng 
       });
     });
     await navigate(page, { id: context.round.id, point: context.resultId });
-    await page.getByText('Đang tải kỳ ngoại kiểm…', { exact: true }).waitFor();
+    await page.getByText('Đang tải đợt ngoại kiểm…', { exact: true }).waitFor();
     await rename(page, context, 'Tên mới khi đang tải kỳ');
     const results = page.locator('.eqa-results-table');
     await results.getByText('Tên mới khi đang tải kỳ', { exact: true }).waitFor();
@@ -126,7 +126,7 @@ test('ngoại kiểm: chi tiết kỳ bỏ phản hồi cũ, thử lại đúng 
 
     await failNextRead(app, 'eqa:getRound');
     await page.reload();
-    await page.getByText('Không tải được kỳ ngoại kiểm', { exact: true }).waitFor();
+    await page.getByText('Không tải được đợt ngoại kiểm', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
     await results.getByText('Tên mới khi đang tải kỳ', { exact: true }).waitFor();
     await app.evaluate(({ ipcMain }) => {
@@ -135,7 +135,7 @@ test('ngoại kiểm: chi tiết kỳ bỏ phản hồi cũ, thử lại đúng 
       handlers.set('eqa:getRound', () => { handlers.set('eqa:getRound', original); return null; });
     });
     await page.reload();
-    await page.getByText('Không tìm thấy kỳ ngoại kiểm', { exact: true }).waitFor();
+    await page.getByText('Không tìm thấy đợt ngoại kiểm', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Về danh sách', exact: true }).click();
     await page.getByRole('region', { name: 'Bảng tổng hợp z-score', exact: true }).waitFor();
     // Một kết quả ngoại kiểm chấp nhận vẫn cần rà soát khi vượt TEa nội bộ.

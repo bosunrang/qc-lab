@@ -18,7 +18,7 @@ export function EqaResultsSummary({ totals, description, loading = false, failed
 }) {
   const unavailable = loading || failed;
   const toggle = (value: 'ok' | 'warn' | 'rej') => onFilter ? () => onFilter(filter === value ? 'all' : value) : undefined;
-  return <div className="eqa-overview-summary" aria-label="Tổng hợp kết quả ngoại kiểm">
+  return <div className="eqa-overview-summary" role="group" aria-label="Tổng hợp kết quả ngoại kiểm">
     <SummaryItem className="eqa-accept-summary" pressed={filter === 'ok'} onClick={toggle('ok')} disabled={unavailable || !totals.total}>
       <span className="eqa-summary-label">Tỷ lệ chấp nhận</span>
       <span className="eqa-accept-value"><b>{unavailable || totals.acceptPct === null ? '—' : `${totals.acceptPct.toFixed(1)}%`}</b><span>{failed ? 'Không tải được số liệu' : loading ? 'Đang tải…' : totals.total ? `${totals.ok}/${totals.total} kết quả` : 'Chưa có kết quả'}</span></span>

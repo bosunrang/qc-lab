@@ -8,18 +8,6 @@ export const EQA_REVIEW_LABELS: Record<EqaReviewKind, string> = {
   preliminary_review: 'Xem xét sơ khởi', analysis_review: 'Xem xét phân tích', system_review: 'Xem xét hệ thống',
 };
 
-export function eqaSourceLines(view: EqaReportView['rounds'][number]): string[] {
-  const lines: string[] = [];
-  for (const d of view.decisions) {
-    if (!['import', 'append', 'reimport'].includes(d.type)) continue;
-    try {
-      const p = JSON.parse(d.payload_json) as { version?: number; sourceFiles?: { fileName: string; sha256: string; creationDate: string }[] };
-      for (const f of p.sourceFiles || []) lines.push(`Phiên bản ${p.version || 1} · ${f.fileName} · Ngày tạo: ${f.creationDate || 'Không có trong PDF'} · SHA-256: ${f.sha256}`);
-    } catch { /* Dữ liệu cũ chưa lưu mã băm được ghi rõ, không tạo lại dấu vết giả. */ }
-  }
-  return lines.length ? lines : ['Chưa lưu mã băm SHA-256 của tệp nguồn.'];
-}
-
 const text = escapeHtml;
 function assessmentHtml(stage: EqaPaperStage): string {
   return `<div class="eqa-paper-choices">${(['appropriate', 'not_appropriate', 'pending'] as const).map((key) => `<span><i aria-hidden="true">${stage.assessment === key ? 'X' : ''}</i>${EQA_ASSESSMENT_LABELS[key]}</span>`).join('')}</div>`;

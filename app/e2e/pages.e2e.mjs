@@ -45,7 +45,7 @@ test('mọi trang ở thanh điều hướng mở được không lỗi', { time
         await page.locator('.wg-table tbody tr', { hasText: '5.10' }).first().waitFor();
       }
       if (label.trim() === 'Phân tích ngoại kiểm') {
-        await page.getByText('Chưa có kỳ ngoại kiểm nào').waitFor();
+        await page.getByText('Chưa có đợt ngoại kiểm nào').waitFor();
       }
       if (label.trim() === 'Six Sigma & Sai số') {
         await page.getByRole('heading', { name: 'Tình trạng' }).waitFor();

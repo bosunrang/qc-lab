@@ -76,7 +76,7 @@ export function useEqaScope(preferredInstrumentId?: string) {
 }
 
 export function EqaScopeControls({ scope, action }: { scope: ReturnType<typeof useEqaScope>; action?: ReactNode }) {
-  return <div className="eqa-scope-controls" aria-label="Phạm vi ngoại kiểm">
+  return <div className="eqa-scope-controls" role="group" aria-label="Phạm vi ngoại kiểm">
     <div className="field"><label htmlFor="eqa-scope-year">Năm</label><select id="eqa-scope-year" value={scope.year} onChange={(e) => scope.change({ year: Number(e.target.value) })}>
       {(scope.years.length ? scope.years : [scope.year]).map((y) => <option key={y} value={y}>{y}</option>)}
     </select></div>

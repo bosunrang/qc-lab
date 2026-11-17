@@ -48,9 +48,13 @@ function ProgramCell({ row, sub }: { row: EqaScheduleRow; sub: string }) {
 
 function MachineTags({ row }: { row: EqaScheduleRow }) {
   if (!row.instruments.length) return null;
-  return <span className="eqa-machine-tags">{row.instruments.map((m) => (
-    <span key={m.instrument_id} className={`tag ${m.submitted_at || m.reported ? 'ok' : 'none'}`} title={m.reported ? 'Đã có trong báo cáo' : m.submitted_at ? 'Đã nộp' : 'Chưa nộp'}>{m.instrument_name}</span>
-  ))}</span>;
+  // Trạng thái nộp không chỉ dựa vào màu: máy đã nộp có dấu ✓, trình đọc màn hình đọc đủ trạng thái.
+  return <span className="eqa-machine-tags">{row.instruments.map((m) => {
+    const state = m.reported ? 'Đã có trong báo cáo' : m.submitted_at ? 'Đã nộp' : 'Chưa nộp';
+    return <span key={m.instrument_id} className={`tag ${m.submitted_at || m.reported ? 'ok' : 'none'}`} title={state}>
+      {(m.submitted_at || m.reported) && <span aria-hidden="true">✓ </span>}{m.instrument_name}<span className="sr-only">: {state}</span>
+    </span>;
+  })}</span>;
 }
 
 export function daysLeftText(row: EqaScheduleRow): string {
@@ -164,6 +168,8 @@ export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRoun
     return map.set(row.id, item);
   }, new Map<string, { row: EqaScheduleRow; kinds: EventKind[] }>()).values()];
   const cells = monthCells(month);
+  // Lưới lịch chỉ có một điểm dừng Tab (ngày đang chọn); phím mũi tên đi giữa các ngày.
+  const tabDate = cells.some((c) => c.date === selectedDay) ? selectedDay : cells.find((c) => c.inMonth)?.date;
   const monthHasEvents = [...byDate.keys()].some((d) => d.startsWith(month));
 
   function selectDay(date: string) { setSelectedDay(date); setMonth(date.slice(0, 7)); }
@@ -183,7 +189,7 @@ export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRoun
   }
   function actions(row: EqaScheduleRow) {
     return <div className="eqa-row-actions">
-      {row.round_id && <button type="button" className="btn ghost sm" onClick={() => onOpenRound(row.round_id!)}>Mở kỳ báo cáo</button>}
+      {row.round_id && <button type="button" className="btn ghost sm" onClick={() => onOpenRound(row.round_id!)}>Mở đợt báo cáo</button>}
       {writable && <>
         {row.status !== 'reported' && <button type="button" className="btn ghost sm" onClick={() => void submitted(row, row.status !== 'submitted')}>
           {row.status === 'submitted' ? row.instruments.length ? 'Sửa đã nộp' : 'Bỏ đã nộp' : 'Ghi nhận nộp'}
@@ -258,8 +264,9 @@ export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRoun
                 // thành cảnh báo. Quá hạn được ưu tiên khi có nhiều công việc.
                 const dayTone = items.some(({ row, kind }) => kind === 'due' && row.status === 'overdue') ? ' is-overdue'
                   : items.some(({ row, kind }) => kind === 'due' && row.status === 'planned' && row.days_left <= EQA_DUE_SOON_DAYS) ? ' is-soon' : '';
-                return <div key={date} role="gridcell" aria-label={`${vnDate(date)}${items.length ? `: ${items.length} việc` : ''}`}>
-                  <button type="button" data-date={date} className={`eqa-cal-day${dayTone}${weekday >= 5 ? ' is-weekend' : ''}${inMonth ? '' : ' is-out'}${date === today ? ' is-today' : ''}${date === selectedDay ? ' is-selected' : ''}`} aria-current={date === today ? 'date' : undefined} aria-pressed={date === selectedDay} aria-label={`${vnDate(date)}${items.length ? `: ${items.length} việc` : ''}`} onClick={() => selectDay(date)}>
+                const toneText = dayTone === ' is-overdue' ? ', có hạn nộp quá hạn' : dayTone === ' is-soon' ? ', có hạn nộp sắp tới' : '';
+                return <div key={date} role="gridcell">
+                  <button type="button" data-date={date} tabIndex={date === tabDate ? 0 : -1} className={`eqa-cal-day${dayTone}${weekday >= 5 ? ' is-weekend' : ''}${inMonth ? '' : ' is-out'}${date === today ? ' is-today' : ''}${date === selectedDay ? ' is-selected' : ''}`} aria-current={date === today ? 'date' : undefined} aria-pressed={date === selectedDay} aria-label={`${vnDate(date)}${items.length ? `: ${items.length} việc` : ''}${toneText}`} onClick={() => selectDay(date)}>
                     <span className="eqa-cal-date"><span>{Number(date.slice(8, 10))}</span>{items.length > 2 && <small>+{items.length - 2}</small>}</span>
                     {items.slice(0, 2).map(({ row, kind }) => <span key={`${row.id}-${kind}`} className={`eqa-cal-event ${kind === 'due' ? dotTone(row) : `is-${kind}`}`} title={[EVENT_LABELS[kind], row.program_name, row.sample_type, `${row.round}/${row.year}`, row.instruments.map((m) => m.instrument_name).join(', ')].filter(Boolean).join(' · ')}><span aria-hidden="true">●</span> {kind === 'due' ? 'Nộp' : kind === 'run' ? 'Chạy' : 'Nhận'} · {row.sample_type || row.program_name}</span>)}
                   </button>

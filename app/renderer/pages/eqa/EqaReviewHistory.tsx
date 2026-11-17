@@ -6,7 +6,7 @@ export function EqaReviewHistory({ reviews, selectedId, onSelect, disabled }: {
   reviews: readonly EqaReportReview[]; selectedId: string; onSelect: (id: string) => void; disabled: boolean;
 }) {
   return <section className="panel eqa-review-history" aria-label="Lịch sử phiếu xem xét">
-    <div className="panel-head"><h2>Lịch sử phiếu xem xét</h2><span className="tag none" aria-label={`${reviews.length} lần ký`}>{reviews.length}</span></div>
+    <div className="panel-head"><h2>Lịch sử phiếu xem xét</h2><span className="tag none"><span className="sr-only">Số lần ký: </span>{reviews.length}</span></div>
     <div className="eqa-review-history-body">
       {reviews.length ? <table className="eqa-review-history-table" aria-label="Các lần ký xem xét">
         <thead><tr><th scope="col">Phiếu xem xét</th><th scope="col">Ngày ký</th></tr></thead>

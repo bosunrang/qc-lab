@@ -26,7 +26,7 @@ export function EqaResultInspector({ selection, onOpenRound, onOpenTest, onClose
     <div className="eqa-section-body" aria-live="polite">
       {error ? <EmptyState size="compact" title="Không tải được kết quả" action={<button className="btn ghost sm" onClick={retry}>Thử lại</button>}>{error}</EmptyState>
         : view === undefined ? <EmptyState size="compact" title="Đang tải kết quả…" />
-        : !view ? <EmptyState size="compact" title="Không tìm thấy kỳ báo cáo" /> : <>
+        : !view ? <EmptyState size="compact" title="Không tìm thấy đợt báo cáo" /> : <>
           <div className="eqa-inspector-title"><h3>{result?.test_name ?? 'Chưa có kết quả'}</h3><span className="eqa-sub">{view.round.round} / {view.round.year}{(result?.sample || selection.sample) ? ` · Mẫu ${result?.sample || selection.sample}` : ''}</span></div>
           {result ? <>
             <div className="eqa-result-score"><b>{numText(result.z_official)}</b><span className="eqa-score-label">z-score</span><ClassTag cls={result.class} /></div>
@@ -54,10 +54,10 @@ export function EqaResultInspector({ selection, onOpenRound, onOpenTest, onClose
               {result.warnings.length > 0 && <ul className="eqa-list">{result.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
             </details>
           </> : <EmptyState size="compact" title="Chưa ghi nhận kết quả ở ô này">Kiểm tra báo cáo của đợt trước khi kết luận thiếu mẫu hoặc chưa tham gia.</EmptyState>}
-          <div className="eqa-source"><span className="eqa-sub">Thông tin nguồn của kỳ · lần nhập gần nhất</span><b>{view.round.report_code || view.round.program_name}</b>
+          <div className="eqa-source"><span className="eqa-sub">Thông tin nguồn của đợt · lần nhập gần nhất</span><b>{view.round.report_code || view.round.program_name}</b>
             <span>Ngày báo cáo: {vnDate(view.round.report_date, 'Chưa ghi ngày')}</span>
             <details key={view.round.id} className="eqa-details"><summary>Tệp báo cáo</summary><span>{view.round.source_name || 'Chưa ghi tên tệp'}</span></details>
-            <button type="button" className="btn ghost sm" onClick={() => onOpenRound(view.round.id, result?.id)}>Mở kỳ báo cáo</button>
+            <button type="button" className="btn ghost sm" onClick={() => onOpenRound(view.round.id, result?.id)}>Mở đợt báo cáo</button>
           </div>
           {onOpenTest && result && <button type="button" className="btn sm" onClick={onOpenTest}>Phân tích xét nghiệm →</button>}
         </>}

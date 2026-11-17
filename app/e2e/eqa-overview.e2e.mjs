@@ -156,9 +156,9 @@ test('ngoại kiểm: tổng quan gọn, lọc đúng xét nghiệm và chi ti�
     await failNextRead(app, 'eqa:listRounds');
     await page.reload();
     await map.getByText('Không tải được ngoại kiểm', { exact: true }).waitFor();
-    const reports = page.getByRole('region', { name: 'Danh sách kỳ ngoại kiểm' });
-    await reports.getByText('Không tải được danh sách kỳ', { exact: true }).waitFor();
-    assert.equal(await reports.getByText('Chưa có kỳ ngoại kiểm nào', { exact: true }).count(), 0, 'không báo rỗng khi danh sách bị lỗi');
+    const reports = page.getByRole('region', { name: 'Danh sách đợt ngoại kiểm' });
+    await reports.getByText('Không tải được danh sách đợt', { exact: true }).waitFor();
+    assert.equal(await reports.getByText('Chưa có đợt ngoại kiểm nào', { exact: true }).count(), 0, 'không báo rỗng khi danh sách bị lỗi');
     await reports.getByRole('button', { name: 'Thử lại', exact: true }).click();
     await summary.getByText('25/30 kết quả', { exact: true }).waitFor();
     assert.equal(await reports.locator('tbody tr').count(), 10);
@@ -172,7 +172,7 @@ test('ngoại kiểm: tổng quan chưa có dữ liệu hiển thị trống, kh
   try {
     await bootstrapAndLogin(page);
     await openPage(page, 'Phân tích ngoại kiểm');
-    await page.getByText('Chưa có kỳ ngoại kiểm nào', { exact: true }).waitFor();
+    await page.getByText('Chưa có đợt ngoại kiểm nào', { exact: true }).waitFor();
     await page.getByRole('region', { name: 'Bảng tổng hợp z-score', exact: true }).getByText('Máy chưa có kết quả trong chương trình này', { exact: true }).waitFor();
     const summary = page.locator('.eqa-overview-summary');
     assert.equal(await summary.locator('.eqa-accept-value>b').innerText(), '—');

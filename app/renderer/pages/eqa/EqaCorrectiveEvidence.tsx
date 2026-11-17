@@ -65,13 +65,18 @@ export function EqaCorrectiveEvidence({ row, canCreate, onCreate, onClose, panel
   const [runDate, setRunDate] = useState<string | undefined>(undefined);
   const read = useCallback(() => row.evidence ? Promise.resolve(row.evidence) : window.qcApi.getEqaCorrectiveEvidence({ resultId: row.result.id, ...(runDate !== undefined ? { runDate } : {}) }), [row.evidence, row.result.id, runDate]);
   const view = useEqaRead(`${row.result.id}:${row.fingerprint}:${runDate}`, read);
+  // Đổi ngày chạy chỉ đọc lại nội kiểm: giữ căn cứ cũ trên màn hình trong lúc tải
+  // để ô ngày không bị gỡ và mất tiêu điểm; nút lập hồ sơ vẫn chờ căn cứ mới.
+  const lastData = useRef(view.data);
+  if (view.data) lastData.current = view.data;
+  const shown = view.data ?? (runDate !== undefined ? lastData.current : undefined);
   return <section ref={inspectorRef} className="panel eqa-corrective-inspector" aria-label="Căn cứ khắc phục ngoại kiểm" style={maxHeight === undefined ? undefined : { maxHeight }}>
     <div className="panel-head"><h2>Căn cứ điều tra</h2><div className="eqa-intro-actions">{!row.record && canCreate && <button type="button" className="btn ghost sm" disabled={!view.data || !!view.error} onClick={() => { if (view.data) onCreate(view.data); }}>Lập hồ sơ</button>}<button type="button" className="btn ghost sm" aria-label="Đóng căn cứ điều tra" onClick={onClose}>Đóng</button></div></div>
     <div className="eqa-section-body" role="region" aria-label="Nội dung căn cứ điều tra" tabIndex={0}>
       {view.error ? <EmptyState size="compact" title="Không tải được căn cứ" action={<button className="btn ghost sm" onClick={view.retry}>Thử lại</button>}>{view.error}</EmptyState>
-        : !view.data ? <EmptyState size="compact" title="Đang tải căn cứ…" /> : <>
+        : !shown ? <EmptyState size="compact" title="Đang tải căn cứ…" /> : <>
           {!row.current && <p className="alert warn">Báo cáo nguồn đã thay đổi. Đây là căn cứ được lưu khi lập hồ sơ.</p>}
-          <EqaEvidenceContent evidence={view.data} runDateControl={!row.record ? <DateField label="Ngày chạy mẫu" value={view.data.run_date} onChange={setRunDate} /> : undefined} />
+          <EqaEvidenceContent evidence={shown} runDateControl={!row.record ? <DateField label="Ngày chạy mẫu" value={runDate ?? shown.run_date} onChange={setRunDate} /> : undefined} />
         </>}
     </div>
   </section>;

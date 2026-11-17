@@ -109,13 +109,13 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
           </>}
       </div>
     </section>}
-    <section className="panel" aria-label="Danh sách kỳ ngoại kiểm"><div className="panel-head"><h2>Kỳ báo cáo <span className="count">{!loaded || error ? '—' : visible.length}</span></h2>
-      {cancelledCount > 0 && <label className="eqa-toggle"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />Hiện kỳ đã huỷ</label>}
+    <section className="panel" aria-label="Danh sách đợt ngoại kiểm"><div className="panel-head"><h2>Đợt báo cáo <span className="count">{!loaded || error ? '—' : visible.length}</span></h2>
+      {cancelledCount > 0 && <label className="eqa-toggle"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />Hiện đợt đã huỷ</label>}
     </div><div className="eqa-section-body">
-      {error ? <EmptyState size="compact" title="Không tải được danh sách kỳ" action={<button className="btn ghost sm" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState>
-        : !loaded ? <EmptyState size="compact" title="Đang tải danh sách kỳ…" />
-        : !visible.length ? <EmptyState title={rounds.length ? 'Chưa có kỳ ngoại kiểm trong phạm vi này' : 'Chưa có kỳ ngoại kiểm nào'} action={writable ? <button className="btn sm" onClick={() => setImporting(true)}>Nhập báo cáo PDF</button> : undefined}>Nhập báo cáo của trung tâm để bắt đầu đối chiếu.</EmptyState>
-        : <div className="eqa-table-wrap"><table className="eqa-table eqa-center-rest"><thead><tr><th>Chương trình / đợt</th><th>Máy</th><th>Kết quả</th><th>Chấp nhận</th><th>Cảnh báo</th><th>Không CN</th><th>Ngày báo cáo</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead><tbody>
+      {error ? <EmptyState size="compact" title="Không tải được danh sách đợt" action={<button className="btn ghost sm" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState>
+        : !loaded ? <EmptyState size="compact" title="Đang tải danh sách đợt…" />
+        : !visible.length ? <EmptyState title={rounds.length ? 'Chưa có đợt ngoại kiểm trong phạm vi này' : 'Chưa có đợt ngoại kiểm nào'} action={writable ? <button className="btn sm" onClick={() => setImporting(true)}>Nhập báo cáo PDF</button> : undefined}>Nhập báo cáo của trung tâm để bắt đầu đối chiếu.</EmptyState>
+        : <div className="eqa-table-wrap"><table className="eqa-table eqa-center-rest"><thead><tr><th>Chương trình / đợt</th><th>Máy</th><th>Kết quả</th><th>Chấp nhận</th><th>Cảnh báo</th><th>Không chấp nhận</th><th>Ngày báo cáo</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead><tbody>
           {visible.map((r) => <tr key={r.id}><td><b className="eqa-strong">{roundLabel(r)}</b><span className="eqa-sub">{r.program_name}</span></td><td className="eqa-wrap">{r.instruments.join(', ') || '—'}</td><td>{r.total}</td><td>{r.ok}</td><td>{r.warn}</td><td>{r.rej}</td><td>{vnDate(r.report_date, '—')}</td><td><RoundStatusTag status={r.status} /></td><td><button className="btn ghost sm" onClick={() => onOpen(r.id)}>Xem</button></td></tr>)}
         </tbody></table></div>}
     </div></section>

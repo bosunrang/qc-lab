@@ -1,7 +1,6 @@
 // Phần dùng chung của trang Phân tích ngoại kiểm: định dạng số, nhãn xếp
-// loại, trạng thái kỳ, tín hiệu chuỗi, ô tổng hợp và khối thông tin. Kết luận
+// loại, trạng thái đợt, tín hiệu chuỗi và khối thông tin. Kết luận
 // (z, xếp loại, tín hiệu) do main tính.
-import type { ReactNode } from 'react';
 import type { EqaClassView, EqaSignalView } from '../../../shared/qc-api';
 import { EQA_CLASS_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EQA_SIGNAL_LABEL } from '../../../main/domain/eqa/series';
@@ -66,12 +65,3 @@ export function Facts({ items }: { items: readonly (readonly [string, string])[]
   );
 }
 
-export function StatCard({ tone, label, value, detail }: { tone: 'info' | 'success' | 'warning' | 'danger' | 'neutral'; label: string; value: ReactNode; detail?: string }) {
-  return (
-    <div className={`eqa-stat is-${tone}`}>
-      <span>{label}</span>
-      <b>{value}</b>
-      {detail ? <small>{detail}</small> : null}
-    </div>
-  );
-}

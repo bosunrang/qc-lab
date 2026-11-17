@@ -192,7 +192,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await page.waitForFunction((id) => new URLSearchParams(location.hash.split('?')[1]).get('point') === id, shown[0].result_id);
     assert.equal(await page.getByRole('region', { name: 'Chi tiết dòng kết quả' }).count(), 0, 'chọn điểm không mở khối chi tiết trong bảng');
     assert.equal(await page.locator('.eqa-table tr.is-selected>td').nth(3).innerText(), shown[0].z.toFixed(2));
-    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
+    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở đợt báo cáo', exact: true }).click();
     await page.locator(`.eqa-results-table tr[data-eqa-result="${shown[0].result_id}"].is-selected`).waitFor();
     assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('id')), shown[0].round_id, 'mở đúng kỳ lịch sử và mẫu đã chọn');
     const multiRound = await page.evaluate(() => window.qcApi.getEqaRound(new URLSearchParams(location.hash.split('?')[1]).get('id')));
@@ -223,7 +223,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     await resultsScroll.evaluate((node) => { node.scrollTop = 0; node.scrollLeft = 0; });
     await page.evaluate(() => { document.querySelector('main').scrollTop = 0; });
     await page.screenshot({ path: path.join(shots, 'eqa-round-summary-multi.png') });
-    await page.getByRole('button', { name: 'Danh sách kỳ' }).click();
+    await page.getByRole('button', { name: '← Quay lại', exact: true }).click();
     await canvas.waitFor();
     const separator = page.getByRole('separator', { name: 'Độ rộng danh sách xét nghiệm' });
     await separator.focus();
@@ -250,7 +250,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     assert.equal(await assayItems.evaluate((node) => node.scrollTop), assayScrollBefore, 'đổi xét nghiệm không dựng lại và kéo danh sách về đầu');
     assert.ok((await page.locator('.eqa-assay-list').boundingBox()).width >= 359, 'đổi xét nghiệm giữ độ rộng đã chỉnh');
     assert.equal(await page.getByRole('region', { name: 'Kết quả đang chọn' }).count(), 0, 'màn phân tích không lặp lại bảng kết quả đang chọn');
-    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
+    await page.locator('.eqa-table tr.is-selected').getByRole('button', { name: 'Mở đợt báo cáo', exact: true }).click();
     const highlighted = page.locator('.eqa-results-table tr.is-selected');
     await highlighted.waitFor();
     assert.match(await highlighted.innerText(), /Ure/);
@@ -277,7 +277,7 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     assert.equal(await primaryRows.count(), roundView.round.total);
     await page.evaluate(() => { document.querySelector('main').scrollTop = 0; });
     await page.screenshot({ path: path.join(shots, 'eqa-round-summary.png') });
-    await page.getByRole('button', { name: 'Danh sách kỳ' }).click();
+    await page.getByRole('button', { name: '← Quay lại', exact: true }).click();
     await page.getByRole('heading', { name: 'Ure · AU5800', exact: true }).waitFor();
     await page.waitForFunction((top) => document.querySelector('.eqa-assay-items')?.scrollTop === top, assayScrollBefore);
     await page.getByRole('button', { name: 'Quay lại', exact: false }).click();
@@ -358,9 +358,9 @@ test('ngoại kiểm: chọn mẫu, đổi xét nghiệm, giữ phạm vi, đố
     assert.equal(yearToolbarHeights.view, 36, 'bộ chuyển cách xem dùng chiều cao control chuẩn');
     assert.deepEqual(yearToolbarHeights.selects, [36, 36, 36], 'ba ô tháng, năm, loại mẫu cao bằng bộ chuyển cách xem');
     await showEqaCalendarMonth(page, '2026-09-15');
-    await page.getByRole('gridcell', { name: '15/09/2026: 1 việc', exact: true }).click();
+    await page.getByRole('button', { name: new RegExp('^15/09/2026: 1 việc') }).click();
     await page.getByRole('heading', { name: /Công việc ngày 15\/09\/2026/ }).waitFor();
-    await page.getByRole('region', { name: 'Công việc ngày được chọn', exact: true }).getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
+    await page.getByRole('region', { name: 'Công việc ngày được chọn', exact: true }).getByRole('button', { name: 'Mở đợt báo cáo', exact: true }).click();
     await page.getByRole('heading', { name: /Sinh hóa · ĐỢT 09/ }).waitFor();
     assert.deepEqual(errors, []);
     console.log(`Ảnh kiểm tra ngoại kiểm: ${shots}`);

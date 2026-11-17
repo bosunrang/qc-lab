@@ -24,6 +24,16 @@ const DECISION_LABEL: Readonly<Record<string, string>> = {
 };
 const SOURCE_LABEL: Readonly<Record<string, string>> = { pdf: 'Báo cáo PDF của trung tâm ngoại kiểm' };
 
+/** Phạm vi của một lần ký xem xét: xem xét hệ thống và bản ký riêng một máy
+ * cũng lưu dưới đợt đầu của phạm vi, nên lịch sử phải ghi rõ phạm vi đã ký. */
+function reviewScope(type: string, payloadJson: string, view: EqaRoundView): string {
+  if (!type.endsWith('_review')) return '';
+  let scope: { roundId?: string; instrumentId?: string; year?: number } = {};
+  try { scope = (JSON.parse(payloadJson || '{}') as { scope?: typeof scope }).scope ?? {}; } catch { /* hồ sơ cũ không có phạm vi */ }
+  const machine = scope.instrumentId ? view.instruments.find((i) => i.instrument_id === scope.instrumentId)?.instrument_name ?? 'một máy' : 'tất cả máy';
+  return scope.roundId ? machine : `cả năm ${scope.year ?? view.round.year} · ${machine}`;
+}
+
 function decisionDetail(type: string, payloadJson: string): string {
   let p: Record<string, unknown> = {};
   try { p = JSON.parse(payloadJson || '{}') as Record<string, unknown>; } catch { /* hiển thị trống */ }
@@ -72,7 +82,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   const reload = useCallback(() => {
     const current = ++request.current.sequence;
     get(id).then((data) => { if (current === request.current.sequence) { setView(data); setError(''); } })
-      .catch((e) => { if (current === request.current.sequence) setError(e instanceof Error && e.message ? e.message : 'Không tải được kỳ ngoại kiểm.'); });
+      .catch((e) => { if (current === request.current.sequence) setError(e instanceof Error && e.message ? e.message : 'Không tải được đợt ngoại kiểm.'); });
   }, [get, id]);
   useEffect(() => {
     const pending = request.current;
@@ -84,6 +94,15 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
 
   const scopedResults = useMemo(() => (view?.results ?? []).filter((r) => !instrument || r.instrument_id === instrument), [view, instrument]);
   const results = useMemo(() => scopedResults.filter((r) => filter === 'all' || (filter === 'attention' ? needsReview(r) : r.class === filter)), [scopedResults, filter]);
+  // Mở từ tổng quan hoặc chuỗi xét nghiệm: cuộn dòng được chọn vào khung một
+  // lần sau khi tải, không giật lại khi dữ liệu tự làm mới.
+  const scrolled = useRef('');
+  const focusVisible = !!focusedResultId && results.some((r) => r.id === focusedResultId);
+  useEffect(() => {
+    if (!focusVisible || scrolled.current === focusedResultId) return;
+    scrolled.current = focusedResultId!;
+    document.querySelector(`[data-eqa-result="${CSS.escape(focusedResultId!)}"]`)?.scrollIntoView({ block: 'center' });
+  }, [focusVisible, focusedResultId]);
 
   const toggle = useCallback((rowId: string) => setExpanded((prev) => {
     const next = new Set(prev);
@@ -91,9 +110,9 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
     return next;
   }), []);
 
-  if (error) return <section className="panel"><EmptyState title="Không tải được kỳ ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={reload}>Thử lại</button>}>{error}</EmptyState></section>;
-  if (view === undefined) return <section className="panel"><EmptyState title="Đang tải kỳ ngoại kiểm…" /></section>;
-  if (view === null) return <section className="panel"><EmptyState title="Không tìm thấy kỳ ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={onBack}>Về danh sách</button>}>Kỳ có thể đã bị xoá khi phục hồi dữ liệu.</EmptyState></section>;
+  if (error) return <section className="panel"><EmptyState title="Không tải được đợt ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={reload}>Thử lại</button>}>{error}</EmptyState></section>;
+  if (view === undefined) return <section className="panel"><EmptyState title="Đang tải đợt ngoại kiểm…" /></section>;
+  if (view === null) return <section className="panel"><EmptyState title="Không tìm thấy đợt ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={onBack}>Về danh sách</button>}>Đợt có thể đã bị xoá khi phục hồi dữ liệu.</EmptyState></section>;
 
   const { round } = view;
   const totals = eqaCounts(scopedResults.map((r) => r.class));
@@ -108,7 +127,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   return (
     <div className="eqa-round">
       <div className="eqa-round-bar">
-        <button type="button" className="btn ghost sm" onClick={onBack}>← Danh sách kỳ</button>
+        <button type="button" className="btn ghost sm" onClick={onBack}>← Quay lại</button>
         <div className="eqa-round-title">
           <h2>{round.program_name} · {roundLabel(round)}</h2>
           <RoundStatusTag status={round.status} />
@@ -117,7 +136,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
         {writable && open && (
           <div className="eqa-intro-actions">
             <button type="button" className="btn ghost sm" onClick={() => setReimport(true)}>Bổ sung / nhập lại PDF</button>
-            <button type="button" className="btn ghost sm" onClick={() => setCancelOpen(true)}>Huỷ kỳ</button>
+            <button type="button" className="btn ghost sm" onClick={() => setCancelOpen(true)}>Huỷ đợt</button>
           </div>
         )}
       </div>
@@ -125,8 +144,8 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
       <EqaResultsSummary totals={totals} filter={filter} onFilter={setFilter}
         description={`${summaryScope} · Chỉ số tổng hợp theo từng mẫu`} />
 
-      <section className="panel" aria-label="Thông tin kỳ">
-        <div className="panel-head"><h2>Thông tin kỳ</h2></div>
+      <section className="panel" aria-label="Thông tin đợt">
+        <div className="panel-head"><h2>Thông tin đợt</h2></div>
         <div className="eqa-section-body">
           <Facts items={[
             ['Đơn vị tổ chức', round.provider], ['Mã chương trình', round.program_code], ['Mã đơn vị', round.unit_code],
@@ -143,7 +162,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
           <div className="eqa-section-body">
             <div className="eqa-table-wrap">
               <table className="eqa-table">
-                <thead><tr><th>Máy</th><th className="num">Kết quả</th><th className="num">Chấp nhận</th><th className="num">Cảnh báo</th><th className="num">Không CN</th><th className="num">Tỷ lệ chấp nhận</th></tr></thead>
+                <thead><tr><th>Máy</th><th className="num">Kết quả</th><th className="num">Chấp nhận</th><th className="num">Cảnh báo</th><th className="num">Không chấp nhận</th><th className="num">Tỷ lệ chấp nhận</th></tr></thead>
                 <tbody>
                   {view.instruments.map((i) => (
                     <tr key={i.instrument_id}>
@@ -230,13 +249,13 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
         </div>
       </section>
 
-      <section className="panel" aria-label="Lịch sử kỳ">
+      <section className="panel" aria-label="Lịch sử đợt">
         <div className="panel-head"><h2>Lịch sử</h2></div>
         <div className="eqa-section-body">
           <ol className="eqa-history">
             {view.decisions.map((d) => (
               <li key={d.id}>
-                <div><b>{DECISION_LABEL[d.type] ?? d.type}</b><span className="eqa-sub">{d.actor_name} · {new Date(d.decided_at).toLocaleString('vi-VN')}</span></div>
+                <div><b>{DECISION_LABEL[d.type] ?? d.type}{reviewScope(d.type, d.payload_json, view) && ` · ${reviewScope(d.type, d.payload_json, view)}`}</b><span className="eqa-sub">{d.actor_name} · {new Date(d.decided_at).toLocaleString('vi-VN')}</span></div>
                 <p>{decisionDetail(d.type, d.payload_json)}</p>
               </li>
             ))}
@@ -301,16 +320,16 @@ function CancelRoundModal({ view, onClose }: { view: EqaRoundView; onClose: () =
     try {
       const result = await cancel(view.round.id, view.round.row_version, reason);
       setBusy(false);
-      if (result.ok) onClose(); else await errorDialog(result.error.message, { title: 'Chưa huỷ được kỳ ngoại kiểm' });
+      if (result.ok) onClose(); else await errorDialog(result.error.message, { title: 'Chưa huỷ được đợt ngoại kiểm' });
     } catch (e) {
       setBusy(false);
-      await errorDialog(e instanceof Error ? e.message : 'Không huỷ được kỳ ngoại kiểm.', { title: 'Chưa huỷ được kỳ ngoại kiểm' });
+      await errorDialog(e instanceof Error ? e.message : 'Không huỷ được đợt ngoại kiểm.', { title: 'Chưa huỷ được đợt ngoại kiểm' });
     }
   }
   return (
-    <Modal title="Huỷ kỳ ngoại kiểm" size="sm" busy={busy} onClose={onClose}
-      footer={<><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>Quay lại</button><button type="button" className="btn danger" disabled={busy || reason.trim().length < 10} onClick={() => void submit()}>Huỷ kỳ</button></>}>
-      <p className="eqa-note">Kỳ đã huỷ vẫn được lưu để truy xuất nhưng không tính vào thống kê. Dùng khi nhập nhầm kỳ hoặc trùng dữ liệu.</p>
+    <Modal title="Huỷ đợt ngoại kiểm" size="sm" busy={busy} onClose={onClose}
+      footer={<><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>Quay lại</button><button type="button" className="btn danger" disabled={busy || reason.trim().length < 10} onClick={() => void submit()}>Huỷ đợt</button></>}>
+      <p className="eqa-note">Đợt đã huỷ vẫn được lưu để truy xuất nhưng không tính vào thống kê. Dùng khi nhập nhầm đợt hoặc trùng dữ liệu.</p>
       <div className="field">
         <label htmlFor="eqaCancelReason">Lý do huỷ (ít nhất 10 ký tự)</label>
         <textarea id="eqaCancelReason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />

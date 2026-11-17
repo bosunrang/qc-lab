@@ -113,7 +113,7 @@ test('lịch ngoại kiểm: hai cách xem, lọc năm, cảnh báo quá hạn, 
     assert.equal(await overdueAlert.locator('details').evaluate(node => node.open), false, 'cảnh báo ban đầu chỉ có một dòng');
     await page.setViewportSize({ width: 1630, height: 1000 });
     await main.getByRole('grid').waitFor();
-    const todayCell = main.getByRole('gridcell', { name: `${seed.today.split('-').reverse().join('/')}: 4 việc`, exact: true });
+    const todayCell = main.getByRole('button', { name: new RegExp(`^${seed.today.split('-').reverse().join('/')}: 4 việc`) });
     await todayCell.waitFor();
     assert.equal(await todayCell.getByText('+2', { exact: true }).count(), 1, 'hiện số mốc bị thu gọn');
     assert.equal(await selected.locator('.eqa-schedule-task').count(), 2, 'gộp ba mốc cùng đợt thành một mục chi tiết');

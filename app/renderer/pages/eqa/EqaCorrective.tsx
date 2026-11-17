@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { EqaNceEvidence } from '../../../shared/qc-api';
 import { canUserAccessPage, canWriteRole } from '../../../main/domain/page-roles';
 import { useAuthStore } from '../../store/auth-store';
@@ -24,6 +24,8 @@ export function EqaCorrective() {
   const scope = useEqaScope();
   const revision = useEqaRevision();
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const canManage = canWriteRole(user?.role) && canUserAccessPage('actions', user);
   const loadNce = useNceStore(s => s.load);
@@ -81,14 +83,20 @@ export function EqaCorrective() {
   function change(key: string, value: string) {
     const next = new URLSearchParams(params); next.set('view', 'khacphuc'); next.set(key, value); next.delete('case');
     if (key === 'year' || key === 'program') { next.delete('fixRound'); next.delete('fixMachine'); }
-    setSelection(null); setParams(next);
+    // Đổi phạm vi thay mục lịch sử như Tổng quan, để Quay lại không đi qua từng lần chọn.
+    setSelection(null); setParams(next, { replace: true });
   }
   function openCase(id: string) { const next = new URLSearchParams(params); next.set('case', id); setParams(next); }
   const caseId = params.get('case');
-  if (caseId && canManage) return <div className="nce-page eqa-corrective-dossier"><DossierPage key={caseId} id={caseId} onBack={() => { const next = new URLSearchParams(params); next.delete('case'); setParams(next); view.retry(); }} /></div>;
+  if (caseId && canManage) return <div className="nce-page eqa-corrective-dossier"><DossierPage key={caseId} id={caseId} onBack={() => {
+    // Hồ sơ mở từ danh sách thì quay lại đúng mục lịch sử đó; mở thẳng bằng đường dẫn thì về danh sách.
+    if (location.key !== 'default') navigate(-1);
+    else { const next = new URLSearchParams(params); next.delete('case'); setParams(next, { replace: true }); }
+    view.retry();
+  }} /></div>;
 
   return <div className="eqa-corrective">
-    <div className="eqa-scope-controls" aria-label="Phạm vi khắc phục ngoại kiểm">
+    <div className="eqa-scope-controls" role="group" aria-label="Phạm vi khắc phục ngoại kiểm">
       <div className="field"><label htmlFor="eqa-fix-year">Năm</label><select id="eqa-fix-year" value={scope.year} onChange={e => change('year', e.target.value)}>{(scope.years.length ? scope.years : [scope.year]).map(y => <option key={y}>{y}</option>)}</select></div>
       <div className="field eqa-scope-program"><label htmlFor="eqa-fix-program">Chương trình</label><select id="eqa-fix-program" value={scope.programId} onChange={e => change('program', e.target.value)}>{!scope.programs.length && <option value="">Chưa có chương trình</option>}{scope.programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
       <div className="field eqa-scope-machine"><label htmlFor="eqa-fix-round">Đợt</label><select id="eqa-fix-round" value={roundId} onChange={e => change('fixRound', e.target.value)}><option value="">Tất cả đợt</option>{scope.rounds.map(r => <option key={r.id} value={r.id}>{r.round}/{r.year}</option>)}</select></div>
@@ -96,9 +104,9 @@ export function EqaCorrective() {
     </div>
     {view.error ? <EmptyState title="Không tải được danh sách khắc phục" action={<button className="btn ghost" onClick={view.retry}>Thử lại</button>}>{view.error}</EmptyState>
       : view.data === undefined ? <EmptyState title="Đang tổng hợp kết quả cần xem xét…" /> : <>
-        <div className="eqa-corrective-summary" aria-label="Tổng hợp khắc phục ngoại kiểm">{[
-          ['Cần lập hồ sơ', counts.required, 'required'], ['Đang xử lý', counts.ongoing, 'ongoing'], ['Đã đóng', counts.closed, 'closed'], ['Cảnh báo cần xem xét', counts.warning, 'warning'],
-        ].map(([label, count, value]) => <button type="button" key={value} className={filter === value ? 'is-active' : ''} onClick={() => setFilter(value as Filter)}><span>{label}</span><b>{count}</b></button>)}</div>
+        <div className="eqa-corrective-summary" role="group" aria-label="Tổng hợp khắc phục ngoại kiểm">{[
+          ['Cần lập hồ sơ', counts.required, 'required'], ['Đang xử lý', counts.ongoing, 'ongoing'], ['Đã đóng', counts.closed, 'closed'], ['Cảnh báo chưa lập hồ sơ', counts.warning, 'warning'],
+        ].map(([label, count, value]) => <button type="button" key={value} className={filter === value ? 'is-active' : ''} aria-pressed={filter === value} onClick={() => setFilter(value as Filter)}><span>{label}</span><b>{count}</b></button>)}</div>
         {!canManage && <p className="eqa-note">Bạn có thể xem danh sách và căn cứ ngoại kiểm. Lập hoặc mở hồ sơ cần quyền ghi và quyền dùng phần Khắc phục sự cố.</p>}
         {nceError && canManage && <div className="alert rej" role="alert">{nceError}<button className="btn ghost sm" onClick={() => void loadNce()}>Thử tải thông tin hồ sơ</button></div>}
         <div ref={workspaceRef} className={`eqa-corrective-workspace${selected ? ' has-evidence' : ''}`} style={{ '--eqa-evidence-width': `${evidenceWidth}px` } as CSSProperties}>

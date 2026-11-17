@@ -69,7 +69,7 @@ export function EqaReports() {
     const query = new URLSearchParams(params);
     query.set('view', 'baocao'); query.set(key, value);
     if (key === 'year' || key === 'program') { query.delete('reportRound'); query.delete('reportMachine'); }
-    setParams(query);
+    setParams(query, { replace: true });
   }
   function update(patch: Partial<EqaReviewDraft>) {
     if (!base || !canSign || selectedId) return;
@@ -114,7 +114,7 @@ export function EqaReports() {
   const latest = report?.reviews[0];
 
   return <div className="eqa-reports">
-    <div className="eqa-scope-controls" aria-label="Phạm vi báo cáo ngoại kiểm">
+    <div className="eqa-scope-controls" role="group" aria-label="Phạm vi báo cáo ngoại kiểm">
       <div className="field"><label htmlFor="eqa-report-year">Năm</label><select id="eqa-report-year" value={scope.year} disabled={busy} onChange={(e) => change('year', e.target.value)}>{(scope.years.length ? scope.years : [scope.year]).map((y) => <option key={y}>{y}</option>)}</select></div>
       <div className="field eqa-scope-program"><label htmlFor="eqa-report-program">Chương trình</label><select id="eqa-report-program" value={scope.programId} disabled={busy} onChange={(e) => change('program', e.target.value)}>{!scope.programs.length && <option value="">Chưa có chương trình</option>}{scope.programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
       <div className="field eqa-scope-machine"><label htmlFor="eqa-report-round">Đợt báo cáo</label><select id="eqa-report-round" value={roundId} disabled={busy} onChange={(e) => change('reportRound', e.target.value)}><option value="">Xem xét hệ thống cả năm</option>{scope.rounds.map((r) => <option key={r.id} value={r.id}>{r.round} / {r.year}</option>)}</select></div>

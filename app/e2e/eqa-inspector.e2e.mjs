@@ -73,10 +73,10 @@ test('ngoại kiểm: chi tiết điểm và xét nghiệm gọn, giữ đúng �
     assert.equal(await table.getByRole('button', { name: 'Chi tiết', exact: true }).count(), 0);
     await page.screenshot({ path: path.join(shots, 'eqa-test-detail-single.png') });
     const selectedPoint = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('point'));
-    await table.getByRole('button', { name: 'Mở kỳ báo cáo', exact: true }).click();
+    await table.getByRole('button', { name: 'Mở đợt báo cáo', exact: true }).click();
     await page.locator(`.eqa-results-table tr[data-eqa-result="${selectedPoint}"].is-selected`).waitFor();
     await page.getByText('VEQAS-2026-01', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Danh sách kỳ', exact: false }).click();
+    await page.getByRole('button', { name: '← Quay lại', exact: true }).click();
     await chart.waitFor();
     await page.getByRole('button', { name: 'Quay lại', exact: false }).click();
     await inspector.getByRole('heading', { name: 'Uric acid (UA)', exact: true }).waitFor();

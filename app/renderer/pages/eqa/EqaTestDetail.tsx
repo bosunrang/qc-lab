@@ -149,8 +149,8 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
         {!stacked && <div className="eqa-assay-search field"><label htmlFor="eqa-assay-search">Tìm xét nghiệm</label><input id="eqa-assay-search" type="search" placeholder="Tên xét nghiệm…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>}
         {grid.error ? <EmptyState size="compact" title="Không tải được danh sách" action={<button className="btn ghost sm" onClick={grid.retry}>Thử lại</button>}>{grid.error}</EmptyState>
           : !grid.data ? <EmptyState size="compact" title="Đang tải danh sách…" />
-          : stacked ? <div className="eqa-assay-search field"><label>Chọn xét nghiệm</label>
-            <SearchSelect value={testId} options={assayOptions} suggestedValues={flaggedAssays} onChange={(id) => { if (id && id !== testId) openAssay(id); }} ariaLabel="Chọn xét nghiệm" placeholder="Gõ tên xét nghiệm…" /></div>
+          : stacked ? <div className="eqa-assay-search field"><label htmlFor="eqa-assay-search">Chọn xét nghiệm</label>
+            <SearchSelect id="eqa-assay-search" value={testId} options={assayOptions} suggestedValues={flaggedAssays} onChange={(id) => { if (id && id !== testId) openAssay(id); }} ariaLabel="Chọn xét nghiệm" placeholder="Gõ tên xét nghiệm…" /></div>
           : !list.length ? <EmptyState size="compact" title="Không có xét nghiệm phù hợp" />
           : <div ref={assayItemsRef} className="eqa-assay-items" onScroll={(e) => {
             if (useEqaStore.getState().analysisListScrollTarget === null) setAnalysisListScroll(e.currentTarget.scrollTop);
@@ -187,7 +187,7 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
             <div className="eqa-section-body">{!tablePoints.length ? <EmptyState size="compact" title={filter === 'all' ? 'Chưa có kết quả trong phạm vi này' : 'Không có kết quả phù hợp bộ lọc'} /> : <div className="eqa-table-wrap eqa-results-scroll" tabIndex={0} role="region" aria-label="Vùng cuộn kết quả từng đợt"><table className="eqa-table eqa-center-rest"><thead><tr><th>Đợt / mẫu</th><th>Kết quả<span className="eqa-sub">{view.unit}</span></th><th>Giá trị ấn định<span className="eqa-sub">{view.unit}</span></th><th>z</th><th>Đánh giá</th><th aria-label="Thao tác" /></tr></thead><tbody>
               {tablePoints.map((p) => <tr key={p.result_id} className={p.result_id === selected?.result_id ? 'is-selected' : undefined}>
                 <td><button type="button" className="eqa-test-link" aria-pressed={p.result_id === selected?.result_id} onClick={() => selectPoint(p)}>{roundLabel(p)}{p.sample ? ` · ${p.sample}` : ''}</button><span className="eqa-sub">{vnDate(p.report_date, '—')}</span></td>
-                <td>{rawNum(p.result)}</td><td>{rawNum(p.assigned)}</td><td>{numText(p.z)}</td><td><ClassTag cls={p.class} /></td><td><button type="button" className="btn ghost sm" onClick={() => onOpenRound(p.round_id, p.result_id)}>Mở kỳ báo cáo</button></td>
+                <td>{rawNum(p.result)}</td><td>{rawNum(p.assigned)}</td><td>{numText(p.z)}</td><td><ClassTag cls={p.class} /></td><td><button type="button" className="btn ghost sm" onClick={() => onOpenRound(p.round_id, p.result_id)}>Mở đợt báo cáo</button></td>
               </tr>)}
             </tbody></table></div>}</div>
           </section>
