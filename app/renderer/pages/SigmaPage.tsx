@@ -19,6 +19,7 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { DateField } from '../components/DateField';
 import { SearchSelect } from '../components/SearchSelect';
+import { ResizeHandle, useStoredWidth } from '../components/ResizeHandle';
 import type { SearchSelectOption } from '../lib/search-options';
 import { printHtmlToPdf } from '../lib/export';
 import { exportSigmaReportXlsx } from '../lib/sigma-summary-export';
@@ -34,6 +35,8 @@ import { CohortModal } from './sigma/CohortModal';
 import { MuModal } from './sigma/MuModal';
 import { SigmaChartsPanel, SigmaMuPanel, SigmaOpspecsPanel, SigmaStatusPanel } from './sigma/SigmaPanels';
 import { TEA_SOURCES, editablePercent, isKnownTeaSource, missingSigmaInputs, sigmaZone, vnDate, vnPeriod } from './sigma/shared';
+
+const HISTORY_MIN_WIDTH = 180, HISTORY_MAX_WIDTH = 480;
 
 export function SigmaPage() {
   const { tests, teaRefs, levelsByTestId, loadTests, loadLevels, instruments} = useManageStore(useShallow((s) => ({ tests: s.tests, teaRefs: s.teaRefs, levelsByTestId: s.levelsByTestId, loadTests: s.loadTests, loadLevels: s.loadLevels, instruments: s.instruments })));
@@ -54,6 +57,16 @@ export function SigmaPage() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [historyMonthFilter, setHistoryMonthFilter] = useState('');
   const [historyYearFilter, setHistoryYearFilter] = useState('');
+  const periodWorkspaceRef = useRef<HTMLDivElement>(null);
+  const periodHistoryRef = useRef<HTMLDivElement>(null);
+  const [storedHistoryWidth, setHistoryWidth] = useStoredWidth('qclab.sigmaPeriodHistoryWidth', 208);
+  const historyWidth = Math.max(HISTORY_MIN_WIDTH, Math.min(HISTORY_MAX_WIDTH, storedHistoryWidth ?? 208));
+  // Giới hạn danh sách theo bề ngang khung để chừa chỗ cho bảng số liệu.
+  const historyMaxNow = () => Math.max(HISTORY_MIN_WIDTH, Math.min(HISTORY_MAX_WIDTH,
+    (periodWorkspaceRef.current?.clientWidth ?? 1067) * .45));
+  function resizeHistory(width: number) {
+    setHistoryWidth(Math.round(Math.max(HISTORY_MIN_WIDTH, Math.min(width, historyMaxNow()))));
+  }
   useEffect(() => { setSelectedPeriodId(null); setHistoryMonthFilter(''); setHistoryYearFilter(''); }, [testId]);
   const [biasModal, setBiasModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [muModal, setMuModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
@@ -334,7 +347,7 @@ export function SigmaPage() {
   }
 
   return (
-    <div className="sigma-page">
+    <div>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
       {loading && <div className="hint" role="status">Đang tải dữ liệu Sigma…</div>}
       {loadError && <div className="alert rej" role="alert">{loadError} <button className="btn ghost sm" onClick={() => loadPeriods(testId)}>Thử lại</button></div>}
@@ -351,7 +364,7 @@ export function SigmaPage() {
             <div className="field sg-unit-field"><label htmlFor="sg-unit">Đơn vị</label><input id="sg-unit" value={test?.unit || ''} aria-label="Đơn vị" readOnly /></div>
             <div className="field sg-instrument-field"><label htmlFor="sg-instrument">Thiết bị</label><input id="sg-instrument" value={instrumentName} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
           </div>
-          <div className="sg-setup-fields sg-analysis-fields">
+          <div className="sg-setup-fields">
             <div className="field sg-tea-source">
               <label htmlFor="sg-tea-source">Nguồn TEa vận hành {writable && !teaEditable && <span className="hint" title={QC_CONFIG_DENIED_MESSAGE}>(cần quyền cấu hình tiêu chí QC)</span>}</label>
               <select id="sg-tea-source" aria-label="Nguồn TEa vận hành" disabled={!teaEditable || teaSaving} value={teaSource} onChange={(e) => saveTeaConfig({ source: e.target.value })}>
@@ -397,8 +410,9 @@ export function SigmaPage() {
               {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Cấu hình Mean/SD</button>}
             </div>
           )}
-          {periods.length > 0 && displayPeriod ? <div className="sg-period-workspace">
-            <div className="sg-period-history" role="navigation" aria-label="Lịch sử kỳ Sigma">
+          {periods.length > 0 && displayPeriod ? <div ref={periodWorkspaceRef} className="sg-period-workspace"
+            style={{ gridTemplateColumns: `clamp(${HISTORY_MIN_WIDTH}px,${historyWidth}px,45%) var(--space-2) minmax(0,1fr)` }}>
+            <div ref={periodHistoryRef} className="sg-period-history" role="navigation" aria-label="Lịch sử kỳ Sigma">
               <div className="sg-period-history-filter">
                 <select value={historyMonthFilter} onChange={(event) => setHistoryMonthFilter(event.target.value)} aria-label="Lọc lịch sử theo kỳ" title="Lọc theo kỳ">
                   <option value="">Tất cả</option>
@@ -421,6 +435,8 @@ export function SigmaPage() {
                 {!filteredPeriods.length && <p className="sg-period-history-empty">Không có kỳ phù hợp.</p>}
               </div>
             </div>
+            <ResizeHandle targetRef={periodHistoryRef} label="Độ rộng danh sách kỳ Sigma"
+              value={historyWidth} min={HISTORY_MIN_WIDTH} max={HISTORY_MAX_WIDTH} maxNow={historyMaxNow} onResize={resizeHistory} />
             <section className="sg-period-workbench" key={displayPeriod.id} aria-label={`Chi tiết kỳ ${vnPeriod(displayPeriod.period)}`}>
               <div className="sg-level-matrix-wrap">
                 <div className="sg-level-matrix" role="table" aria-label={`Dữ liệu Sigma kỳ ${vnPeriod(displayPeriod.period)}`}>

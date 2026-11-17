@@ -80,7 +80,7 @@ export function SigmaTrendChart({ periods }: { periods: SigmaPeriodView[] }) {
   </svg></div>;
 }
 
-interface MdcPoint { x: number; y: number; index: number; level: number; period: string; levelData: SigmaLevelResult; cvRatio: number; biasRatio: number; color: string }
+interface MdcPoint { x: number; y: number; index: number; level: number; period: string; levelData: SigmaLevelResult; cvRatio: number; biasRatio: number }
 
 export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
   const rows = useMemo(() => validPeriods(periods), [periods]);
@@ -117,7 +117,7 @@ export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
       const ratios = levelData ? mdcRatios(levelData) : null;
       if (!levelData || !ratios) return [];
       const { cvRatio, biasRatio } = ratios;
-      return [{ x: px(cvRatio), y: py(biasRatio), index, level, period: period.period, levelData, cvRatio, biasRatio, color: LEVEL_COLORS[levelIndex % LEVEL_COLORS.length] }];
+      return [{ x: px(cvRatio), y: py(biasRatio), index, level, period: period.period, levelData, cvRatio, biasRatio }];
     }),
   }));
 
@@ -138,7 +138,7 @@ export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
     <text x={(L + W - R) / 2} y={H - 7} fontSize="10.5" fill="#40515c" textAnchor="middle" fontWeight="700">CV / TEA (%)</text>
     <text transform={`translate(13,${(T + H - B) / 2}) rotate(-90)`} fontSize="10.5" fill="#40515c" textAnchor="middle" fontWeight="700">|BIAS| / TEA (%)</text>
   </svg>
-  {tip && <div className="sg-chart-tooltip" style={{ left: `${tip.x / W * 100}%`, top: `${tip.y / H * 100}%` }}><b>{periodTitle(tip.period)} · Mức {tip.level}</b><div>Sigma: <strong style={{ color: tip.color }}>{Number(tip.levelData.sigma?.sigma).toFixed(2)}</strong></div><div>CV/TEa: {tip.cvRatio.toFixed(1)}% · |Bias|/TEa: {tip.biasRatio.toFixed(1)}%</div><div className="muted">CV {Number(tip.levelData.cv).toFixed(2)}% · Bias {Number(tip.levelData.biasEqa).toFixed(2)}%</div></div>}
+  {tip && <div className="sg-chart-tooltip"><b>{periodTitle(tip.period)} · Mức {tip.level}</b><div>Sigma: <strong>{Number(tip.levelData.sigma?.sigma).toFixed(2)}</strong></div><div>CV/TEa: {tip.cvRatio.toFixed(1)}% · |Bias|/TEa: {tip.biasRatio.toFixed(1)}%</div><div className="muted">CV {Number(tip.levelData.cv).toFixed(2)}% · Bias {Number(tip.levelData.biasEqa).toFixed(2)}%</div></div>}
   </div>;
 }
 

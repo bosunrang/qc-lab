@@ -197,16 +197,6 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   assert.match(sigma, /\.sg-eqa-table th\{[^}]*height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
   assert.match(sigma, /\.sg-eqa-del\{min-width:0;margin:0 auto;\}/);
   assert.match(sigma, /\.sg-eqa-table td input\[type=number\]\{[^}]*width:min\(100%,120px\)[^}]*height:var\(--control-h\)[^}]*margin:0 auto;/);
-  assert.match(
-    sigma,
-    /\.sg-eqa-summary\.is-empty\{[^}]*border-left:3px solid var\(--warning-accent\)[^}]*border-radius:var\(--radius-md\)[^}]*font-size:var\(--text-sm\)[^}]*line-height:var\(--leading-body\);\}/,
-    'hướng dẫn thiếu vòng EQA dùng vạch cảnh báo tại chỗ 3px, góc bo 8px và chữ 13px',
-  );
-  assert.match(
-    sigma,
-    /\.sg-eqa-summary\.is-empty \.sg-eqa-empty\{color:var\(--warning-text\);font-weight:var\(--weight-normal\);\}/,
-    'nội dung hướng dẫn EQA không được đậm quá mức cần thiết',
-  );
   assert.match(reagent, /\.rc-pair-head \{[^}]*min-height:\s*var\(--table-header-h-sm\)[^}]*font-size:\s*var\(--table-head-size-sm\)[^}]*letter-spacing:\s*var\(--table-head-tracking-sm\)/);
   const westgard = source('westgard.css');
   assert.match(

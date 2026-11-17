@@ -78,7 +78,7 @@ export function SigmaMuPanel({ period, unit, writable, onEdit }: {
   period: SigmaPeriodView; unit: string; writable: boolean; onEdit: (level: SigmaLevelResult) => void;
 }) {
   return (
-    <details className="panel sg-collapse-panel sg-mu-panel">
+    <details className="panel sg-collapse-panel">
       <summary className="sg-collapse-summary"><span role="heading" aria-level={2}>Độ không đảm bảo đo (MU)</span></summary>
       <div className="sg-collapse-body">
         <div className="sg-mu-table-wrap">

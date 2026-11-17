@@ -244,6 +244,10 @@ rộng hoặc chỉnh sửa mã nguồn.
 | Báo cáo & Biểu mẫu | Báo cáo dữ liệu, báo cáo Sigma, PDF/Excel và mẫu biểu |
 | Cài đặt & Đám mây | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
 
+Số liệu theo kỳ của Sigma dùng thanh kéo chung giữa lịch sử kỳ và bảng mức
+QC. Kéo chuột hoặc dùng phím trái/phải để đổi độ rộng danh sách, nhớ lựa
+chọn khi mở lại; giới hạn theo bề ngang khung để bảng số liệu còn đủ chỗ.
+
 Tổng quan ngoại kiểm dùng tỷ lệ chấp nhận theo số kết quả đã nhập của đúng
 máy–chương trình–năm; đây là chỉ số tổng hợp, không thay kết luận từng mẫu
 hoặc trạng thái xử lý. Lọc theo xếp loại chỉ lọc xét nghiệm, giữ các đợt và

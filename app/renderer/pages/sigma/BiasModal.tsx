@@ -85,18 +85,15 @@ export function BiasModal({ initialRounds, initialWindowMonths, source, onClose,
       <div className="sg-eqa-source">
         <div className="field sg-eqa-window"><label htmlFor="sgEqaWindowMonths">Số tháng</label><input id="sgEqaWindowMonths" type="number" min="1" step="1" value={monthsDraft} aria-invalid={!validMonths || undefined}
           onChange={e => { setMonthsDraft(e.target.value); sourceRevision.current++; setLoadingSource(false); setSelection(null); }} /></div>
-        <AsyncButton className="btn ghost sm" disabled={!validMonths} onClick={loadFromEqa}>Lấy từ ngoại kiểm</AsyncButton>
-        <span className="hint-inline">Tối thiểu 1 tháng, tính đến hết tháng Sigma. Lấy tất cả mẫu hợp lệ của cùng xét nghiệm và máy.</span>
+        <AsyncButton className="btn teal" disabled={!validMonths} onClick={loadFromEqa}>Lấy từ ngoại kiểm</AsyncButton>
+        {fromEqa && <button type="button" className="btn ghost" onClick={switchToManual}>Chuyển sang nhập tay</button>}
       </div>
-      {!validMonths && <p className="alert warn">Nhập số tháng là số nguyên từ 1 trở lên.</p>}
-      {validMonths && sourceOutdated && <p className="alert warn">Số tháng đã đổi. Bấm Lấy từ ngoại kiểm để cập nhật mẫu trước khi áp dụng.</p>}
-      <p className="hint-inline">{fromEqa
-        ? 'Mẫu ngoại kiểm: áp dụng một Bias% chung cho tất cả mức QC của kỳ này, dùng đủ mọi mẫu hợp lệ. CV và TEa giữ riêng từng mức; các kỳ khác không đổi.'
-        : `Vòng nhập tay chỉ áp dụng cho mức ${source.level}.`}</p>
+      {!validMonths && <p className="alert warn sg-eqa-notice">Nhập số tháng là số nguyên từ 1 trở lên.</p>}
+      {validMonths && sourceOutdated && <p className="alert warn sg-eqa-notice">Số tháng đã đổi. Bấm Lấy từ ngoại kiểm để cập nhật mẫu trước khi áp dụng.</p>}
       {selection && (
         <div className="sg-eqa-selection">
-          <p className="hint-inline">Báo cáo từ {vnDate(selection.window.start)} tới {vnDate(selection.window.end)} · {selection.included.length} mẫu dùng trong {new Set(selection.included.map(s => s.reportDate.slice(0, 7))).size}/{selection.windowMonths} tháng · {selection.excluded.length} mẫu loại.</p>
-          {!selection.included.length && <div className="alert warn">Không có mẫu ngoại kiểm hợp lệ trong khoảng này; chưa đủ căn cứ áp dụng Bias chung.</div>}
+          <p className="hint-inline">{vnDate(selection.window.start)} – {vnDate(selection.window.end)} · {selection.included.length} mẫu · {new Set(selection.included.map(s => s.reportDate.slice(0, 7))).size}/{selection.windowMonths} tháng có mẫu</p>
+          {!selection.included.length && <div className="alert warn">Không có mẫu hợp lệ trong khoảng đã chọn.</div>}
           {selection.excluded.length > 0 && <details>
             <summary>Mẫu bị loại ({selection.excluded.length})</summary>
             <ul className="sg-eqa-excluded">{selection.excluded.map((s) => <li key={s.resultId}>{s.label} · {vnDate(s.reportDate)} · {SIGMA_EQA_EXCLUSION_LABEL[s.reason]}</li>)}</ul>
@@ -124,21 +121,15 @@ export function BiasModal({ initialRounds, initialWindowMonths, source, onClose,
           </tbody>
         </table>
       </div>
-      {fromEqa
-        ? <button type="button" className="btn ghost sm sg-eqa-add" onClick={switchToManual}>Bỏ mẫu ngoại kiểm, nhập tay</button>
-        : <button type="button" className="btn ghost sm sg-eqa-add" onClick={() => setRounds((r) => [...r, { lab: '', target: '' }])}>+ Thêm vòng</button>}
-      <div className={`sg-eqa-summary${parsedRounds.length ? '' : ' is-empty'}`}>
-        {eqa ? (
-          <>
-            <div><span>Số vòng/mẫu hợp lệ</span><b>{eqa.n}</b></div>
-            <div><span>Bias dùng tính Sigma (TB có dấu)</span><b className="sg-eqa-average">{eqa.mean.toFixed(3)}</b></div>
-            {eqa.biasSem != null && <div><span>Sai số chuẩn của Bias</span><b>{eqa.biasSem.toFixed(3)}</b></div>}
-            {eqa.n > 1 && <div><span>Bias RMS (chỉ dùng cho MU)</span><b>{eqa.rms.toFixed(3)}</b></div>}
-            {eqa.mixedSigns && <div className="sg-eqa-warning">Bias đổi dấu giữa các vòng: sai số hệ thống không ổn định, xem lại trước khi dùng.</div>}
-            {eqa.n < SIGMA_EQA_BIAS_RULES.minSamples && <div className="sg-eqa-warning">Chưa đủ {SIGMA_EQA_BIAS_RULES.minSamples} vòng/mẫu; ước lượng Bias còn dao động lớn.</div>}
-          </>
-        ) : <span className="sg-eqa-empty">Nhập đủ KQ PXN và Target EQA cho ít nhất 1 vòng, hoặc lấy từ ngoại kiểm.</span>}
-      </div>
+      {!fromEqa && <button type="button" className="btn ghost sm sg-eqa-add" onClick={() => setRounds((r) => [...r, { lab: '', target: '' }])}>+ Thêm vòng</button>}
+      {eqa && <div className="sg-eqa-summary">
+        <div><span>{fromEqa ? 'Số mẫu hợp lệ' : 'Số vòng hợp lệ'}</span><b>{eqa.n}</b></div>
+        <div><span>Bias Sigma (TB có dấu)</span><b className="sg-eqa-average">{eqa.mean.toFixed(3)}</b></div>
+        {eqa.biasSem != null && <div><span>Sai số chuẩn Bias</span><b>{eqa.biasSem.toFixed(3)}</b></div>}
+        {eqa.n > 1 && <div><span>Bias RMS (MU)</span><b>{eqa.rms.toFixed(3)}</b></div>}
+        {eqa.mixedSigns && <div className="sg-eqa-warning">Bias đổi dấu giữa các mẫu; cần rà soát trước khi dùng.</div>}
+        {eqa.n < SIGMA_EQA_BIAS_RULES.minSamples && <div className="sg-eqa-warning">Dưới {SIGMA_EQA_BIAS_RULES.minSamples} mẫu: ước lượng Bias còn ít căn cứ.</div>}
+      </div>}
     </Modal>
   );
 }

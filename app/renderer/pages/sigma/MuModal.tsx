@@ -21,7 +21,7 @@ export function MuModal({ level, onClose, onSubmit }: {
   }
 
   return (
-    <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} size="lg" className="sg-mu-modal"
+    <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} size="lg"
       footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Áp dụng ngân sách MU</AsyncButton></>}>
       <table className="sg-mu-detail-table">
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>

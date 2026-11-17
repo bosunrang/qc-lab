@@ -32,11 +32,9 @@ test('Bias ngoại kiểm: chặn căn cứ thay đổi khi đang mở, áp dụ
     const modal = page.getByRole('dialog', { name: 'Bias% cho Six Sigma', exact: true });
     const months = modal.getByRole('spinbutton', { name: 'Số tháng', exact: true });
     assert.equal(await months.inputValue(), '3');
-    assert.match(await modal.innerText(), /Vòng nhập tay chỉ áp dụng cho mức 1/);
     await modal.getByRole('button', { name: 'Lấy từ ngoại kiểm', exact: true }).click();
     await modal.locator('.sg-eqa-selection').waitFor();
     await page.waitForFunction(() => document.querySelectorAll('.sg-eqa-table tbody tr').length === 3);
-    assert.match(await modal.innerText(), /CV và TEa giữ riêng từng mức/);
     assert.match(await modal.innerText(), /01\/07\/2026.*30\/09\/2026/);
     assert.match(await modal.innerText(), /3\/3 tháng/);
     await months.fill('0');
