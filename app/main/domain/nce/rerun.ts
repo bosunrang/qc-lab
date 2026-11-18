@@ -25,6 +25,8 @@ export interface NceRerunInput {
   requiredLevels?: readonly number[];
   /** Ngày sớm nhất được nhận (ngày phát hiện), áp dụng cả khi có lần khởi đầu. */
   notBeforeDate?: string;
+  /** Lần chạy bị loại sau lần khởi đầu, trước lần rerun, chưa thuộc hồ sơ nào. */
+  unattachedFailures?: readonly NceRunKey[];
 }
 
 export interface NceRerunResult {
@@ -53,6 +55,12 @@ export function checkNceRerun(input: NceRerunInput): NceRerunResult {
   }
   if (input.notBeforeDate && candidate.date < input.notBeforeDate && !problems.some((p) => p.code === 'rerun-too-early')) {
     add('rerun-too-early', 'Lần chạy xác minh phải từ ngày phát hiện sự cố trở đi.');
+  }
+  // D-01: QC vẫn bị loại sau xử lý tức thời là diễn biến của cùng sự kiện, phải
+  // nằm trong hồ sơ (và buộc tầng CAPA), không được bỏ ngoài rồi cho chạy lại.
+  const unattached = (input.unattachedFailures ?? []).filter((run) => compareRun(run, candidate) < 0).sort(compareRun);
+  if (unattached.length) {
+    add('rerun-unattached-failure', `Lần chạy ${unattached.map(runLabel).join('; ')} bị loại sau lần khởi đầu nhưng chưa gắn vào hồ sơ: gắn vào hồ sơ này từ hàng chờ trước khi cho hoạt động trở lại.`);
   }
 
   const failurePointIds = new Set(failures.flatMap((run) => run.points.map((point) => point.pointId)));

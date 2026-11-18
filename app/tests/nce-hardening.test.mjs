@@ -211,13 +211,13 @@ test('NCE-H05: thay lô sau release không làm mất bằng chứng rerun hay h
   assert.equal(view.record.status, 'closed');
 });
 
-test('NCE-H06: điểm rerun của lô cũ bị huỷ vẫn chặn duyệt', () => {
+test('NCE-H06: điểm rerun của lô cũ bị huỷ chặn từ bước nộp duyệt (rà soát 17/11/2026)', () => {
   const { db, nce, readyLow, testId } = fixture();
-  let view = readyLow();
+  const view = readyLow();
   db.prepare('UPDATE test_levels SET qc_lot_id=NULL WHERE test_id=?').run(testId);
   db.prepare('UPDATE qc_points SET voided=1 WHERE test_id=? AND date=? AND level=2').run(testId, rerun.date);
-  view = must(nce.submitNce({ data: ref(view) }, admin), 'nộp');
-  const result = nce.approveNce({ data: ref(view) }, approver);
+  assert.ok(nce.getNce(view.record.id, admin).missing.some((m) => m.code === 'recheck-rerun-missing-level'), 'hồ sơ báo ngay ở danh sách còn thiếu');
+  const result = nce.submitNce({ data: ref(view) }, admin);
   assert.equal(result.error.code, 'gate');
   assert.match(result.error.message, /thiếu mức M2/);
 });

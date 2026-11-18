@@ -200,9 +200,12 @@ test('duyệt kiểm lại bằng chứng rerun: điểm rerun bị huỷ sau kh
     tier: 'low', tierReason: 'Lỗi đơn lẻ, khôi phục ngay sau hiệu chuẩn', riskSeverity: 2, riskProbability: 1, riskLevel: 'low', riskBasis: 'SOP-QC-07', checklist: CHECKLIST_OK,
   } } }, owner), 'điền hồ sơ');
   dossier = must(nce.recordNcePatientImpact({ data: { ...ref(dossier), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
+  // Lần hỏng C nằm giữa B và rerun D phải thuộc hồ sơ (rà soát 17/11/2026);
+  // ca này giữ tầng xử lý nhanh nên coi C là nhập sai và huỷ điểm đó.
+  must(entry.voidPoint({ data: { pointId: ids['2026-09-02-3:1'], kind: 'data-entry', reason: 'Nhập sai giá trị lần chạy C' } }, admin), 'huỷ điểm C');
   dossier = must(nce.releaseNce({ data: { ...ref(dossier), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại');
   dossier = must(nce.submitNce({ data: ref(dossier) }, owner), 'nộp duyệt');
-  must(entry.voidPoint({ data: { pointId: ids['2026-09-03-1:2'], kind: 'data-entry', reason: 'Nhập nhầm' } }, admin), 'huỷ điểm rerun');
+  must(entry.voidPoint({ data: { pointId: ids['2026-09-03-1:2'], kind: 'data-entry', reason: 'Nhập nhầm giá trị mức 2' } }, admin), 'huỷ điểm rerun');
   assert.match(nce.approveNce({ data: ref(dossier) }, approver).error.message, /Bằng chứng rerun không còn hợp lệ/);
 });
 
@@ -218,6 +221,8 @@ test('ca 12: chỉ huỷ hồ sơ chưa cho chạy lại, có lý do; trả lạ
   // Lần chạy B được giải phóng: lập hồ sơ mới cho nó được.
   let again = createFromB(nce, testId);
   again = must(nce.recordNcePatientImpact({ data: { ...ref(again), impact: { outcome: 'not_reported', description: 'Đã giữ kết quả', resultCount: 12 } } }, releaser), 'ảnh hưởng');
+  // Lần hỏng C cùng sự kiện phải gắn vào hồ sơ trước khi cho chạy lại (D-01).
+  again = must(nce.attachNceRun({ data: { ...ref(again), run: C } }, owner), 'gắn lần hỏng C');
   // W đứng trước lần hỏng C nên không còn là bằng chứng khôi phục hiện hành.
   again = must(nce.releaseNce({ data: { ...ref(again), release: { reason: 'QC chạy lại đạt', rerun: D } } }, releaser), 'cho chạy lại bằng D sau lần hỏng cuối');
   assert.equal(nce.cancelNce({ data: { ...ref(again), reason: 'Muốn huỷ sau khi đã cho chạy lại' } }, owner).error.code, 'status');

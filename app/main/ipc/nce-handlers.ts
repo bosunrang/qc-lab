@@ -83,7 +83,7 @@ export function createNceHandlers(db: Db) {
     const editable = row.status === 'open' || row.status === 'released';
     return {
       record: row, runs: loaded.runs, actions: loaded.actions, decisions: loaded.decisions, revisions: loaded.revisions,
-      missing: [...nceNextStep(dossier, null, suspect).missing, ...eqaClosureMissing(loaded)], capa_triggers: nceCapaTriggers(dossier), recurrence: dossier.recurrence,
+      missing: [...nceNextStep(dossier, null, suspect, row.status === 'released' || row.status === 'pending_approval' ? recheckRelease(dossier) : null).missing, ...eqaClosureMissing(loaded)], capa_triggers: nceCapaTriggers(dossier), recurrence: dossier.recurrence,
       eqa_followup: eqaFollowup(loaded),
       suspect_window: suspect ? {
         last_accepted: suspect.lastAccepted, onset: suspect.onset, onset_rules: suspect.onsetRules,
@@ -253,15 +253,21 @@ export function createNceHandlers(db: Db) {
     const { trigger, repeats } = failureSnapshots(dossier);
     // Lần hỏng chưa được gắn hồ sơ vẫn là bằng chứng không thể bỏ qua khi
     // chọn mốc khôi phục. Khi duyệt lại, không lấy sự kiện SAU release cũ.
-    const latestOtherFailure = !alreadyCut && trigger ? nceRunOutcomes(db, testId, [{ date: run.date, runId: run.runId }])
-      .filter((r) => r.rejected && compareRun(r, trigger) > 0).sort(compareRun).at(-1) : undefined;
+    const otherFailures = !alreadyCut && trigger ? nceRunOutcomes(db, testId, [{ date: run.date, runId: run.runId }])
+      .filter((r) => r.rejected && compareRun(r, trigger) > 0).sort(compareRun) : [];
+    const latestOtherFailure = otherFailures.at(-1);
+    // Lần hỏng trước ứng viên mà chưa thuộc hồ sơ nào (kể cả hồ sơ này) phải gắn
+    // vào hồ sơ trước khi cho chạy lại (D-01).
+    const unattachedFailures = dossier.source === 'iqc'
+      ? otherFailures.filter((r) => compareRun(r, run) < 0 && !recordOfRun(db, testId, r.date, r.runId)).map((r) => ({ date: r.date, runId: r.runId }))
+      : [];
     // Chỉ cần khoá lần hỏng cuối để kiểm thứ tự, không đánh giá lại toàn bộ
     // CSDL thêm một lần cho từng lần hỏng. Snapshot này không được lưu.
     const additional: NceRunSnapshot[] = latestOtherFailure ? [{ testId, date: latestOtherFailure.date, runId: latestOtherFailure.runId, points: [] }] : [];
     const result = checkNceRerun({
       testId, trigger: dossier.source === 'iqc' ? trigger : null, repeatRejects: [...repeats, ...additional], candidate: snapshot, lotChangeNote,
       requiredLevels: dossier.source === 'iqc' ? undefined : nceOperationalLevels(db, testId),
-      notBeforeDate: dossier.detectedAt,
+      notBeforeDate: dossier.detectedAt, unattachedFailures,
     });
     const absent = nceOperationalLevels(db, testId).filter((level) => !snapshot.points.some((p) => p.level === level && !p.voided));
     const warnings = absent.length ? [{ code: 'rerun-operational-levels', message: `Chưa có mức ${absent.map((l) => `M${l}`).join(', ')} so với cấu hình vận hành hiện tại. Cổng hiện hành dùng các mức của lần khởi đầu; phải đối chiếu đủ mức theo SOP trước khi quyết định.` }] : [];
@@ -400,6 +406,15 @@ export function createNceHandlers(db: Db) {
     const patch = prepareNcePatch(data.patch, loaded.dossier);
     if (!patch.ok) return fail(patch.code, patch.message);
     if (patch.data.ownerUserId !== undefined && !activeWriter(patch.data.ownerUserId)) return fail('invalid-owner', 'Người phụ trách phải là tài khoản đang hoạt động có quyền ghi.');
+    // Hồ sơ lập với hạn mặc định của tầng xử lý nhanh; chuyển sang CAPA mà hạn
+    // chưa được ai sửa thì dời theo hạn CAPA trong Cài đặt. Hạn đã chỉnh tay
+    // thì giữ nguyên, và không bao giờ tự rút ngắn hạn.
+    const { dossier: current } = loaded;
+    if (patch.data.tier === 'capa' && current.tier !== 'capa' && patch.data.dueDate === undefined
+      && current.dueDate === defaultNceDueDate(current.detectedAt, current.tier || '', config())) {
+      const capaDue = defaultNceDueDate(current.detectedAt, 'capa', config());
+      if (capaDue > current.dueDate) patch.data.dueDate = capaDue;
+    }
     const changes = nceFieldChanges(editableOf(loaded.dossier, loaded.row.phase), patch.data);
     if (!Object.keys(changes).length) return w.noChange(view(loaded, w.actor));
     const changedPatch = Object.fromEntries(Object.keys(changes).map((key) => [key, patch.data[key as keyof typeof patch.data]]));
@@ -566,7 +581,7 @@ export function createNceHandlers(db: Db) {
     const target = transitionTo(loaded, 'submit');
     if (!target) return fail('status', 'Chỉ nộp duyệt hồ sơ đã cho chạy lại.');
     const allowed = canSubmitNce(actorLike(w.actor), loaded.dossier); if (!allowed.ok) return fail(allowed.code, allowed.message);
-    const missing = [...nceSubmitMissing(loaded.dossier, suspectOf(loaded.dossier)), ...eqaClosureMissing(loaded)];
+    const missing = [...nceSubmitMissing(loaded.dossier, suspectOf(loaded.dossier), recheckRelease(loaded.dossier)), ...eqaClosureMissing(loaded)];
     if (missing.length) return fail('gate', `Hồ sơ chưa đủ điều kiện nộp duyệt: ${missingText(missing)}.`);
     return commitEdit(w, loaded, version, ['Nộp duyệt hồ sơ NCE', 'chờ duyệt'], { status: target },
       (_tx, now) => insertNceDecision(db, loaded.row.id, 'submit', {}, w.actor, now));

@@ -12,7 +12,7 @@ import type { NceRunSnapshot } from '../domain/nce/types';
 
 export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries };
 import { uid } from '../domain/text-utils';
-import { validateQcPointInput, validateVoidInput, rejectedRunVoidReasonError, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
+import { validateQcPointInput, validateVoidInput, rejectedRunVoidReasonError, REJECTED_RUN_VOID_REASON_MIN, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
 import { evaluateRangeCandidate, manualRangeDeviation, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory, meanSdOnDate } from '../domain/manage-validation';
@@ -512,6 +512,15 @@ export function createEntryHandlers(db: Db, options: {
     if (runRejected) {
       const reasonError = rejectedRunVoidReasonError(reason);
       if (reasonError) return { ok: false, error: reasonError };
+    }
+    // Điểm là bằng chứng rerun của hồ sơ NCE đã cho chạy lại nhưng chưa đóng:
+    // huỷ làm bằng chứng mất hiệu lực, hồ sơ chỉ nộp/duyệt được sau khi nhập
+    // lại điểm của đúng lần chạy đó. Bắt ghi lý do như lần chạy bị loại.
+    const rerunOf = db.prepare(`SELECT n.nce_id FROM nce_runs r JOIN nce_records n ON n.id=r.nce_record_id
+      WHERE r.role='rerun' AND r.test_id=? AND r.date=? AND r.run_id=? AND n.status IN ('released','pending_approval') LIMIT 1`)
+      .get(point.test_id, point.date, point.run_id) as { nce_id: string } | undefined;
+    if (rerunOf && reason.trim().length < REJECTED_RUN_VOID_REASON_MIN) {
+      return { ok: false, error: { code: 'reason-required-rerun-evidence', message: `Điểm này là bằng chứng rerun của hồ sơ ${rerunOf.nce_id}: cần ghi lý do huỷ tối thiểu ${REJECTED_RUN_VOID_REASON_MIN} ký tự. Sau khi huỷ phải nhập lại điểm của lần chạy này thì hồ sơ mới nộp/duyệt được.` } };
     }
     const rejectionJson = runRejected ? JSON.stringify({ rules: view?.rules ?? [], rejectedLevels }) : '';
     const kindLabel = kind === 'analytical' ? 'Kết quả QC thực tế không hợp lệ' : kind === 'data-entry' ? 'Nhập sai dữ liệu' : '';

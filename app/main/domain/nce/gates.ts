@@ -166,9 +166,18 @@ export function nceContentMissing(dossier: NceDossier, suspect?: NceSuspectWindo
   return missing;
 }
 
-export function nceSubmitMissing(dossier: NceDossier, suspect?: NceSuspectWindow | null): NceMissing[] {
+/** Bằng chứng rerun đã chốt, kiểm lại trên dữ liệu QC hiện tại (điểm có thể bị
+ * huỷ sau khi cho chạy lại). Báo ngay từ lúc nộp, không đợi tới bước duyệt. */
+function nceRecheckMissing(releaseRecheck: NceRerunResult | null | undefined): NceMissing[] {
+  if (!releaseRecheck || releaseRecheck.ok) return [];
+  return releaseRecheck.problems.map((p) => ({ code: `recheck-${p.code}`, message: `Bằng chứng rerun không còn hợp lệ: ${p.message.replace(/\.$/, '')}. Nhập lại điểm QC của đúng lần chạy rerun đó` }));
+}
+
+/** `releaseRecheck`: kết quả `checkNceRerun()` cho lần rerun đã chốt, trên dữ liệu
+ * hiện tại; `null` với hồ sơ không có lần rerun. */
+export function nceSubmitMissing(dossier: NceDossier, suspect?: NceSuspectWindow | null, releaseRecheck: NceRerunResult | null = null): NceMissing[] {
   if (dossier.status !== 'released') return [{ code: 'status', message: 'Chỉ nộp duyệt hồ sơ đã cho chạy lại.' }];
-  return nceContentMissing(dossier, suspect);
+  return [...nceContentMissing(dossier, suspect), ...nceRecheckMissing(releaseRecheck)];
 }
 
 // ---------------------------------------------------------- 5.5 Duyệt
@@ -177,21 +186,20 @@ export function nceSubmitMissing(dossier: NceDossier, suspect?: NceSuspectWindow
  * điểm rerun bị huỷ sau khi cho chạy lại); `null` với hồ sơ không phải IQC. */
 export function nceApproveMissing(dossier: NceDossier, releaseRecheck: NceRerunResult | null, suspect?: NceSuspectWindow | null): NceMissing[] {
   if (dossier.status !== 'pending_approval') return [{ code: 'status', message: 'Chỉ duyệt hồ sơ đang chờ duyệt.' }];
-  const missing = nceContentMissing(dossier, suspect);
-  if (releaseRecheck && !releaseRecheck.ok) missing.push(...releaseRecheck.problems.map((p) => ({ code: `recheck-${p.code}`, message: `Bằng chứng rerun không còn hợp lệ: ${p.message}` })));
-  return missing;
+  return [...nceContentMissing(dossier, suspect), ...nceRecheckMissing(releaseRecheck)];
 }
 
 // --------------------------------------------------------- Bước tiếp theo
 
 export interface NceNextStep { step: 'release' | 'submit' | 'approve' | null; missing: NceMissing[] }
 
-/** Bước kế tiếp và những gì còn thiếu, để giao diện hiển thị "còn thiếu gì". */
-export function nceNextStep(dossier: NceDossier, rerunPreview: NceRerunResult | null = null, suspect?: NceSuspectWindow | null): NceNextStep {
+/** Bước kế tiếp và những gì còn thiếu, để giao diện hiển thị "còn thiếu gì".
+ * `releaseRecheck` chỉ dùng sau khi đã cho chạy lại. */
+export function nceNextStep(dossier: NceDossier, rerunPreview: NceRerunResult | null = null, suspect?: NceSuspectWindow | null, releaseRecheck: NceRerunResult | null = null): NceNextStep {
   switch (dossier.status) {
     case 'open': return { step: 'release', missing: nceReleaseMissing(dossier, rerunPreview, suspect) };
-    case 'released': return { step: 'submit', missing: nceSubmitMissing(dossier, suspect) };
-    case 'pending_approval': return { step: 'approve', missing: nceContentMissing(dossier, suspect) };
+    case 'released': return { step: 'submit', missing: nceSubmitMissing(dossier, suspect, releaseRecheck) };
+    case 'pending_approval': return { step: 'approve', missing: [...nceContentMissing(dossier, suspect), ...nceRecheckMissing(releaseRecheck)] };
     default: return { step: null, missing: [] };
   }
 }

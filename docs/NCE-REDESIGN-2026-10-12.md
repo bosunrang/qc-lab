@@ -315,6 +315,33 @@ nhiệm vụ) nằm ở `app/main/domain/nce/` để test trực tiếp, không 
   đề, chạy lại 4 ca CAPA và dọn lỗi đều đạt. Kiểm tra bảng ở 1647/1000/600px
   không tràn khung; ảnh Electron dùng để rà lại bố cục và căn cột.
 
+### Rà soát 17/11/2026 — Khắc phục sự cố IQC
+
+Đối chiếu lại với ISO 15189:2022 (7.3.7.2, 7.5, 8.7), CLSI C24 và Westgard.
+Khung sáu bước, khoảng nghi ngờ, cổng rerun, phân tầng và duyệt độc lập giữ
+nguyên. Sửa ba chỗ:
+
+- **A1 — lần hỏng lặp lại phải nằm trong hồ sơ (D-01).** QC vẫn bị loại sau
+  xử lý tức thời mà chưa thuộc hồ sơ nào thì cổng rerun báo
+  `rerun-unattached-failure` và chặn cho hoạt động trở lại. Trước đây vẫn cho
+  qua: hồ sơ né được tiêu chí ép CAPA "QC tiếp tục bị loại", còn lần hỏng kẹt
+  trong hàng chờ vì sau release không gắn được nữa. Lần hỏng sau ứng viên rerun
+  vẫn chặn mốc cũ như quyết định 15/10 (không báo trùng).
+- **A2 — hạn CAPA theo cấu hình.** Hồ sơ IQC lập với hạn mặc định của tầng xử
+  lý nhanh. Chuyển sang tầng CAPA mà hạn chưa được chỉnh tay thì dời theo hạn
+  CAPA trong Cài đặt, ghi lịch sử; hạn đã chỉnh tay giữ nguyên, không tự rút
+  ngắn.
+- **A3 — bằng chứng rerun kiểm lại từ bước nộp.** Danh sách "còn thiếu" (đã
+  cho chạy lại, chờ duyệt) và cổng nộp duyệt kiểm lại lần rerun trên dữ liệu
+  hiện tại, không đợi tới bước duyệt. Huỷ điểm đang là bằng chứng rerun của hồ
+  sơ chưa đóng phải ghi lý do ≥ 10 ký tự, thông báo nêu mã hồ sơ; nhập lại
+  điểm của đúng lần chạy đó thì bằng chứng hợp lệ trở lại.
+
+Hồi quy: `nce-iqc-review.test.mjs`; cập nhật `nce-handlers` (gắn lần hỏng C
+trước release, huỷ C khi giữ tầng xử lý nhanh) và `nce-hardening` H06 (chặn từ
+bước nộp). Còn chờ SOP như cũ: ma trận nguy cơ, mức bắt buộc khi rerun, thẩm
+quyền theo mức độ, ngưỡng Bias TEa/4.
+
 ### Bổ sung 28/10/2026 — rà soát nghiệp vụ khoảng nghi ngờ và đánh giá kỹ thuật
 
 Rà soát đối chiếu ISO 15189:2022 và Westgard phát hiện bốn chỗ chưa chặt; đã
