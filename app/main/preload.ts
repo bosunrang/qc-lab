@@ -113,6 +113,7 @@ const api = {
   cancelEqaRound: (input: unknown) => ipcRenderer.invoke('eqa:cancelRound', input),
   listEqaSchedule: () => ipcRenderer.invoke('eqa:listSchedule'),
   listEqaPrograms: () => ipcRenderer.invoke('eqa:listPrograms'),
+  listEqaAssignees: () => ipcRenderer.invoke('eqa:listAssignees'),
   saveEqaSchedule: (input: unknown) => ipcRenderer.invoke('eqa:saveSchedule', input),
   markEqaSubmitted: (input: unknown) => ipcRenderer.invoke('eqa:markSubmitted', input),
   removeEqaSchedule: (input: unknown) => ipcRenderer.invoke('eqa:removeSchedule', input),

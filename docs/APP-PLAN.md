@@ -288,6 +288,11 @@ Danh sách xét nghiệm giữ vị trí cuộn khi đổi xét nghiệm hoặc 
 lại; thay đổi cấu hình nạp lại cả chuỗi lẫn danh sách. Biểu đồ phần trăm có
 chú giải riêng cho điểm chưa có đối chiếu TEa, không coi là trong/vượt TEa.
 
+Biểu mẫu thêm/sửa lịch ngoại kiểm đặt Người phụ trách và Ghi chú cùng hàng,
+ô người phụ trách hẹp hơn, dùng cùng dropdown với Chương trình và Loại mẫu.
+Chọn tài khoản đang hoạt động bằng họ tên kèm
+tên đăng nhập; lịch lưu bản tên để giữ nguyên thông tin phân công cũ.
+
 Thẻ Lịch ngoại kiểm chỉ giữ hai cách xem Lịch tháng và Danh sách ở bên trái
 thanh công cụ; bên phải lần lượt là tháng, năm, loại mẫu và Thêm đợt, dùng
 cùng kiểu nút chuyển và ô chọn của hệ thống. Hai cách xem giữ chung
@@ -336,8 +341,10 @@ chưa nộp/chưa có báo cáo của máy mình vẫn xoá được khi máy kh
 đã có báo cáo. Bộ đếm danh sách tính số lịch theo nhóm máy, không gọi nhầm
 là số kỳ báo cáo. Nâng schema giữ
 toàn bộ mã lịch, dấu nộp, ngày giờ và loại mẫu hiện có của dữ liệu cũ.
-Chưa khai lịch vẫn hiện lịch tháng và hướng dẫn thêm đợt bên cạnh, không
-hiện bộ lọc loại mẫu chưa có dữ liệu. Chọn ngày
+Chưa khai lịch vẫn hiện lịch tháng và hướng dẫn thêm đợt bên cạnh. Hai khung
+thẳng mép trên, mép dưới và dải tiêu đề; lưới ngày tự giãn theo phần hướng dẫn,
+không đặt chiều cao cố định. Khi xếp dọc, mỗi khung cao theo nội dung.
+Không hiện bộ lọc loại mẫu chưa có dữ liệu. Chọn ngày
 có thể dùng làm hạn nộp gợi sẵn khi thêm đợt. Biểu mẫu chỉ có Ngày chạy mẫu
 và Hạn nộp kết quả, nằm cùng hàng theo lưới chung; đợt mới không khai ngày
 nhận mẫu, sửa đợt giữ nguyên ngày nhận mẫu đã lưu. Ràng buộc ngày của dữ

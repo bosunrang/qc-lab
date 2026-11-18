@@ -830,6 +830,8 @@ export interface EqaScheduleInput {
   receiveDate?: string; runDate?: string; dueDate: string; assignee?: string; note?: string;
   sampleType?: string; instrumentIds?: string[];
 }
+/** Thông tin tối thiểu của tài khoản đang hoạt động để chọn người phụ trách. */
+export interface EqaAssigneeOption { id: string; name: string; username: string }
 export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
 /** Không truyền instrumentId khi xem tất cả máy trong phạm vi. */
 export interface EqaReportScope { programId: string; year: number; roundId?: string; instrumentId?: string }
@@ -1062,6 +1064,7 @@ export interface QcApi {
   getEqaInstrumentGrid(input: { programId: string; year: number; instrumentId: string }): Promise<EqaInstrumentGridRow[]>;
   listEqaSchedule(): Promise<EqaScheduleRow[]>;
   listEqaPrograms(): Promise<EqaProgramOption[]>;
+  listEqaAssignees(): Promise<EqaAssigneeOption[]>;
   saveEqaSchedule(input: { id?: string; data: EqaScheduleInput }): Promise<IpcResult<EqaScheduleRow>>;
   /** Đợt có khai máy: `instrumentIds` là các máy đã nộp (máy khác bỏ đánh dấu);
    * không gửi thì `submitted` áp cho mọi máy. */

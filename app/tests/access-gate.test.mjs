@@ -77,11 +77,14 @@ test('quyền theo trang được chặn ở main, không chỉ ẩn menu', () =
   const ktv = ctxOf(actorOf('ktv', 'technician'));
   assert.doesNotThrow(() => gate.guard('entry:addPoint', ktv));
   assert.doesNotThrow(() => gate.guard('config:listTests', ktv), 'danh mục dùng chung mọi trang');
-  for (const channel of ['sigma:listPeriods', 'reagent:saveRows', 'report:queryReport', 'nce:get', 'eqa:listRounds']) {
+  for (const channel of ['sigma:listPeriods', 'reagent:saveRows', 'report:queryReport', 'nce:get', 'eqa:listRounds', 'eqa:listAssignees']) {
     assert.throws(() => gate.guard(channel, ktv), (error) => error instanceof AccessError && error.code === 'forbidden', channel);
   }
   // Tóm tắt NCE vẫn đọc được: Tổng quan và Báo cáo dùng nó.
   assert.doesNotThrow(() => gate.guard('nce:list', ktv));
+  db.prepare('UPDATE users SET page_perms_json=? WHERE id=?').run(JSON.stringify(['eqa']), 'ktv');
+  assert.doesNotThrow(() => gate.guard('eqa:listAssignees', ktv), 'chọn người phụ trách chỉ cần quyền Ngoại kiểm');
+  assert.throws(() => gate.guard('auth:listUsers', ktv), AccessError, 'không mở quyền quản trị người dùng');
   // Người chỉ xem không vào Cấu hình chung, Nhật ký hay Người dùng.
   const viewer = ctxOf(actorOf('viewer', 'viewer'));
   for (const channel of ['config:saveTest', 'audit:query', 'auth:listUsers', 'backup:export']) {

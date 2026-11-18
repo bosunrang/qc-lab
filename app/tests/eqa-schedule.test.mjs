@@ -49,6 +49,20 @@ function fixture() {
 }
 const plan = (over = {}) => ({ data: { programName: 'CHƯƠNG TRÌNH SINH HÓA', provider: 'TTKCXN TP. HCM', year: 2026, round: 'ĐỢT 01', dueDate: isoLocalDateAfter(3), ...over } });
 
+test('người phụ trách ngoại kiểm: chỉ trả danh tính tài khoản đang hoạt động', () => {
+  const { db, eqa } = fixture();
+  try {
+    const add = db.prepare('INSERT INTO users(id,username,name,role,pass_hash,active) VALUES (?,?,?,?,?,?)');
+    add.run('a', 'ktv_a', 'Nguyễn An', 'technician', 'hash-khong-cong-bo', 1);
+    add.run('b', 'ktv_b', 'Nguyễn An', 'viewer', 'hash-khong-cong-bo', 1);
+    add.run('c', 'ngung_dung', 'Người đã ngừng dùng', 'admin', 'hash-khong-cong-bo', 0);
+    assert.deepEqual(eqa.listEqaAssignees().map(row => ({ ...row })), [
+      { id: 'a', name: 'Nguyễn An', username: 'ktv_a' },
+      { id: 'b', name: 'Nguyễn An', username: 'ktv_b' },
+    ]);
+  } finally { db.close(); }
+});
+
 test('lập lịch, đánh dấu đã nộp, rồi nhận ra đợt đã có báo cáo', () => {
   const { db, eqa, testId } = fixture();
   assert.equal(eqa.saveEqaSchedule(plan(), viewer).error?.code, 'forbidden');

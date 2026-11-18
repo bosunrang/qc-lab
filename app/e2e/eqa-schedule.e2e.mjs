@@ -94,7 +94,8 @@ test('lịch ngoại kiểm: hai cách xem, lọc năm, cảnh báo quá hạn, 
       const waiting = must(await api.saveEqaSchedule({ data: { programName: 'EQA Huyết học', sampleType: 'Huyết học', year, round: 'ĐỢT 01', dueDate: at(4) } }));
       must(await api.markEqaSubmitted({ data: { id: waiting.id, submitted: true } }));
       must(await api.createUser({ data: { username: 'calendar_viewer', name: 'Người xem lịch', role: 'viewer', password: 'mat-khau-lich-123' } }));
-      return { year, today: at(0), due: at(3), soonId: soon.id, received: at(-1), beforeReceived: at(-2) };
+      const assignee = must(await api.createUser({ data: { username: 'calendar_assignee', name: 'KTV B', role: 'technician', password: 'mat-khau-lich-123', pagePerms: ['eqa'] } }));
+      return { year, today: at(0), due: at(3), soonId: soon.id, received: at(-1), beforeReceived: at(-2), assigneeId: assignee.id };
     });
     const main = page.getByRole('region', { name: 'Lịch và danh sách đợt', exact: true });
     const selected = page.getByRole('region', { name: 'Công việc ngày được chọn', exact: true });
@@ -190,7 +191,26 @@ test('lịch ngoại kiểm: hai cách xem, lọc năm, cảnh báo quá hạn, 
     assert.equal(await page.locator('#eqa-s-run').getAttribute('aria-invalid'), 'true', 'ràng buộc ngày nhận cũ chỉ đúng ô ngày chạy hiện có');
     await page.locator('#eqa-s-run').fill(seed.today);
     await page.locator('#eqa-s-run').press('Tab');
-    await page.locator('#eqa-s-assignee').fill('KTV B');
+    const assignee = page.getByRole('combobox', { name: 'Người phụ trách', exact: true });
+    assert.equal(await assignee.inputValue(), '__saved_name__');
+    assert.match(await assignee.locator('option:checked').textContent(), /KTV A.*đã lưu/);
+    await assignee.selectOption(seed.assigneeId);
+    const dropdownStyles = await page.getByRole('dialog', { name: 'Sửa đợt ngoại kiểm' }).evaluate(node => {
+      const read = id => {
+        const select = node.querySelector(id), style = getComputedStyle(select), icon = getComputedStyle(select, '::picker-icon');
+        return [style.appearance, style.fontFamily, style.fontSize, style.height, style.borderRadius, style.borderColor,
+          style.backgroundColor, icon.width, icon.height, icon.maskImage, icon.backgroundColor];
+      };
+      return { program: read('#eqa-s-program'), sample: read('#eqa-s-sample'), assignee: read('#eqa-s-assignee') };
+    });
+    assert.deepEqual(dropdownStyles.assignee, dropdownStyles.program, 'người phụ trách dùng cùng kiểu dropdown và mũi tên với chương trình');
+    assert.deepEqual(dropdownStyles.assignee, dropdownStyles.sample, 'người phụ trách dùng cùng kiểu dropdown và mũi tên với loại mẫu');
+    const assignmentLayout = await page.locator('.eqa-form-assignment').evaluate(node => {
+      const person = node.querySelector('#eqa-s-assignee').getBoundingClientRect(), note = node.querySelector('#eqa-s-note').getBoundingClientRect();
+      return { aligned: Math.abs(person.y - note.y) <= 1, smaller: person.width < note.width, contained: person.right <= note.left };
+    });
+    assert.deepEqual(assignmentLayout, { aligned: true, smaller: true, contained: true });
+    await page.getByRole('dialog', { name: 'Sửa đợt ngoại kiểm' }).screenshot({ path: path.join(shots, 'assignee-note.png') });
     await page.getByRole('button', { name: 'Lưu thay đổi' }).click();
     await soonRow.getByText('KTV B', { exact: true }).waitFor();
     const retainedReceiveDate = await page.evaluate(async id => (await window.qcApi.listEqaSchedule()).find(row => row.id===id).receive_date, seed.soonId);

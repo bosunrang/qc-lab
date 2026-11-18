@@ -133,7 +133,7 @@ const DATA_API_NAMES = [
   'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
   'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'getSigmaEqaBias', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
-  'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'getEqaRound', 'getEqaReport', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'listEqaCorrective', 'getEqaCorrectiveEvidence', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'listEqaAssignees', 'getEqaRound', 'getEqaReport', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'listEqaCorrective', 'getEqaCorrectiveEvidence', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
@@ -287,6 +287,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     // Lịch và hạn nộp ngoại kiểm: việc của KTV, cùng nhóm với nhập báo cáo.
     listEqaSchedule: { channel: 'eqa:listSchedule', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaSchedule(); } },
     listEqaPrograms: { channel: 'eqa:listPrograms', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaPrograms(); } },
+    // KTV chọn người phụ trách ở máy trạm; chỉ trả danh tính, không mở quyền quản trị người dùng.
+    listEqaAssignees: { channel: 'eqa:listAssignees', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaAssignees(); } },
     saveEqaSchedule: { channel: 'eqa:saveSchedule', lan: true, run: (ctx, input) => eqa.saveEqaSchedule(input, ctx.actor()) },
     markEqaSubmitted: { channel: 'eqa:markSubmitted', lan: true, run: (ctx, input) => eqa.markEqaSubmitted(input, ctx.actor()) },
     removeEqaSchedule: { channel: 'eqa:removeSchedule', lan: true, run: (ctx, input) => eqa.removeEqaSchedule(input, ctx.actor()) },

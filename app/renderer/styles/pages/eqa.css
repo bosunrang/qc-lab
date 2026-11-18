@@ -265,6 +265,14 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-schedule-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:var(--space-4);align-items:start;}
 .eqa-schedule-workspace.is-list{grid-template-columns:minmax(0,1fr);}
 .eqa-schedule.is-unplanned .eqa-cal-day{min-height:var(--table-row-h-input);}
+/* Khi chưa có lịch, hai khung chung chiều cao; lưới ngày nhận phần trống
+   để đáy lịch và hướng dẫn thẳng hàng mà không đặt chiều cao cố định. */
+.eqa-schedule.is-unplanned .eqa-schedule-workspace{align-items:stretch;}
+.eqa-schedule.is-unplanned .eqa-schedule-main,.eqa-schedule.is-unplanned .eqa-schedule-rail>.panel{display:flex;flex-direction:column;}
+.eqa-schedule.is-unplanned .eqa-schedule-rail>.panel>.panel-head{min-height:calc(var(--control-h) + var(--space-5) + 1px);}
+.eqa-schedule.is-unplanned .eqa-section-body{display:flex;flex:1;flex-direction:column;}
+.eqa-schedule.is-unplanned .eqa-cal{flex:1;grid-template-rows:auto;grid-auto-rows:1fr;}
+.eqa-schedule.is-unplanned .eqa-schedule-picked-date{margin-top:auto;}
 .eqa-schedule-workspace .panel{margin-bottom:0;}
 .eqa-schedule-main,.eqa-schedule-rail{min-width:0;}
 .eqa-schedule-rail{display:grid;gap:var(--space-4);}
@@ -291,6 +299,14 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-form{display:grid;row-gap:var(--field-gap);}
 .modal-b .eqa-form>.field,.modal-b .eqa-form>.field-error{margin:0;}
 .eqa-form-program{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:var(--field-gap);}
+.eqa-form-assignment{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:start;gap:var(--field-gap);}
+/* Giữ nguyên kiểu dropdown chung. Chỉ chừa vùng riêng cho mũi tên để nhãn
+   dài không tràn sang ghi chú hoặc che mất mũi tên trong ô hẹp. */
+@supports (appearance:base-select){
+  .eqa-form-assignment select{position:relative;contain:paint;}
+  .eqa-form-assignment select::before{content:'';position:absolute;inset:var(--focus-ring-width) 0 var(--focus-ring-width) auto;width:calc(var(--control-padding-x) + var(--icon) + var(--space-1-5));background:inherit;pointer-events:none;z-index:0;}
+  .eqa-form-assignment select::picker-icon{position:absolute;top:50%;right:var(--control-padding-x);translate:0 -50%;z-index:1;}
+}
 /* Chọn máy chạy mẫu / máy đã nộp: lưới ô tích, mỗi ô tên máy và dòng phụ. */
 .eqa-machine-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--space-2);}
 .eqa-machine-picker label{display:flex;align-items:flex-start;gap:var(--space-2);}

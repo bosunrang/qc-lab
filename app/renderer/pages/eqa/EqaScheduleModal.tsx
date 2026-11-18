@@ -1,7 +1,7 @@
 import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Hộp thêm/sửa một đợt trong lịch ngoại kiểm. Kiểm tra dữ liệu do main làm
 // (`domain/eqa/schedule.ts`); form chỉ chỉ ra ô sai theo mã lỗi.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useEqaStore } from '../../store/eqa-store';
 import { useManageStore } from '../../store/manage-store';
@@ -11,11 +11,12 @@ import { EmptyState } from '../../components/EmptyState';
 import { useAsyncAction } from '../../components/AsyncButton';
 import { formError, formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
 import { useInvalidField } from '../../lib/useInvalidField';
+import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
 import { reportFormError } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
 import { isoLocalDate } from '../../../main/domain/local-date';
 import { EQA_SAMPLE_TYPES } from '../../../main/domain/eqa/schedule';
-import type { EqaScheduleRow } from '../../../shared/qc-api';
+import type { EqaAssigneeOption, EqaScheduleRow } from '../../../shared/qc-api';
 
 const NEW_PROGRAM = '__new__';
 const FIELD_ERRORS: FieldErrorMap = {
@@ -37,6 +38,27 @@ export function EqaScheduleModal({ row, initialDueDate = '', onClose }: { row: E
   const [runDate, setRunDate] = useState(row?.run_date ?? '');
   // Ngày chọn trên lịch chỉ gợi sẵn khi tạo mới; sửa đợt giữ ngày đã lưu.
   const [dueDate, setDueDate] = useState(row?.due_date ?? initialDueDate);
+  // Lịch giữ bản tên tại lúc phân công, kể cả tài khoản sau đó đổi tên hoặc ngừng dùng.
+  const [assignee, setAssignee] = useState({ id: '', name: row?.assignee ?? '' });
+  const [users, setUsers] = useState<EqaAssigneeOption[] | null>(null);
+  const [usersError, setUsersError] = useState('');
+  const [usersRevision, setUsersRevision] = useState(0);
+  useStoreInvalidation(['users'], undefined, () => setUsersRevision(value => value + 1));
+  useEffect(() => {
+    let cancelled = false;
+    setUsers(null); setUsersError('');
+    window.qcApi.listEqaAssignees().then(options => {
+      if (!cancelled) setUsers(options);
+    }).catch(() => {
+      if (!cancelled) setUsersError('Không tải được danh sách người dùng.');
+    });
+    return () => { cancelled = true; };
+  }, [usersRevision]);
+  const assigneeValue = assignee.id || (assignee.name ? '__saved_name__' : '');
+  const keepSavedAssignee = assignee.name && !users?.some(user => user.id === assignee.id);
+  const assigneePlaceholder = users === null ? (usersError ? 'Chưa tải được danh sách' : 'Đang tải…') : '— Chọn tài khoản —';
+  const selectedUser = users?.find(user => user.id === assignee.id);
+  const assigneeLabel = selectedUser ? `${selectedUser.name} (@${selectedUser.username})` : assignee.name ? `${assignee.name} (đã lưu)` : assigneePlaceholder;
   const [err, setErr] = useState<FormError | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const errorId = useInvalidField(formRef, err);
@@ -61,7 +83,7 @@ export function EqaScheduleModal({ row, initialDueDate = '', onClose }: { row: E
       programName: isNew ? String(fd.get('programName') || '') : '', provider: isNew ? String(fd.get('provider') || '') : '',
       year: Number(fd.get('year')), round: String(fd.get('round') || ''),
       receiveDate, runDate, dueDate, sampleType, instrumentIds: [...machineIds],
-      assignee: String(fd.get('assignee') || ''), note: String(fd.get('note') || ''),
+      assignee: assignee.name, note: String(fd.get('note') || ''),
     }, row?.id);
     if (!result.ok) {
       await reportFormError(isNew && result.error.code === 'missing-program' ? formError(result.error.message, 'programName') : formErrorFrom(result.error, {
@@ -127,8 +149,23 @@ export function EqaScheduleModal({ row, initialDueDate = '', onClose }: { row: E
             ))}
           </div>
         </div>
-        <div className="field"><label htmlFor="eqa-s-assignee">Người phụ trách</label><input id="eqa-s-assignee" name="assignee" defaultValue={row?.assignee ?? ''} /></div>
-        <div className="field"><label htmlFor="eqa-s-note">Ghi chú</label><input id="eqa-s-note" name="note" defaultValue={row?.note ?? ''} /></div>
+        <div className="eqa-form-assignment">
+          <div className="field" title={assigneeLabel}>
+            <label htmlFor="eqa-s-assignee">Người phụ trách</label>
+            <select id="eqa-s-assignee" name="assignee" value={assigneeValue} disabled={users === null} onChange={event => {
+              const value = event.target.value;
+              if (keepSavedAssignee && value === assigneeValue) return;
+              const person = users?.find(user => user.id === value);
+              setAssignee(person ? { id: person.id, name: person.name } : { id: '', name: '' });
+            }}>
+              <option value="">{assigneePlaceholder}</option>
+              {keepSavedAssignee && <option value={assigneeValue}>{assignee.name} (đã lưu)</option>}
+              {users?.map(user => <option key={user.id} value={user.id}>{user.name} (@{user.username})</option>)}
+            </select>
+            {usersError && <div className="alert rej" role="alert">{usersError}<button type="button" className="btn ghost sm" onClick={() => setUsersRevision(value => value + 1)}>Thử lại</button></div>}
+          </div>
+          <div className="field"><label htmlFor="eqa-s-note">Ghi chú</label><input id="eqa-s-note" name="note" defaultValue={row?.note ?? ''} /></div>
+        </div>
       </form>
     </Modal>
   );

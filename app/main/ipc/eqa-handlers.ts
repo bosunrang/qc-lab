@@ -6,7 +6,7 @@ import type { Db } from '../db/sqlite-like';
 import { createEqaCorrectiveReader } from './eqa-corrective-reader';
 import type {
   EqaAttentionRow, EqaDecisionRow, EqaImportInput, EqaImportPreview, EqaInstrumentGridRow, EqaInstrumentSummary, EqaResultRow, EqaRoundRow,
-  EqaRoundView, EqaSeriesView, EqaProgramOption, EqaScheduleInstrument, EqaScheduleRow,
+  EqaRoundView, EqaSeriesView, EqaProgramOption, EqaScheduleInstrument, EqaScheduleRow, EqaAssigneeOption,
 } from '../../shared/qc-api';
 import { daysBetween, eqaScheduleStatus, validateEqaSchedule } from '../domain/eqa/schedule';
 import { isoLocalDate, viDate } from '../domain/local-date';
@@ -594,6 +594,11 @@ export function createEqaHandlers(db: Db) {
     return row ? toScheduleRow(row, scheduleInstruments(id).get(id) ?? [], row.round_id ? reportedInstruments(row.round_id) : new Map(), isoLocalDate()) : null;
   };
 
+  /** Chỉ đọc danh tính để chọn người; không mở thông tin quản trị tài khoản. */
+  function listEqaAssignees(): EqaAssigneeOption[] {
+    return db.prepare("SELECT id, COALESCE(NULLIF(name,''),username) AS name, username FROM users WHERE active<>0 ORDER BY name, username").all() as EqaAssigneeOption[];
+  }
+
   /** Loại mẫu và máy gợi sẵn cùng lấy từ một lịch gần nhất; chưa có lịch thì
    * dùng thông tin chương trình và báo cáo. Không đổi nhãn các lịch đã lưu. */
   function listEqaPrograms(): EqaProgramOption[] {
@@ -761,5 +766,5 @@ export function createEqaHandlers(db: Db) {
   });
 
   return { ...createEqaCorrectiveReader(db, listEqaRounds, getEqaRound), ...createEqaReportHandlers(db, listEqaRounds, getEqaRound), listEqaRounds, getEqaRound, getEqaSeries, getEqaInstrumentGrid, listEqaAttention, previewEqaImport, importEqaRound, cancelEqaRound,
-    listEqaSchedule, listEqaPrograms, saveEqaSchedule, markEqaSubmitted, removeEqaSchedule };
+    listEqaSchedule, listEqaPrograms, listEqaAssignees, saveEqaSchedule, markEqaSubmitted, removeEqaSchedule };
 }

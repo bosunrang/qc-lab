@@ -113,7 +113,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 167);
+  assert.equal(handlers.size, 168);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -138,7 +138,7 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
     'getLicenseStatus', 'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
     // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
     'getReportTemplateSettings', 'getSigmaEqaBias', 'getSoftwareUpdateStatus', 'getStorageInfo', 'getVoidPointAssessment', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
-    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAttention', 'listEqaCorrective', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
+    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAssignees', 'listEqaAttention', 'listEqaCorrective', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
     'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
     'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
     'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listReagentComparisons',
