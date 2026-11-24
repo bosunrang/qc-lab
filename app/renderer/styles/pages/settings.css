@@ -46,7 +46,6 @@
   height:var(--control-h);
   min-height:var(--control-h);
   padding:var(--space-2) var(--space-2-5);
-  border-color:var(--border);
   font-size:var(--text-base);
 }
 

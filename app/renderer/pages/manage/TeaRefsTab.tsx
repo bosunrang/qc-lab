@@ -247,7 +247,7 @@ export function TeaRefsTab() {
 
   return (
     <>
-      <div className="rcfg-toolbar"><div><h2>Bảng TEa tham chiếu</h2><p>Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, nhóm, đơn vị..." aria-label="Tìm trong bảng TEa tham chiếu" /><button className="btn teal" onClick={() => { setAddErr(null); setAdding(true); }}>＋ Thêm xét nghiệm</button></div></div>
+      <div className="rcfg-toolbar"><div><h2>Bảng TEa tham chiếu</h2><p>Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.</p></div><div className="rcfg-tools"><input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, nhóm, đơn vị..." aria-label="Tìm trong bảng TEa tham chiếu" /><button className="btn teal" onClick={() => { setAddErr(null); setAdding(true); }}>＋ Thêm xét nghiệm</button></div></div>
       <div className="tea-source-registry">{TEA_SOURCE_CARDS.map((source) => <div className={`tea-source-card ${source.tone}`} key={source.label}><div><b>{source.label}</b><span className={`tag ${source.tone === 'dynamic' ? 'ok' : source.tone === 'retired' ? 'warn' : 'none'}`}>{source.tag}</span></div><p>{source.detail}</p><a href={source.url} target="_blank" rel="noreferrer">Mở nguồn chính thức</a></div>)}</div>
       <div className="panel rcfg-list tea-ref-panel">
       {visibleCatalog.length || visibleCustomRefs.length ? <table className="tea-ref-table">

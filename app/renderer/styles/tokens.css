@@ -77,11 +77,9 @@
   /* Màu chữ vai trò: tối ưu độ rõ trên bốn bề mặt sáng của ứng dụng. */
   --ink-strong:#173740;
   --ink-body:#344b55;
-  --ink-faint:#70818a;
   --ink-button:#263f49;
   --ink-accent:#0b5f66;
   --ink-disabled:#6f818a;
-  --ink-placeholder:#70818a;
   --ink-readonly:#4a626e;
   --ink-archived:#8a5550;
   --ink-filter:#36535f;
@@ -265,10 +263,9 @@
 
   /* Màu chữ theo vai trò hẹp — trước 2026-09-25 nằm ở lớp bí danh tạm. */
   --text-strong:var(--ink-strong);
-  --text-faint:var(--ink-faint);
   --text-button:var(--ink-button);
   --text-readonly:var(--ink-readonly);
-  --text-placeholder:var(--ink-placeholder);
+  --text-placeholder:var(--text-tertiary);
   --text-archived:var(--ink-archived);
   --text-on-dark-muted:var(--dark-on-light);
   --text-accent:var(--ink-accent);
@@ -313,6 +310,7 @@
   --choice-control-size:17px;
   --control-padding-x:var(--space-3);
   --control-radius:var(--radius-sm);
+  --control-border:var(--surface-border);
   --button-padding-x:var(--space-3-5);
   --button-font-size:var(--text-base);
   --button-font-weight:var(--weight-semibold);

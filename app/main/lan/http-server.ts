@@ -239,7 +239,7 @@ export class LanHttpServer<User> {
     try {
       const content = await readFile(candidate);
       const extension = extname(candidate).toLowerCase();
-      const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
+      const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/vnd.microsoft.icon', '.woff2': 'font/woff2' };
       return { content, type: types[extension] || 'application/octet-stream', html: extension === '.html' };
     } catch { return null; }
   }

@@ -146,12 +146,13 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
    không dựa vào `font:inherit` của trình duyệt. */
 input:not([type="checkbox"]):not([type="radio"]),select,textarea,td,.refrow,.mrow,.shift-item b{font-size:var(--text-base);}
 td{color:var(--text-secondary);font-size:var(--table-body-size);}
-input:not([type="checkbox"]):not([type="radio"]),select{width:100%;padding:0 var(--control-padding-x);border:1px solid var(--border);border-radius:var(--control-radius);background:var(--surface);box-shadow:var(--shadow-control);color:var(--text-primary);font-weight:var(--weight-normal);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,background var(--motion-fast) ease;}
+input:not([type="checkbox"]):not([type="radio"]),select{width:100%;padding:0 var(--control-padding-x);border:1px solid var(--control-border);border-radius:var(--control-radius);background:var(--surface);box-shadow:var(--shadow-control);color:var(--text-primary);font-weight:var(--weight-normal);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,background var(--motion-fast) ease;}
 input:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
 input[type="search"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
 input[type="date"]:not([type="checkbox"]):not([type="radio"]){height:var(--control-h);min-height:var(--control-h);}
 select{height:var(--control-h);min-height:var(--control-h);}
-textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:var(--control-h);border:1px solid var(--border);border-radius:var(--control-radius);background:var(--surface);box-shadow:var(--shadow-control);color:var(--text-primary);font-weight:var(--weight-normal);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,background var(--motion-fast) ease;}
+textarea{width:100%;padding:var(--space-2) var(--control-padding-x);min-height:var(--control-h);border:1px solid var(--control-border);border-radius:var(--control-radius);background:var(--surface);box-shadow:var(--shadow-control);color:var(--text-primary);font-weight:var(--weight-normal);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,background var(--motion-fast) ease;}
+input::placeholder,textarea::placeholder{color:var(--text-placeholder);opacity:1;}
 
 /* Thẻ chọn nhiều dùng chung trong toàn hệ thống. Checkbox luôn vuông; nút
    tròn chỉ dành cho lựa chọn một (radio). CSS trang chỉ quyết định bố cục
@@ -175,8 +176,8 @@ aside :focus-visible,.dayseg button.on:focus-visible{outline-color:var(--focus-r
 /* Click chuột chỉ đổi MỘT viền. Khi focus bằng bàn phím, `:focus-visible`
    để viền thường và chỉ hiện vòng tương phản ở trên — tránh hai đường teal
    song song như control trước đây. */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){border-color:var(--accent-border);box-shadow:none;}
-input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:var(--surface-subtle);color:var(--text-readonly);border-color:var(--border-subtle);}
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){border-color:var(--focus-ring);box-shadow:none;}
+input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:var(--surface-subtle);color:var(--text-readonly);}
 input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--surface-page);color:var(--text-disabled);border-color:var(--border-subtle);cursor:not-allowed;}
 
 /* Thanh kéo đổi độ rộng cột danh sách (`ResizeHandle`): một vạch mảnh giữa
@@ -187,6 +188,13 @@ input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textar
 
 /* Ô chọn có tìm kiếm dùng cho danh sách dài. Popup nằm trong cùng lớp với ô
    nhập để focus trap của modal và thao tác bàn phím vẫn hoạt động thống nhất. */
+:is(input[type="search"],input.search-input,.search-select>input):not(:disabled){
+  background-image:url('../assets/search.svg');
+  background-position:var(--control-padding-x) center;
+  background-repeat:no-repeat;
+  background-size:var(--icon);
+  padding-inline-start:calc(var(--control-padding-x) + var(--icon) + var(--space-2));
+}
 .search-select{position:relative;min-width:0;}
 /* Ô nhập chiếm đúng chiều cao control, không để dư khoảng chân chữ của dòng. */
 .search-select>input{display:block;}
@@ -499,8 +507,8 @@ td .hint{margin-top:var(--space-0-5);color:var(--text-tertiary);}
 .flow-panel{margin-top:var(--space-4);}
 
 
-.datebox{position:relative;display:inline-flex;align-items:center;box-sizing:border-box;height:var(--control-h);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden}
-.datebox:has(:focus:not(:focus-visible)){border-color:var(--accent-border)}
+.datebox{position:relative;display:inline-flex;align-items:center;box-sizing:border-box;height:var(--control-h);border:1px solid var(--control-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden}
+.datebox:has(:focus:not(:focus-visible)){border-color:var(--focus-ring)}
 /* Khung `.datebox` (kể cả viền) cao đúng 36px như ô nhập khác; ô văn bản bên
    trong lấp đầy khung. Trước 02/11/2026 ô trong cao 36px cộng viền khung thành 38px. */
 /* Canh giữa chuỗi ngày `dd/mm/yyyy` để cân bằng với nút lịch bên phải. */

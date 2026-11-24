@@ -114,12 +114,12 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    shorthand `border:` ở rule gốc nên không bị nó ghi đè ngược. */
 .qc-value-cell.run-excluded{border-style:dashed;border-width:1.5px;border-color:var(--text-tertiary);}
 .qc-value-cell.warn.run-excluded{border-color:var(--warning-border);}
-.prev-lot-slot small{color:var(--text-faint)}
+.prev-lot-slot small{color:var(--text-tertiary)}
 .qc-old-lot-toggle{margin-left:auto;white-space:nowrap}
 .qc-previous-card{border-color:var(--border);background:var(--surface)}
-.qc-sheet input.qc-inline-input{box-sizing:border-box;width:75px;min-width:75px;max-width:75px;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-2);line-height:var(--control-h-sm);border:1px dashed var(--border-subtle);border-radius:var(--radius-md);background:var(--surface);box-shadow:none;color:var(--text-tertiary);font-size:var(--text-base);font-weight:700;text-align:center;font-variant-numeric:tabular-nums;}
-.qc-inline-input:hover,.qc-inline-input:focus:not(:focus-visible){border-color:var(--accent-border-strong);background:var(--surface);box-shadow:none;}
-.qc-inline-input:focus:not(:focus-visible){border-color:var(--accent-border);border-style:solid;}
+.qc-sheet input.qc-inline-input{box-sizing:border-box;width:75px;min-width:75px;max-width:75px;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-2);line-height:var(--control-h-sm);border-style:dashed;border-radius:var(--radius-md);background:var(--surface);box-shadow:none;color:var(--text-tertiary);font-size:var(--text-base);font-weight:700;text-align:center;font-variant-numeric:tabular-nums;}
+.qc-inline-input:hover:not(:disabled,:focus){border-color:var(--focus-ring);}
+.qc-inline-input:focus:not(:focus-visible){border-style:solid;}
 .qc-staff-cell{min-width:96px;white-space:nowrap;}
 
 .qc-cumulative{border-bottom:1px solid var(--border-subtle);position:sticky;left:0;z-index:var(--z-sticky);display:grid;grid-template-columns:repeat(4,minmax(105px,1fr));background:var(--surface-subtle);}
@@ -317,12 +317,10 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 /* Viết tắt người nhập là một `.pill` chuẩn; ở đây chỉ canh giữa và giữ bề
    rộng tối thiểu để cột không nhảy theo độ dài mã. */
 .qc-staff { justify-content: center; min-width: 34px; margin: 0; }
-.qc-staff-sep { margin: 0 var(--space-0-5); color: var(--text-faint); font-weight:var(--weight-bold); }
+.qc-staff-sep { margin: 0 var(--space-0-5); color: var(--text-tertiary); font-weight:var(--weight-bold); }
 
 
-.qc-note-input{width:100%;min-width:128px;min-height:var(--control-h);resize:vertical;padding:var(--space-1-5) var(--space-2);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);font-size:var(--text-sm);line-height:var(--leading-snug);box-shadow:none;}
-.qc-note-input::placeholder{color:var(--text-placeholder);}
-.qc-note-input:focus:not(:focus-visible){border-color:var(--accent-border);}
+.qc-note-input{width:100%;min-width:128px;min-height:var(--control-h);resize:vertical;padding:var(--space-1-5) var(--space-2);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);font-size:var(--text-sm);line-height:var(--leading-snug);box-shadow:none;}
 /* Header mức QC vẫn có tooltip khi rê/Tab, nhưng không gạch chân như liên kết. */
 .qc-sheet th.qc-level-head{cursor:help;text-decoration:none;}
 .qc-sheet th.qc-level-head::after{content:attr(data-qc-tooltip);position:absolute;left:50%;top:calc(100% + 7px);transform:translateX(-50%) translateY(-3px);z-index:1;min-width:max-content;padding:var(--space-2) var(--space-2-5);border:1px solid var(--accent-border-soft);border-radius:var(--radius-md);background:var(--surface-inverse-soft);color:var(--on-accent);box-shadow:var(--shadow-tooltip-compact);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-heading);letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity var(--motion-fast) ease,transform var(--motion-fast) ease,visibility var(--motion-fast);}

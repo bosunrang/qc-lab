@@ -174,7 +174,7 @@ export function TargetsTab() {
 
   return (
     <>
-      <div className="rcfg-toolbar target-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, phần mềm tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." /></div></div>
+      <div className="rcfg-toolbar target-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, phần mềm tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." aria-label="Tìm xét nghiệm trong bảng Mean/SD" /></div></div>
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.</EmptyState> : <>
       <div className="target-selector target-config-selector">

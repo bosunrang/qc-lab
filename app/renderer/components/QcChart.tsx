@@ -3,7 +3,7 @@ import { qcRunKey, compareQcRunKey } from '../../main/domain/sort-order';
 // ±1/±2/±3SD, nhãn bậc SD bên trái, giá trị thật bên phải và nhãn ngày trục X.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { vnDate, vnDayMonth } from '../lib/format';
-import { CHART_TEAL } from '../lib/chart-colors';
+import { CHART_MUTED_TEXT, CHART_TEAL, CHART_WARNING } from '../lib/chart-colors';
 import { levelDash, markerShape, markerSize, pickRejectLabels, rejectRuleLabel, traceMarker } from '../lib/qc-marker';
 
 export interface QcChartPoint {
@@ -105,7 +105,7 @@ function LjTooltip({ hit, decimals = 2 }: { hit: LjHover | null; decimals?: numb
 const LJ = {
   okBand: '#e8f6ef', okMid: '#ffffff', warnBand: '#fff3cf', rejectBand: '#f9d6d5',
   grid: '#5d6b76', mean: '#17212b', line: CHART_TEAL,
-  okPoint: CHART_TEAL, warnPoint: '#dd8b1f', rejectPoint: '#c5221f',
+  okPoint: CHART_TEAL, warnPoint: CHART_WARNING, rejectPoint: '#c5221f',
 } as const;
 
 /** Chú giải hình điểm dưới biểu đồ Levey-Jennings, viết bằng HTML để trình
@@ -135,7 +135,7 @@ const BANDS: { low: number; high: number; color: keyof typeof LJ }[] = [
   { low: -1, high: 1, color: 'okMid' },
 ];
 
-const CUSUM_COLORS = { pos: CHART_TEAL, neg: '#4f789d', warn: '#dd8b1f', rej: '#c5221f' };
+const CUSUM_COLORS = { pos: CHART_TEAL, neg: '#4f789d', rej: '#c5221f' };
 
 /** Chiều cao vẽ: mốc `height`; bật `responsiveHeight` thì giữ cùng tỷ lệ hình
  * học so với mốc 1180px, nhưng chỉ cho tăng tối đa 20% — ở trang Nhập QC, ẩn
@@ -469,7 +469,7 @@ function drawLJ(
   }
 
   if (!n) {
-    ctx.fillStyle = '#7b838e'; ctx.font = '600 14px Manrope,system-ui,sans-serif';
+    ctx.fillStyle = CHART_MUTED_TEXT; ctx.font = '600 14px Manrope,system-ui,sans-serif';
     ctx.textAlign = 'center'; ctx.fillText('Chưa có điểm QC trong khoảng xem', padL + cw / 2, padT + ch / 2);
     return;
   }
@@ -661,7 +661,7 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
   }
 
   if (!n) {
-    ctx.fillStyle = '#7b838e'; ctx.font = '600 14px Manrope,system-ui,sans-serif';
+    ctx.fillStyle = CHART_MUTED_TEXT; ctx.font = '600 14px Manrope,system-ui,sans-serif';
     ctx.textAlign = 'center'; ctx.fillText('Chưa có điểm QC trong khoảng xem', padL + cw / 2, padT + ch / 2);
     return;
   }
@@ -738,7 +738,7 @@ function drawCusum(ctx: CanvasRenderingContext2D, width: number, height: number,
 
   const n = cs.cPos.length;
   if (!n) {
-    ctx.fillStyle = '#7b838e'; ctx.font = '600 14px Manrope,system-ui,sans-serif';
+    ctx.fillStyle = CHART_MUTED_TEXT; ctx.font = '600 14px Manrope,system-ui,sans-serif';
     ctx.textAlign = 'center'; ctx.fillText('Chưa có dữ liệu CUSUM', padL + cw / 2, padT + ch / 2);
     return;
   }
@@ -820,7 +820,7 @@ function drawMultiCusum(ctx: CanvasRenderingContext2D, width: number, height: nu
     ctx.setLineDash(value === 0 ? [] : [4, 3]); ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + cw, yy); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = '#17212b'; ctx.textAlign = 'right'; ctx.fillText(value === 0 ? '0' : `h=${value > 0 ? '+' : ''}${value}`, padL - 9, yy);
   }
-  if (!runKeys.length) { ctx.fillStyle = '#7b838e'; ctx.font = '600 14px Manrope,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Chưa có dữ liệu CUSUM', padL + cw / 2, padT + ch / 2); return; }
+  if (!runKeys.length) { ctx.fillStyle = CHART_MUTED_TEXT; ctx.font = '600 14px Manrope,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Chưa có dữ liệu CUSUM', padL + cw / 2, padT + ch / 2); return; }
 
   ctx.save(); ctx.beginPath(); ctx.rect(padL, padT, cw, ch); ctx.clip();
   if (allBranchesAtZero) {

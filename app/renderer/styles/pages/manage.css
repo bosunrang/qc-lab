@@ -51,13 +51,13 @@ main:has(.config-shell){padding-bottom:var(--space-4);}
 .rcfg-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3) var(--space-4);min-height:0;margin:0;padding:var(--space-5) 0 var(--panel-content-gap);background:transparent;border-bottom:0;box-shadow:none;color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);letter-spacing:0;text-transform:none;}
 .config-shell-main > .rcfg-toolbar{align-items:center;}
 .rcfg-toolbar h2{margin:0;font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);letter-spacing:-.01em;color:var(--text-primary);}
-.rcfg-toolbar p{margin:var(--space-0-5) 0 0;max-width:520px;color:var(--text-faint);font-size:var(--text-xs);font-weight:500;}
+.rcfg-toolbar p{margin:var(--space-0-5) 0 0;max-width:520px;color:var(--text-tertiary);font-size:var(--text-xs);font-weight:500;}
 .rcfg-toolbar>div:first-child{flex:1 1 320px;min-width:min(100%,260px);}
 .rcfg-tools{display:flex;align-items:center;gap:var(--space-2);flex:1 1 300px;min-width:0;justify-content:flex-end;flex-wrap:wrap;}
 /* Ô tìm kiếm và nút chính cùng cao 36px, nền trắng: header không còn dải xám
    nên ô nền xám cũ (`--surface-subtle`) sẽ thành mảng màu duy nhất trôi nổi
    trên nền trang. */
-.rcfg-tools input{height:var(--control-h);min-height:var(--control-h);width:auto;flex:1 1 220px;max-width:320px;border-color:var(--border-subtle);background:var(--surface);box-shadow:none;}
+.rcfg-tools input{height:var(--control-h);min-height:var(--control-h);width:auto;flex:1 1 220px;max-width:320px;background:var(--surface);box-shadow:none;}
 /* Ghi chú Mean/SD dùng hết chỗ còn lại; cụm tìm kiếm chỉ chiếm độ rộng ô,
    không giữ nửa hàng trống và ép ghi chú xuống dòng sớm. */
 .target-toolbar p{max-width:none;}
@@ -424,13 +424,10 @@ main:has(.config-shell){padding-bottom:var(--space-4);}
 .tea-ref-table th:nth-child(7), .tea-ref-table td:nth-child(7) { width: 10%; }
 .tea-ref-table th:nth-child(8), .tea-ref-table td:nth-child(8) { width: 18%; }
 .tea-ref-table tbody tr{scroll-snap-align:start;scroll-margin-top:var(--table-header-h);}
-/* Ô nhập TEa CLIA%/Ricos% trong bảng dùng chiều cao điều khiển dạng bảng;
-   viền chỉ nổi rõ khi hover/focus để giữ mật độ dữ liệu gọn. */
-.tea-ref-table input.tea-ref-value{display:block;box-sizing:border-box;width:min(100%,88px);height:var(--control-h);min-height:var(--control-h);margin:0 auto;padding:var(--space-1) var(--space-2);border-color:transparent;background:transparent;box-shadow:none;text-align:center;cursor:text;appearance:textfield;-moz-appearance:textfield;transition:background-color var(--motion-fast) ease,border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
+/* Ô TEa CLIA%/Ricos% dùng viền và màu lấy nét chung của ô nhập. */
+.tea-ref-table input.tea-ref-value{display:block;box-sizing:border-box;width:min(100%,88px);height:var(--control-h);min-height:var(--control-h);margin:0 auto;padding:var(--space-1) var(--space-2);box-shadow:none;text-align:center;cursor:text;appearance:textfield;-moz-appearance:textfield;}
 .tea-ref-table input.tea-ref-value::-webkit-inner-spin-button,
 .tea-ref-table input.tea-ref-value::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
-.tea-ref-table input.tea-ref-value:hover:not(:disabled),
-.tea-ref-table input.tea-ref-value:focus:not(:focus-visible){border-color:var(--accent-border);background:var(--surface);}
 .tea-lab-value b{font-size:var(--text-sm);color:var(--text-primary);}
 .tea-profile-cell{display:flex;align-items:center;justify-content:center;min-width:0;white-space:nowrap;}
 .tea-profile-cell .btn{min-height:var(--control-h-sm);padding:var(--space-0-5) var(--space-2);}
@@ -506,11 +503,8 @@ main:has(.config-shell){padding-bottom:var(--space-4);}
    mục xét nghiệm (đổi máy thì cả dòng đổi theo), và cột "Xét nghiệm trong
    panel" của thẻ Panel QC (gộp danh sách dài lại thành một dòng để đọc). */
 .assay-machine-select,
-.panel-test-select{width:100%;max-width:280px;height:var(--control-h);padding:0 var(--space-2-5);border:1px solid var(--surface-border);border-radius:var(--radius-md);background-color:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;text-align:left;cursor:pointer;}
-.assay-machine-select:hover,
-.panel-test-select:hover{border-color:var(--accent-border-strong);}
-.assay-machine-select:focus:not(:focus-visible),
-.panel-test-select:focus:not(:focus-visible){border-color:var(--accent-border);}
+.panel-test-select{width:100%;max-width:280px;height:var(--control-h);padding:0 var(--space-2-5);border-radius:var(--radius-md);background-color:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;text-align:left;cursor:pointer;}
+:is(.assay-machine-select,.panel-test-select):hover:not(:focus,:disabled){border-color:var(--focus-ring);}
 .assay-advanced{margin-top:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;}
 .assay-advanced summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--panel-header-h);padding:var(--space-2) var(--space-3);background:var(--surface-section-header);cursor:pointer;list-style:none;box-sizing:border-box;}
 .assay-advanced summary::-webkit-details-marker{display:none;}
@@ -602,7 +596,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
    cấu hình khác. */
 .lot-trans-target-head-row{display:flex;align-items:center;gap:var(--space-2-5);margin:var(--space-4) 0 var(--space-2-5);}
 .lot-trans-target-head-row label{margin:0;}
-.lot-trans-target-head-row input.lot-trans-target-search{flex:0 0 220px;width:220px;max-width:45%;height:var(--control-h-compact);min-height:0;margin-left:auto;padding:0 var(--space-2-5);border:1px solid var(--surface-border);border-radius:var(--radius-md);font-size:var(--text-sm);background:var(--surface);}
+.lot-trans-target-head-row input.lot-trans-target-search{flex:0 0 220px;width:220px;max-width:45%;height:var(--control-h-compact);min-height:0;margin-left:auto;padding-inline-end:var(--space-2-5);border-radius:var(--radius-md);font-size:var(--text-sm);}
 .lot-trans-target-table .target-head,.lot-trans-target-table .target-row{grid-template-columns:32px 210px repeat(4,minmax(108px,1fr)) minmax(84px,.75fr);column-gap:var(--space-3);width:100%;padding-left:var(--space-3);padding-right:var(--space-3);}
 .target-table.lot-trans-target-table{max-height:min(320px,calc(100vh - 430px));margin:0;border:1px solid var(--table-head-border);border-radius:var(--table-radius);}
 .lot-trans-target-table .target-head{min-height:var(--table-header-h);}

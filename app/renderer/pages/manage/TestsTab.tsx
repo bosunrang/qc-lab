@@ -307,7 +307,7 @@ export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTe
         <div className="rcfg-toolbar">
           <div><h2>Danh mục xét nghiệm</h2><p>Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.</p></div>
           <div className="rcfg-tools">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, máy, đơn vị, phương pháp, hoá chất, TEa..." aria-label="Tìm xét nghiệm" />
+            <input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, máy, đơn vị, phương pháp, hoá chất, TEa..." aria-label="Tìm xét nghiệm" />
             <button className="btn teal" onClick={openNew}>＋ Thêm xét nghiệm</button>
           </div>
       </div>

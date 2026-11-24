@@ -30,10 +30,10 @@
 .sg-setup-heading + .sg-control-row input:not([type="checkbox"]):not([type="radio"]),.sg-setup-heading + .sg-control-row select{box-sizing:border-box;height:var(--control-h);min-height:var(--control-h);}
 .sgcards{display:grid;flex:1;gap:var(--space-5);grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;margin:var(--panel-content-gap);}
 .sgbig{color:var(--on-accent);border-radius:var(--radius-md);box-shadow:var(--on-accent-inset-border);border:1px solid var(--on-accent-border);display:grid;align-content:center;min-height:168px;padding:var(--space-3-5);text-align:center;}
-.sgbig .lab{font-size:var(--text-xs);text-transform:uppercase;opacity:.9;letter-spacing:.08em;}
+.sgbig .lab{font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.08em;}
 .sgbig .v{font-size:var(--text-2xl);font-weight:700;line-height:var(--leading-display);margin-top:var(--space-1);margin-bottom:var(--space-1);letter-spacing:-.03em;font-family:var(--font-sans);font-variant-numeric:tabular-nums;}
 .sgbig .grade{font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-1-5);}
-.sgbig .sub{font-size:var(--text-xs);opacity:.92;line-height:var(--leading-body);margin-top:auto;}
+.sgbig .sub{font-size:var(--text-xs);line-height:var(--leading-body);margin-top:auto;}
 @media(max-width:1280px){ .sgbig{ min-height:154px; padding:var(--space-3) var(--space-3-5); } }
 @media(max-width:1150px){ .sgbig{ min-height:146px; padding:var(--space-3); } }
 
@@ -58,7 +58,7 @@
 .sg-level-matrix-head{min-height:var(--table-header-h);background:var(--table-head-bg);color:var(--table-head-ink);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-tracking);}.sg-level-matrix-head span{display:flex;align-items:center;justify-content:center;padding:0 var(--table-cell-px-compact);text-align:center;}.sg-level-matrix-head span:not(:first-child){border-left:1px solid var(--table-head-border);}
 .sg-level-row{min-height:96px;border-top:1px solid var(--surface-divider);background:var(--surface);}.sg-level-row:hover{background:var(--surface-subtle);}.sg-level-row>div{min-width:0;padding:var(--space-3) var(--table-cell-px-compact);}.sg-level-row>div:not(:first-child){border-left:1px solid var(--surface-divider);}
 .sg-level-identity,.sg-level-cell{display:grid;align-content:center;justify-items:center;gap:var(--space-1);text-align:center;}.sg-level-identity b{color:var(--text-primary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-level-identity span,.sg-level-source,.sg-level-sigma span{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-heading);}
-.sg-level-input-row{display:flex;align-items:center;justify-content:center;gap:var(--space-2);min-width:0;}.sg-level-input-row input.sg-number{box-sizing:border-box;flex:0 1 92px;min-width:74px;height:var(--control-h);min-height:var(--control-h);padding:0 var(--space-2);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);font-size:var(--text-base);font-weight:var(--weight-normal);text-align:center;appearance:textfield;-moz-appearance:textfield;}.sg-level-input-row .btn{height:var(--control-h);min-height:var(--control-h);}.sg-level-input-row input.sg-number::-webkit-inner-spin-button,.sg-level-input-row input.sg-number::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}.sg-level-input-row input.sg-number::placeholder{color:var(--text-tertiary);opacity:.72;}
+.sg-level-input-row{display:flex;align-items:center;justify-content:center;gap:var(--space-2);min-width:0;}.sg-level-input-row input.sg-number{box-sizing:border-box;flex:0 1 92px;min-width:74px;height:var(--control-h);min-height:var(--control-h);padding:0 var(--space-2);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);font-size:var(--text-base);font-weight:var(--weight-normal);text-align:center;appearance:textfield;-moz-appearance:textfield;}.sg-level-input-row .btn{height:var(--control-h);min-height:var(--control-h);}.sg-level-input-row input.sg-number::-webkit-inner-spin-button,.sg-level-input-row input.sg-number::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
 .sg-level-source{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sg-level-sigma b{font-size:var(--text-lg);font-weight:var(--weight-bold);line-height:var(--leading-heading);font-variant-numeric:tabular-nums;}
 
@@ -126,9 +126,8 @@
 .sg-eqa-table td{height:var(--table-row-h-input);padding:var(--table-cell-py-compact) var(--table-cell-px-compact);border-bottom:1px solid var(--border-subtle);color:var(--text-primary);text-align:center;vertical-align:middle;}
 /* Ô nhập dùng chiều cao control chung; hàng bảng dùng token dành cho ô nhập.
    Padding dọc bằng 0 như control hệ thống để số không bị ép trong ô. */
-.sg-eqa-table td input[type=number]{box-sizing:border-box;width:min(100%,120px);max-width:none;height:var(--control-h);min-height:var(--control-h);margin:0 auto;padding:0 var(--control-padding-x);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);font:400 var(--text-base) var(--font-sans);text-align:center;appearance:textfield;-moz-appearance:textfield;}
+.sg-eqa-table td input[type=number]{box-sizing:border-box;width:min(100%,120px);max-width:none;height:var(--control-h);min-height:var(--control-h);margin:0 auto;padding:0 var(--control-padding-x);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);font:400 var(--text-base) var(--font-sans);text-align:center;appearance:textfield;-moz-appearance:textfield;}
 .sg-eqa-table td input[type=number]::-webkit-inner-spin-button,.sg-eqa-table td input[type=number]::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
-.sg-eqa-table input:focus:not(:focus-visible){border-color:var(--accent-border);background:var(--surface);}
 .sg-eqa-index{color:var(--text-tertiary);font-size:var(--text-xs);}
 /* Nguồn của từng vòng: nhãn đợt/mẫu ngoại kiểm hoặc "Nhập tay" (SIGMA-REVIEW-2026-11-17). */
 .sg-eqa-table td.sg-eqa-label{text-align:center;color:var(--text-secondary);font-size:var(--table-body-size);overflow-wrap:anywhere;}

@@ -433,10 +433,10 @@ test('mọi var() trong CSS đều có định nghĩa và không tham chiếu v�
 
 test('mọi cặp màu chữ/nền đạt WCAG AA', () => {
   const lum = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
     .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
   const ratio = (a, b) => {
-    const x = lum(flat(a)); const y = lum(flat(b));
+    const x = lum(flat(a) ?? a); const y = lum(flat(b) ?? b);
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   };
   const fails = [];
@@ -445,8 +445,9 @@ test('mọi cặp màu chữ/nền đạt WCAG AA', () => {
     if (v < min) fails.push(`${fg} trên ${bg} = ${v.toFixed(2)} (cần ${min})`);
   };
   // Chữ trên mọi bề mặt sáng mà nó thực sự nằm lên.
-  for (const bg of ['--surface', '--surface-page', '--surface-subtle', '--surface-sunken']) {
-    for (const fg of ['--text-primary', '--text-secondary', '--text-tertiary', '--accent-text']) need(fg, bg, 4.5);
+  const lightSurfaces = ['--surface', '--surface-page', '--surface-subtle', '--surface-section-header', '--surface-sunken'];
+  for (const bg of lightSurfaces) {
+    for (const fg of ['--text-primary', '--text-secondary', '--text-tertiary', '--text-placeholder', '--accent-text']) need(fg, bg, 4.5);
     need('--text-disabled', bg, 3);
   }
   // Chữ trắng trên nền hành động. Nút huỷ tô bằng --danger-text (xem
@@ -459,10 +460,11 @@ test('mọi cặp màu chữ/nền đạt WCAG AA', () => {
     need(`--${k}-text`, '--surface', 4.5);
     need(`--${k}-accent`, '--surface', 3); // thanh accent là thông tin phi văn bản
   }
-  // Ranh giới control và vòng focus: WCAG 1.4.11 đòi 3:1.
-  for (const bg of ['--surface', '--surface-page']) {
+  // Dấu hiệu lấy nét và báo lỗi phải rõ cả trên nền có màu trạng thái.
+  for (const bg of [...lightSurfaces, '--accent-surface', '--warning-surface', '--danger-surface']) {
     need('--border-strong', bg, 3);
     need('--focus-ring', bg, 3);
+    need('--danger-accent', bg, 3);
   }
   // Sidebar là bề mặt tối, hệ màu riêng.
   for (const fg of ['--sidebar-text', '--sidebar-text-muted', '--sidebar-icon']) need(fg, '--sidebar-bg', 4.5);
@@ -471,8 +473,37 @@ test('mọi cặp màu chữ/nền đạt WCAG AA', () => {
   // Vòng focus trên nền tối: sidebar và nút phân đoạn đang chọn.
   for (const bg of ['--sidebar-bg', '--sidebar-active-bg', '--surface-inverse-soft']) need('--focus-ring-on-dark', bg, 3);
 
+  const sigmaSource = readFileSync(join(ROOT, 'renderer/pages/sigma/shared.ts'), 'utf8');
+  const sigmaColors = [...sigmaSource.matchAll(/\bc: '(#[0-9a-f]{6})', label:/g)].map((m) => m[1]);
+  assert.ok(sigmaColors.length > 0, 'đọc được bảng màu các thẻ Sigma');
+  for (const color of sigmaColors) need('--on-accent', color, 4.5);
+
+  const chartColors = readFileSync(join(ROOT, 'renderer/lib/chart-colors.ts'), 'utf8');
+  const warningPoint = /CHART_WARNING = '(#[0-9a-f]{6})'/.exec(chartColors)?.[1];
+  const chartText = /CHART_MUTED_TEXT = '(#[0-9a-f]{6})'/.exec(chartColors)?.[1];
+  assert.equal(warningPoint, flat('--warning-accent'), 'điểm cảnh báo cùng màu với chú giải');
+  assert.equal(chartText, flat('--text-tertiary'), 'thông báo trong biểu đồ dùng màu chữ phụ chung');
+  const qcChart = readFileSync(join(ROOT, 'renderer/components/QcChart.tsx'), 'utf8');
+  const bands = [...qcChart.matchAll(/\b(?:okBand|okMid|warnBand|rejectBand): '(#[0-9a-f]{6})'/g)].map((m) => m[1]);
+  assert.equal(bands.length, 4, 'đo tương phản trên mọi nền của biểu đồ Levey–Jennings');
+  for (const bg of bands) need(warningPoint, bg, 3);
+  need(chartText, '--surface', 4.5);
+  need(chartText, bands[0], 4.5);
+
   assert.deepEqual(fails, [],
-    'mọi cặp màu vai trò phải đạt WCAG; Clinical Precision không giữ ngoại lệ');
+    'các cặp màu chức năng phải đạt ngưỡng tương phản tương ứng');
+});
+
+test('chữ gợi ý và nhãn Sigma giữ màu đủ đậm khi hiển thị', () => {
+  const appCss = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
+  assert.match(appCss, /input::placeholder,textarea::placeholder\{color:var\(--text-placeholder\);opacity:1;\}/);
+  assert.equal(TOKEN['--control-border'], 'var(--surface-border)', 'viền ô nhập trong biểu mẫu và bảng cùng màu với viền khung');
+  for (const selector of [/\),select/, /textarea/, /\.datebox/]) {
+    assert.match(appCss, new RegExp(selector.source + '\\{[^}]*border:1px solid var\\(--control-border\\);'));
+  }
+  const sigmaCss = readFileSync(join(STYLE_DIR, 'pages/sigma.css'), 'utf8');
+  assert.match(sigmaCss, /\.sgbig\{color:var\(--on-accent\);/);
+  assert.doesNotMatch(sigmaCss, /\.sgbig(?: \.(?:lab|sub))?\{[^}]*opacity\s*:/);
 });
 
 test('chỉ dùng độ đậm có file font thật', () => {

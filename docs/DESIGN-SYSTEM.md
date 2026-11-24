@@ -63,10 +63,23 @@ Ghi chú:
   `--text-placeholder`…
 - Trạng thái: 5 họ `success / info / warning / danger / neutral`, mỗi họ đủ
   các vai trò `-text`, `-surface`, `-border`, `-accent`.
-- Viền: `--surface-border` cho viền bề mặt, `--surface-divider` cho đường chia
-  nội bộ.
-- Mọi cặp chữ/nền đạt WCAG AA. CSS trang không viết hex, `rgb()`/`hsl()` hay
-  `!important`.
+- Viền mặc định của ô biểu mẫu và ô nhập trong bảng dùng
+  `--control-border`, cùng màu `--surface-border` của khung Hướng dẫn nhanh
+  luật Westgard. Đường chia nội bộ dùng `--surface-divider`.
+- Khi bấm vào ô, viền lấy nét dùng teal `--focus-ring`. Khi dùng bàn phím,
+  vòng lấy nét dùng cùng màu. Ô có lỗi dùng `--danger-accent`. Các dấu hiệu
+  lấy nét và báo lỗi đạt tối thiểu **3:1** trên nền liền kề.
+- Chữ thông thường, kể cả chữ mô tả và chữ gợi ý, đạt tối thiểu **4,5:1**
+  trên nền đang hiển thị. Dùng `--text-tertiary` cho mô tả và
+  `--text-placeholder` cho chữ gợi ý. Nhãn và thông tin phụ trên thẻ Sigma
+  dùng màu `--on-accent` ở độ đục đầy đủ.
+- Điểm cảnh báo Levey–Jennings và chú giải dùng cùng màu
+  `--warning-accent`. Điểm đạt tối thiểu **3:1** trên các dải nền và có
+  hình tam giác để nhận biết trạng thái. Chữ thông báo trong biểu đồ dùng
+  màu tương đương `--text-tertiary`.
+- CSS trang không viết hex, `rgb()`/`hsl()` hay `!important`. Ngưỡng
+  tương phản theo [WCAG 2.2 về chữ](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+  và [tín hiệu phi văn bản](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 
 ## Component dùng chung
 
@@ -76,6 +89,7 @@ Ghi chú:
 | `.hint-inline` | Chữ "Chưa có./Chưa ghi nhận." nằm giữa nội dung hồ sơ | Dùng cho cả khối trống |
 | `Modal` | Chọn cỡ bằng `size="sm|md|lg|xl"` (mặc định md) | Truyền `width`/`style`; CSS trang đặt width cho modal |
 | `.field` | Mọi cặp nhãn + ô nhập bọc trong `<div className="field">`. Nhãn cách ô `--field-label-gap`; khối cha tạo khoảng cách giữa các field bằng `gap:var(--field-gap)` | Nhãn tự thêm margin-top; rule trang chỉ để đặt `margin-top:0` cho nhãn |
+| Ô tìm kiếm | Dùng `type="search"` hoặc lớp `.search-input` cho ô lọc kiểu text. Cách trình bày chung đặt kính lúp 16 px bên trái, kể cả trong `SearchSelect` | Tự thêm icon hoặc dùng hai nút xóa trong cùng ô |
 | `.tag` + `ok|warn|rej|none` | Badge trạng thái | Tạo lớp `*-chip`, `*-pill`, `*-badge`; đổi kích thước/chữ/màu ở CSS trang |
 | `.pill` | Nhãn thông tin trung tính | Như trên |
 | `.count` | Bộ đếm trong tab/nút lọc; tab `.on` đổi sang nền teal | Đổi kích thước, chữ hay màu ở CSS trang |
@@ -117,6 +131,7 @@ Tất cả nằm trong `app/tests/design-system.test.mjs`:
 | Control 28/32/36 | mật độ control dùng token component, không viết lại số chuẩn tại trang |
 | Mọi `var()` có định nghĩa (CSS và TSX) | mọi var() trong CSS đều có định nghĩa và không tham chiếu vòng |
 | WCAG AA | mọi cặp màu chữ/nền đạt WCAG AA |
+| Chữ gợi ý và nhãn Sigma | chữ gợi ý và nhãn Sigma giữ màu đủ đậm khi hiển thị |
 | Chỉ 4 độ đậm | chỉ dùng độ đậm có file font thật |
 | Không dùng màu primitive | CSS trang không được đụng thẳng vào lớp primitive |
 | Lưới khoảng cách | mọi padding/margin/gap đều nằm trên thang khoảng cách |

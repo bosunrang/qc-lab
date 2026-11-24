@@ -59,7 +59,7 @@ export function InstrumentsTab({ createRequest = 0, onCreateRequestHandled }: { 
         <div className="rcfg-toolbar">
           <div><h2>Danh sách máy</h2><p>Quản lý máy xét nghiệm, hãng và số sê-ri.</p></div>
           <div className="rcfg-tools">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên máy, hãng, số sê-ri…" aria-label="Tìm máy xét nghiệm" />
+            <input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên máy, hãng, số sê-ri…" aria-label="Tìm máy xét nghiệm" />
             <button className="btn teal" onClick={openNew}>＋ Thêm máy xét nghiệm</button>
           </div>
       </div>
