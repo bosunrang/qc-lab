@@ -3,6 +3,17 @@ import { filterSearchOptions, prioritizeSearchOptions, type SearchSelectOption }
 
 const NO_SUGGESTIONS: readonly string[] = [];
 
+/** Nút xoá chung cho ô chọn có tìm kiếm và ô tên xét nghiệm nhập tự do. */
+export function SearchClearButton({ onClear, onEscape, ariaLabel = 'Xoá nội dung tìm kiếm xét nghiệm', title = 'Xoá để tìm xét nghiệm khác' }: {
+  onClear: () => void; onEscape?: () => void; ariaLabel?: string; title?: string;
+}) {
+  return <button type="button" className="search-select-clear" aria-label={ariaLabel} title={title}
+    onMouseDown={event => event.preventDefault()} onClick={onClear}
+    onKeyDown={event => {
+      if (event.key === 'Escape' && onEscape) { event.preventDefault(); event.stopPropagation(); onEscape(); }
+    }}><span aria-hidden="true">×</span></button>;
+}
+
 export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTIONS, onChange, ariaLabel, placeholder = 'Gõ để tìm kiếm…' }: {
   /** Id của ô nhập, để `<label htmlFor>` bên ngoài gắn được vào. */
   id?: string;
@@ -22,6 +33,7 @@ export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTI
   const [activeIndex, setActiveIndex] = useState(0);
   const preparedOptions = useMemo(() => prioritizeSearchOptions(options, suggestedValues), [options, suggestedValues]);
   const selected = preparedOptions.find((option) => option.value === value);
+  const inputText = dirtyQuery ? query : selected?.label ?? '';
   const filtered = useMemo(() => filterSearchOptions(preparedOptions, dirtyQuery ? query : ''), [dirtyQuery, preparedOptions, query]);
   const safeActiveIndex = filtered.length ? Math.min(activeIndex, filtered.length - 1) : -1;
 
@@ -45,6 +57,12 @@ export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTI
     setOpen(false);
     setDirtyQuery(false);
     setQuery('');
+    inputRef.current?.focus();
+  }
+
+  function clearSearch() {
+    // Chỉ xoá nội dung tìm kiếm; xét nghiệm đang xem đổi khi chọn mục mới.
+    setQuery(''); setDirtyQuery(true); setOpen(true); setActiveIndex(0);
     inputRef.current?.focus();
   }
 
@@ -80,12 +98,14 @@ export function SearchSelect({ id, value, options, suggestedValues = NO_SUGGESTI
       <input ref={inputRef} id={id} type="text" role="combobox" autoComplete="off" spellCheck={false}
         aria-label={ariaLabel} aria-expanded={open} aria-controls={open ? listId : undefined} aria-autocomplete="list" aria-haspopup="listbox"
         aria-activedescendant={open && safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
-        placeholder={placeholder} value={dirtyQuery ? query : selected?.label ?? ''}
-        // Giữ cách đặt con trỏ và chọn chữ tự nhiên như ô nhập tên xét nghiệm.
+        placeholder={placeholder} value={inputText}
         // Tab chỉ chuyển focus; bấm chuột, gõ chữ hoặc ↓/↑ mới mở danh sách.
-        onClick={showOptions}
+        onClick={(event) => { showOptions(); if (!dirtyQuery) event.currentTarget.select(); }}
         onChange={(event) => { setQuery(event.target.value); setDirtyQuery(true); setOpen(true); setActiveIndex(0); }}
         onKeyDown={onInputKeyDown} />
+      {inputText.length > 0 && <SearchClearButton onClear={clearSearch} onEscape={open ? () => {
+        setOpen(false); setDirtyQuery(false); setQuery(''); inputRef.current?.focus();
+      } : undefined} />}
       {open && (
         <div id={listId} className="search-select-menu" role="listbox" aria-label={ariaLabel}>
           {filtered.length ? filtered.map((option, index) => (

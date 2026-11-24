@@ -44,7 +44,6 @@
   --gray-600:#536a76;
   --gray-900:#172b35;
   --navy-950:#14242e;
-  --naviva-navy:#1b2247;
 
   --teal-100:#e2f1f0;
   /* Bốn bậc lấp vào khoảng trống giữa teal-100 và teal-500. Giá trị là mã
@@ -97,7 +96,7 @@
   --dark-icon:#8ea5b0;
   --dark-accent:#6ccfc2;
   --dark-accent-bar:#2fb3a6;   /* thanh dọc của mục đang mở — KHÁC màu icon */
-  --dark-surface-active:#203b43;
+  --dark-surface-active:#1c2e38;
   --dark-tooltip:#183641;
   --dark-line:#294b58;
   --dark-on-light:#dde8ec;
@@ -113,10 +112,11 @@
   --shadow-ink-soft:rgba(23,43,53,.09);
   --shadow-ink-medium:rgba(23,43,53,.16);
 
-  /* Cỡ chữ: 8 bậc, SỐ NGUYÊN, gốc 14px cho app dữ liệu dày. */
-  --text-2xs:11px;   /* overline, mã, badge rất nhỏ */
-  --text-xs:12px;    /* caption, badge, chú thích nhỏ */
-  --text-sm:13px;    /* chữ phụ, thân bảng, header cột bảng, nhãn form */
+  /* Thang đọc: nội dung 14px, bảng/nhãn 13.5px, chữ phụ 13px.
+     Giữ tên 2xs cho các vị trí cũ nhưng không hạ chữ đọc xuống dưới 13px. */
+  --text-2xs:var(--text-xs);
+  --text-xs:13px;    /* chữ phụ, chú thích, thông tin nguồn */
+  --text-sm:13.5px;  /* thân bảng, header cột bảng, nhãn và bộ lọc */
   --text-base:14px;  /* thân chữ, control, nút */
   --text-md:16px;    /* tiêu đề panel */
   --text-lg:20px;    /* tiêu đề modal/dialog */
@@ -226,7 +226,7 @@
   --neutral-border:var(--gray-200);  --neutral-accent:var(--gray-600);
 
   /* Nền dự phòng cùng tông ảnh Naviva; chữ/icon đủ sáng trên cả vùng hoạ tiết. */
-  --sidebar-bg:var(--naviva-navy);
+  --sidebar-bg:var(--navy-950);
   --sidebar-border:var(--dark-line);
   --sidebar-text:var(--dark-text);
   --sidebar-text-muted:var(--dark-text-muted);
@@ -242,6 +242,9 @@
   --sidebar-group-divider:linear-gradient(90deg,rgba(126,149,165,.26),rgba(126,149,165,0));
   --sidebar-expanded-width:clamp(208px,17vw,258px);
   --sidebar-collapsed-width:78px;
+  --sidebar-logo-size:40px;
+  --sidebar-item-h:40px;
+  --sidebar-group-font-size:11px;
 
   /* Focus — MỘT vòng cho cả app. */
   /* teal-500 chứ không phải teal nhạt: vòng focus phải đạt 3:1 với nền
@@ -316,15 +319,17 @@
 
   --panel-padding:var(--space-5);
   --panel-content-gap:var(--space-4);
+  /* Khoảng cách dọc giữa các khung nội dung cùng cấp trên trang. */
+  --panel-stack-gap:var(--space-4);
   --panel-header-h:48px;
   /* Lề ngang của dải tiêu đề panel, bằng lề nội dung panel. Trước 02/11/2026
      các trang dùng lẫn 14/16/20px. */
   --panel-header-px:var(--panel-padding);
   --subpanel-header-h:44px;
   --panel-shadow:var(--shadow-panel);
-  /* Header trang dính ở đỉnh vùng cuộn; các panel sticky lấy mốc này để
-     không chui xuống dưới header khi người dùng cuộn. */
-  --page-header-h:88px;
+  /* Cụm logo và header trang dùng chung mốc chiều cao để thẳng viền dưới.
+     Các khung bám khi cuộn cũng lấy mốc này. */
+  --page-header-h:80px;
 
 
   /* Thang tiêu đề — MỖI CẤP CẤU TRÚC MỘT CỠ, không tuỳ trang.
@@ -390,7 +395,8 @@
      2026-09-24 lẫn 8/10/12/14/16/20px và cộng dồn margin-top 8px của nhãn. */
   --field-gap:var(--space-4);
   --toolbar-gap:var(--space-2);
-  --page-header-gap:var(--space-6);
+  --page-header-gap:var(--space-4);
+  --page-gutter:clamp(var(--space-5),2.4vw,var(--space-6));
 
   --scrollbar-track:var(--gray-100);
   --scrollbar-thumb:var(--scrollbar-thumb-base);

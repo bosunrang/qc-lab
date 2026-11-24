@@ -9,6 +9,7 @@ import { bootstrapAndLogin, enterValue, launchApp, openPage, seedOperationalTest
 test('mọi trang ở thanh điều hướng mở được không lỗi', { timeout: 180_000 }, async () => {
   const { app, page, errors, userDataDir } = await launchApp();
   try {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await bootstrapAndLogin(page);
     await seedOperationalTest(page);
     // Có sẵn một điểm để Westgard, Sigma, Báo cáo có dữ liệu mà vẽ.
@@ -38,6 +39,17 @@ test('mọi trang ở thanh điều hướng mở được không lỗi', { time
       await page.locator('main .head').first().waitFor();
       // Cho các lệnh nạp dữ liệu bất đồng bộ của trang kịp chạy xong.
       await page.waitForTimeout(400);
+      const insets = await page.locator('main .head').evaluate((header) => {
+        const pageStyle = getComputedStyle(header.closest('main'));
+        const headerStyle = getComputedStyle(header);
+        return [pageStyle.paddingLeft, pageStyle.paddingRight, headerStyle.paddingLeft, headerStyle.paddingRight];
+      });
+      assert.deepEqual(insets, ['24px', '24px', '24px', '24px'], `tiêu đề và nội dung trang "${label}" cùng lề 24 px`);
+      const [brand, header] = await Promise.all([
+        page.locator('.brand-row').boundingBox(),
+        page.locator('main .head').boundingBox(),
+      ]);
+      assert.ok(Math.abs(brand.y + brand.height - (header.y + header.height)) < 1, `viền dưới cụm logo và header trang "${label}" thẳng hàng`);
       const crashed = await page.getByText('Trang này gặp lỗi khi hiển thị').count();
       assert.equal(crashed, 0, `trang "${label}" rơi vào PageErrorBoundary`);
       if (label.trim() === 'Phân tích Westgard') {

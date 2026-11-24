@@ -15,6 +15,7 @@ import { EQA_DUE_SOON_DAYS, EQA_SAMPLE_TYPES } from '../../../main/domain/eqa/sc
 import type { EqaScheduleRow } from '../../../shared/qc-api';
 import { EqaScheduleModal } from './EqaScheduleModal';
 import { EqaSubmitModal } from './EqaSubmitModal';
+import type { EqaNavigationContext } from './useEqaScope';
 
 const WEEKDAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ nhật'];
 const EVENT_LABELS = { receive: 'Nhận mẫu', run: 'Chạy mẫu', due: 'Hạn nộp' };
@@ -85,7 +86,7 @@ function dueOrder(a: EqaScheduleRow, b: EqaScheduleRow): number {
   return a.due_date.localeCompare(b.due_date) || a.program_name.localeCompare(b.program_name, 'vi') || a.round_no - b.round_no;
 }
 
-export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRound: (id: string) => void; targetScheduleId?: string }) {
+export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRound: (id: string, resultId?: string, context?: EqaNavigationContext) => void; targetScheduleId?: string }) {
   const { schedule, loading, loaded, error, load, markSubmitted, removeSchedule } = useEqaStore(useShallow((s) => ({
     schedule: s.schedule, loading: s.loading, loaded: s.loaded, error: s.error, load: s.load, markSubmitted: s.markSubmitted, removeSchedule: s.removeSchedule,
   })));
@@ -189,7 +190,9 @@ export function EqaSchedule({ onOpenRound, targetScheduleId = '' }: { onOpenRoun
   }
   function actions(row: EqaScheduleRow) {
     return <div className="eqa-row-actions">
-      {row.round_id && <button type="button" className="btn ghost sm" onClick={() => onOpenRound(row.round_id!)}>Mở đợt báo cáo</button>}
+      {row.round_id && <button type="button" className="btn ghost sm" onClick={() => onOpenRound(row.round_id!, undefined, {
+        year: row.year, programId: row.program_id, instrumentId: row.instruments.length === 1 ? row.instruments[0].instrument_id : '',
+      })}>Mở đợt báo cáo</button>}
       {writable && <>
         {row.status !== 'reported' && <button type="button" className="btn ghost sm" onClick={() => void submitted(row, row.status !== 'submitted')}>
           {row.status === 'submitted' ? row.instruments.length ? 'Sửa đã nộp' : 'Bỏ đã nộp' : 'Ghi nhận nộp'}

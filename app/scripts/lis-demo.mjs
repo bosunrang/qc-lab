@@ -84,7 +84,7 @@ export async function launchLisDemo({ failAckOnce = false, persistent = false } 
     const saved = await page.evaluate(async (settings) => window.qcApi.saveLisSettings({ data: settings }),
       { enabled: true, url: gateway.url, token: gateway.token });
     if (!saved.ok) throw new Error(saved.error.message);
-    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Cài đặt & Đám mây' }).click();
+    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Cài đặt & Kết nối' }).click();
     await page.getByRole('button', { name: 'Xem hàng chờ QC', exact: true }).click();
     const modal = page.getByRole('dialog', { name: 'Hàng chờ QC từ LIS Gateway', exact: true });
     await modal.getByText('Sẵn sàng nhận (3)', { exact: true }).waitFor();

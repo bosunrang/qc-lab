@@ -28,13 +28,18 @@ test('SB-2..SB-6 cập nhật: lấy mọi nồng độ trong 3 tháng, loại �
     sample({ resultId: 'admin', ncCauseCategory: 'eqa_administrative' }),
     sample({ resultId: 'tech', result: 104, ncCauseCategory: 'eqa_technical' }),
     sample({ resultId: 'unsure', assignedUncertain: true }),
+    sample({ resultId: 'unsure-old', assignedUncertain: true, reportDate: '2026-07-31' }),
+    sample({ resultId: 'unsure-program', assignedUncertain: true, ncCauseCategory: 'eqa_program' }),
+    sample({ resultId: 'unsure-invalid', assignedUncertain: true, assigned: 0 }),
   ], { period: '2026-10' });
   assert.deepEqual(r.window, { start: '2026-08-01', end: '2026-10-31' });
-  assert.deepEqual(r.included.map((s) => s.resultId).sort(), ['a', 'c', 'far', 'tech'], 'lấy cả nồng độ xa QC, giữ mẫu có lỗi kỹ thuật');
+  assert.deepEqual(r.included.map((s) => s.resultId).sort(), ['a', 'c', 'far', 'tech', 'unsure'], 'giữ mẫu có cảnh báo độ không đảm bảo để rà soát');
+  assert.equal(r.included.find(s => s.resultId === 'unsure').assignedUncertain, true, 'giữ cờ cảnh báo cho giao diện');
   assert.deepEqual(Object.fromEntries(r.excluded.map((s) => [s.resultId, s.reason])), {
-    late: 'after-period', old: 'outside-window', b: 'outside-window', admin: 'nce-cause', unsure: 'assigned-uncertain',
+    late: 'after-period', old: 'outside-window', b: 'outside-window', admin: 'nce-cause',
+    'unsure-old': 'outside-window', 'unsure-program': 'nce-cause', 'unsure-invalid': 'invalid',
   });
-  assert.ok(Math.abs(r.mean - (2 + 3 + 2 + 4) / 4) < 1e-10);
+  assert.ok(Math.abs(r.mean - (2 + 3 + 2 + 4 + 2) / 5) < 1e-10);
   assert.equal(r.mixedSigns, false);
   assert.equal(r.enough, true);
   assert.ok(r.rms > r.mean, 'RMS lớn hơn trung bình vì gộp độ phân tán');
@@ -89,7 +94,7 @@ test('SB-3 cập nhật: đúng 3 tháng lịch ở tháng nhuận và các ngà
   }
 });
 
-test('SB-3..SB-5: lưu vòng mới kiểm lại thời gian, NCE và độ tin cậy; lỗi không ghi dở', () => {
+test('SB-3..SB-5: lưu vòng mới kiểm lại thời gian và NCE; lỗi không ghi dở', () => {
   const f = fixture();
   try {
     const selected = f.rounds(f.view());
@@ -106,12 +111,34 @@ test('SB-3..SB-5: lưu vòng mới kiểm lại thời gian, NCE và độ tin c
     assert.equal(f.save(selected, { levels: [{ level: 1, cv: 2 }, { level: 2, cv: 3 }] }).error.code, 'invalid-eqa-selection', 'NCE thay đổi sau lúc mở hộp thoại');
     assert.deepEqual(f.stored(), before);
     assert.equal(f.db.prepare('SELECT COUNT(*) n FROM activity').get().n, afterNceAuditCount);
-    const uncertain = f.importRound({ round: 'ĐỢT 10', date: '2026-10-15', rows: [{ code: 'GLUC', instrument: f.machine.name, sample: 'M1', unit: 'mmol/L', result: 5.2, assigned: 5, sigmaP: .05, zProvider: 4,
-      peer: { instrument: { n: 2, mean: 5, sd: 1, cv: 20 } } }] });
-    const r = uncertain.results[0];
-    assert.equal(f.view('2026-10').excluded.find(s => s.resultId === r.id).reason, 'assigned-uncertain');
-    assert.equal(f.save([{ lab: r.result, target: r.assigned, eqaResultId: r.id }], { period: '2026-10' }).error.code, 'invalid-eqa-selection');
-    assert.deepEqual(f.stored(), before);
+  } finally { f.db.close(); }
+});
+
+test('SB-5 cập nhật: u/σp > 0,3 chỉ cảnh báo, vẫn lấy và lưu đủ mẫu vào Bias chung', () => {
+  const f = fixture();
+  try {
+    const uncertain = f.importRound({ round: 'ĐỢT 08', date: '2026-08-15', rows: [{ code: 'GLUC', instrument: f.machine.name, sample: 'M1', unit: 'mmol/L', result: 5.1, assigned: 5, sigmaP: .05, zProvider: 2,
+      peer: { instrument: { n: 17, mean: 5, sd: .05, cv: 1 } } }] });
+    const source = f.eqa.getEqaRound(uncertain.round.id).results[0];
+    assert.ok(source.assigned_check.ratio > .3);
+    assert.equal(source.assigned_check.uncertain, true);
+    const before = f.stored(), view = f.view();
+    assert.equal(view.n, 2);
+    assert.deepEqual(view.excluded, []);
+    assert.equal(view.included.find(s => s.resultId === source.id).assignedUncertain, true);
+    assert.ok(Math.abs(view.mean - 3) < 1e-10, 'TB của mẫu thường +4% và mẫu cảnh báo +2%');
+    assert.deepEqual(f.stored(), before, 'lấy mẫu chỉ đọc, không tự cập nhật kỳ đã lưu');
+    const rs = f.rounds(view), levels = [{ level: 1, cv: 2 }, { level: 2, cv: 3 }];
+    const auditCount = f.db.prepare('SELECT COUNT(*) n FROM activity').get().n;
+    const saved = must(f.save(rs, { levels }));
+    for (const level of saved.levels) {
+      assert.equal(level.eqaRounds.length, 2);
+      assert.ok(level.eqaRounds.some(r => r.eqaResultId === source.id));
+      assert.ok(Math.abs(level.biasEqa - 3) < 1e-10);
+      assert.ok(Math.abs(level.sigma.sigma - (10 - 3) / level.cv) < 1e-10);
+    }
+    assert.ok(f.db.prepare('SELECT COUNT(*) n FROM activity').get().n > auditCount);
+    assert.deepEqual(f.eqa.getEqaRound(uncertain.round.id).results[0], source, 'không đổi đánh giá ngoại kiểm chính thức');
   } finally { f.db.close(); }
 });
 

@@ -3,7 +3,7 @@ import test from 'node:test';
 import path from 'node:path';
 import { bootstrapAndLogin, launchApp, openPage } from './helpers.mjs';
 
-test('Bias ngoại kiểm: chặn căn cứ thay đổi khi đang mở, áp dụng đúng mẫu và sửa CV giữ nguồn', { timeout: 120_000 }, async () => {
+test('Bias ngoại kiểm: cảnh báo u/σp vẫn tính mẫu, chặn NCE thay đổi và sửa CV giữ nguồn', { timeout: 120_000 }, async () => {
   const { app, page, errors, userDataDir } = await launchApp();
   try {
     await page.setViewportSize({ width: 1680, height: 1100 });
@@ -20,7 +20,8 @@ test('Bias ngoại kiểm: chặn căn cứ thay đổi khi đang mở, áp dụ
       const inputs = [], reports = [];
       for (const [month, assigned, result] of [[7, 280, 285.6], [8, 310, 306.9], [9, 295, 303.85]]) {
         const input = { source: 'pdf', round: { program: 'Chương trình Bias', provider: 'Mô phỏng', programCode: 'BIAS', unitCode: '99999', year: 2026, round: `ĐỢT 0${month}`, reportDate: `2026-0${month}-15` },
-          rows: [{ code: 'GLU', instrument: machine.name, sample: 'M1', unit: 'mmol/L', result, assigned, sigmaP: assigned * .005, zProvider: (result - assigned) / (assigned * .005), peer: {} }],
+          rows: [{ code: 'GLU', instrument: machine.name, sample: 'M1', unit: 'mmol/L', result, assigned, sigmaP: assigned * .005, zProvider: (result - assigned) / (assigned * .005),
+            peer: month === 8 ? { instrument: { n: 17, mean: assigned, sd: assigned * .005, cv: .5 } } : {} }],
           mappings: [{ code: 'GLU', instrument: machine.name, testId: assay.id }] };
         inputs.push(input); reports.push(must(await api.importEqaRound({ data: input })));
       }
@@ -37,6 +38,11 @@ test('Bias ngoại kiểm: chặn căn cứ thay đổi khi đang mở, áp dụ
     await page.waitForFunction(() => document.querySelectorAll('.sg-eqa-table tbody tr').length === 3);
     assert.match(await modal.innerText(), /01\/07\/2026.*30\/09\/2026/);
     assert.match(await modal.innerText(), /3\/3 tháng/);
+    assert.match(await modal.getByRole('status').innerText(), /Có 1 mẫu.*u\/σp ước tính > 0,3.*vẫn được tính vào Bias Sigma/);
+    const reviewRow = modal.locator('.sg-eqa-table tbody tr').filter({ hasText: 'ĐỢT 08' });
+    assert.match(await reviewRow.innerText(), /Cần rà soát: u\/σp ước tính > 0,3/);
+    assert.equal(await modal.getByRole('button', { name: 'Áp dụng Bias%', exact: true }).isEnabled(), true);
+    await page.screenshot({ path: path.join(userDataDir, 'sigma-eqa-bias-warning.png') });
     await months.fill('0');
     assert.equal(await modal.getByRole('button', { name: 'Lấy từ ngoại kiểm', exact: true }).isDisabled(), true);
     assert.equal(await modal.getByRole('button', { name: 'Áp dụng Bias%', exact: true }).isDisabled(), true);
@@ -65,6 +71,7 @@ test('Bias ngoại kiểm: chặn căn cứ thay đổi khi đang mở, áp dụ
     await modal.getByRole('button', { name: 'Lấy từ ngoại kiểm', exact: true }).click();
     await page.waitForFunction(() => document.querySelectorAll('.sg-eqa-table tbody tr').length === 1);
     assert.match(await modal.innerText(), /01\/09\/2026.*30\/09\/2026/);
+    assert.equal(await modal.getByRole('status').count(), 0, 'mẫu cảnh báo ngoài khoảng không còn cảnh báo trong bộ mẫu tính Bias');
     await months.fill('18');
     await modal.getByRole('button', { name: 'Lấy từ ngoại kiểm', exact: true }).click();
     await page.waitForFunction(() => document.querySelectorAll('.sg-eqa-table tbody tr').length === 4);
@@ -98,6 +105,7 @@ test('Bias ngoại kiểm: chặn căn cứ thay đổi khi đang mở, áp dụ
     assert.ok(Math.abs(saved.levels[0].biasEqa - 1) < 1e-10);
     assert.ok(Math.abs(saved.levels[0].sigma.sigma - 4.5) < 1e-10);
     assert.equal(saved.levels[0].eqaRounds.length, 3);
+    assert.ok(saved.levels[0].eqaRounds.some(r => r.eqaResultId === seed.reports[1].results[0].id), 'mẫu có cảnh báo u/σp vẫn được lưu và tham gia Bias');
     assert.deepEqual(saved.levels.map(l => l.eqaWindowMonths), [6, 6]);
     assert.deepEqual(saved.levels.map(l => l.cv), [2, 3]);
     assert.deepEqual(saved.levels[0].eqaRounds, saved.levels[1].eqaRounds);

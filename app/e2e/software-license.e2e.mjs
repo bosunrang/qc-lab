@@ -61,7 +61,7 @@ test('kích hoạt offline: chặn IPC/LAN, từ chối mã sai máy, nhận mã
     await page.reload();
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).waitFor();
     assert.equal((await page.evaluate(() => window.qcApi.getLicenseStatus())).state, 'active');
-    await openPage(page, 'Cài đặt & Đám mây');
+    await openPage(page, 'Cài đặt & Kết nối');
     await page.getByRole('heading', { name: 'Thông tin đơn vị', exact: true }).waitFor();
     assert.equal(await page.getByRole('region', { name: 'Giấy phép phần mềm' }).count(), 0);
     assert.equal(await page.getByRole('region', { name: 'Cập nhật phần mềm' }).count(), 0);
@@ -107,7 +107,7 @@ test('kích hoạt offline: chặn IPC/LAN, từ chối mã sai máy, nhận mã
     await replace(null);
     await page.locator('.sidebar-license-expiry').getByText('Hạn dùng: Vĩnh viễn', { exact: true }).waitFor();
     assert.equal(await page.locator('.license-expiry-notice').count(), 0);
-    await openPage(page, 'Cài đặt & Đám mây');
+    await openPage(page, 'Cài đặt & Kết nối');
     await page.screenshot({ path: path.join(userDataDir, 'software-settings.png'), fullPage: true });
     console.log(`Ảnh kích hoạt và giấy phép: ${userDataDir}`);
   } finally { await app.close(); }

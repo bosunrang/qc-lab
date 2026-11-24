@@ -7,7 +7,7 @@
 .eqa-intro-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
 
 /* Tổng quan: tỷ lệ là chỉ số tổng hợp, hai ô bên cạnh lọc theo đánh giá mẫu. */
-.eqa-overview-summary{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));margin-bottom:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-panel);overflow:hidden;}
+.eqa-overview-summary{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));margin-bottom:var(--panel-stack-gap);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-panel);overflow:hidden;}
 .eqa-accept-summary,.eqa-summary-count{display:grid;align-content:start;gap:var(--space-2);min-width:0;padding:var(--space-4) var(--space-5);border:0;background:transparent;color:var(--text-primary);font:inherit;text-align:left;cursor:pointer;}
 .eqa-summary-count{border-left:1px solid var(--surface-divider);}
 .eqa-summary-label{font-size:var(--text-sm);font-weight:var(--weight-semibold);}
@@ -27,6 +27,7 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-overview-summary>div{cursor:default;}
 .eqa-overview-summary button:disabled{cursor:default;}
 .eqa-map-filter{width:auto;max-width:100%;}
+.eqa-round-list-filter{width:200px;max-width:100%;}
 .eqa-zmap-heading{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;min-width:0;}
 .eqa-zmap-heading h2{margin:0;}
 .eqa-zmap-heading .tag{cursor:pointer;}
@@ -67,18 +68,20 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-results-table .eqa-peer th,.eqa-results-table .eqa-peer td{text-align:left;}
 .eqa-results-table .eqa-peer .num{text-align:center;}
 
-/* Dòng mở rộng của bảng kết quả: nhóm đồng đẳng và lưu ý. */
+/* Lưu ý nằm dưới bảng nhóm đồng đẳng, cùng độ rộng để đọc liền mạch. */
 .eqa-table tbody tr.eqa-detail-row>td{padding-top:0;background:var(--surface-sunken);}
-.eqa-detail{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:var(--space-5);padding:var(--space-3) 0;}
+.eqa-detail{display:grid;grid-template-columns:minmax(0,1fr);width:min(100%,680px);gap:var(--space-3);padding:var(--space-3) 0;}
 .eqa-detail .eqa-note{margin-top:var(--space-2);font-size:var(--text-xs);}
 .eqa-detail h3{margin:0 0 var(--space-2);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-secondary);}
-.eqa-peer{width:auto;min-width:min(100%,560px);}
+.eqa-detail-notes{display:flex;flex-direction:column;gap:var(--space-2);width:100%;min-width:0;overflow-wrap:anywhere;}
+.eqa-detail-notes h3{margin:0;color:inherit;}
+.eqa-peer{width:100%;min-width:min(100%,560px);}
 .eqa-peer th,.eqa-peer td{padding:var(--space-1-5) var(--space-3);background:transparent;}
 .eqa-peer th{position:static;}
 .eqa-peer-name{display:inline-flex;align-items:center;gap:var(--space-2);color:var(--text-primary);font-weight:var(--weight-semibold);white-space:nowrap;}
 
 .eqa-toggle{display:inline-flex;align-items:center;gap:var(--space-2);color:var(--text-secondary);font-size:var(--text-sm);cursor:pointer;}
-.eqa-note{margin:0;color:var(--text-tertiary);font-size:var(--text-sm);}
+.eqa-note{margin:0;color:var(--text-tertiary);font-size:var(--text-xs);}
 .eqa-list{margin:0;padding-left:var(--space-5);display:grid;gap:var(--space-1);}
 .eqa-pre{white-space:pre-line;}
 .eqa-tags{display:inline-flex;flex-wrap:wrap;gap:var(--space-1);}
@@ -96,7 +99,6 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-facts dt{color:var(--text-tertiary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}
 .eqa-facts dd{margin:var(--space-1) 0 0;color:var(--text-primary);overflow-wrap:anywhere;}
 .eqa-filters{display:flex;align-items:flex-end;gap:var(--space-3);flex-wrap:wrap;}
-.eqa-inline-field{min-width:200px;}
 .eqa-history{margin:0;padding:0;list-style:none;display:grid;gap:var(--space-3);}
 .eqa-history li{display:grid;gap:var(--space-1);padding-bottom:var(--space-3);border-bottom:1px solid var(--surface-divider);}
 .eqa-history li:last-child{padding-bottom:0;border-bottom:none;}
@@ -110,19 +112,21 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-report-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
 .eqa-corrective{min-width:0;}
 /* Thẻ tổng hợp dùng kiểu .nce-summary-card; thẻ đang lọc giữ nền nhấn. */
-.eqa-corrective-summary{margin-bottom:var(--space-4);}
+.eqa-corrective-summary{margin-bottom:var(--panel-stack-gap);}
 .eqa-corrective-summary>.nce-summary-card.is-active{background:var(--accent-surface-tint);border-top-color:var(--accent-border);border-right-color:var(--accent-border);border-bottom-color:var(--accent-border);}
-.eqa-corrective-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-5);align-items:start;}
+.eqa-corrective-workspace{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;}
 .eqa-corrective-workspace.has-evidence{grid-template-columns:minmax(0,1fr) var(--space-2) clamp(340px,var(--eqa-evidence-width,420px),min(640px,calc(100% - 480px - var(--space-6))));gap:var(--space-2);align-items:stretch;}
-.eqa-corrective-list,.eqa-corrective-inspector{min-width:0;margin-bottom:0;position:sticky;top:calc(var(--page-header-h) + var(--space-4));display:flex;flex-direction:column;max-height:calc(100dvh - var(--page-header-h) - var(--space-6));}
+.eqa-corrective-list,.eqa-corrective-inspector{min-width:0;margin-bottom:0;position:sticky;top:calc(var(--page-header-h) + var(--page-header-gap));display:flex;flex-direction:column;max-height:calc(100dvh - var(--page-header-h) - var(--page-header-gap) - var(--space-2));}
 .eqa-corrective-workspace .panel>.panel-head:first-child{margin-bottom:0;}
 .eqa-corrective-list>.panel-head:first-child{flex:none;}
 .eqa-corrective-inspector>.panel-head:first-child{flex:none;padding-block:var(--space-1-5);}
-.eqa-corrective-toolbar{flex:none;display:flex;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-3) var(--panel-padding);}
-.eqa-corrective-toolbar>select{flex:0 1 220px;width:auto;max-width:100%;}
+.eqa-corrective-heading{display:flex;align-items:center;gap:var(--space-2);min-width:0;}
+.eqa-corrective-heading>.tag{flex:none;}
+.eqa-corrective-toolbar{flex:0 1 532px;display:flex;gap:var(--space-3);flex-wrap:wrap;min-width:0;max-width:100%;margin-left:auto;}
+.eqa-corrective-toolbar>select{flex:0 1 200px;width:auto;max-width:100%;}
 .eqa-corrective-toolbar input{flex:1;min-width:0;}
 /* Bảng thẳng lề với thanh lọc và cách viền panel theo khoảng đệm chung. */
-.eqa-corrective-list>.eqa-table-wrap{width:auto;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;margin:0 var(--panel-padding) var(--panel-padding);border:1px solid var(--surface-divider);border-radius:var(--table-radius);}
+.eqa-corrective-list>.eqa-table-wrap{width:auto;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;margin:var(--panel-content-gap) var(--panel-padding) var(--panel-padding);border:1px solid var(--surface-divider);border-radius:var(--table-radius);}
 .eqa-corrective-table{min-width:700px;border:0;border-radius:0;overflow:visible;}
 .eqa-corrective-table thead th{position:sticky;top:0;z-index:var(--z-sticky);}
 .eqa-corrective-table td:first-child{vertical-align:top;}
@@ -142,9 +146,9 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-evidence-table :is(th,td){padding:var(--table-cell-py-compact) var(--table-cell-px-compact);}
 .eqa-evidence-table th{white-space:normal;}
 .eqa-corrective-dossier{min-width:0;}
-.eqa-reports{display:flex;flex-direction:column;min-height:0;height:calc(100dvh - var(--page-header-h) - var(--space-6) - var(--space-6) - var(--control-h-compact) - var(--space-4));}
+.eqa-reports{display:flex;flex-direction:column;min-height:0;height:calc(100dvh - var(--page-header-h) - var(--page-header-gap) - var(--space-6) - var(--control-h-compact) - var(--space-4));}
 .eqa-reports>.eqa-scope-controls,.eqa-reports>.alert{flex:none;}
-.eqa-report-workspace{display:grid;flex:1;min-height:0;grid-template-columns:minmax(280px,320px) minmax(0,1fr) minmax(240px,280px);gap:var(--space-5);align-items:stretch;}
+.eqa-report-workspace{display:grid;flex:1;min-height:0;grid-template-columns:minmax(280px,320px) minmax(0,1fr) minmax(240px,280px);gap:var(--panel-stack-gap) var(--space-5);align-items:stretch;}
 .eqa-report-editor{display:flex;flex-direction:column;min-height:0;margin-bottom:0;overflow:hidden;}
 .eqa-report-editor>.panel-head:first-child{flex:none;margin:0;}
 .eqa-report-editor-body{display:grid;flex:1;grid-auto-rows:max-content;align-content:start;gap:var(--field-gap);padding:var(--panel-padding);min-height:0;overflow-y:auto;}
@@ -199,19 +203,26 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-coverage-fields{display:grid;gap:var(--field-gap);min-width:0;margin:0;padding:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);}
 .eqa-coverage-fields legend{padding:0 var(--space-2);font-size:var(--text-sm);color:var(--text-secondary);}
 .eqa-replace{display:grid;gap:var(--space-3);}
-/* Thu gọn cột tệp, dành đủ chỗ cho thông tin báo cáo và các ô chọn. */
-.eqa-import-files{table-layout:fixed;min-width:1000px;}
-.eqa-import-files th:nth-child(1){width:24%;}
-.eqa-import-files th:nth-child(2){width:20%;}
-.eqa-import-files th:nth-child(3){width:15%;}
-.eqa-import-files th:nth-child(4){width:10%;}
-.eqa-import-files th:nth-child(5){width:9%;}
-.eqa-import-files th:nth-child(6){width:13%;}
-.eqa-import-files th:nth-child(7){width:9%;}
+/* Cột có ô nhập và tiêu đề dài giữ đủ độ rộng; cột tệp nhận phần còn lại.
+   Tiêu đề luôn một dòng, nội dung dài xuống dòng và cửa sổ hẹp cuộn ngang. */
+.eqa-import-files{table-layout:fixed;min-width:1060px;}
+.eqa-import-files :is(th,td){padding:var(--table-cell-py-compact) var(--table-cell-px-compact);overflow-wrap:anywhere;}
+.eqa-import-files th{white-space:nowrap;}
+.eqa-import-files td{height:var(--table-row-h-input);}
+.eqa-import-files th:nth-child(1){width:auto;}
+.eqa-import-files th:nth-child(2){width:210px;}
+.eqa-import-files th:nth-child(3){width:160px;}
+.eqa-import-files th:nth-child(4){width:96px;}
+.eqa-import-files th:nth-child(5){width:80px;}
+.eqa-import-files th:nth-child(6){width:80px;}
+.eqa-import-files th:nth-child(7){width:190px;}
+.eqa-import-files th:nth-child(8){width:96px;}
 .eqa-import-files :is(input,select){text-align:center;}
 /* Năm của từng tệp: đủ cho 4 chữ số, không kéo giãn cột. */
 .eqa-import-year{width:min(100%,96px);}
 .eqa-map-table-wrap{overflow:visible;}
+/* Danh sách tìm xét nghiệm phải vượt được mép bảng ở hàng ánh xạ cuối. */
+.eqa-map-table-wrap>.eqa-table{overflow:visible;}
 .eqa-map-table-wrap .search-select>input{text-align:center;}
 .eqa-file-picker{display:grid;grid-template-columns:var(--control-h) minmax(0,1fr) auto;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);transition:border-color var(--motion-fast) ease,background var(--motion-fast) ease;}
 .eqa-file-picker.is-dragging{border-color:var(--accent-border-strong);background:var(--accent-surface-tint);}
@@ -262,7 +273,7 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 /* Cảnh báo gọn, chỉ mở danh sách khi người dùng cần xem đợt quá hạn. */
 .eqa-overdue-summary{cursor:pointer;}
 .eqa-overdue-list{margin-top:var(--space-3);}
-.eqa-schedule-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:var(--space-4);align-items:start;}
+.eqa-schedule-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:var(--panel-stack-gap) var(--space-4);align-items:start;}
 .eqa-schedule-workspace.is-list{grid-template-columns:minmax(0,1fr);}
 .eqa-schedule.is-unplanned .eqa-cal-day{min-height:var(--table-row-h-input);}
 /* Khi chưa có lịch, hai khung chung chiều cao; lưới ngày nhận phần trống
@@ -275,7 +286,7 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-schedule.is-unplanned .eqa-schedule-picked-date{margin-top:auto;}
 .eqa-schedule-workspace .panel{margin-bottom:0;}
 .eqa-schedule-main,.eqa-schedule-rail{min-width:0;}
-.eqa-schedule-rail{display:grid;gap:var(--space-4);}
+.eqa-schedule-rail{display:grid;gap:var(--panel-stack-gap);}
 .eqa-schedule-steps{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-4);}
 .eqa-schedule-steps>li{display:flex;align-items:flex-start;gap:var(--space-3);}
 .eqa-schedule-steps b{font-size:var(--title-card);font-weight:var(--title-card-weight);}
@@ -361,15 +372,15 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-test>.eqa-round-bar{flex:none;}
 /* Không gian phân tích dùng cùng panel và control của app. Chỉ vùng dữ liệu
    cuộn ngang; thanh chọn và bằng chứng luôn nằm trong chiều rộng trang. */
-.eqa-scope-controls{display:flex;align-items:end;gap:var(--field-gap);flex-wrap:wrap;padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-panel);}
+.eqa-scope-controls{display:flex;align-items:end;gap:var(--field-gap);flex-wrap:wrap;padding:var(--space-4);margin-bottom:var(--panel-stack-gap);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-panel);}
 .eqa-scope-controls .field{margin:0;min-width:96px;}
 .eqa-scope-controls .field:first-child{flex:0 0 96px;}
 .eqa-scope-controls .eqa-scope-program{flex:1 1 300px;min-width:min(100%,280px);}
 .eqa-scope-controls .eqa-scope-machine{flex:1 1 240px;min-width:min(100%,160px);max-width:280px;}
 .eqa-scope-action{flex:none;margin-left:auto;}
-.eqa-review-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,320px);gap:var(--space-4);align-items:start;}
+.eqa-review-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,320px);gap:var(--panel-stack-gap) var(--space-4);align-items:start;margin-bottom:var(--panel-stack-gap);}
 .eqa-review-workspace.is-empty{grid-template-columns:minmax(0,1fr);align-items:stretch;}
-.eqa-review-workspace>.panel{min-width:0;}
+.eqa-review-workspace>.panel{min-width:0;margin-bottom:0;}
 .eqa-inspector .eqa-facts{grid-template-columns:repeat(2,minmax(0,1fr));}
 .eqa-inspector-title h3{margin:0;color:var(--text-primary);font-size:var(--title-card);font-weight:var(--weight-bold);}
 .eqa-facts-group{display:grid;gap:var(--space-2);align-content:start;}
@@ -378,15 +389,16 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
 .eqa-result-score>b{font-size:var(--text-2xl);font-weight:var(--weight-bold);line-height:var(--leading-display);font-variant-numeric:tabular-nums;}
 .eqa-score-label{color:var(--text-tertiary);font-size:var(--text-sm);}
 .eqa-z-discrepancy{color:var(--warning-text);}
-.eqa-source{display:grid;justify-items:start;gap:var(--space-1-5);padding-top:var(--space-3);border-top:1px solid var(--surface-divider);overflow-wrap:anywhere;font-size:var(--text-sm);color:var(--text-secondary);}
+.eqa-source{display:grid;justify-items:start;gap:var(--space-1-5);padding-top:var(--space-3);border-top:1px solid var(--surface-divider);overflow-wrap:anywhere;font-size:var(--text-xs);color:var(--text-secondary);}
 .eqa-source>b{color:var(--text-primary);font-weight:var(--weight-semibold);}
 .eqa-details[open]>summary{margin-bottom:var(--space-3);}
 .eqa-details>.eqa-note{margin-top:var(--space-3);}
 .eqa-zmap td.eqa-zcell{padding:0;}
-.eqa-cell-button{display:block;width:100%;min-width:60px;min-height:var(--table-row-h);padding:var(--space-2);border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;}
-.eqa-zcell.is-selected{box-shadow:inset 0 0 0 2px var(--accent);}
-.eqa-zcell.is-selected .eqa-cell-button{text-decoration:underline;text-underline-offset:var(--space-1);font-weight:var(--weight-bold);}
+.eqa-cell-button{display:block;width:100%;min-width:60px;min-height:var(--table-row-h);padding:var(--space-2);border:0;border-radius:var(--control-radius);background:transparent;color:inherit;font:inherit;cursor:pointer;}
+/* Cả hai trạng thái vẽ viền trên nút; ô bảng chỉ giữ màu xếp loại. */
 .eqa-cell-button:hover{box-shadow:inset 0 0 0 1px var(--accent-border);}
+.eqa-cell-button[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--accent);}
+.eqa-cell-button:focus-visible{outline-offset:var(--focus-ring-offset-inset);}
 .eqa-zmap-trend{width:124px;min-width:124px;border-left:1px solid var(--surface-divider);}
 .eqa-row-trend{display:block;width:112px;margin:auto;padding:0;border:0;background:transparent;cursor:pointer;}
 .eqa-row-trend svg{display:block;width:100%;height:auto;}
@@ -425,7 +437,7 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
   .eqa-review-history{grid-column:2;grid-row:2;}
 }
 @media (max-width:1100px){
-  .eqa-corrective-workspace.has-evidence{grid-template-columns:minmax(0,1fr);gap:var(--space-5);align-items:start;}
+  .eqa-corrective-workspace.has-evidence{grid-template-columns:minmax(0,1fr);row-gap:var(--panel-stack-gap);align-items:start;}
   /* Xếp dọc thì hai khung cùng `top` dính sẽ chồng lên nhau khi cuộn. */
   .eqa-corrective-workspace.has-evidence .eqa-corrective-list,.eqa-corrective-workspace.has-evidence .eqa-corrective-inspector{position:static;}
   .eqa-corrective-resize{display:none;}
@@ -449,10 +461,10 @@ button.eqa-summary-count.is-warn:hover,.eqa-summary-count.is-warn[aria-pressed=t
   .eqa-test{display:block;}
   .eqa-file-picker{grid-template-columns:var(--control-h) minmax(0,1fr);}
   .eqa-file-picker .btn{grid-column:1/-1;justify-self:stretch;}
-  .eqa-analysis-workspace{display:grid;grid-template-columns:minmax(0,1fr);}
+  .eqa-analysis-workspace{display:grid;grid-template-columns:minmax(0,1fr);row-gap:var(--panel-stack-gap);}
   .eqa-analysis-main{overflow:visible;}
   .eqa-analysis-resize{display:none;}
-  .eqa-assay-list{display:block;height:auto;margin-bottom:var(--space-5);}
+  .eqa-assay-list{display:block;height:auto;}
   .eqa-review-workspace .eqa-inspector .eqa-section-body{grid-template-columns:minmax(0,1fr);}
   .eqa-scope-controls .eqa-scope-machine{max-width:none;}
 }

@@ -1,8 +1,8 @@
 // Phần dùng chung của trang Phân tích ngoại kiểm: định dạng số, nhãn xếp
 // loại, trạng thái đợt, tín hiệu chuỗi và khối thông tin. Kết luận
 // (z, xếp loại, tín hiệu) do main tính.
-import type { EqaClassView, EqaSignalView } from '../../../shared/qc-api';
-import { EQA_CLASS_LABEL } from '../../../main/domain/eqa/evaluation';
+import type { EqaClassView, EqaSignalView, EqaResultRow } from '../../../shared/qc-api';
+import { EQA_CLASS_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EQA_SIGNAL_LABEL } from '../../../main/domain/eqa/series';
 
 export function numText(value: number | null | undefined, digits = 2): string {
@@ -20,6 +20,20 @@ export function pctText(value: number | null | undefined): string {
 
 export function ClassTag({ cls }: { cls: EqaClassView | null }) {
   return cls ? <span className={`tag ${cls}`}>{EQA_CLASS_LABEL[cls]}</span> : <span className="tag none">Chưa đánh giá</span>;
+}
+
+/** Nhãn và bộ lọc của hai màn chi tiết phải nhận cùng danh sách lưu ý. */
+export function eqaResultNotes(row: Pick<EqaResultRow, 'assigned_check' | 'provider_check' | 'warnings'>): string[] {
+  const out: string[] = [];
+  const check = row.assigned_check;
+  if (check?.uncertain) out.push(`Giá trị ấn định kém chắc chắn: u(x_pt) = ${check.ratio.toFixed(2)}·σp > 0,3·σp (N = ${check.n}); z′ = ${check.z_prime.toFixed(2)}`);
+  if (row.provider_check === 'mismatch' || row.provider_check === 'swapped') out.push(EQA_PROVIDER_CHECK_LABEL[row.provider_check]);
+  return [...out, ...row.warnings];
+}
+
+/** Giữ nhãn đánh giá và lưu ý giống nhau ở bảng từng đợt và chi tiết đợt. */
+export function EqaAssessmentTags({ cls, notes }: { cls: EqaClassView; notes: readonly string[] }) {
+  return <span className="eqa-tags"><ClassTag cls={cls} />{notes.length > 0 && <span className="tag warn" title={notes.join('\n')}>Có lưu ý</span>}</span>;
 }
 
 /** Chọn kết quả mặc định theo mức đánh giá trước, rồi theo |z|. Không dùng

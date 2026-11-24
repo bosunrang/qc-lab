@@ -155,7 +155,6 @@
   font-size:var(--title-panel); font-weight:var(--title-panel-weight); line-height:var(--leading-heading);
 }
 .wg-cusum-view-mode{flex:0 0 auto;}
-.wg-cusum-switch-panel{margin-bottom:var(--space-3);}
 
 /* Cùng kích thước HIỂN THỊ với `canvas.entryLJStack`: không để quy tắc
    canvas dùng chung ép về tối đa 1320px. Nếu bị thu nhỏ sau khi vẽ, chữ và

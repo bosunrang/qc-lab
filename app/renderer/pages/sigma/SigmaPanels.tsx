@@ -3,14 +3,14 @@
 // `SigmaPage.tsx` ngày 2026-09-26 (kế hoạch kiến trúc D.7); dữ liệu và kết luận
 // đều do main process tính, các khối này chỉ trình bày.
 import { SigmaTrendChart, SigmaMdcChart } from '../../components/SigmaCharts';
-import { sigmaDesignEligible } from '../../lib/sigma-workflow';
+import { designBlockedReason, sigmaDesignEligible } from '../../lib/sigma-workflow';
 import { ImprovementCard } from './ImprovementCard';
-import { cohortStatusLabel, designRunText, formatDpmo, missingSigmaInputs, sigmaZone, vnPeriod } from './shared';
+import { designRunText, formatDpmo, missingSigmaInputs, sigmaZone, vnPeriod } from './shared';
 import type { SigmaLevelResult, SigmaPeriodView } from '../../../shared/qc-api';
 
 export function SigmaStatusPanel({ period, testName, teaText }: { period: SigmaPeriodView | undefined; testName: string; teaText: string }) {
   return (
-    <div className="panel">
+    <div className="panel sg-status-panel">
       <h2 className="sg-setup-heading panel-title">Tình trạng</h2>
       {!period
         ? <div className="hint">Chưa có kỳ Sigma. Hãy thêm kỳ để bắt đầu.</div>
@@ -56,7 +56,7 @@ export function SigmaQcDesignPanel({ period, governingLevel, hasSingleOperationa
             return <tr key={lv.level}><td>Mức {lv.level}</td><td className="num" style={{ color: sigmaZone(lv.sigma?.sigma).c }}>{lv.sigma?.sigma.toFixed(2) ?? '—'}</td>
               {!lv.sigma ? <><td>—</td><td>Chưa đủ CV/Bias</td><td>Chưa đánh giá</td></>
                 : hasSingleOperationalLevel ? <><td><span className="hint">Chưa áp dụng</span></td><td>Cần tối thiểu 2 mức QC đang vận hành</td><td>Không đưa gợi ý Sigma Rules</td></>
-                : !eligible ? <><td><span className="hint">Chưa đủ điều kiện</span></td><td>{lv.cvSource !== 'iqc-cohort' ? 'CV nhập tay' : lv.cohortStale ? 'Cần nạp và rà soát lại' : !lv.cohortReviewed ? 'Chưa xác nhận rà soát' : cohortStatusLabel(lv.cohortStatus)}</td><td>Không dùng để đề xuất QC</td></>
+                : !eligible ? <><td><span className="hint">Chưa đủ điều kiện</span></td><td>{designBlockedReason(lv)}</td><td>Không dùng để đề xuất QC</td></>
                   : !design ? <><td>—</td><td>—</td><td>—</td></>
                     : <><td><b>{design.rules.join(' / ')}</b><div className="sg-cell-meta">{designRunText(design)} · bảng {design.levels} mức</div></td><td>{design.risk}</td><td>{design.plan}</td></>}
             </tr>;

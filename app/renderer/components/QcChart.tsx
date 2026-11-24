@@ -450,13 +450,13 @@ function drawLJ(
   });
   ctx.restore();
 
-  ctx.font = '800 11.5px Manrope,system-ui,sans-serif';
+  ctx.font = '700 13.5px Manrope,system-ui,sans-serif';
   ctx.fillStyle = '#17212b'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(comparison?.title ?? 'Levey-Jennings', padL + cw / 2, padT - 8);
 
   // Trục Y: bậc SD bên trái ('> +3'/'< -3' ở hai đầu), giá trị thật bên phải.
   // Biểu đồ đối chiếu chỉ có nhãn bên trái: bên phải sẽ lặp đúng giá trị đó.
-  ctx.font = '800 12.5px Manrope,system-ui,sans-serif';
+  ctx.font = '700 13px Manrope,system-ui,sans-serif';
   ctx.textBaseline = 'middle';
   for (const z of gridLevels) {
     const yy = y(mean + z * sd);
@@ -513,7 +513,7 @@ function drawLJ(
   ctx.restore();
 
   // Tên luật cạnh điểm Loại, đặt về phía giữa biểu đồ để không ra khỏi vùng vẽ.
-  ctx.font = '700 10.5px Manrope,system-ui,sans-serif';
+  ctx.font = '700 13px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center';
   const rejects = marks.filter((m) => m.p.verdict === 'rej' && m.p.rules.length);
   // Tâm nhãn kẹp trong vùng vẽ: điểm sát hai đầu trục không đẩy nhãn đè lên
@@ -532,7 +532,7 @@ function drawLJ(
     ctx.fillStyle = LJ.rejectPoint; ctx.fillText(text, tx, ty);
   }
 
-  ctx.fillStyle = '#536772'; ctx.font = '700 11.5px Manrope,system-ui,sans-serif';
+  ctx.fillStyle = '#536772'; ctx.font = '700 13px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   if (layout) {
     // Giãn nhãn theo chiều rộng chữ thực tế; tự bớt nhãn khi khung hẹp.
@@ -647,11 +647,11 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
   }
   ctx.restore();
 
-  ctx.font = '800 11.5px Manrope,system-ui,sans-serif';
+  ctx.font = '700 13.5px Manrope,system-ui,sans-serif';
   ctx.fillStyle = '#17212b'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText('Levey-Jennings tổng hợp', padL + cw / 2, padT - 8);
 
-  ctx.font = '800 12.5px Manrope,system-ui,sans-serif'; ctx.textBaseline = 'middle';
+  ctx.font = '700 13px Manrope,system-ui,sans-serif'; ctx.textBaseline = 'middle';
   for (const z of [3, 2, 1, 0, -1, -2, -3]) {
     const yy = y(z);
     const left = z === 3 ? '> +3' : z === -3 ? '< -3' : String(z);
@@ -689,7 +689,7 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
   });
   ctx.restore();
 
-  ctx.fillStyle = '#536772'; ctx.font = '700 11.5px Manrope,system-ui,sans-serif';
+  ctx.fillStyle = '#536772'; ctx.font = '700 13px Manrope,system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   const maxTicks = 5, total = Math.min(maxTicks, n);
   const tickIdx = total === 1 ? [0] : [...new Set(Array.from({ length: total }, (_, i) => Math.round((i * (n - 1)) / (total - 1))))];
@@ -697,7 +697,7 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
 
   // Chú giải theo mức: đoạn nét cùng màu và kiểu nét của đường.
   let lx = padL + 8; const ly = 10;
-  ctx.font = '800 11.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.font = '700 13.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   series.forEach((s, li) => {
     const color = MULTI_COLORS[li % MULTI_COLORS.length];
     const label = s.label || `Mức ${s.level}`;
@@ -720,11 +720,11 @@ function drawCusum(ctx: CanvasRenderingContext2D, width: number, height: number,
   const clampY = (v: number) => Math.max(padT, Math.min(padT + ch, yOf(v)));
 
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
-  ctx.font = '800 11.5px Manrope,system-ui,sans-serif';
+  ctx.font = '700 13.5px Manrope,system-ui,sans-serif';
   ctx.fillStyle = '#17212b'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(`CUSUM xu hướng (k=${k.toFixed(2)}, h=${h.toFixed(2)})`, padL + cw / 2, padT - 8);
 
-  ctx.font = '800 12.5px Manrope,system-ui,sans-serif'; ctx.textBaseline = 'middle';
+  ctx.font = '700 13px Manrope,system-ui,sans-serif'; ctx.textBaseline = 'middle';
   for (const v of [h, 0, -h]) {
     const gy = yOf(v);
     ctx.strokeStyle = v === 0 ? LJ.mean : '#e2a8a2';
@@ -812,9 +812,9 @@ function drawMultiCusum(ctx: CanvasRenderingContext2D, width: number, height: nu
   const x = (index: number) => runKeys.length <= 1 ? padL + cw / 2 : padL + markPad + (index / (runKeys.length - 1)) * (cw - markPad * 2);
 
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
-  ctx.font = '800 11.5px Manrope,system-ui,sans-serif'; ctx.fillStyle = '#17212b'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.font = '700 13.5px Manrope,system-ui,sans-serif'; ctx.fillStyle = '#17212b'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(`CUSUM tổng hợp theo mức (k=${k.toFixed(2)}, h=${h.toFixed(2)})`, padL + cw / 2, padT - 8);
-  ctx.font = '800 12.5px Manrope,system-ui,sans-serif'; ctx.textBaseline = 'middle';
+  ctx.font = '700 13px Manrope,system-ui,sans-serif'; ctx.textBaseline = 'middle';
   for (const value of [h, 0, -h]) {
     const yy = y(value); ctx.strokeStyle = value === 0 ? LJ.mean : '#e2a8a2'; ctx.lineWidth = value === 0 ? 1.8 : 1.15;
     ctx.setLineDash(value === 0 ? [] : [4, 3]); ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + cw, yy); ctx.stroke(); ctx.setLineDash([]);
@@ -824,7 +824,7 @@ function drawMultiCusum(ctx: CanvasRenderingContext2D, width: number, height: nu
 
   ctx.save(); ctx.beginPath(); ctx.rect(padL, padT, cw, ch); ctx.clip();
   if (allBranchesAtZero) {
-    ctx.fillStyle = '#536772'; ctx.font = '700 12px Manrope,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#536772'; ctx.font = '700 13px Manrope,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText('Các nhánh CUSUM đang trùng tại 0.00 — chưa có độ lệch vượt k để cộng dồn', padL + cw / 2, y(0) - 10);
   } else series.forEach((item, levelIndex) => {
     const [positive, negative] = MULTI_CUSUM_COLORS[levelIndex % MULTI_CUSUM_COLORS.length];
@@ -844,11 +844,11 @@ function drawMultiCusum(ctx: CanvasRenderingContext2D, width: number, height: nu
     });
   });
   ctx.restore();
-  ctx.fillStyle = '#536772'; ctx.font = '700 11.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#536772'; ctx.font = '700 13px Manrope,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   const ticks = Math.min(5, runKeys.length);
   const tickIndices = ticks === 1 ? [0] : [...new Set(Array.from({ length: ticks }, (_, i) => Math.round((i * (runKeys.length - 1)) / (ticks - 1))))];
   for (const index of tickIndices) { const date = runKeys[index].split('\u0000')[0]; ctx.fillText(vnDayMonth(date, date.slice(0, 5)), x(index), padT + ch + 10); }
-  let lx = padL + 8; const ly = 10; ctx.font = '800 11.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  let lx = padL + 8; const ly = 10; ctx.font = '700 13.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   series.forEach((item, index) => {
     const [positive, negative] = MULTI_CUSUM_COLORS[index % MULTI_CUSUM_COLORS.length];
     for (const [label, color] of [[`M${item.level}+`, positive], [`M${item.level}−`, negative]] as const) { ctx.fillStyle = color; ctx.fillRect(lx, ly - 2, 14, 4); ctx.fillStyle = '#17212b'; ctx.fillText(label, lx + 20, ly); lx += 20 + ctx.measureText(label).width + 12; }

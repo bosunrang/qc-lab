@@ -31,7 +31,7 @@ một thay đổi làm lệch kết quả tính toán sẽ bị chặn ngay khi 
 
 | Nhóm | Số ca | Kiểm |
 | --- | --- | --- |
-| Luật Westgard | 31 | 13 luật (1-2s, 1-3s, 2-2s, R4s, 3-1s, 4-1s, 6x, 8x, 9x, 10x, 12x, 7T, 2of3-2s), ca nổ và ca sát ranh giới không nổ; trong mức và liên mức (2–3 mức); hành động riêng của xét nghiệm (nâng, hạ, tắt luật); loại cả lần chạy; đổi Mean/SD giữa chuỗi |
+| Luật Westgard | 33 | 13 luật (1-2s, 1-3s, 2-2s, R4s, 3-1s, 4-1s, 6x, 8x, 9x, 10x, 12x, 7T, 2of3-2s), ca nổ và ca sát ranh giới không nổ; trong mức và liên mức (2–3 mức); bộ luật bật sẵn theo số mức (WG-26); hành động riêng của xét nghiệm (nâng, hạ, tắt luật); loại cả lần chạy; đổi Mean/SD giữa chuỗi |
 | Z-score, Mean, SD, CV | 5 | Z từng điểm; Mean/SD/CV quan sát (SD mẫu n − 1); điểm và lần chạy bị loại không vào thống kê; nhãn "tạm thời"; CV ở Tổng quan |
 | Six Sigma | 27 | Sigma, DPMO, Bias âm, Bias nhiều vòng EQA (trung bình có dấu cho Sigma, RMS cho MU), thiếu Bias; bảng Westgard Sigma Rules 2 và 3 mức, ranh giới 3σ, 4σ, 5σ, 6σ và số sát dưới ranh giới, 1 mức QC không có bảng; TEa CLIA dạng tuyệt đối và "lớn hơn giữa" quy đổi theo Mean từng mức; ngân sách MU (Nordtest và ISO/TS 20914, thiếu u(cal) hoặc u(Cref), U so với TEa); QGI; một ca trọn đường từ 30 điểm IQC tới gợi ý thiết kế QC |
 | CUSUM | 5 | C+ và C− từng lần chạy, tín hiệu ±h, k/h theo cấu hình, đặt lại từ lần chạy QC xác minh khi hồ sơ NCE cho phép hoạt động trở lại, CUSUM không tự loại điểm |

@@ -51,7 +51,7 @@ export function EqaZMap({ rounds, rows, visibleRows = rows, selected, onSelect, 
                 const cell = row.cells.find((c) => c.round_id === round.id && c.sample === sample);
                 const active = selected?.testId === row.test_id && selected.roundId === round.id && (selected.resultId ? selected.resultId === cell?.result_id : selected.sample === sample);
                 const label = `${row.test_name} · ${round.round}${sample ? ` · mẫu ${sample}` : ''}: ${cell ? `z = ${numText(cell.z)} · ${EQA_CLASS_LABEL[cell.class]}` : 'chưa có kết quả'}`;
-                return <td key={`${round.id}-${sample}`} className={`eqa-zcell is-${cell?.class ?? 'empty'}${active ? ' is-selected' : ''}`}>
+                return <td key={`${round.id}-${sample}`} className={`eqa-zcell is-${cell?.class ?? 'empty'}`}>
                   <button type="button" className="eqa-cell-button" title={label} aria-label={label} aria-pressed={active}
                     onClick={() => onSelect({ testId: row.test_id, roundId: round.id, resultId: cell?.result_id, sample })}>{cell ? numText(cell.z) : '—'}</button>
                 </td>;

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
+import { SearchClearButton } from '../../components/SearchSelect';
 import { RowActionButton } from '../../components/RowActionButton';
 import { reportFormError, confirmDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
 import { showToast } from '../../state/toast-store';
@@ -173,6 +174,16 @@ export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTe
     setNameQuery(input.value);
     if (input.form) fillTeaSuggestion(input.form, match);
     openNamePicker();
+  }
+
+  function clearTestName() {
+    const input = nameInputRef.current;
+    if (!input) return;
+    input.value = '';
+    changeTestName(input);
+    // Xoá bằng nút cũng là sửa biểu mẫu: gỡ lỗi ô nhập và giữ cảnh báo bỏ nháp.
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
   }
 
   function cancelNamePickerClose() {
@@ -358,7 +369,7 @@ export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTe
                           placeholder="Gõ để tìm tên, viết tắt hoặc bí danh…"
                           value={nameQuery}
                           onFocus={cancelNamePickerClose}
-                          onClick={openNamePicker}
+                          onClick={event => { if (!namePickerOpen) event.currentTarget.select(); openNamePicker(); }}
                           onBlur={closeNamePickerSoon}
                           onChange={(event) => changeTestName(event.currentTarget)}
                           onKeyDown={(event) => {
@@ -370,6 +381,8 @@ export function TestsTab({ openTestId, onNeedInstrument, onGoTeaRefs }: { openTe
                               event.preventDefault(); chooseTeaSuggestion(matchingSuggestions[0]);
                             }
                           }} />
+                        {nameQuery.length > 0 && <SearchClearButton onClear={clearTestName} ariaLabel="Xoá tên xét nghiệm" title="Xoá tên để nhập lại"
+                          onEscape={namePickerOpen ? () => { setNamePickerOpen(false); nameInputRef.current?.focus(); } : undefined} />}
                         {namePickerOpen && (
                           <div id="assayTeaSuggestions" className="search-select-menu" role="listbox">
                             {matchingSuggestions.length ? matchingSuggestions.map((item) => (

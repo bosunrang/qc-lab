@@ -99,7 +99,7 @@ test('báo cáo ngoại kiểm: xem trước, lịch sử cạnh phiếu, bản 
       assert(Math.abs(right.x + right.width - filter.x - filter.width) <= 1, `khung cuối thẳng mép phải với bộ chọn ở ${width}px`);
       assert(a.x + a.width <= b.x + 1, `hai cột không chồng ở ${width}px`);
       if (width > 1500) assert(b.x + b.width <= h.x + 1, 'lịch sử nằm bên phải bản xem trước');
-      else assert(b.y + b.height <= h.y + 1, 'lịch sử nằm dưới bản xem trước khi thu hẹp');
+      else assert(Math.abs(h.y - (b.y + b.height) - 16) <= 1, 'lịch sử cách bản xem trước 16 px khi xếp dọc');
       assert.equal(await reports.evaluate(el => el.scrollWidth > el.clientWidth), false, `không tràn ngang ở ${width}px`);
       const body = editor.locator('.eqa-report-editor-body');
       const footer = editor.locator('.eqa-editor-footer');
@@ -117,9 +117,9 @@ test('báo cáo ngoại kiểm: xem trước, lịch sử cạnh phiếu, bản 
     await page.waitForTimeout(250);
     const smallEditor = await editor.boundingBox(), smallPreview = await preview.boundingBox();
     await page.screenshot({ path: path.join(userDataDir, 'eqa-report-split-narrow.png'), fullPage: true });
-    assert(smallEditor.y + smallEditor.height <= smallPreview.y + 1, `cửa sổ hẹp xếp khung nhập trên bản xem trước: ${JSON.stringify({ smallEditor, smallPreview })}`);
+    assert(Math.abs(smallPreview.y - (smallEditor.y + smallEditor.height) - 16) <= 1, 'cửa sổ hẹp xếp khung nhập cách bản xem trước 16 px');
     const smallHistory = await history.boundingBox();
-    assert(smallPreview.y + smallPreview.height <= smallHistory.y + 1, 'màn hình hẹp xếp lịch sử dưới phiếu');
+    assert(Math.abs(smallHistory.y - (smallPreview.y + smallPreview.height) - 16) <= 1, 'cửa sổ hẹp xếp bản xem trước cách lịch sử 16 px');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(userDataDir, 'eqa-report-split-draft.png'), fullPage: true });

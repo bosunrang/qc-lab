@@ -1,4 +1,4 @@
-import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
+import type { SigmaCohortView, SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 
 /** Mức có đủ điều kiện dùng cho thiết kế QC hay không — đọc kết quả của main,
  * không dò lại điều kiện. `listPeriods()` chỉ để `qualityDesign` khác `null`
@@ -8,6 +8,23 @@ import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
 export function sigmaDesignEligible(level: SigmaLevelResult): boolean {
   return level.qualityDesign != null;
 }
+export function cohortStatusLabel(status: SigmaCohortView['status'] | string): string {
+  return status === 'eligible' ? 'Đủ số điểm — cần rà soát' : status === 'provisional' ? 'Tạm thời (20–29)' : status === 'insufficient' ? 'Chưa đủ (<20)'
+    : status === 'out-of-control' ? 'Mất kiểm soát chưa xử lý' : 'Không ổn định';
+}
+
+/** Vì sao một mức đã có Sigma mà chưa được đưa gợi ý thiết kế QC — một nguồn
+ * cho cả màn hình và bản in. Nhóm IQC đủ điều kiện, đã rà soát mà main vẫn
+ * không đưa gợi ý thì xét nghiệm chỉ có một mức đang vận hành (Westgard chỉ
+ * công bố bảng cho 2 và 3 mức). */
+export function designBlockedReason(level: SigmaLevelResult): string {
+  if (level.cvSource !== 'iqc-cohort') return 'CV nhập tay';
+  if (level.cohortStale) return 'Cần nạp và rà soát lại';
+  if (!level.cohortReviewed) return 'Chưa xác nhận rà soát IQC';
+  if (level.cohortStatus === 'eligible') return 'Cần tối thiểu 2 mức QC đang vận hành';
+  return cohortStatusLabel(level.cohortStatus ?? '');
+}
+
 export function governingSigmaLevel(period: SigmaPeriodView | undefined): SigmaLevelResult | undefined {
   if (!period?.levels.length || !period.levels.every(sigmaDesignEligible)) return undefined;
   return [...period.levels].sort((a, b) => a.sigma!.sigma - b.sigma!.sigma)[0];

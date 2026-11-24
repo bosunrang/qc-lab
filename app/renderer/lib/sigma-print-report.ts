@@ -1,5 +1,5 @@
 import type { SigmaLevelResult, SigmaPeriodView } from '../../shared/qc-api';
-import { sigmaDesignEligible } from './sigma-workflow';
+import { designBlockedReason, sigmaDesignEligible } from './sigma-workflow';
 import { drawMdcChart, drawPeriodChart, levelAt, qcDesign, SIGMA_GRADE_LEGEND, sigmaOf, teaText, zone } from './sigma-summary-export';
 import { DOCUMENT_CSS, documentHeader, escapeHtml, signatureBlock, type PrintIdentity } from './print-document';
 
@@ -114,8 +114,7 @@ function biasSource(level: SigmaLevelResult): string {
 function designCells(level: SigmaLevelResult): [string, string, string] {
   if (!level.sigma) return ['—', 'Chưa đủ CV/Bias/TEa', 'Chưa đánh giá'];
   if (!sigmaDesignEligible(level) || !level.qualityDesign) {
-    const reason = level.cvSource !== 'iqc-cohort' ? 'CV nhập tay' : level.cohortStale ? 'Cần nạp và rà soát lại' : !level.cohortReviewed ? 'Chưa xác nhận rà soát IQC' : level.cohortStatus === 'out-of-control' ? 'Mất kiểm soát chưa xử lý' : 'Chưa đủ điều kiện';
-    return ['Chưa đưa gợi ý', reason, 'Không dùng để đề xuất QC'];
+    return ['Chưa đưa gợi ý', designBlockedReason(level), 'Không dùng để đề xuất QC'];
   }
   const design = level.qualityDesign;
   const run = `N=${design.n}${design.r > 1 ? ` · R=${design.r}` : ''}`;

@@ -57,7 +57,6 @@ export function WestgardPage() {
   const [cusumView, setCusumView] = useState<'summary' | 'levels'>('summary');
 
   useCatalog(['tests', 'instruments', 'lots', 'lotGroups', 'summaries']);
-  useEffect(() => { loadRuleSettings(); }, [loadRuleSettings]);
   const currentSummary = summaries.find((s) => s.testId === testId);
   // Ghi nhớ các mảng/đối tượng dẫn xuất: chúng là phụ thuộc của useMemo dựng
   // dữ liệu biểu đồ bên dưới. Tạo mới mỗi lần render thì biểu đồ bị dựng lại
@@ -67,6 +66,12 @@ export function WestgardPage() {
   const previousLotBlocks = useMemo(() => (analysisTestId === testId ? loadedPrevious : []), [analysisTestId, testId, loadedPrevious]);
   const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError;
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
+  // Panel cấu hình chung hiện mặc định theo số mức của xét nghiệm đang xem (WG-26).
+  const ruleLevelCount = levelNums.length || 2;
+  useEffect(() => {
+    useWestgardStore.setState({ ruleLevelCount });
+    void loadRuleSettings(ruleLevelCount);
+  }, [ruleLevelCount, loadRuleSettings]);
   // Đã nạp danh sách mức (khác `undefined`) mà không còn mức nào vận hành.
   const noOperationalLevels = !!testId && levelsByTestId[testId] !== undefined && !levels.length;
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
@@ -237,7 +242,7 @@ export function WestgardPage() {
                   <b>Cấu hình chung của luật</b>
                   <div className="flow-note">
                     {ruleSettings.map((r) => (
-                      <span className="wg-rule-item" key={r.id}>
+                      <span className="wg-rule-item" key={r.id} title={r.custom ? 'Đã đặt riêng ở cấu hình chung' : `Mặc định cho xét nghiệm ${ruleLevelCount} mức`}>
                         <label><input type="checkbox" checked={r.on} disabled={!ruleSettingsEditable} onChange={(e) => onToggleRule(r.id, e.target.checked)} /><span className="pill">{r.id}</span></label>
                       </span>
                     ))}
@@ -309,7 +314,7 @@ export function WestgardPage() {
         </div>
       )}
       {view === 'current' && testId && chartMode === 'cusum' && cusumOn && levels.length >= 2 && cusumView === 'levels' && (
-        <div className="panel wg-multi-panel wg-cusum-switch-panel">
+        <div className="panel wg-multi-panel">
           <div className="wg-cusum-heading">
             <h2 className="panel-title">Xu hướng CUSUM theo từng mức</h2>
             <div className="dayseg wg-cusum-view-mode" role="group" aria-label="Cách xem biểu đồ CUSUM">

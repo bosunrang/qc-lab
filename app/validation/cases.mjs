@@ -13,8 +13,10 @@
 // - Được đưa vào thống kê (`accepted`): lần chạy có BẤT KỲ điểm "Loại bỏ" nào
 //   thì mọi mức của lần chạy đó bị loại khỏi thống kê (quyết định WG-16).
 //
-// Luật bật mặc định (registry): 1-2s (cảnh báo), 1-3s, 2-2s, R4s, 4-1s, 6x,
-// 10x. Ca cần luật khác thì ghi ở `rules` (hành động riêng của xét nghiệm).
+// Luật bật mặc định (registry) theo số mức QC (WG-26): 1–2 mức dùng 1-2s
+// (cảnh báo), 1-3s, 2-2s, R4s, 4-1s, 10x; từ 3 mức dùng 1-2s (cảnh báo), 1-3s,
+// 2of3-2s, R4s, 3-1s, 12x. Ca cần luật khác thì ghi ở `rules` (hành động
+// riêng của xét nghiệm).
 
 export const L1 = { level: 1, mean: 100, sd: 2 };
 export const L2 = { level: 2, mean: 200, sd: 5 };
@@ -27,6 +29,7 @@ const multi = (rows) => rows.map((row) => ({ z: Object.fromEntries(row.map((z, i
 
 const REF = {
   westgard: 'Westgard JO. "Westgard Rules" và "Multirule QC" — westgard.com',
+  wg26: 'Quyết định WG-26 (docs/WESTGARD-REVIEW-2026-09-22-lan2.md): luật bật sẵn theo số mức QC — 1–2 mức 1-3s/2-2s/R4s/4-1s/10x, từ 3 mức 1-3s/2of3-2s/R4s/3-1s/12x; 6x không bật sẵn',
   wg16: 'Quyết định WG-16 (docs/WESTGARD-REVIEW-2026-09-22-lan2.md): lần chạy có điểm Loại bỏ thì mọi mức của lần chạy đó ra khỏi thống kê',
   wg19: 'Quyết định WG-19: luật đếm chuỗi không nối qua mốc đổi Mean/SD; điểm cũ giữ Mean/SD đã chốt lúc nhập',
   wg20: 'Quyết định WG-20: điểm vượt MỚI NHẤT trong cửa sổ mang kết luận 2of3-2s',
@@ -101,14 +104,14 @@ export const WESTGARD_CASES = [
     basis: `${REF.westgard}: 4-1s đòi đủ bốn kết quả liên tiếp.`,
   },
   {
-    id: 'WG-10', title: '6x: sáu điểm liên tiếp cùng phía Mean',
-    levels: [L1], runs: seq([-0.5, 0.3, 0.5, 0.2, 0.6, 0.4, 0.3]),
+    id: 'WG-10', title: '6x: sáu điểm liên tiếp cùng phía Mean (bật 6x)',
+    levels: [L1], rules: { '6x': 'reject' }, runs: seq([-0.5, 0.3, 0.5, 0.2, 0.6, 0.4, 0.3]),
     expect: { points: { '7/1': { verdict: 'rej', rules: ['6x'] } } },
-    basis: 'Luật 6x (bật mặc định): sáu kết quả liên tiếp cùng phía so với Mean.',
+    basis: 'Luật 6x (xét nghiệm tự bật, không bật sẵn theo WG-26): sáu kết quả liên tiếp cùng phía so với Mean.',
   },
   {
-    id: 'WG-11', title: '6x: chỉ năm điểm cùng phía thì không nổ',
-    levels: [L1], runs: seq([-0.5, 0.3, 0.5, 0.2, 0.6, 0.4, -0.3]),
+    id: 'WG-11', title: '6x: chỉ năm điểm cùng phía thì không nổ (bật 6x)',
+    levels: [L1], rules: { '6x': 'reject' }, runs: seq([-0.5, 0.3, 0.5, 0.2, 0.6, 0.4, -0.3]),
     expect: { points: {} },
     basis: 'Luật 6x đòi đủ sáu kết quả liên tiếp.',
   },
@@ -226,10 +229,10 @@ export const WESTGARD_CASES = [
     basis: `${REF.westgard}: 3-1s với ba mức QC trong một lần chạy.`,
   },
   {
-    id: 'WG-29', title: '2of3-2s liên mức: 2 trong 3 mức cùng vượt +2SD (bật 2of3-2s)',
-    levels: [L1, L2, L3], rules: { '2of3-2s': 'reject' }, runs: multi([[0.5, -0.5, 0.4], [2.3, 2.5, 0.2]]),
-    expect: { points: { '2/1': { verdict: 'rej', rules: ['1-2s', '2-2s', '2of3-2s'] }, '2/2': { verdict: 'rej', rules: ['1-2s', '2-2s', '2of3-2s'] } } },
-    basis: `${REF.westgard}: 2of3-2s dùng cho 3 mức QC; hai mức cùng vượt 2SD cũng là 2-2s liên mức. Mức 3 Đạt nhưng cả lần chạy bị loại (WG-16).`,
+    id: 'WG-29', title: '3 mức QC: 2of3-2s bật sẵn, 2 trong 3 mức cùng vượt +2SD',
+    levels: [L1, L2, L3], runs: multi([[0.5, -0.5, 0.4], [2.3, 2.5, 0.2]]),
+    expect: { points: { '2/1': { verdict: 'rej', rules: ['1-2s', '2of3-2s'] }, '2/2': { verdict: 'rej', rules: ['1-2s', '2of3-2s'] } } },
+    basis: `${REF.westgard}: 2of3-2s dùng cho 3 mức QC. ${REF.wg26}, nên 2-2s không chạy ở xét nghiệm 3 mức. Mức 3 Đạt nhưng cả lần chạy bị loại (WG-16).`,
   },
   {
     id: 'WG-30', title: 'Lần chạy bị loại: mức khác Đạt nhưng không vào thống kê',
@@ -254,6 +257,18 @@ export const WESTGARD_CASES = [
       points: { '3/1': { verdict: 'rej', rules: ['1-3s'] }, '6/1': { verdict: 'warn', rules: ['1-3s'] } },
     },
     basis: `${REF.gv2}. Lần chạy 6 nhập sau khi đổi nên 1-3s chỉ còn cảnh báo.`,
+  },
+  {
+    id: 'WG-33', title: '2 mức QC: 6x không bật sẵn — 3 lần chạy cả hai mức cùng phía Mean vẫn Đạt',
+    levels: [L1, L2], runs: multi([[0.3, 0.4], [0.5, 0.2], [0.6, 0.3]]),
+    expect: { points: {} },
+    basis: `${REF.wg26}. Trước WG-26, 6x gộp hai mức nổ ở lần chạy 3 và làm khoảng 10% lần chạy ổn định bị loại giả.`,
+  },
+  {
+    id: 'WG-34', title: '3 mức QC: 3-1s bật sẵn — cả ba mức cùng vượt +1SD trong một lần chạy',
+    levels: [L1, L2, L3], runs: multi([[0.2, -0.3, 0.1], [1.2, 1.4, 1.1]]),
+    expect: { points: { '2/1': { verdict: 'rej', rules: ['3-1s'] }, '2/2': { verdict: 'rej', rules: ['3-1s'] }, '2/3': { verdict: 'rej', rules: ['3-1s'] } } },
+    basis: `${REF.westgard}: 3-1s dùng cho 3 mức QC. ${REF.wg26}.`,
   },
 ];
 

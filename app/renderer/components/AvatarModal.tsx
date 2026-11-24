@@ -5,7 +5,7 @@ import { Modal } from './Modal';
 
 const AVATAR_SIZE = 160;
 
-export function AvatarModal({ onClose }: { onClose: () => void }) {
+export function AvatarModal({ initials, onClose }: { initials: string; onClose: () => void }) {
   const { user, setAvatar, clearAvatar } = useAuthStore(useShallow((s) => ({ user: s.user, setAvatar: s.setAvatar, clearAvatar: s.clearAvatar })));
   const [fileName, setFileName] = useState('Chưa chọn ảnh nào');
   const [busy, setBusy] = useState(false);
@@ -50,7 +50,7 @@ export function AvatarModal({ onClose }: { onClose: () => void }) {
     <Modal title="Ảnh đại diện" onClose={onClose} guardUnsaved={false}
       footer={<><button type="button" className="btn ghost" disabled={busy || !user?.avatar} onClick={clear}>Xoá ảnh</button><button type="button" className="btn teal" onClick={onClose}>Đóng</button></>}>
       <div className="avatar-modal-preview">
-        {user?.avatar ? <img src={user.avatar} alt="Ảnh đại diện" /> : <div className="avatar-modal-initial">{(user?.name || user?.username || 'U').trim().charAt(0).toUpperCase() || 'U'}</div>}
+        {user?.avatar ? <img src={user.avatar} alt="Ảnh đại diện" /> : <div className="avatar-modal-initial">{initials}</div>}
       </div>
       <div className="field">
         <label htmlFor="avatarPick">Chọn ảnh mới</label>

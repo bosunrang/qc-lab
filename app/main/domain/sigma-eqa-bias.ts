@@ -12,18 +12,17 @@ export interface SigmaEqaSample {
   reportDate: string;
   result: number;
   assigned: number;
-  /** Giá trị ấn định kém chắc chắn (u(x_pt) > 0,3·σp, N-05). */
+  /** Cảnh báo cần rà soát khi u(x_pt) ước tính > 0,3·σp; không tự loại mẫu. */
   assignedUncertain: boolean;
   /** Nhóm nguyên nhân của hồ sơ NCE gắn với kết quả (nếu có). */
   ncCauseCategory: string;
 }
 
-export type SigmaEqaExclusion = 'after-period' | 'outside-window' | 'nce-cause' | 'assigned-uncertain' | 'invalid';
+export type SigmaEqaExclusion = 'after-period' | 'outside-window' | 'nce-cause' | 'invalid';
 export const SIGMA_EQA_EXCLUSION_LABEL: Readonly<Record<SigmaEqaExclusion, string>> = {
   'after-period': 'Báo cáo sau kỳ Sigma',
   'outside-window': 'Báo cáo trước khoảng thời gian đã chọn',
   'nce-cause': 'Điều tra kết luận lỗi hành chính hoặc chương trình/mẫu',
-  'assigned-uncertain': 'Giá trị ấn định kém chắc chắn',
   invalid: 'Thiếu kết quả hoặc giá trị ấn định',
 };
 
@@ -68,7 +67,6 @@ export function selectSigmaEqaBias(samples: readonly SigmaEqaSample[], options: 
       : s.reportDate > end ? 'after-period'
       : s.reportDate < start ? 'outside-window'
       : ['eqa_administrative', 'eqa_program'].includes(s.ncCauseCategory) ? 'nce-cause'
-      : s.assignedUncertain ? 'assigned-uncertain'
       : null;
     if (reason) excluded.push({ ...s, reason });
     else included.push({ ...s, bias: (s.result - s.assigned) / Math.abs(s.assigned) * 100 });

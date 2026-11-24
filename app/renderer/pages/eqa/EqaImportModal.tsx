@@ -150,7 +150,7 @@ export function EqaImportModal({ onClose, onImported }: { onClose: () => void; o
         {reports.length > 0 && (
           <>
             <p className="eqa-note">{reports.length} tệp thuộc {groups.length} đợt. Kiểm tra năm của từng tệp trước khi tiếp tục; năm là một phần của đợt nên sửa năm sẽ chuyển tệp sang đợt khác.</p>
-            <div className="eqa-table-wrap">
+            <div className="eqa-table-wrap" role="region" aria-label="Danh sách báo cáo PDF đã đọc" tabIndex={0}>
               <table className="eqa-table eqa-center-rest eqa-import-files">
                 <thead><tr><th>File</th><th>Nhóm thiết bị trên báo cáo</th><th>Chương trình · đợt</th><th>Năm</th><th>Mẫu</th><th className="num">Thông số</th><th>Máy của PXN</th><th>Đọc file</th></tr></thead>
                 <tbody>

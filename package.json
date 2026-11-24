@@ -1,6 +1,6 @@
 {
   "name": "qc-lab",
-  "version": "1.1.3",
+  "version": "1.1.5",
   "description": "QC Lab - Nội kiểm chất lượng xét nghiệm (IQC) cho phòng xét nghiệm lâm sàng",
   "author": "QC Lab",
   "license": "UNLICENSED",
@@ -72,6 +72,7 @@
     },
     "files": [
       "app-dist/**/*",
+      "!app-dist/mock/**/*",
       "build/icon.png",
       "!app-dist/renderer/assets/*.wasm",
       "package.json"

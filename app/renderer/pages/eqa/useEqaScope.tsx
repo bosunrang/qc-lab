@@ -13,10 +13,12 @@ export interface EqaSelection { testId: string; roundId: string; resultId?: stri
 /** Chỉ mang phạm vi đọc sang màn khác, không mang trạng thái hộp thoại. */
 export function eqaContextParams(params: URLSearchParams, context: EqaNavigationContext = {}): URLSearchParams {
   const next = new URLSearchParams();
-  for (const key of ['year', 'program', 'machine']) if (params.get(key)) next.set(key, params.get(key)!);
+  for (const key of ['year', 'program', 'machine', 'roundMachine', 'roundFilter', 'roundCancelled']) if (params.get(key)) next.set(key, params.get(key)!);
   if (context.year !== undefined) next.set('year', String(context.year));
   if (context.programId) next.set('program', context.programId);
-  if (context.instrumentId) next.set('machine', context.instrumentId);
+  if (context.instrumentId !== undefined) {
+    if (context.instrumentId) next.set('machine', context.instrumentId); else next.delete('machine');
+  }
   if (context.resultId) next.set('point', context.resultId);
   if (context.roundId) next.set('round', context.roundId);
   return next;
@@ -45,15 +47,23 @@ export function useEqaScope(preferredInstrumentId?: string) {
   const scopedRounds = yearRounds.filter((r) => r.program_id === programId)
     .sort((a, b) => a.round_no - b.round_no || a.report_date.localeCompare(b.report_date));
   // Máy đã khai nhưng chưa có báo cáo vẫn chọn được để người dùng thấy thiếu.
-  const machines = [...new Map(scopedRounds.flatMap((r) => [...r.by_instrument, ...r.missing_instruments])
+  // Giữ cả máy chỉ còn đợt đã huỷ để vẫn tra cứu được theo máy đó.
+  const machineRounds = rounds.filter((r) => r.year === year && r.program_id === programId);
+  const machines = [...new Map(machineRounds.flatMap((r) => [...r.by_instrument, ...r.missing_instruments])
     .map((i) => [i.instrument_id, { id: i.instrument_id, name: i.instrument_name }])).values()]
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   const wantedMachine = preferredInstrumentId || params.get('machine');
-  const instrumentId = machines.some((i) => i.id === wantedMachine) ? wantedMachine! : preferredInstrumentId || machines[0]?.id || '';
+  const activeMachineIds = new Set(scopedRounds.flatMap((r) => [...r.by_instrument, ...r.missing_instruments]).map((i) => i.instrument_id));
+  const defaultMachine = machines.find((i) => activeMachineIds.has(i.id)) ?? machines[0];
+  const instrumentId = machines.some((i) => i.id === wantedMachine) ? wantedMachine! : preferredInstrumentId || defaultMachine?.id || '';
   const context: EqaNavigationContext = { year, programId, instrumentId };
 
   function change(next: Partial<EqaNavigationContext>) {
     const query = eqaContextParams(params, { ...context, ...next });
+    // Các bộ lọc riêng của danh sách đợt trở về tất cả khi đổi năm/chương trình.
+    if (next.year !== undefined && next.year !== year || next.programId !== undefined && next.programId !== programId) {
+      query.delete('roundMachine'); query.delete('roundFilter');
+    }
     if (params.get('test')) query.set('test', params.get('test')!);
     // Đổi phạm vi không giữ ô kết quả của phạm vi trước.
     setParams(query, { replace: true });

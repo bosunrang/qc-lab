@@ -17,6 +17,22 @@ const rounds = ['r1', 'r2', 'r3'].map((id) => ({ id }));
 const cell = (id, round, z, cls = 'ok', sample = '') => ({ result_id: id, round_id: round, z, class: cls, sample });
 const row = (id, cells) => ({ test_id: id, test_name: id, unit: 'mmol/L', cells });
 
+test('ngoại kiểm: danh sách đợt giữ số liệu từng máy, bỏ đợt không có máy và giữ đợt đã huỷ để tra cứu', () => {
+  const a = { instrument_id: 'a', instrument_name: 'Máy 1', total: 2, ok: 2, warn: 0, rej: 0 };
+  const b = { instrument_id: 'b', instrument_name: 'Máy 2', total: 3, ok: 1, warn: 1, rej: 1 };
+  const round = (id, by_instrument, extra = {}) => ({ id, year: 2026, program_id: 'p', status: 'open', by_instrument, total: 5, ok: 3, warn: 1, rej: 1, ...extra });
+  const shared = round('shared', [a, b]), onlyA = round('only-a', [a]), cancelled = round('cancelled', [a, b], { status: 'cancelled' });
+  const data = [shared, onlyA, cancelled, round('old-year', [b], { year: 2025 }), round('other-program', [b], { program_id: 'other' })];
+  const selected = model.overviewRoundRows(data, 2026, 'p', 'b');
+  assert.deepEqual(selected.map(item => item.round.id), ['shared', 'cancelled']);
+  assert.deepEqual(selected.map(item => item.instrument), [b, b]);
+  assert.equal(selected[0].instrument.total, 3, 'không dùng tổng 5 kết quả của cả báo cáo');
+  assert.equal(selected[0].instrument.rej, 1, 'giữ xếp loại main đã trả về');
+  assert.deepEqual(model.overviewRoundRows(data, 2026, 'p', 'missing'), []);
+  assert.deepEqual(model.overviewRoundRows(data, 2026, 'p', '').map(item => [item.round.id, item.instrument.instrument_id]),
+    [['shared', 'a'], ['shared', 'b'], ['only-a', 'a'], ['cancelled', 'a'], ['cancelled', 'b']], 'tất cả máy vẫn tách từng máy thành dòng riêng');
+});
+
 test('ngoại kiểm: tỷ lệ tính theo kết quả đã nhập, dùng xếp loại main và không coi ô thiếu là đạt', () => {
   const totals = model.overviewTotals([row('Na', [cell('a', 'r1', 3.2, 'ok'), cell('b', 'r2', 2.4, 'warn')]), row('K', [cell('c', 'r1', -3.5, 'rej')])]);
   assert.deepEqual(totals, { total: 3, ok: 1, warn: 1, rej: 1, acceptPct: 100 / 3 });

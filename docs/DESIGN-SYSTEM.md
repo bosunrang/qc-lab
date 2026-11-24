@@ -1,6 +1,6 @@
 # Hệ thiết kế QC Lab — Clinical Precision
 
-Cập nhật 2026-09-25. Nguồn giá trị duy nhất là
+Cập nhật thang chữ 2026-11-24. Nguồn giá trị duy nhất là
 `app/renderer/styles/tokens.css`; mọi quy tắc dưới đây được khoá bằng
 `app/tests/design-system.test.mjs` (chạy qua `npm test`). Khi tài liệu và
 tokens.css lệch nhau, tokens.css đúng — sửa tài liệu.
@@ -22,10 +22,11 @@ Lớp 4 "bí danh tạm" (91 tên đồng nghĩa, 820 chỗ dùng) đã xoá ng�
 
 | Nhóm | Giá trị | Token |
 | --- | --- | --- |
-| Cỡ chữ | 11 / 12 / 13 / 14 / 16 / 20 / 24 / 30px | `--text-2xs` … `--text-2xl` |
+| Cỡ chữ | chữ phụ 13, bảng/nhãn/bộ lọc 13.5, nội dung/control 14, tiêu đề 16 / 20 / 24, KPI 30px | `--text-xs/sm/base/md/lg/xl/2xl`; tên `--text-2xs` cũ trỏ về chữ phụ 13px |
 | Độ đậm | 400 / 500 / 600 / 700 (chỉ 4 file font) | `--weight-normal/medium/semibold/bold` |
 | Dãn dòng | 1 / 1.15 / 1.3 / 1.4 / 1.55 | `--leading-none/display/heading/snug/body` |
-| Tiêu đề | trang 24, hero 24, panel 16, khối con 14, thẻ 13, overline 11 | `--title-page/hero/panel/sub/card/overline` |
+| Tiêu đề | trang 24, hero 24, panel 16, khối con 14, thẻ 13.5, overline 13 | `--title-page/hero/panel/sub/card/overline` |
+| Thanh điều hướng | mục 14, nhãn nhóm 11 | `--text-base`, `--sidebar-group-font-size` |
 | Khoảng cách | 2 / 4 / 6 / 8 / 10 / 12 / 14 / 16 / 20 / 24 / 32px | `--space-0-5` … `--space-8` |
 | Bo góc | 8px mọi nơi; pill 999px | `--radius-sm/md/lg`, `--radius-full` |
 | Chiều cao control | 28 / 32 / 36px | `--control-h-sm`, `--control-h-compact`, `--control-h` |
@@ -82,6 +83,16 @@ Ghi chú:
 | `RowActionButton` | Nút sửa/xoá vuông trong hàng | Nút danger có chữ riêng cho cùng thao tác |
 | Vòng focus | Một vòng `--focus-ring` cho cả app | Tạo viền focus thứ hai |
 
+### Lề trang và khoảng cách giữa các khung
+
+Tiêu đề và nội dung cùng dùng `--page-gutter` cho lề trái và phải.
+Lề là **24 px** trên desktop và thu dần tới **20 px** ở cửa sổ hẹp.
+
+Các khung nội dung cùng cấp xếp dọc trên trang cách nhau **16 px** theo
+`--panel-stack-gap`. Luồng thông thường dùng lề dưới mặc định của `.panel`.
+Với lưới hoặc flex xếp dọc, khối cha có thể dùng token đó cho khoảng cách
+giữa các hàng và đặt lề dưới của khung con về 0 để tránh cộng dồn.
+
 ## Thêm một giá trị mới
 
 1. Kiểm tra thang hiện có trước — đa số trường hợp là làm tròn về bậc gần nhất.
@@ -109,6 +120,7 @@ Tất cả nằm trong `app/tests/design-system.test.mjs`:
 | Chỉ 4 độ đậm | chỉ dùng độ đậm có file font thật |
 | Không dùng màu primitive | CSS trang không được đụng thẳng vào lớp primitive |
 | Lưới khoảng cách | mọi padding/margin/gap đều nằm trên thang khoảng cách |
+| Khung xếp dọc cách nhau 16 px | các khung xếp dọc dùng khoảng cách 16 px |
 | Một vòng focus | chỉ có một vòng focus dùng chung; focus chuột và bàn phím không tạo hai viền accent |
 | Không hex/rgb/!important/cỡ chữ thô | CSS trang không còn giá trị thô nào |
 | EmptyState | thông báo trống chỉ dựng qua EmptyState, CSS trang không đè viền/nền |

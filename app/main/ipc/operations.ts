@@ -249,9 +249,9 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     // Ba dòng cấu hình luật dưới đây chỉ cần quyền ghi nhưng vẫn là việc quản
     // trị, nên không mở qua LAN.
     saveRuleAction: { channel: 'westgard:saveRuleAction', lan: false, run: (ctx, testId, ruleId, action) => westgard.saveRuleAction(testId, ruleId, action, ctx.actor()) },
-    listRuleSettings: { channel: 'westgard:listRuleSettings', lan: true, run: () => westgard.listRuleSettings() },
+    listRuleSettings: { channel: 'westgard:listRuleSettings', lan: true, run: (_ctx, levelCount) => westgard.listRuleSettings(levelCount) },
     saveRuleSetting: { channel: 'westgard:saveRuleSetting', lan: false, run: (ctx, ruleId, on) => westgard.saveRuleSetting(ruleId, on, ctx.actor()) },
-    resetRuleSettings: { channel: 'westgard:resetRuleSettings', lan: false, run: (ctx) => westgard.resetRuleSettings(ctx.actor()) },
+    resetRuleSettings: { channel: 'westgard:resetRuleSettings', lan: false, run: (ctx, levelCount) => westgard.resetRuleSettings(levelCount, ctx.actor()) },
     listArchivedBlocks: { channel: 'westgard:listArchivedBlocks', lan: true, run: (_ctx, testId, groupId) => westgard.listArchivedBlocks(testId, groupId) },
     listArchivedGroupTests: { channel: 'westgard:listArchivedGroupTests', lan: true, run: (_ctx, groupId) => westgard.listArchivedGroupTests(groupId) },
     listPreviousLotBlocks: { channel: 'westgard:listPreviousLotBlocks', lan: true, run: (_ctx, testId) => westgard.listPreviousLotBlocks(testId) },

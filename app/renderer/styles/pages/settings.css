@@ -3,9 +3,9 @@
 .settings-profile-grid{
   display:grid;
   grid-template-columns:minmax(320px,.8fr) minmax(0,1.2fr);
-  gap:var(--space-4);
+  gap:var(--panel-stack-gap) var(--space-4);
   align-items:stretch;
-  margin-bottom:var(--space-4);
+  margin-bottom:var(--panel-stack-gap);
 }
 
 .settings-profile-grid > .panel{
@@ -16,9 +16,9 @@
 .settings-cloud-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:var(--space-4);
+  gap:var(--panel-stack-gap) var(--space-4);
   align-items:stretch;
-  margin-bottom:var(--space-4);
+  margin-bottom:var(--panel-stack-gap);
 }
 
 .settings-cloud-grid > .panel{
@@ -100,9 +100,8 @@
   margin-top:var(--space-0-5);
   color:var(--text-tertiary);
   font-size:var(--text-xs);
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:.06em;
+  font-weight:var(--weight-medium);
+  overflow-wrap:anywhere;
 }
 
 /* Các công cụ quản trị (4 hoặc 5 thẻ, tuỳ chế độ vận hành) dùng một hàng khi
@@ -145,7 +144,7 @@
    textarea chung của app; khối Firebase Rules bên dưới mới là vùng monospace. */
 .firebase-config-input{width:100%;min-height:168px;resize:vertical;font-family:var(--font-sans);font-size:var(--text-base);line-height:var(--leading-body)}
 .firebase-actions{display:flex;gap:var(--space-2);flex-wrap:wrap}
-.settings-firebase-help{margin:0 0 var(--space-4);color:var(--text-tertiary);font-size:var(--text-sm)}
+.settings-firebase-help{margin:0 0 var(--space-4);color:var(--text-tertiary);font-size:var(--text-xs)}
 .settings-firebase-help a{color:var(--accent);font-weight:var(--weight-semibold)}
 
 /* Cố định cấp tiêu đề panel Cài đặt theo token Clinical Precision, không để
@@ -170,7 +169,7 @@
 
 
 /* Cấu hình hồ sơ NCE: ba ô số trên một hàng, ngoại lệ phân tách xuống dòng. */
-.settings-nce-note{margin:var(--space-4) var(--space-4) 0;color:var(--text-tertiary);font-size:var(--text-sm);}
+.settings-nce-note{margin:var(--space-4) var(--space-4) 0;color:var(--text-tertiary);font-size:var(--text-xs);}
 .settings-nce-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--field-gap);margin:var(--space-4) var(--space-4) 0;}
 .settings-nce-wide{grid-column:1 / -1;}
 .settings-nce-wide>label{display:flex;align-items:center;gap:var(--space-2);}

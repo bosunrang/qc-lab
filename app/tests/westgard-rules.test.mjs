@@ -4,7 +4,7 @@
 // hành vi Westgard không đổi khi viết lại.
 import assert from 'node:assert/strict';
 import {
-  WG_RULE_REGISTRY, WG_RULES, WG_DEFAULT_ON, WG_ALERT_RULES, WG_RULE_DESCRIPTIONS,
+  WG_RULE_REGISTRY, WG_RULES, wgDefaultOn, ruleDefaultOn, WG_ALERT_RULES, WG_RULE_DESCRIPTIONS,
   RULE_SCOPES, defaultRuleAction, defaultRuleScope, allowedRuleScopes, primaryErrorRule, errorType,
   errorClass, normalizeErrorClass,
 } from '../main/domain/westgard-rules.ts';
@@ -18,7 +18,7 @@ for (const r of REG) {
   assert.ok(r.id && typeof r.id === 'string', 'mỗi luật phải có id');
   assert.ok(r.desc && typeof r.desc === 'string', `${r.id}: thiếu mô tả điều kiện`);
   assert.ok(['SE', 'RE', ''].includes(r.err), `${r.id}: err phải là 'SE' | 'RE' | ''`);
-  assert.equal(typeof r.defaultOn, 'boolean', `${r.id}: defaultOn phải là boolean`);
+  assert.ok(['always', 'upTo2', 'from3', 'never'].includes(r.defaultOn), `${r.id}: defaultOn phải khai theo số mức QC`);
   assert.equal(typeof r.alert, 'boolean', `${r.id}: alert phải là boolean`);
   assert.ok(RULE_SCOPES.includes(r.scope), `${r.id}: scope phải nằm trong RULE_SCOPES`);
   assert.ok(r.scopeMin >= 2, `${r.id}: scopeMin phải >= 2`);
@@ -49,7 +49,14 @@ REG.forEach((r) => {
 });
 
 assert.deepEqual(WG_RULES, IDS, 'WG_RULES phải là danh sách id của bảng đăng ký, đúng thứ tự');
-assert.deepEqual([...WG_DEFAULT_ON].sort(), REG.filter(r => r.defaultOn).map(r => r.id).sort(), 'WG_DEFAULT_ON phải dẫn xuất từ cột defaultOn');
+// WG-26: bộ luật bật sẵn theo bảng đa quy tắc Westgard cho từng số mức QC.
+const sorted = (set) => [...set].sort();
+assert.deepEqual(sorted(wgDefaultOn(1)), ['1-2s', '1-3s', '10x', '2-2s', '4-1s', 'R4s'], '1 mức dùng bộ 2 mức (R4s tự không chạy khi thiếu mức)');
+assert.deepEqual(sorted(wgDefaultOn(2)), ['1-2s', '1-3s', '10x', '2-2s', '4-1s', 'R4s'], '2 mức: 1-3s/2-2s/R4s/4-1s/10x');
+assert.deepEqual(sorted(wgDefaultOn(3)), ['1-2s', '1-3s', '12x', '2of3-2s', '3-1s', 'R4s'], '3 mức: 1-3s/2of3-2s/R4s/3-1s/12x');
+assert.deepEqual(sorted(wgDefaultOn(4)), sorted(wgDefaultOn(3)), 'từ 3 mức trở lên dùng bộ 3 mức');
+for (const id of ['6x', '8x', '9x', '7T']) for (const n of [1, 2, 3]) assert.equal(ruleDefaultOn(id, n), false, `${id} không bật sẵn ở ${n} mức`);
+for (const r of REG) assert.deepEqual([1, 2, 3].map(n => ruleDefaultOn(r.id, n)), [1, 2, 3].map(n => wgDefaultOn(n).has(r.id)), `${r.id}: wgDefaultOn dẫn xuất từ cột defaultOn`);
 assert.deepEqual(WG_ALERT_RULES.slice().sort(), REG.filter(r => r.alert).map(r => r.id).sort(), 'WG_ALERT_RULES phải dẫn xuất từ cột alert');
 assert.deepEqual(Object.keys(WG_RULE_DESCRIPTIONS).sort(), IDS.slice().sort(), 'WG_RULE_DESCRIPTIONS phải phủ đúng bộ luật của bảng đăng ký');
 for (const r of REG) assert.equal(WG_RULE_DESCRIPTIONS[r.id], r.desc, `${r.id}: mô tả trong WG_RULE_DESCRIPTIONS phải lấy từ bảng đăng ký`);

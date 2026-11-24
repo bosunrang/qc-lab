@@ -376,7 +376,8 @@ export interface PreviousLotSeries {
 
 /** Trạng thái CHUNG của 1 luật Westgard (toàn phòng xét nghiệm, không riêng
  * xét nghiệm nào) — panel "Cấu hình chung của luật" trang Phân tích Westgard. */
-export interface RuleSetting { id: string; desc: string; on: boolean; fix: string; alert: boolean; }
+/** `custom`: luật đã đặt riêng ở cấu hình chung; không thì theo mặc định số mức QC (WG-26). */
+export interface RuleSetting { id: string; desc: string; on: boolean; custom: boolean; fix: string; alert: boolean; }
 
 /** Phân tích Westgard cho một lô thuộc nhóm lô đã dừng/lưu trữ. Kết quả được
  * tính lại theo bộ luật đang bật, dùng Mean/SD đã chốt của lô thay vì
@@ -398,7 +399,7 @@ export interface UncertaintyBudgetResult {
 export interface SigmaEqaBiasSampleView {
   resultId: string; label: string; reportDate: string; result: number; assigned: number; assignedUncertain: boolean; ncCauseCategory: string;
 }
-export type SigmaEqaExclusionView = 'after-period' | 'outside-window' | 'nce-cause' | 'assigned-uncertain' | 'invalid';
+export type SigmaEqaExclusionView = 'after-period' | 'outside-window' | 'nce-cause' | 'invalid';
 export interface SigmaEqaBiasView {
   included: (SigmaEqaBiasSampleView & { bias: number })[];
   excluded: (SigmaEqaBiasSampleView & { reason: SigmaEqaExclusionView })[];
@@ -783,6 +784,8 @@ export interface EqaSeriesView {
   points: {
     result_id: string; round_id: string; program_id: string; program_name: string; year: number; round: string; sample: string; report_date: string;
     result: number; assigned: number; z: number; class: EqaClassView; pct: number | null;
+    /** Cùng căn cứ lưu ý với chi tiết đợt, không thay xếp loại chính thức. */
+    assigned_check: EqaResultRow['assigned_check']; provider_check: EqaProviderCheckView; warnings: string[];
     /** TEa vận hành (%) tại giá trị ấn định của mẫu; null khi xét nghiệm chưa có TEa. */
     tea_pct: number | null; within_tea: boolean | null;
     j: number; signals: EqaSignalView[]; unsuccessful: boolean;
@@ -1025,9 +1028,10 @@ export interface QcApi {
   listTestSummaries(): Promise<TestSummary[]>;
   analyzeLevel(testId: string, level: number): Promise<LevelAnalysis>;
   saveRuleAction(testId: string, ruleId: string, action: 'inactive' | 'alert' | 'reject' | ''): Promise<IpcResult<{ ruleId: string; action: 'inactive' | 'alert' | 'reject' | '' }>>;
-  listRuleSettings(): Promise<RuleSetting[]>;
+  /** `levelCount`: số mức QC của xét nghiệm đang xem, để hiện mặc định đúng nhóm. */
+  listRuleSettings(levelCount?: number): Promise<RuleSetting[]>;
   saveRuleSetting(ruleId: string, on: boolean): Promise<IpcResult<{ ruleId: string; on: boolean }>>;
-  resetRuleSettings(): Promise<IpcResult<RuleSetting[]>>;
+  resetRuleSettings(levelCount?: number): Promise<IpcResult<RuleSetting[]>>;
   listArchivedBlocks(testId: string, groupId: string): Promise<ArchivedBlock[]>;
   listArchivedGroupTests(groupId: string): Promise<{ id: string; label: string }[]>;
   /** Chuỗi lô cũ của từng mức đang vận hành — công tắc "Xem lô cũ" trên trang

@@ -45,7 +45,7 @@ test('lỗi được ghi vào tệp log tại máy, không lộ mật khẩu', {
       globalThis.__openedFolders = [];
       shell.openPath = async (folder) => { globalThis.__openedFolders.push(folder); return ''; };
     });
-    await openPage(page, 'Cài đặt & Đám mây');
+    await openPage(page, 'Cài đặt & Kết nối');
     await page.getByRole('button', { name: 'Mở thư mục log' }).click();
     await page.waitForTimeout(300);
     assert.deepEqual(await app.evaluate(() => globalThis.__openedFolders), [logDir]);

@@ -364,7 +364,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Cài đặt & Đám mây" subtitle="Thông tin đơn vị, sao lưu và kết nối Firebase" />
+      <PageHeader title="Cài đặt & Kết nối" subtitle="Thông tin đơn vị, sao lưu và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">
           <h2 className="panel-title settings-panel-title"><UnitProfileIcon />Thông tin đơn vị</h2>

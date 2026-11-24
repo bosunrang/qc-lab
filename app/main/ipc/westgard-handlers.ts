@@ -52,18 +52,27 @@ export function createWestgardHandlers(db: Db) {
   /** Hai cấu hình chung cho cùng hành động ở mọi luật — so theo kết quả phân
    * giải, không theo chuỗi JSON (`{}` và bảng mặc định đầy đủ là một). Lưu lại
    * đúng cấu hình đang dùng không phải một lần đổi, không ghi phiên bản mới. */
-  const sameResolvedRules = (a: RuleActionsMap, b: RuleActionsMap) => {
-    const actionA = makeRuleActionLayered(a, {}), actionB = makeRuleActionLayered(b, {});
+  // Mặc định khác nhau giữa 1–2 mức và từ 3 mức (WG-26): hai cấu hình chỉ
+  // giống nhau khi phân giải giống nhau ở cả hai nhóm số mức.
+  const sameResolvedRules = (a: RuleActionsMap, b: RuleActionsMap) => [2, 3].every((levelCount) => {
+    const actionA = makeRuleActionLayered(a, {}, levelCount), actionB = makeRuleActionLayered(b, {}, levelCount);
     return WG_RULE_REGISTRY.every(rule => actionA(rule.id) === actionB(rule.id));
+  });
+  const settingsOf = (rules: RuleActionsMap, levelCount: number) => globalRuleList(rules, levelCount).map(r => {
+    const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
+    return { id: r.id, on: r.on, custom: r.custom, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
+  });
+  const cleanLevelCount = (value: unknown) => {
+    const n = Number(value);
+    return Number.isInteger(n) && n > 0 && n <= 20 ? n : 2;
   };
 
   /** Cấu hình luật CHUNG (panel "Cấu hình chung của luật"): trạng thái bật/tắt
-   * + mô tả + gợi ý xử lý của từng luật, KHÔNG phụ thuộc xét nghiệm nào. */
-  function listRuleSettings(): { id: string; desc: string; on: boolean; fix: string; alert: boolean }[] {
-    return globalRuleList(globalRules()).map(r => {
-      const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
-      return { id: r.id, on: r.on, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
-    });
+   * + mô tả + gợi ý xử lý của từng luật, không phụ thuộc xét nghiệm nào. Luật
+   * chưa đặt riêng theo mặc định của `levelCount` mức QC (số mức của xét
+   * nghiệm đang xem; mặc định 2). */
+  function listRuleSettings(levelCount?: unknown): { id: string; desc: string; on: boolean; custom: boolean; fix: string; alert: boolean }[] {
+    return settingsOf(globalRules(), cleanLevelCount(levelCount));
   }
 
   /** Bật/tắt một luật ở tầng chung: đổi mặc định cho mọi xét nghiệm, không
@@ -85,15 +94,12 @@ export function createWestgardHandlers(db: Db) {
     return { ok: true, data: { ruleId, on } };
   });
 
-  /** Khôi phục toàn bộ cấu hình mặc định của `WG_RULE_REGISTRY`, không phải
-   * bật tất cả luật. */
-  const resetRuleSettings = writeCommand(db, 'resetRuleSettings', 'admin', (w): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> => {
+  /** Khôi phục mặc định của `WG_RULE_REGISTRY`: xoá mọi luật đặt riêng ở cấu
+   * hình chung, để mỗi xét nghiệm dùng bộ luật mặc định theo số mức QC của nó
+   * (WG-26). Không phải bật tất cả luật. */
+  const resetRuleSettings = writeCommand(db, 'resetRuleSettings', 'admin', (w, levelCount: unknown): IpcResult<{ id: string; on: boolean; custom: boolean; desc: string; fix: string; alert: boolean }[]> => {
     const defaults: RuleActionsMap = {};
-    for (const rule of WG_RULE_REGISTRY) defaults[rule.id] = rule.defaultOn;
-    const data = globalRuleList(defaults).map(r => {
-      const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
-      return { id: r.id, on: r.on, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
-    });
+    const data = settingsOf(defaults, cleanLevelCount(levelCount));
     const before = globalRules();
     if (sameResolvedRules(before, defaults)) return w.noChange(data);
     w.commit((tx) => {

@@ -12,7 +12,7 @@ theo nghiệp vụ chuẩn (yêu cầu ngày 17/11/2026).
 | --- | --- |
 | Westgard, Sigma metric | `Sigma = (TEa − \|Bias\|) / CV`: Bias là sai số **hệ thống**, CV là sai số ngẫu nhiên (độ chụm nội kiểm) |
 | Nordtest TR 537 | Bias RMS = √(trung bình² + độ phân tán²) dùng cho **độ không đảm bảo đo**, vì ngân sách MU cần cả phần dao động của bias |
-| ISO 13528 / EQA-REVIEW N-05 | Giá trị ấn định từ trung bình nhóm đồng đẳng; khi u(x_pt) > 0,3·σp giá trị ấn định kém chắc chắn |
+| ISO 13528 / EQA-REVIEW N-05 | Khi u(x_pt) > 0,3·σp, độ không đảm bảo của giá trị ấn định có ảnh hưởng đáng kể đến đánh giá ngoại kiểm; không suy thành yêu cầu tự loại mẫu khỏi Bias Sigma |
 | EQA-REVIEW N-11, N-15 | Kết quả mà điều tra kết luận lỗi hành chính hoặc vấn đề chương trình/mẫu không phản ánh phương pháp |
 
 ## 2. Phát hiện
@@ -32,7 +32,7 @@ theo nghiệp vụ chuẩn (yêu cầu ngày 17/11/2026).
 | SB-2 | **Nguồn "Ngoại kiểm"**: lấy kết quả hiện hành (đợt đang dùng, phiên bản hiện hành) của đúng xét nghiệm (`test_id`) của kỳ Sigma. Mỗi mẫu là một giá trị Bias% = (KQ − giá trị ấn định) / \|giá trị ấn định\| × 100 |
 | SB-3 | **Thời gian (cập nhật theo yêu cầu người dùng)**: mọi mẫu hợp lệ trong số tháng lịch được chọn, tối thiểu 1 tháng, mặc định 3, không áp trần 12 tháng. Tính tới hết tháng Sigma; ví dụ kỳ 11/2026 chọn 1 tháng lấy từ 01/11, chọn 3 tháng lấy từ 01/09, đều tới 30/11, không lấy báo cáo sau kỳ |
 | SB-4 | **Bias chung (thay phương án lọc ±25%)**: lấy mọi nồng độ của cùng xét nghiệm–máy, tính trung bình có dấu các Bias% và áp dụng chung cho các mức QC. CV, TEa và Mean vẫn riêng từng mức. Mỗi mẫu chỉ được đếm một lần trong bộ mẫu chung |
-| SB-5 | **Loại trừ**: kết quả thuộc hồ sơ NCE (chưa huỷ) có nhóm nguyên nhân lỗi hành chính hoặc chương trình/mẫu (N-15); mẫu có giá trị ấn định kém chắc chắn (N-05). Mẫu bị loại vẫn hiện kèm lý do |
+| SB-5 | **Loại trừ (cập nhật 18/11/2026)**: kết quả thuộc hồ sơ NCE (chưa huỷ) có kết luận nguyên nhân lỗi hành chính hoặc chương trình/mẫu (N-15, SB-5b). Cờ u/σp ước tính > 0,3 (N-05) chỉ cảnh báo cần rà soát, không tự loại khỏi Bias Sigma. Mẫu bị loại vì căn cứ khác vẫn hiện kèm lý do |
 | SB-6 | **Cỡ mẫu**: khuyến nghị ≥ 3 mẫu sau loại trừ; ít hơn thì cảnh báo "chưa đủ mẫu", vẫn cho người phụ trách quyết định áp dụng. Hiện sai số chuẩn SD/√n; các mẫu đổi dấu thì cảnh báo "Bias không ổn định" thay vì đổi sang RMS |
 | SB-7 | **Truy vết**: mỗi vòng lấy từ ngoại kiểm lưu mã kết quả và nhãn đợt/mẫu; main đối chiếu lại KQ và giá trị ấn định với CSDL khi lưu, không tin số do giao diện gửi |
 | SB-8 | Bias so với giá trị ấn định của nhóm đồng đẳng là độ lệch so với nhóm, không phải so với giá trị thật; nhãn hiển thị ghi rõ nguồn |
@@ -60,9 +60,10 @@ Tham khảo: [ADLM — The Case for Six Sigma](https://myadlm.org/cln/articles/2
 
 ## 5. Khắc phục sau rà soát triển khai
 
-- Khi lưu vòng mới lấy từ ngoại kiểm, main dùng lại bộ lọc thời gian,
-  kết luận NCE và độ tin cậy giá trị ấn
-  định. Căn cứ thay đổi trong lúc mở hộp thoại phải lấy lại trước khi áp dụng.
+- Khi lưu vòng mới lấy từ ngoại kiểm, main dùng lại bộ lọc thời gian, số
+  liệu hợp lệ và kết luận NCE. Cờ độ không đảm bảo của giá trị ấn định chỉ
+  dùng cảnh báo, không chặn lấy hoặc lưu mẫu. Căn cứ loại trừ thay đổi trong
+  lúc mở hộp thoại phải lấy lại trước khi áp dụng.
 - NCE khớp bằng `eqa_source_key` như tab Khắc phục: đổi số liệu không mang
   theo kết luận của báo cáo cũ; bổ sung máy hoặc đổi phiên bản mà giữ nguyên
   nội dung vẫn nhận đúng kết luận cũ.
@@ -107,3 +108,20 @@ Còn chờ chuyên môn của khoa: MU có cộng u(cal) bên cạnh u(bias) (No
 thuần chỉ dùng u(Rw) và u(bias)); u(Rw) đang lấy CV một lô QC (ISO/TS 20914
 khuyến nghị độ chụm dài hạn ≥ 6 tháng); tiêu chí "U ≤ TEa" là lựa chọn của
 PXN, không phải ngưỡng chuẩn.
+
+## 7. Cảnh báo độ không đảm bảo giá trị ấn định (18/11/2026)
+
+Theo yêu cầu người dùng, thay phần tự loại theo N-05 trong SB-5: mẫu có
+u/σp ước tính > 0,3 vẫn tham gia trung bình Bias và được lưu khi người dùng
+bấm áp dụng, nếu không có căn cứ loại trừ khác. Hộp thoại hiện số mẫu cần
+rà soát và đánh dấu từng dòng; cảnh báo không đồng nghĩa giá trị ấn định sai
+hoặc mẫu đã được phê duyệt chuyên môn. Không đổi kết quả ngoại kiểm chính
+thức, công thức ước tính u, công thức Bias/Sigma hay dữ liệu kỳ đã lưu.
+
+Căn cứ: [Eurachem — Understanding PT performance assessment, 2024](https://eurachem.org/images/stories/leaflets/pt/pt_perf_assmnt/PT_Understand_Evaluation_V1_EN.pdf)
+dùng ngưỡng 0,3 để xét ảnh hưởng độ không đảm bảo trong chấm điểm ngoại
+kiểm (z′); không phải quy tắc loại mẫu Bias Sigma. Công thức ước tính u từ
+SD/N cần phù hợp phương pháp lập giá trị ấn định; xem
+[Eurachem 2021, phụ lục D](https://www.eurachem.org/images/stories/Guides/pdf/EPT_2021_P1_EN.pdf).
+Kiểm thử hồi quy kiểm cả lấy mẫu, lưu chung nhiều mức, giữ nguyên cờ cảnh
+báo và việc loại đúng theo thời gian, dữ liệu không hợp lệ hoặc NCE.

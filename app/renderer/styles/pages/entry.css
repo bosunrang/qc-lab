@@ -14,13 +14,13 @@
    sát mép phải cây; thanh kéo cao đúng bằng cây. Thanh kéo chiếm trọn
    khoảng trống 16px giữa cây và bảng nhập (lưới không còn khoảng cách cột),
    nên vạch kéo nằm chính giữa hai khối. */
-.entry-tree-dock{position:sticky; top:112px; align-self:start; display:flex; max-height:calc(100vh - 132px);}
+.entry-tree-dock{position:sticky; top:calc(var(--page-header-h) + var(--page-header-gap)); align-self:start; display:flex; max-height:calc(100vh - var(--page-header-h) - var(--page-header-gap) - var(--space-5));}
 .entry-tree-dock>.resize-handle{width:var(--space-4);}
 /* Cây tự giãn theo tên dài nhất nhưng không quá 20vw (≈290px ở 1440, ≈380px ở
    1920): rộng hơn thì bảng nhập (tối thiểu 780px) phải cuộn ngang ngay ở màn
    1440 (đánh giá 09/11/2026). Tên dài xuống dòng trong nút cây. */
 .tree{
-  max-height:calc(100vh - 132px); width:max-content; min-width:240px; max-width:clamp(240px,20vw,440px); padding:0;
+  max-height:inherit; width:max-content; min-width:240px; max-width:clamp(240px,20vw,440px); padding:0;
   overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
 }
 .entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-1-5) var(--space-2-5) var(--space-1-5) var(--space-3);background:var(--table-head-bg);border-bottom:1px solid var(--table-head-border);}
@@ -67,13 +67,9 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .qc-month-picker select,.qc-current-month{height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-2-5);font-size:var(--text-sm);}
 .qc-month-picker select:first-of-type{min-width:92px;}
 .qc-current-month{white-space:nowrap;min-width:112px;}
-/* Chiều cao vùng cuộn bám theo cửa sổ thay vì cố định 574px (vốn chỉ vừa
-   cửa sổ cao ~768px): khi cuộn trang để bảng nằm ngay dưới header dính
-   (`.head` 88px), phần còn lại gồm tiêu đề bảng (64–90px khi tên xét nghiệm
-   xuống dòng), margin 14px trên dưới và viền panel — trừ 208px là đáy bảng
-   luôn nằm trong cửa sổ. Sàn 360px giữ đủ khoảng 7 hàng ngày khi cửa sổ
-   thấp hơn `minHeight` 700px của Electron (vd trình duyệt preview). */
-.qc-sheet-wrap{display:block;max-width:100%;margin:var(--space-3-5) var(--panel-padding);border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:max(360px,calc(100vh - 208px));overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
+/* Chừa chiều cao cho header trang và 120px cho tiêu đề, lề và viền bảng.
+   Sàn 360px giữ khoảng bảy hàng ngày trên các cửa sổ thấp. */
+.qc-sheet-wrap{display:block;max-width:100%;margin:var(--space-3-5) var(--panel-padding);border:1px solid var(--surface-border);border-radius:var(--radius-md);max-height:max(360px,calc(100vh - var(--page-header-h) - 120px));overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--surface);position:relative;}
 /* Một sàn bề rộng DUY NHẤT, không đổi theo cửa sổ. Bản trước đặt 1080px ở
    trên 1280px rồi hạ 840/780px ở cửa sổ hẹp, nên ở 1366px bảng bị ép rộng
    1080px trong vùng chỉ ~740px — cuộn ngang NHIỀU hơn ở 1280px (sàn 840px).
@@ -191,7 +187,7 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .entry-secondary-panel{padding:0;overflow:hidden;}
 .entry-secondary-summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--panel-header-h);padding:var(--space-2-5) var(--panel-header-px);border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);color:var(--text-primary);}
 .entry-secondary-summary>span{font-size:var(--title-panel);font-weight:var(--weight-semibold);}
-.entry-secondary-summary>small{flex:1;color:var(--text-tertiary);font-size:var(--text-sm);font-weight:700;text-align:right;}
+.entry-secondary-summary>small{flex:1;color:var(--text-tertiary);font-size:var(--text-xs);font-weight:700;text-align:right;}
 /* Mức cho dải kiểm soát là lựa chọn RIÊNG: đặt ở góc phải tiêu đề để không
    phải bấm thẻ biểu đồ Levey–Jennings chỉ nhằm đổi nội dung bảng bên dưới. */
 .range-summary-header .dayseg{flex:0 0 auto;}
@@ -265,17 +261,17 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 /* Số điểm ĐÃ GHI NHẬN so với số điểm vào thống kê — dòng truy vết, để ngay
    dưới dải Mean/SD/CV nên bám trái cùng với nó khi thẻ cuộn ngang. */
 .qc-cumulative-source{position:sticky;left:0;padding:var(--space-1-5) var(--space-2-5);border-bottom:1px solid var(--border-subtle);font-size:var(--text-xs);}
-.qc-points-panel{margin-top:var(--space-4);}
-
 .qc-voided-box{margin:var(--space-4) var(--space-4) 0;overflow-x:auto;}
 .qc-voided-box h4{margin:0 0 var(--space-2-5);font-size:var(--title-sub);font-weight:var(--title-sub-weight);color:var(--text-strong);}
 
-/* Cảnh báo lần chạy bị loại đứng ngay dưới dòng ngày/mức/giá trị: chỉ `.field` có khoảng cách sẵn trong modal. */
+/* Khoảng cách của cảnh báo lần chạy bị loại và lựa chọn lập NCE trong hộp thoại. */
+.void-point-summary{font-size:var(--text-sm);color:var(--text-secondary);font-weight:var(--weight-medium);line-height:var(--leading-body);}
 .void-run-rejected{margin-top:var(--space-2-5);}
-.void-nce-choice{margin-top:var(--space-2-5);padding:var(--space-2-5) var(--space-3);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}
+.void-nce-choice{margin-top:var(--field-gap);}
 .void-nce-choice label{display:flex;align-items:center;gap:var(--space-2);margin:0;color:var(--text-primary);}
-.void-nce-choice input{flex:none;}
-.void-nce-choice .hint{margin-top:var(--space-1);}
+/* Checkbox dùng kích thước hệ thống thay vì kích thước 13px mặc định của trình duyệt. */
+.void-nce-choice input[type="checkbox"]{box-sizing:border-box;flex:0 0 var(--choice-control-size);width:var(--choice-control-size);height:var(--choice-control-size);margin:0;padding:0;}
+.void-nce-choice label>span{min-width:0;}
 .qc-voided-table{width:100%;table-layout:fixed;}
 .qc-voided-table th,.qc-voided-table td{vertical-align:middle;text-align:center;}
 .qc-voided-table th:nth-child(1),.qc-voided-table td:nth-child(1){width:16%;}

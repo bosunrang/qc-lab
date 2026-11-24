@@ -27,7 +27,7 @@ test('các lưới nhập liệu đặc thù căn từ trên khi một ô hiện
   for (const selector of ['nce-technical-input-grid', 'nce-impact-form-grid', 'nce-capa-risk-grid']) {
     assert.match(actions, new RegExp(`\\.${selector}\\{[^}]*align-items:start`, 's'));
   }
-  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row\{[^}]*align-items:start/s);
+  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row(?:,[^{]+)?\{[^}]*align-items:start/s);
   assert.match(westgard, /\.wg-test-picker\{[^}]*align-items:start/s);
 });
 

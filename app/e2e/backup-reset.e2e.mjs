@@ -51,7 +51,7 @@ test('xuất backup, xoá sạch dữ liệu rồi phục hồi lại từ tệp
       };
       dialog.showOpenDialog = async () => { globalThis.__dialogs.open.push(file); return { canceled: false, filePaths: [file] }; };
     }, backupPath);
-    await openPage(page, 'Cài đặt & Đám mây');
+    await openPage(page, 'Cài đặt & Kết nối');
 
     // Huỷ hộp thoại lưu: không có tệp, không có thông báo.
     await app.evaluate(() => { globalThis.__cancelNext = true; });

@@ -63,7 +63,7 @@ const SECTION_TEAL = 'FF31869B';
 /** Bề ngang biểu đồ Sigma theo số kỳ: mỗi kỳ khoảng 160px, từ 560 đến 1600px.
  * Trước 06/11/2026 tối thiểu 960px nên một kỳ chỉ còn hai cột nhỏ giữa khung
  * trống. Ảnh Excel và PDF cùng đọc con số này. */
-export function periodChartWidth(periodCount: number): number {
+function periodChartWidth(periodCount: number): number {
   return Math.max(560, Math.min(1600, 160 * periodCount + 300));
 }
 

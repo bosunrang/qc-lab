@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { bootstrapAndLogin, launchApp, openPage } from './helpers.mjs';
 
@@ -73,24 +74,92 @@ function riqasPdf(sample) {
 }
 
 test('nhập nhiều đợt một lần: ánh xạ ở đợt đầu, các đợt sau nhập hàng loạt', { timeout: 120_000 }, async () => {
-  const { app, page, errors } = await launchApp();
+  const { app, page, errors, userDataDir } = await launchApp();
   try {
+    await page.setViewportSize({ width: 1280, height: 900 });
     await bootstrapAndLogin(page);
     await page.evaluate(async () => {
       const must = (r) => { if (!r.ok) throw new Error(JSON.stringify(r.error)); return r.data; };
       const machine = must(await window.qcApi.saveInstrument({ data: { name: 'EasyLyte Plus' } }));
       for (const name of ['Chloride', 'Potassium', 'Sodium']) must(await window.qcApi.saveTest({ data: { name, instrumentId: machine.id, unit: 'mmol/L' } }));
+      for (let i = 1; i <= 20; i++) must(await window.qcApi.saveTest({ data: { name: `Xét nghiệm bổ sung ${String(i).padStart(2, '0')}`, instrumentId: machine.id, unit: 'mmol/L' } }));
     });
     await openPage(page, 'Phân tích ngoại kiểm');
     await page.locator('.eqa-scope-controls').getByRole('button', { name: 'Nhập báo cáo PDF', exact: true }).click();
     const modal = page.getByRole('dialog', { name: 'Nhập báo cáo ngoại kiểm' });
     await modal.locator('#eqaFile').setInputFiles([1, 2, 3].map((n) => ({ name: `RIQAS_C23_S${n}.pdf`, mimeType: 'application/pdf', buffer: riqasPdf(n) })));
     await modal.getByText('3 tệp thuộc 3 đợt', { exact: false }).waitFor();
+    const files = modal.getByRole('region', { name: 'Danh sách báo cáo PDF đã đọc', exact: true });
+    const assertColumns = async () => {
+      const layout = await files.evaluate(el => {
+        const table = el.querySelector('table').getBoundingClientRect();
+        const cells = [...el.querySelectorAll('tbody tr:first-child td')].map(cell => cell.getBoundingClientRect());
+        const headersFit = [...el.querySelectorAll('th')].every(th => {
+          const range = document.createRange(); range.selectNodeContents(th);
+          const style = getComputedStyle(th), available = th.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+          return range.getClientRects().length === 1 && range.getBoundingClientRect().width <= available + 1;
+        });
+        return { count: cells.length, machine: cells[6].width, status: cells[7].width,
+          headersFit,
+          inside: cells.every(cell => cell.left >= table.left - 1 && cell.right <= table.right + 1),
+          wrapperFits: el.getBoundingClientRect().right <= el.closest('.modal-b').getBoundingClientRect().right };
+      });
+      assert.equal(layout.count, 8);
+      assert(layout.machine >= 175, 'ô chọn máy có đủ chiều rộng');
+      assert(layout.status >= 85, 'trạng thái đọc tệp không bị mất');
+      assert(layout.inside && layout.wrapperFits);
+      assert(layout.headersFit, 'tiêu đề cả tám cột nằm trên một dòng và không bị cắt');
+    };
+    await assertColumns();
+    assert(await files.evaluate(el => el.scrollWidth <= el.clientWidth + 1), 'bảng vừa khung ở kích thước modal đầy đủ');
+    await modal.screenshot({ path: path.join(userDataDir, 'eqa-pdf-columns.png') });
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await assertColumns();
+    assert(await files.evaluate(el => el.scrollWidth > el.clientWidth), 'bảng cuộn ngang ở cửa sổ nhỏ');
+    await files.evaluate(el => { el.scrollLeft = el.scrollWidth; });
+    assert(await files.getByText('Đọc được', { exact: true }).first().isVisible());
+    await files.evaluate(el => { el.scrollLeft = 0; });
+    await page.setViewportSize({ width: 1280, height: 900 });
     for (const n of [1, 2, 3]) await modal.getByRole('combobox', { name: `Máy của PXN cho RIQAS_C23_S${n}.pdf` }).selectOption({ label: 'EasyLyte Plus' });
     await modal.getByRole('button', { name: 'Kiểm tra 3 đợt', exact: true }).click();
     // Lần đầu gặp mã thông số: cả ba đợt chờ ánh xạ; ánh xạ ở đợt đầu rồi ghi.
     await modal.getByText('Cần xem trước', { exact: true }).nth(2).waitFor();
     await modal.getByRole('button', { name: 'Xem trước', exact: true }).first().click();
+    // Danh sách ở hàng cuối phải vượt mép bảng và cuộn tới lựa chọn cuối.
+    const mapping = modal.getByRole('region', { name: 'Ánh xạ xét nghiệm', exact: true });
+    const picker = mapping.getByRole('combobox').last();
+    const originalLabel = await picker.inputValue();
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 1024, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      await picker.click();
+      const menu = mapping.getByRole('listbox');
+      await menu.waitFor();
+      const unclipped = await menu.evaluate(el => {
+        const box = el.getBoundingClientRect();
+        const table = el.closest('table').getBoundingClientRect();
+        const body = el.closest('.modal-b').getBoundingClientRect();
+        const x = box.left + box.width / 2;
+        const y = Math.min(box.bottom - 8, body.bottom - 8);
+        return { extendsTable: y > table.bottom, receivesPointer: el.contains(document.elementFromPoint(x, y)) };
+      });
+      assert(unclipped.extendsTable && unclipped.receivesPointer, 'danh sách nhận được chuột ở phần vượt khỏi bảng');
+      await menu.hover();
+      await page.mouse.wheel(0, 600);
+      await page.waitForFunction(id => document.getElementById(id)?.scrollTop > 0, await menu.getAttribute('id'));
+      const lastChoice = menu.getByRole('option').last();
+      const lastLabel = await lastChoice.locator('span').innerText();
+      await modal.screenshot({ path: path.join(userDataDir, `eqa-mapping-scroll-${viewport.width}.png`) });
+      await lastChoice.click();
+      assert.equal(await picker.inputValue(), lastLabel, 'chọn được xét nghiệm cuối sau khi cuộn');
+      await picker.click();
+      assert.equal(await picker.evaluate(el => el.selectionStart === 0 && el.selectionEnd === el.value.length), true);
+      await picker.locator('..').getByRole('button', { name: 'Xoá nội dung tìm kiếm xét nghiệm', exact: true }).click();
+      assert.equal(await picker.inputValue(), '');
+      await picker.press('Escape');
+      assert.equal(await picker.inputValue(), lastLabel, 'xoá nội dung tìm rồi huỷ không mất ánh xạ đã chọn');
+      await picker.fill(originalLabel);
+      await mapping.getByRole('option').filter({ hasText: originalLabel }).first().click();
+    }
     await modal.getByRole('button', { name: 'Ghi đợt ngoại kiểm', exact: true }).click({ timeout: 20_000 });
     // Quay về danh sách: hai đợt còn lại dùng ánh xạ vừa lưu nên đã sẵn sàng.
     await modal.getByRole('button', { name: 'Nhập 2 đợt sẵn sàng', exact: true }).click();
@@ -109,6 +178,7 @@ test('nhập nhiều đợt một lần: ánh xạ ở đợt đầu, các đợ
     const rounds = await page.evaluate(() => window.qcApi.listEqaRounds());
     assert.deepEqual(rounds.map((r) => r.round).sort(), ['CYCLE 23 SAMPLE 1', 'CYCLE 23 SAMPLE 2', 'CYCLE 23 SAMPLE 3']);
     assert.deepEqual(errors, []);
+    console.log(`Ảnh kiểm tra bảng nhập PDF: ${userDataDir}`);
   } finally {
     await app.close();
   }

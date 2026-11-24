@@ -10,7 +10,7 @@ test('tick LIS chưa lưu thì chưa hỏi Gateway', { timeout: 120_000 }, async
   try {
     await bootstrapAndLogin(page);
     const counter = await countIpcCalls(app, ['lis:pullQueue']);
-    await openPage(page, 'Cài đặt & Đám mây');
+    await openPage(page, 'Cài đặt & Kết nối');
     const status = page.locator('#lisGatewayStatus');
     await status.waitFor();
     await page.locator('#lisGatewayEnabled').check();

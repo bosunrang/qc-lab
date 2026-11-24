@@ -18,21 +18,30 @@ body{background:var(--surface-page);color:var(--text-primary);font-size:var(--te
 .app-shell.nav-collapsed{grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr);}
 
 
-aside{background:var(--sidebar-bg) url('../assets/naviva-login-pattern.png') center / cover no-repeat;color:var(--sidebar-text);padding:var(--space-5) var(--space-3) var(--space-4);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;min-width:0;max-width:100vw;border-right:1px solid var(--sidebar-border);box-shadow:var(--shadow-sidebar);z-index:var(--z-sidebar);}
-.brand-row{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-2);position:relative;padding:0 var(--space-2);}
-.brand-row:after{content:"";position:absolute;right:8px;bottom:-10px;left:8px;height:1px;background:var(--sidebar-group-divider);}
-.brand{display:flex;align-items:center;color:var(--on-accent);position:relative;gap:var(--space-3);font-weight:var(--weight-bold);font-size:var(--text-md);min-width:0;flex:1 1 auto;}
-.brand-copy{min-width:0;}
-.brand-copy>div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.brand small{display:block;max-width:100%;overflow-wrap:normal;color:var(--sidebar-text-muted);font-weight:var(--weight-semibold);font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:var(--title-overline-tracking);margin-top:var(--space-0-5);line-height:var(--leading-heading);white-space:normal;}
-.brand-mark{color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-weight:var(--weight-bold);position:relative;flex:0 0 var(--control-h);width:var(--control-h);height:var(--control-h);border-radius:var(--radius-lg);background:linear-gradient(145deg,var(--accent),var(--accent-active));box-shadow:var(--shadow-brand);overflow:hidden;}
+aside{background:var(--sidebar-bg);color:var(--sidebar-text);padding:0 var(--space-3) var(--space-4);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;min-width:0;max-width:100vw;border-right:1px solid var(--sidebar-border);box-shadow:var(--shadow-sidebar);z-index:var(--z-sidebar);}
+.brand-row{container-type:inline-size;display:grid;align-items:center;flex:none;min-height:var(--page-header-h);padding:var(--space-2) var(--space-1);border-bottom:1px solid color-mix(in srgb,var(--on-accent) 10%,transparent);}
+.brand{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"logo title toggle" "logo subtitle toggle";column-gap:var(--space-2);align-items:center;color:var(--on-accent);font-weight:var(--weight-bold);font-size:var(--text-md);line-height:var(--leading-heading);min-width:0;}
+.brand-copy{display:contents;}
+.brand-copy>*{margin-inline-start:var(--space-1);}
+.brand-copy>div{grid-area:title;align-self:end;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.02em;}
+.brand small{grid-area:subtitle;align-self:start;display:block;min-width:0;overflow-wrap:anywhere;color:var(--sidebar-text-muted);font-weight:var(--weight-medium);font-size:var(--text-xs);margin-top:var(--space-0-5);line-height:var(--leading-heading);}
+.brand-mark{grid-area:logo;color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-weight:var(--weight-bold);position:relative;width:var(--control-h);height:var(--control-h);border-radius:var(--radius-lg);background:linear-gradient(145deg,var(--accent),var(--accent-active));box-shadow:var(--shadow-brand);overflow:hidden;}
+.brand>.brand-mark{width:var(--sidebar-logo-size);height:var(--sidebar-logo-size);background:linear-gradient(145deg,var(--surface),var(--surface-sunken));color:var(--accent-text);box-shadow:var(--shadow-control);}
 .brand-mark img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;}
 
-.nav-toggle{margin-left:auto;flex:none;width:var(--control-h-compact);height:var(--control-h-compact);display:flex;align-items:center;justify-content:center;background:var(--sidebar-toggle-surface);border:1px solid var(--sidebar-toggle-border);border-radius:var(--radius-md);color:var(--sidebar-active-accent);cursor:pointer;padding:0;transition:var(--motion-fast) ease;}
-.nav-toggle:hover{background:var(--sidebar-toggle-surface-hover);}
+.nav-toggle{grid-area:toggle;width:var(--control-h-sm);height:var(--control-h-sm);display:grid;place-items:center;background:color-mix(in srgb,var(--sidebar-link-text) 9%,transparent);border:0;border-radius:var(--control-radius);color:var(--sidebar-link-text);cursor:pointer;padding:0;transition:background var(--motion-fast) ease,color var(--motion-fast) ease;}
+.nav-toggle:hover{background:var(--sidebar-toggle-surface-hover);color:var(--sidebar-active-accent);}
 .nav-toggle svg{width:var(--icon);height:var(--icon);}
-.app-shell.nav-collapsed .brand-row{justify-content:center;}
-.app-shell.nav-collapsed .nav-toggle{position:absolute;right:-25px;background:var(--surface);border:1px solid var(--surface-border);color:var(--text-primary);box-shadow:var(--panel-shadow);z-index:var(--z-float);}
+
+/* Khi dòng mô tả không còn đủ chỗ cạnh logo, cho nó dùng cả bề ngang. */
+@container (max-width:210px){
+  .brand{grid-template-areas:"logo title toggle" "subtitle subtitle subtitle";}
+  .brand-copy>div{align-self:center;}
+  .brand small{margin-top:var(--space-1-5);margin-inline-start:0;}
+}
+.app-shell.nav-collapsed .brand{grid-template-columns:auto;grid-template-areas:"logo";justify-content:center;}
+.app-shell.nav-collapsed .nav-toggle{position:absolute;grid-area:auto;inset-block-start:50%;inset-inline-start:calc(50% + var(--sidebar-logo-size) / 2 + var(--space-1));translate:0 -50%;background:var(--surface);border:1px solid var(--surface-border);color:var(--text-primary);box-shadow:var(--shadow-panel);}
+.app-shell.nav-collapsed .nav-toggle:hover{background:var(--accent-surface);color:var(--accent-text);}
 .app-shell.nav-collapsed .nav-toggle svg{transform:rotate(180deg);}
 
 .sidebar-footer{position:relative;flex:none;margin-top:auto;padding:var(--space-3) var(--space-1) 0;}.sidebar-footer:before{content:"";position:absolute;top:0;right:var(--space-2);left:var(--space-2);height:1px;background:var(--sidebar-group-divider);}
@@ -45,62 +54,57 @@ aside{background:var(--sidebar-bg) url('../assets/naviva-login-pattern.png') cen
 .app-shell.nav-collapsed .sidebar-footer{padding-right:0;padding-left:0;}.app-shell.nav-collapsed .sidebar-runtime{grid-template-columns:var(--control-h-compact);justify-content:center;padding:var(--space-1) 0;}.app-shell.nav-collapsed .sidebar-runtime-copy{display:none;}
 
 nav{display:flex;flex:1 1 auto;flex-direction:column;overflow:auto;min-width:0;min-height:0;max-width:100%;gap:var(--space-1);margin-top:var(--space-4);}
-.nav-group{display:flex;align-items:center;gap:var(--space-2);margin:var(--space-4) var(--space-3) var(--space-1-5);color:var(--sidebar-group-text);font-size:var(--text-xs);font-weight:var(--weight-semibold);text-transform:uppercase;letter-spacing:var(--title-overline-tracking);}
-.nav-group:after{content:"";height:1px;flex:1;background:var(--sidebar-group-divider);}
-nav a{position:relative;display:flex;align-items:center;width:100%;text-align:left;text-decoration:none;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font-weight:var(--weight-semibold);color:var(--sidebar-link-text);font-size:var(--text-base);gap:var(--space-2-5);min-height:var(--control-h);margin:var(--space-0-5) 0;box-sizing:border-box;transition:background var(--motion-fast) ease,color var(--motion-fast) ease;}
-nav a:hover{background:color-mix(in srgb,var(--sidebar-active-accent) 5%,transparent);color:var(--sidebar-active-ink);}
-nav a.active{background:linear-gradient(90deg,var(--sidebar-active-bg),color-mix(in srgb,var(--sidebar-active-bg) 34%,transparent));color:var(--on-accent);box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
-nav .ic{display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;width:32px;height:var(--control-h-compact);border-radius:var(--radius-md);color:var(--sidebar-icon);}
+.nav-group{margin:0 var(--space-3) var(--space-1);color:var(--sidebar-group-text);font-size:var(--sidebar-group-font-size);font-weight:var(--weight-semibold);line-height:var(--leading-snug);text-transform:uppercase;letter-spacing:var(--title-overline-tracking);}
+nav a{position:relative;display:flex;align-items:center;width:100%;text-align:left;text-decoration:none;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font-weight:var(--weight-semibold);color:color-mix(in srgb,var(--sidebar-link-text) 90%,var(--sidebar-bg));font-size:var(--text-base);gap:var(--space-2-5);min-height:var(--control-h);margin:var(--space-0-5) 0;box-sizing:border-box;transition:background var(--motion-fast) ease,color var(--motion-fast) ease;}
+nav a:not(.active):hover{background:color-mix(in srgb,var(--sidebar-bg),var(--sidebar-active-bg));color:var(--sidebar-active-ink);}
+nav a.active{background:var(--sidebar-active-bg);color:var(--on-accent);font-weight:var(--weight-bold);box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
+nav .ic{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--icon-nav);height:var(--icon-nav);color:var(--sidebar-icon);}
 nav .ic svg{width:var(--icon-nav);height:var(--icon-nav);}
 nav a.active .ic{color:var(--sidebar-active-accent);}
-.app-shell.nav-collapsed nav{padding-top:var(--space-3);gap:var(--space-2-5);}
-.app-shell.nav-collapsed nav a{justify-content:center;padding:0;}
-.app-shell.nav-collapsed nav a.active{padding-left:0;border-left:0;box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
+/* Khoảng cách giữa các mục do nhóm tạo ở cả hai chế độ. */
+#primary-navigation{margin-top:var(--space-3-5);gap:var(--space-4);}
+#primary-navigation>div{display:grid;flex:none;gap:var(--space-1);}
+#primary-navigation a{min-height:var(--sidebar-item-h);margin:0;padding-block:var(--space-1);}
+#primary-navigation.nav-icon-only{margin-top:var(--space-3);gap:var(--space-2-5);}
+#primary-navigation.nav-icon-only a{justify-content:center;padding:0;}
+#primary-navigation.nav-icon-only a.active{padding-left:0;border-left:0;box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
 
 @media(max-width:1050px){
   .brand-copy,.nav-group,.nav-label,.sidebar-runtime-copy{display:none;}
-  .brand-row,.brand,nav a,.sidebar-runtime{justify-content:center;}
+  .brand{grid-template-columns:auto;grid-template-areas:"logo";justify-content:center;}
+  .sidebar-runtime{justify-content:center;}
   .nav-toggle{display:none;}
   .sidebar-footer{padding-right:0;padding-left:0;}.sidebar-runtime{grid-template-columns:var(--control-h-compact);padding:var(--space-1) 0;}
-  nav{padding-top:var(--space-3);gap:var(--space-2-5);}
-  nav a{padding:0;}
-  nav a.active{padding-left:0;border-left:0;box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
 }
 
 /* Header sticky bắt đầu sát đỉnh vùng cuộn. Padding dọc phía
    trên ở đây sẽ làm lệch vị trí hiển thị của header so với luồng nội dung. */
-main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:0 clamp(var(--space-5),2.4vw,36px) 64px;box-sizing:border-box;overscroll-behavior-y:contain;}
-/* Header trang chuẩn 84px ở desktop: đủ cho tên trang, mô tả và cụm tài
-   khoản nhưng không chiếm chiều cao của bảng. `min-height` (thay vì height)
-   vẫn cho phép nó nới an toàn nếu một tiêu đề/khối tài khoản phải xuống dòng. */
-.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(var(--space-3),1.4vw,var(--space-5));position:sticky;top:0;z-index:var(--z-page-head);box-sizing:border-box;min-height:var(--page-header-h);margin:0 calc(-1 * clamp(var(--space-5),2.4vw,36px)) var(--page-header-gap);padding:var(--space-3) clamp(var(--space-5),2.4vw,36px);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:var(--shadow-page-head);}
-/* Khoảng hở dưới header nằm trên chính margin dưới của `.head`
-   (`margin:0 calc(...) var(--page-header-gap)`). Bản trước dùng
-   `main > .head + *{margin-top:...}` — KHÔNG khớp được, vì mọi trang app
-   bọc nội dung trong một <div> vô danh nên `.head` không phải con trực tiếp
-   của <main>; hệ quả là mọi trang mất đúng 22px khoảng hở dưới tiêu đề. */
+main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:0 var(--page-gutter) 64px;box-sizing:border-box;overscroll-behavior-y:contain;}
+/* Header trang cao tối thiểu 80px, chừa 16px phía dưới. Header có thể cao
+   hơn nếu tiêu đề hoặc cụm tài khoản xuống dòng ở cửa sổ hẹp. */
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(var(--space-3),1.4vw,var(--space-5));position:sticky;top:0;z-index:var(--z-page-head);box-sizing:border-box;min-height:var(--page-header-h);margin:0 calc(-1 * var(--page-gutter)) var(--page-header-gap);padding:var(--space-3) var(--page-gutter);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--surface-divider);box-shadow:var(--shadow-page-head);}
 .head h1{font-size:var(--title-page);font-weight:var(--title-page-weight);letter-spacing:-.03em;line-height:var(--leading-display);}
-.head p{margin-top:var(--space-1);color:var(--text-tertiary);font-size:var(--text-sm);max-width:72ch;font-weight:var(--weight-medium);line-height:var(--leading-snug);}
-.head-actions{display:flex;align-items:center;gap:var(--space-2-5);flex-wrap:wrap;}
-
-.top-user{display:flex;align-items:center;gap:var(--space-2-5);border:1px solid var(--surface-divider);padding:var(--space-1-5) var(--space-2);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-panel);flex:0 1 auto;min-width:0;}
-.top-user .avatar{width:var(--control-h);height:var(--control-h);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--accent-active);display:flex;align-items:center;justify-content:center;font-size:var(--text-sm);font-weight:var(--weight-bold);overflow:hidden;flex-shrink:0;cursor:pointer;}
+.head p{margin-top:var(--space-1);color:var(--text-tertiary);font-size:var(--text-xs);max-width:72ch;font-weight:var(--weight-medium);line-height:var(--leading-snug);}
+.top-user{display:flex;align-items:center;gap:var(--space-2);min-width:0;max-width:100%;margin-inline-start:auto;}
+.top-user :is(.avatar,.logout){display:grid;place-items:center;flex:none;padding:0;border-radius:var(--radius-md);cursor:pointer;}
+.top-user .avatar{width:var(--control-h);height:var(--control-h);border:0;background:var(--surface-inverse-soft);color:var(--on-accent);font-size:var(--text-xs);font-weight:var(--weight-bold);overflow:hidden;}
+.top-user .avatar:hover{background:var(--surface-inverse);}
 .top-user .avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+.top-user .meta{min-width:0;line-height:var(--leading-snug);}
+.top-user .name{font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.top-user .role{white-space:nowrap;font-size:var(--text-xs);color:var(--text-tertiary);}
+.top-user .logout{width:var(--control-h-compact);height:var(--control-h-compact);margin-inline-start:var(--space-6);border:1px solid var(--surface-divider);background:var(--surface);color:var(--text-tertiary);}
+.top-user .logout:hover{background:var(--surface-subtle);border-color:var(--surface-border);color:var(--text-primary);}
+.top-user .logout svg{width:var(--icon);height:var(--icon);}
 
 .avatar-modal-preview{display:flex;justify-content:center;margin-bottom:var(--panel-content-gap);}
 .avatar-modal-preview img,.avatar-modal-initial{width:96px;height:96px;border-radius:var(--radius-md);overflow:hidden;object-fit:cover;}
 .avatar-modal-initial{display:flex;align-items:center;justify-content:center;background:var(--neutral-surface);color:var(--accent-text);font-size:var(--text-xl);font-weight:var(--weight-bold);}
 .file-pick{display:flex;align-items:center;gap:var(--space-2-5);min-height:var(--control-h-sm);}
-.top-user .meta{text-align:left;line-height:var(--leading-display);min-width:92px;}
-.top-user .name{font-size:var(--text-sm);font-weight:var(--weight-bold);color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.top-user .role{text-transform:uppercase;margin-top:var(--space-0-5);white-space:nowrap;font-size:var(--text-xs);font-weight:700;letter-spacing:.02em;color:var(--text-tertiary);}
-.top-user button{height:var(--control-h-compact);border-radius:var(--radius-md);border:1px solid var(--surface-border);background:var(--surface);color:var(--text-button);cursor:pointer;font-size:var(--text-sm);font-weight:var(--weight-bold);display:inline-flex;align-items:center;gap:var(--space-1-5);padding:0 var(--space-2-5);}
-.top-user button:hover{background:var(--surface-subtle);border-color:var(--border);color:var(--text-primary);}
-.top-user button svg{width:var(--icon-sm);height:var(--icon-sm);}
 
 /* Panel không mang padding chung để header phủ trọn chiều ngang. Header và
    từng vùng nội dung tự quản lý khoảng đệm, tránh cộng dồn gutter. */
-.panel{background:var(--surface);border:1px solid var(--surface-divider);border-radius:var(--radius-md);box-shadow:var(--panel-shadow);overflow:hidden;padding:0;margin-bottom:var(--space-5);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
+.panel{background:var(--surface);border:1px solid var(--surface-divider);border-radius:var(--radius-md);box-shadow:var(--panel-shadow);overflow:hidden;padding:0;margin-bottom:var(--panel-stack-gap);transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease;}
 /* Panel chứa ô chọn có tìm kiếm (`SearchSelect`): không cắt phần tràn để danh
    sách thả xuống vượt được đáy panel; header tự bo góc thay cho `overflow:hidden`. */
 .panel.has-popover{overflow:visible;}
@@ -186,6 +190,9 @@ input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textar
 .search-select{position:relative;min-width:0;}
 /* Ô nhập chiếm đúng chiều cao control, không để dư khoảng chân chữ của dòng. */
 .search-select>input{display:block;}
+.search-select>input:not([type="checkbox"]):not([type="radio"]){padding-right:var(--control-h);}
+.search-select-clear{position:absolute;top:var(--space-1);right:var(--space-1);display:grid;place-items:center;width:calc(var(--control-h) - var(--space-2));height:calc(var(--control-h) - var(--space-2));min-height:0;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);font:var(--weight-normal) var(--text-md)/var(--leading-none) var(--font-sans);cursor:pointer;}
+.search-select-clear:hover{background:var(--surface-subtle);color:var(--text-primary);}
 .search-select-menu{position:absolute;top:calc(100% + var(--space-1));right:0;left:0;z-index:var(--z-picker);max-height:calc(var(--control-h) * 7);overflow:auto;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-menu);}
 .search-select-option{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);width:100%;min-height:var(--control-h);padding:var(--space-2) var(--space-2-5);border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:var(--surface);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-sm);text-align:left;cursor:pointer;}
 .search-select-option:last-child{border-bottom:0;}
@@ -364,7 +371,7 @@ label.field>span:first-child{display:block;margin-bottom:var(--field-label-gap);
 .license-expiry-notice{width:100%;margin-bottom:var(--space-4);}
 @media print{.license-expiry-notice{display:none;}}
 .shift-item{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);border:1px solid var(--surface-border);overflow:hidden;padding:var(--space-2-5) var(--space-3);border-radius:var(--radius-md);background:var(--surface);}
-.shift-item .meta{color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
+.shift-item .meta{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-body);}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-2px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
 
@@ -393,7 +400,7 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 .stat-value{margin-top:var(--space-2);color:var(--text-primary);font-size:var(--text-2xl);font-weight:var(--weight-bold);line-height:var(--leading-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
 .stat-value.accent{color:var(--accent);}
 .stat-value.danger{color:var(--danger-text);}
-.stat-sub{margin-top:var(--space-1-5);color:var(--text-tertiary);font-size:var(--text-sm);font-weight:500;line-height:var(--leading-body);}
+.stat-sub{margin-top:var(--space-1-5);color:var(--text-tertiary);font-size:var(--text-xs);font-weight:500;line-height:var(--leading-body);}
 /* Chú giải hình điểm dưới biểu đồ L-J (QcChartLegend). Hình trùng drawPoint():
    tròn = Đạt, tam giác = Cảnh báo, vuông = Loại, rỗng = không vào thống kê. */
 .qc-legend{display:flex;flex-wrap:wrap;gap:var(--space-4);margin:var(--space-2-5) var(--space-6) var(--space-3-5);padding:0;list-style:none;color:var(--text-tertiary);font-size:var(--text-xs);}
@@ -454,7 +461,8 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 
 /* Chữ "chưa có giá trị" nằm giữa nội dung (ô chi tiết hồ sơ, sau nhãn). Không phải
    thông báo trống của cả khối — khối trống dùng `EmptyState`. */
-.hint-inline{color:var(--text-tertiary);}
+.hint-inline{color:var(--text-tertiary);font-size:var(--text-xs);}
+small{font-size:var(--text-xs);}
 /* Thông báo trống — component `EmptyState` (components/EmptyState.tsx) là cách
    DUY NHẤT để dựng. Nằm thẳng trên bề mặt của khối chứa nên không có viền
    hay nền riêng: panel ngoài đã có viền và nền trắng, thêm một hộp xám bên
@@ -471,7 +479,7 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700
 td.acts{display:flex;gap:var(--space-1-5);align-items:center;}
 button.x{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:var(--control-h-compact);background:transparent;border:none;color:var(--danger-text);cursor:pointer;font-size:var(--text-sm);padding:0;}
 /* Chuẩn chữ phụ toàn hệ thống: ghi chú, mô tả hàng và metadata đều dùng
-   caption 11.5px/nét 500/màu muted. Những trạng thái cảnh báo hoặc lỗi có
+   cỡ 13px/nét 500/màu muted. Những trạng thái cảnh báo hoặc lỗi có
    rule riêng để ghi đè màu, còn tiêu đề trang/modal giữ cấp chữ cao hơn. */
 .hint{color:var(--text-tertiary);font-size:var(--text-xs);line-height:var(--leading-body);font-weight:500;}
 .meta{color:var(--text-tertiary);font-size:var(--text-xs);font-weight:500;line-height:var(--leading-snug);}

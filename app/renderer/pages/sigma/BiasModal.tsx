@@ -33,6 +33,8 @@ export function BiasModal({ initialRounds, initialWindowMonths, source, onClose,
       ...(round.eqaResultId ? { eqaResultId: round.eqaResultId, label: round.label ?? '' } : {}) }))
     : EMPTY);
   const [selection, setSelection] = useState<SigmaEqaBiasView | null>(null);
+  const reviewSamples = selection?.included.filter(s => s.assignedUncertain) ?? [];
+  const reviewSampleIds = new Set(reviewSamples.map(s => s.resultId));
   // Một lần áp dụng chỉ dùng một nguồn: toàn bộ mẫu ngoại kiểm hợp lệ, hoặc vòng nhập tay (SB-4b).
   const fromEqa = rounds.some(r => r.eqaResultId);
   const sourceOutdated = fromEqa && loadedWindowMonths !== windowMonths;
@@ -94,9 +96,15 @@ export function BiasModal({ initialRounds, initialWindowMonths, source, onClose,
         <div className="sg-eqa-selection">
           <p className="hint-inline">{vnDate(selection.window.start)} – {vnDate(selection.window.end)} · {selection.included.length} mẫu · {new Set(selection.included.map(s => s.reportDate.slice(0, 7))).size}/{selection.windowMonths} tháng có mẫu</p>
           {!selection.included.length && <div className="alert warn">Không có mẫu hợp lệ trong khoảng đã chọn.</div>}
-          {selection.excluded.length > 0 && <details>
+          {reviewSamples.length > 0 && <div className="alert warn" role="status">
+            Có {reviewSamples.length} mẫu có tỷ lệ u/σp ước tính &gt; 0,3. Các mẫu này vẫn được tính vào Bias Sigma; cần rà soát độ không đảm bảo của giá trị ấn định trước khi sử dụng kết quả.
+          </div>}
+          {selection.excluded.length > 0 && <details className="sg-eqa-exclusions">
             <summary>Mẫu bị loại ({selection.excluded.length})</summary>
-            <ul className="sg-eqa-excluded">{selection.excluded.map((s) => <li key={s.resultId}>{s.label} · {vnDate(s.reportDate)} · {SIGMA_EQA_EXCLUSION_LABEL[s.reason]}</li>)}</ul>
+            <ul className="sg-eqa-excluded">{selection.excluded.map((s) => <li key={s.resultId}>
+              <div className="sg-eqa-excluded-source">{s.label}</div>
+              <div className="hint-inline"><time dateTime={s.reportDate}>{vnDate(s.reportDate)}</time> · {SIGMA_EQA_EXCLUSION_LABEL[s.reason]}</div>
+            </li>)}</ul>
           </details>}
         </div>
       )}
@@ -110,7 +118,9 @@ export function BiasModal({ initialRounds, initialWindowMonths, source, onClose,
               return (
                 <tr key={i}>
                   <td className="sg-eqa-index">{i + 1}</td>
-                  <td className="sg-eqa-label">{v.eqaResultId ? v.label : 'Nhập tay'}</td>
+                  <td className="sg-eqa-label">{v.eqaResultId ? v.label : 'Nhập tay'}
+                    {v.eqaResultId && reviewSampleIds.has(v.eqaResultId) && <div className="sg-eqa-warning">Cần rà soát: u/σp ước tính &gt; 0,3</div>}
+                  </td>
                   <td><input type="number" step="any" aria-label={`KQ PXN vòng ${i + 1}`} value={v.lab} readOnly={!!v.eqaResultId} onChange={(e) => change(i, 'lab', e.target.value)} /></td>
                   <td><input type="number" step="any" aria-label={`Target EQA vòng ${i + 1}`} value={v.target} readOnly={!!v.eqaResultId} onChange={(e) => change(i, 'target', e.target.value)} /></td>
                   <td className="sg-eqa-bias" style={{ color: bias != null ? (Math.abs(bias) > 10 ? 'var(--danger-text)' : 'var(--accent)') : undefined }}>{bias != null ? `${bias.toFixed(2)}%` : '—'}</td>

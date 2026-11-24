@@ -18,9 +18,11 @@ interface WestgardState {
    * được — thêm/huỷ điểm hay đổi Mean/SD đều làm số liệu lô cũ đổi theo. */
   previousLotBlocks: ArchivedBlock[];
   ruleSettings: RuleSetting[];
+  /** Số mức QC của xét nghiệm đang xem: luật chưa đặt riêng theo mặc định của nhóm số mức này (WG-26). */
+  ruleLevelCount: number;
   loadSummaries: () => Promise<void>;
   loadAnalysis: (testId: string, levels: number[]) => Promise<void>;
-  loadRuleSettings: () => Promise<void>;
+  loadRuleSettings: (levelCount?: number) => Promise<void>;
   saveRuleSetting: (ruleId: string, on: boolean) => Promise<void>;
   resetRuleSettings: () => Promise<void>;
 }
@@ -35,7 +37,7 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
   analysisError: '',
   analysisByLevel: {},
   previousLotBlocks: [],
-  ruleSettings: [],
+  ruleSettings: [], ruleLevelCount: 2,
 
   loadSummaries: async () => {
     const revision = ++summaryRevision;
@@ -63,8 +65,11 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
       if (revision === analysisRevision) set({ analysisLoading: false, analysisError: 'Không tải được phân tích. Vui lòng thử lại.' });
     }
   },
-  loadRuleSettings: async () => {
-    set({ ruleSettings: await window.qcApi.listRuleSettings() });
+  loadRuleSettings: async (levelCount) => {
+    const count = levelCount ?? get().ruleLevelCount;
+    const ruleSettings = await window.qcApi.listRuleSettings(count);
+    // Bỏ phản hồi cũ khi người dùng đã chuyển sang xét nghiệm khác số mức.
+    if (levelCount === undefined || count === get().ruleLevelCount) set({ ruleSettings });
   },
   // Bật/tắt 1 luật ở tầng CHUNG đổi verdict của MỌI xét nghiệm trong hệ
   // thống. Store nạp lại
@@ -77,7 +82,7 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
     await get().loadSummaries();
   },
   resetRuleSettings: async () => {
-    const result = await window.qcApi.resetRuleSettings();
+    const result = await window.qcApi.resetRuleSettings(get().ruleLevelCount);
     if (!result.ok) throw new Error(result.error.message);
     set({ ruleSettings: result.data });
     await get().loadSummaries();

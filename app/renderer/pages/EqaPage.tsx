@@ -31,8 +31,8 @@ export function EqaPage() {
     query.set('test', test);
     setParams(query, { replace });
   };
-  const openRound = (roundId: string, resultId?: string) => {
-    const query = eqaContextParams(params, { resultId });
+  const openRound = (roundId: string, resultId?: string, context?: EqaNavigationContext) => {
+    const query = eqaContextParams(params, { ...context, resultId });
     query.set('id', roundId);
     setParams(query);
   };

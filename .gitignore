@@ -5,6 +5,9 @@ dist-issuer/
 app-dist/
 .cache/
 .tmp-edits/
+# Dữ liệu mẫu xuất ra và tệp kiểm tra tạm tại máy.
+/output/
+/tmp/
 *.log
 *.tmp
 *.bak

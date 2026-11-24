@@ -4,6 +4,7 @@ import { vnDate as formatVnDate } from '../../lib/format';
 import type { SigmaCohortView, SigmaLevelResult } from '../../../shared/qc-api';
 import { TEA_SOURCES, type SigmaTeaSource } from '../../lib/sigma-tea';
 export { TEA_SOURCES } from '../../lib/sigma-tea';
+export { cohortStatusLabel } from '../../lib/sigma-workflow';
 
 /** Dải năm cho bộ lọc và hộp thêm kỳ: năm nay ± 5. */
 export const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
@@ -49,10 +50,6 @@ export function missingSigmaInputs(level: SigmaLevelResult): string[] {
   return missing;
 }
 
-export function cohortStatusLabel(status: SigmaCohortView['status'] | string): string {
-  return status === 'eligible' ? 'Đủ số điểm — cần rà soát' : status === 'provisional' ? 'Tạm thời (20–29)' : status === 'insufficient' ? 'Chưa đủ (<20)'
-    : status === 'out-of-control' ? 'Mất kiểm soát chưa xử lý' : 'Không ổn định';
-}
 
 /** Màu trạng thái dùng bộ badge chung, để bảng chọn cohort không tự tạo một
  * ngôn ngữ cảnh báo riêng với phần còn lại của ứng dụng. */

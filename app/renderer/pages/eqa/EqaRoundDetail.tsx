@@ -1,7 +1,7 @@
-// Một kỳ ngoại kiểm: thông tin kỳ, tổng hợp theo máy, bảng kết quả (z, z nhà
-// cung cấp, % lệch, xu hướng; dòng mở rộng có nhóm đồng đẳng và lưu ý) và
-// lịch sử nhập/bổ sung/huỷ.
+// Chi tiết một máy trong đợt ngoại kiểm: thông tin, bảng kết quả (z, z nhà
+// cung cấp, % lệch, xu hướng), nhóm đồng đẳng và lịch sử nhập/bổ sung/huỷ.
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useEqaStore } from '../../store/eqa-store';
 import { useAuthStore } from '../../store/auth-store';
 import { useStoreInvalidation } from '../../lib/useStoreInvalidation';
@@ -11,9 +11,9 @@ import { EmptyState } from '../../components/EmptyState';
 import { Modal } from '../../components/Modal';
 import { errorDialog } from '../../state/dialog-store';
 import type { EqaResultRow, EqaRoundView } from '../../../shared/qc-api';
-import { eqaCounts, EQA_PEER_LABEL, EQA_PROVIDER_CHECK_LABEL } from '../../../main/domain/eqa/evaluation';
+import { eqaCounts, EQA_PEER_LABEL } from '../../../main/domain/eqa/evaluation';
 import { EqaImportModal } from './EqaImportModal';
-import { ClassTag, Facts, numText, pctText, rawNum, roundLabel, RoundStatusTag, TrendTags } from './shared';
+import { EqaAssessmentTags, Facts, numText, pctText, rawNum, roundLabel, RoundStatusTag, TrendTags, eqaResultNotes } from './shared';
 import { EqaResultsSummary } from './EqaResultsSummary';
 import { EqaResultFilter, useEqaResultFilter } from './EqaResultFilter';
 import type { EqaNavigationContext } from './useEqaScope';
@@ -51,17 +51,9 @@ function peerGroupName(row: EqaResultRow, level: EqaResultRow['peer'][number]['l
   return '';
 }
 
-function notes(row: EqaResultRow): string[] {
-  const out: string[] = [];
-  const check = row.assigned_check;
-  if (check?.uncertain) out.push(`Giá trị ấn định kém chắc chắn: u(x_pt) = ${check.ratio.toFixed(2)}·σp > 0,3·σp (N = ${check.n}); z′ = ${check.z_prime.toFixed(2)}`);
-  if (row.provider_check === 'mismatch' || row.provider_check === 'swapped') out.push(EQA_PROVIDER_CHECK_LABEL[row.provider_check]);
-  return [...out, ...row.warnings];
-}
-
 /** Dòng cần xem: chưa chấp nhận, vượt TEa nội bộ, có tín hiệu hoặc có lưu ý. */
 function needsReview(row: EqaResultRow): boolean {
-  return row.class !== 'ok' || row.within_tea === false || !!row.trend?.signals.length || !!row.trend?.unsuccessful || notes(row).length > 0;
+  return row.class !== 'ok' || row.within_tea === false || !!row.trend?.signals.length || !!row.trend?.unsuccessful || eqaResultNotes(row).length > 0;
 }
 
 export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id: string; focusedResultId?: string; onBack: () => void; onOpenTest: (testId: string, context?: EqaNavigationContext) => void }) {
@@ -69,9 +61,11 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const [view, setView] = useState<EqaRoundView | null | undefined>(undefined);
   const [error, setError] = useState('');
-  const [requestedInstrument, setInstrument] = useState('');
-  const instrument = view && !view.instruments.some((item) => item.instrument_id === requestedInstrument) ? '' : requestedInstrument;
-  if (view && requestedInstrument && !instrument) setInstrument('');
+  const [params, setParams] = useSearchParams();
+  // Chi tiết luôn thuộc một máy. Liên kết cũ chỉ suy ra máy khi có kết quả
+  // được chỉ rõ hoặc cả đợt thực sự chỉ có một máy.
+  const instrument = params.get('machine') || view?.results.find((row) => row.id === focusedResultId)?.instrument_id
+    || (view?.instruments.length === 1 ? view.instruments[0].instrument_id : '');
   const [filter, setFilter] = useEqaResultFilter(`${id}:${instrument}`);
   const [reimport, setReimport] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -92,7 +86,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   }, [reload]);
   useStoreInvalidation(['eqa_rounds', 'tests', 'instruments', 'tea_refs'], undefined, reload);
 
-  const scopedResults = useMemo(() => (view?.results ?? []).filter((r) => !instrument || r.instrument_id === instrument), [view, instrument]);
+  const scopedResults = useMemo(() => (view?.results ?? []).filter((r) => r.instrument_id === instrument), [view, instrument]);
   const results = useMemo(() => scopedResults.filter((r) => filter === 'all' || (filter === 'attention' ? needsReview(r) : r.class === filter)), [scopedResults, filter]);
   // Mở từ tổng quan hoặc chuỗi xét nghiệm: cuộn dòng được chọn vào khung một
   // lần sau khi tải, không giật lại khi dữ liệu tự làm mới.
@@ -113,16 +107,19 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
   if (error) return <section className="panel"><EmptyState title="Không tải được đợt ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={reload}>Thử lại</button>}>{error}</EmptyState></section>;
   if (view === undefined) return <section className="panel"><EmptyState title="Đang tải đợt ngoại kiểm…" /></section>;
   if (view === null) return <section className="panel"><EmptyState title="Không tìm thấy đợt ngoại kiểm" action={<button type="button" className="btn ghost sm" onClick={onBack}>Về danh sách</button>}>Đợt có thể đã bị xoá khi phục hồi dữ liệu.</EmptyState></section>;
+  if (!instrument) return <section className="panel"><EmptyState title="Chọn máy từ danh sách đợt báo cáo"
+    action={<button type="button" className="btn ghost sm" onClick={() => setParams({ year: String(view.round.year), program: view.round.program_id })}>Về danh sách</button>}>
+    Đợt có nhiều máy. Bấm Xem tại dòng của máy cần đọc.
+  </EmptyState></section>;
 
   const { round } = view;
   const totals = eqaCounts(scopedResults.map((r) => r.class));
-  const summaryScope = instrument ? view.instruments.find((item) => item.instrument_id === instrument)?.instrument_name ?? 'Máy đang chọn' : 'Tất cả máy';
+  const summaryScope = view.instruments.find((item) => item.instrument_id === instrument)?.instrument_name ?? 'Máy đã chọn chưa có kết quả';
   const open = round.status === 'open';
-  // Cột Máy, Mẫu chỉ hiện khi kỳ có nhiều giá trị; một giá trị thì đã nằm ở Thông tin kỳ.
-  const samples = [...new Set(view.results.map((r) => r.sample).filter(Boolean))];
-  const showInstrument = view.instruments.length > 1;
+  // Máy đã hiện ở Thông tin đợt; cột Mẫu chỉ cần khi máy có nhiều mẫu.
+  const samples = [...new Set(scopedResults.map((r) => r.sample).filter(Boolean))];
   const showSample = samples.length > 1;
-  const columns = 11 + Number(showInstrument) + Number(showSample);
+  const columns = 11 + Number(showSample);
 
   return (
     <div className="eqa-round">
@@ -149,48 +146,17 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
         <div className="eqa-section-body">
           <Facts items={[
             ['Đơn vị tổ chức', round.provider], ['Mã chương trình', round.program_code], ['Mã đơn vị', round.unit_code],
-            ['Máy', view.instruments.map((i) => i.instrument_name).join(', ')], ['Mẫu', samples.join(', ')], ['Mã báo cáo', round.report_code],
+            ['Máy', summaryScope], ['Mẫu', samples.join(', ')], ['Mã báo cáo', round.report_code],
             ['Cấp nhóm làm giá trị ấn định', round.assigned_level], ['Ngày báo cáo', vnDate(round.report_date, '')],
             ['Nguồn', `${SOURCE_LABEL[round.source] ?? round.source}${round.source_name ? ` · ${round.source_name}` : ''}`],
           ]} />
         </div>
       </section>
 
-      {view.instruments.length > 1 && (
-        <section className="panel" aria-label="Tổng hợp theo máy">
-          <div className="panel-head"><h2>Tổng hợp theo máy</h2></div>
-          <div className="eqa-section-body">
-            <div className="eqa-table-wrap">
-              <table className="eqa-table">
-                <thead><tr><th>Máy</th><th className="num">Kết quả</th><th className="num">Chấp nhận</th><th className="num">Cảnh báo</th><th className="num">Không chấp nhận</th><th className="num">Tỷ lệ chấp nhận</th></tr></thead>
-                <tbody>
-                  {view.instruments.map((i) => (
-                    <tr key={i.instrument_id}>
-                      <td><b className="eqa-strong">{i.instrument_name}</b></td>
-                      <td className="num">{i.total}</td><td className="num">{i.ok}</td><td className="num">{i.warn}</td><td className="num">{i.rej}</td>
-                      <td className="num">{pctText(i.accept_pct)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      )}
-
       <section className="panel" aria-label="Kết quả ngoại kiểm">
         <div className="panel-head">
           <h2>Kết quả</h2>
           <div className="eqa-filters">
-            {view.instruments.length > 1 && (
-              <div className="field eqa-inline-field">
-                <label htmlFor="eqaInstrument">Máy</label>
-                <select id="eqaInstrument" value={instrument} onChange={(e) => setInstrument(e.target.value)}>
-                  <option value="">Tất cả máy</option>
-                  {view.instruments.map((i) => <option key={i.instrument_id} value={i.instrument_id}>{i.instrument_name}</option>)}
-                </select>
-              </div>
-            )}
             <EqaResultFilter value={filter} onChange={setFilter} label="Lọc xét nghiệm theo đánh giá" allLabel="Tất cả xét nghiệm" />
           </div>
         </div>
@@ -200,19 +166,18 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
               <table className="eqa-table eqa-results-table">
                 <thead>
                   <tr>
-                    {showInstrument && <th>Máy</th>}<th className="eqa-test-cell">Xét nghiệm</th>{showSample && <th>Mẫu</th>}<th className="num">KQ PXN</th><th className="num">Giá trị ấn định</th>
+                    <th className="eqa-test-cell">Xét nghiệm</th>{showSample && <th>Mẫu</th>}<th className="num">KQ PXN</th><th className="num">Giá trị ấn định</th>
                     <th className="num">σp</th><th className="num">z</th><th className="num">z NCC</th><th className="num">% lệch</th>
                     <th>Đánh giá</th><th className="eqa-trend-cell">Xu hướng</th><th>So TEa PXN</th><th aria-label="Thao tác" />
                   </tr>
                 </thead>
                 <tbody>
                   {results.map((r) => {
-                    const flags = notes(r);
+                    const flags = eqaResultNotes(r);
                     const isOpen = expanded.has(r.id);
                     return (
                       <Fragment key={r.id}>
                         <tr className={r.id === focusedResultId ? 'is-selected' : undefined} data-eqa-result={r.id}>
-                          {showInstrument && <td>{r.instrument_name}</td>}
                           <td className="eqa-test-cell"><b className="eqa-strong">{r.test_name}</b><span className="eqa-sub">{[r.code, r.unit].filter(Boolean).join(' · ')}</span></td>
                           {showSample && <td>{r.sample || '—'}</td>}
                           <td className="num">{rawNum(r.result)}</td>
@@ -221,7 +186,7 @@ export function EqaRoundDetail({ id, focusedResultId, onBack, onOpenTest }: { id
                           <td className="num">{numText(r.z)}</td>
                           <td className="num">{numText(r.z_provider)}</td>
                           <td className="num">{pctText(r.pct)}</td>
-                          <td><span className="eqa-tags"><ClassTag cls={r.class} />{flags.length > 0 && <span className="tag warn">Có lưu ý</span>}</span></td>
+                          <td><EqaAssessmentTags cls={r.class} notes={flags} /></td>
                           <td className="eqa-trend-cell">{r.trend && (r.trend.signals.length || r.trend.unsuccessful) ? <TrendTags signals={r.trend.signals} unsuccessful={r.trend.unsuccessful} /> : '—'}</td>
                           <td>{r.within_tea === null ? '—' : <span className={`tag ${r.within_tea ? 'ok' : 'warn'}`}>{r.within_tea ? 'Trong' : 'Vượt'} TEa {numText(r.tea_pct, 1)}%</span>}</td>
                           <td>
@@ -304,7 +269,7 @@ function ResultDetail({ row, flags }: { row: EqaResultRow; flags: readonly strin
         ) : <span className="hint-inline">Báo cáo không có số liệu nhóm.</span>}
         <p className="eqa-note">SDI = (KQ PXN − trung bình nhóm) / SD nhóm; % lệch so với trung bình nhóm.</p>
       </div>
-      <div>
+      <div className={`eqa-detail-notes${flags.length ? ' alert warn' : ''}`}>
         <h3>Lưu ý</h3>
         {flags.length ? <ul className="eqa-list">{flags.map((f) => <li key={f}>{f}</li>)}</ul> : <span className="hint-inline">Không có.</span>}
       </div>
@@ -332,6 +297,7 @@ function CancelRoundModal({ view, onClose }: { view: EqaRoundView; onClose: () =
     <Modal title="Huỷ đợt ngoại kiểm" size="sm" busy={busy} onClose={onClose}
       footer={<><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>Quay lại</button><button type="button" className="btn danger" disabled={busy || reason.trim().length < 10} onClick={() => void submit()}>Huỷ đợt</button></>}>
       <p className="eqa-note">Đợt đã huỷ vẫn được lưu để truy xuất nhưng không tính vào thống kê. Dùng khi nhập nhầm đợt hoặc trùng dữ liệu.</p>
+      {view.instruments.length > 1 && <p className="eqa-note">Thao tác này huỷ toàn bộ đợt của các máy: {view.instruments.map((i) => i.instrument_name).join(', ')}.</p>}
       <div className="field">
         <label htmlFor="eqaCancelReason">Lý do huỷ (ít nhất 10 ký tự)</label>
         <textarea id="eqaCancelReason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />

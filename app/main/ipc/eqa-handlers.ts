@@ -28,6 +28,13 @@ const objectInput = (value: unknown): Record<string, unknown> => value && typeof
 const text = (value: unknown, max: number) => String(value ?? '').trim().slice(0, max);
 const parseJson = <T>(raw: string, fallback: T): T => { try { return JSON.parse(raw || '') as T; } catch { return fallback; } };
 
+/** Hai màn chi tiết dùng cùng căn cứ lưu ý; không đổi xếp loại nhà cung cấp. */
+function resultChecks(row: Pick<EqaResultRow, 'result' | 'assigned' | 'sigma_p' | 'provider_check'>, peer: EqaPeer, warnings: string[]): Pick<EqaResultRow, 'assigned_check' | 'provider_check' | 'warnings'> {
+  const check = eqaAssignedUncertainty(row.result, row.assigned, row.sigma_p, peer);
+  return { provider_check: row.provider_check, warnings,
+    assigned_check: check ? { level: check.level, n: check.n, u: check.u, ratio: check.ratio, uncertain: check.uncertain, z_prime: check.zPrime } : null };
+}
+
 /** Các bảng một lần ghi ngoại kiểm có thể đổi; renderer nghe `eqa_rounds`. */
 const EQA_TABLES = ['eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions'];
 
@@ -346,15 +353,13 @@ export function createEqaHandlers(db: Db) {
     const teaOf = operationalTeaResolver(db);
     return rows.map(({ peer_json, warnings_json, ...row }) => {
       const peer = parseJson<EqaPeer>(peer_json, {});
-      const check = eqaAssignedUncertainty(row.result, row.assigned, row.sigma_p, peer);
       const point = series.get(row.test_id)?.points.find((p) => p.id === row.id);
       // TEa vận hành (hồ sơ TEa PXN trước, TEa chung vì mẫu ngoại kiểm không
       // ứng với mức QC nào), quy đổi giới hạn tuyệt đối tại giá trị ấn định
       // của mẫu. Thiếu TEa thì để trống, không báo "Vượt TEa".
       const tea = teaOf(row.test_id, row.assigned)?.value ?? null;
       return {
-        ...row, peer: eqaPeerComparison(row.result, peer), warnings: parseJson<string[]>(warnings_json, []),
-        assigned_check: check ? { level: check.level, n: check.n, u: check.u, ratio: check.ratio, uncertain: check.uncertain, z_prime: check.zPrime } : null,
+        ...row, peer: eqaPeerComparison(row.result, peer), ...resultChecks(row, peer, parseJson<string[]>(warnings_json, [])),
         tea_pct: tea, within_tea: tea !== null && row.pct !== null ? Math.abs(row.pct) <= tea : null,
         // `enough` theo chương trình của chính kết quả này (N-07).
         trend: point ? { signals: point.signals, unsuccessful: point.unsuccessful, j: point.j,
@@ -371,6 +376,11 @@ export function createEqaHandlers(db: Db) {
     if (!test) return null;
     const config = readEqaConfig(db);
     const series = seriesOf(id, config);
+    // Đọc gộp căn cứ lưu ý của các phiên bản hiện hành, không gọi lại từng đợt.
+    const checkRows = db.prepare(`SELECT e.id, e.result, e.assigned, e.sigma_p, e.provider_check, e.peer_json, e.warnings_json
+      FROM eqa_results e JOIN eqa_rounds r ON r.id=e.round_id AND e.version=r.version
+      WHERE r.status='open' AND e.test_id=?`).all(id) as (Pick<EqaResultRow, 'id' | 'result' | 'assigned' | 'sigma_p' | 'provider_check'> & { peer_json: string; warnings_json: string })[];
+    const checks = new Map(checkRows.map(row => [row.id, resultChecks(row, parseJson<EqaPeer>(row.peer_json, {}), parseJson<string[]>(row.warnings_json, []))]));
     const teaOf = operationalTeaResolver(db);
     const programNames = new Map([...series.meta.values()].map((m) => [m.program_id, m.program_name]));
     return {
@@ -383,7 +393,7 @@ export function createEqaHandlers(db: Db) {
         // TEa vận hành quy đổi tại giá trị ấn định của từng mẫu, như bảng kết quả kỳ.
         const tea = teaOf(test.id, meta.assigned)?.value ?? null;
         return { result_id: p.id, round_id: meta.round_id, program_id: meta.program_id, program_name: meta.program_name, year: p.year, round: p.round, sample: p.sample, report_date: meta.report_date,
-          result: meta.result, assigned: meta.assigned, z: p.z, class: p.cls, pct: meta.pct, tea_pct: tea,
+          result: meta.result, assigned: meta.assigned, z: p.z, class: p.cls, pct: meta.pct, tea_pct: tea, ...checks.get(p.id)!,
           within_tea: tea !== null && meta.pct !== null ? Math.abs(meta.pct) <= tea : null, j: p.j, signals: p.signals, unsuccessful: p.unsuccessful };
       }),
     };

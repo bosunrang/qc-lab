@@ -8,7 +8,7 @@ import { ResizeHandle, useStoredWidth } from '../../components/ResizeHandle';
 import type { EqaInstrumentGridRow, EqaSeriesView } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { normalizeSearchText } from '../../lib/search-options';
-import { ClassTag, numText, pctText, rawNum, roundLabel, TrendTags, worstEqaResult } from './shared';
+import { EqaAssessmentTags, numText, pctText, rawNum, roundLabel, TrendTags, worstEqaResult, eqaResultNotes } from './shared';
 import { EqaSeriesChart } from './EqaSeriesChart';
 import { EqaResultFilter, useEqaResultFilter } from './EqaResultFilter';
 import { useEqaScope, type EqaNavigationContext } from './useEqaScope';
@@ -27,7 +27,7 @@ function isStacked() { return window.matchMedia(STACKED_QUERY).matches; }
 export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
   testId: string; onBack: () => void;
   onOpenTest: (id: string, context?: EqaNavigationContext, replace?: boolean) => void;
-  onOpenRound: (id: string, resultId?: string) => void;
+  onOpenRound: (id: string, resultId?: string, context?: EqaNavigationContext) => void;
 }) {
   const series = useEqaStore((s) => s.series);
   const allRounds = useEqaStore((s) => s.rounds);
@@ -125,8 +125,8 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
   const latestSignals = [...new Set(latestRound.flatMap((p) => p.signals))];
   const latestUnsuccessful = latestRound.some((p) => p.unsuccessful);
   const latestHasSignals = latestSignals.length > 0 || latestUnsuccessful;
-  const tablePoints = [...points].reverse().filter((p) => filter === 'all' || (filter === 'attention'
-    ? p.class !== 'ok' || p.signals.length > 0 || p.unsuccessful || p.within_tea === false
+  const tablePoints = [...points].reverse().map(point => ({ point, notes: eqaResultNotes(point) })).filter(({ point: p, notes }) => filter === 'all' || (filter === 'attention'
+    ? p.class !== 'ok' || p.signals.length > 0 || p.unsuccessful || p.within_tea === false || notes.length > 0
     : p.class === filter));
 
   return <div className="eqa-test">
@@ -185,9 +185,9 @@ export function EqaTestDetail({ testId, onBack, onOpenTest, onOpenRound }: {
           <EqaResultFilter value={filter} onChange={setFilter} label="Lọc kết quả từng đợt theo đánh giá" allLabel="Tất cả kết quả" />
         </div>
             <div className="eqa-section-body">{!tablePoints.length ? <EmptyState size="compact" title={filter === 'all' ? 'Chưa có kết quả trong phạm vi này' : 'Không có kết quả phù hợp bộ lọc'} /> : <div className="eqa-table-wrap eqa-results-scroll" tabIndex={0} role="region" aria-label="Vùng cuộn kết quả từng đợt"><table className="eqa-table eqa-center-rest"><thead><tr><th>Đợt / mẫu</th><th>Kết quả<span className="eqa-sub">{view.unit}</span></th><th>Giá trị ấn định<span className="eqa-sub">{view.unit}</span></th><th>z</th><th>Đánh giá</th><th aria-label="Thao tác" /></tr></thead><tbody>
-              {tablePoints.map((p) => <tr key={p.result_id} className={p.result_id === selected?.result_id ? 'is-selected' : undefined}>
+              {tablePoints.map(({ point: p, notes }) => <tr key={p.result_id} className={p.result_id === selected?.result_id ? 'is-selected' : undefined}>
                 <td><button type="button" className="eqa-test-link" aria-pressed={p.result_id === selected?.result_id} onClick={() => selectPoint(p)}>{roundLabel(p)}{p.sample ? ` · ${p.sample}` : ''}</button><span className="eqa-sub">{vnDate(p.report_date, '—')}</span></td>
-                <td>{rawNum(p.result)}</td><td>{rawNum(p.assigned)}</td><td>{numText(p.z)}</td><td><ClassTag cls={p.class} /></td><td><button type="button" className="btn ghost sm" onClick={() => onOpenRound(p.round_id, p.result_id)}>Mở đợt báo cáo</button></td>
+                <td>{rawNum(p.result)}</td><td>{rawNum(p.assigned)}</td><td>{numText(p.z)}</td><td><EqaAssessmentTags cls={p.class} notes={notes} /></td><td><button type="button" className="btn ghost sm" onClick={() => onOpenRound(p.round_id, p.result_id, { year: p.year, programId: p.program_id, instrumentId: view.instrument_id })}>Mở đợt báo cáo</button></td>
               </tr>)}
             </tbody></table></div>}</div>
           </section>

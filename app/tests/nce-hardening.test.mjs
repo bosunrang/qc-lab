@@ -290,7 +290,9 @@ test('NCE-H11: quyết định ảnh hưởng ghi trước lần rerun muộn h�
 });
 
 test('NCE-H12: luật 6x kéo khoảng nghi ngờ về đầu chuỗi, không dừng ở lần đạt ngay trước', () => {
-  const { nce, addRun, testId } = fixture();
+  const { db, nce, addRun, testId } = fixture();
+  // 6x không bật sẵn (WG-26): xét nghiệm tự bật trước khi nhập các lần chạy này.
+  must(require('../../app-dist/main/ipc/westgard-handlers.js').createWestgardHandlers(db).saveRuleAction(testId, '6x', 'reject', admin), 'bật 6x');
   // Mức 1 lệch dương sáu lần liên tiếp; mức 2 lệch âm để không thành chuỗi gộp mức.
   for (const date of ['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']) addRun(date, 0.5, -0.5);
   const shift = { date: '2026-09-15', runId: '1' };

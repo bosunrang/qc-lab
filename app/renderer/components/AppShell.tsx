@@ -92,12 +92,15 @@ export function AppShell() {
           <div className="brand">
             <div className="brand-mark">{profile?.logo_data ? <img src={profile.logo_data} alt="" /> : brandMarkText}</div>
             {!collapsed && <div className="brand-copy"><div>{brandTitle}</div><small>{brandSub}</small></div>}
+            <button type="button" className="nav-toggle" title={toggleLabel} aria-label={toggleLabel}
+              aria-expanded={!collapsed} aria-controls="primary-navigation" onClick={toggleCollapsed}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
           </div>
-          <button type="button" className="nav-toggle" title={toggleLabel} aria-label={toggleLabel} onClick={toggleCollapsed}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-          </button>
         </div>
-        <nav aria-label="Điều hướng chính">
+        <nav id="primary-navigation" className={iconOnly ? 'nav-icon-only' : undefined} aria-label="Điều hướng chính">
           {NAV_GROUPS.map((group) => {
             const items = group.ids.map(pageById).filter((page): page is PageDef => !!page && canUserAccessPage(page.id, user));
             if (!items.length) return null;

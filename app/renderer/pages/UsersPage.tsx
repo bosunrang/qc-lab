@@ -1,23 +1,17 @@
 import { FormErrorMessage } from '../components/FormErrorMessage';
-// Người dùng: trang quản lý tài khoản có ba điểm cấu trúc chính:
-//   1. Form "Thêm người dùng" nằm ngang phía trên danh sách. Thông tin tài
-//      khoản và các màn hình truy cập dùng chung một panel, không lồng thẻ.
-//   2. Bảng danh sách có 4 cột (Người dùng / Vai trò / Trạng thái / Hành
-//      động) với cụm nút trên từng dòng, không phải select+checkbox inline.
-//   3. `pagePerms` — quyền theo từng trang.
-//      Vai trò là trần trên, lưới checkbox chỉ thu hẹp thêm. Chặn thật ở
-//      main (`auth-handlers.ts` gọi `selectUserPermissions`), lưới này chỉ
-//      là giao diện.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useUsersStore } from '../store/users-store';
 import { useAuthStore } from '../store/auth-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { Modal } from '../components/Modal';
+import { EmptyState } from '../components/EmptyState';
+import { NavIcon } from '../components/NavIcon';
 import { PageHeader } from '../components/PageHeader';
+import { Pagination, pageBounds } from '../components/Pagination';
 import { RowActionButton } from '../components/RowActionButton';
 import { reportFormError, confirmDialog, infoDialog, errorDialog } from '../state/dialog-store';
-import { PAGE_DEFS, ROLE_LIST, canWrite, rolePageIds, roleLabel } from '../lib/permissions';
+import { PAGE_DEFS, ROLE_LIST, canWrite, userPageIds, rolePageIds, roleLabel } from '../lib/permissions';
 import { initialsFromName } from '../../main/domain/name-initials';
 import type { PublicUser } from '../../shared/qc-api';
 import { AsyncButton } from '../components/AsyncButton';
@@ -41,6 +35,22 @@ const CAPABILITY_OPTIONS: readonly [string, string][] = [
   ['nce.approve', 'Duyệt đóng hồ sơ NCE'],
 ];
 
+const PAGE_SIZE = 12;
+const PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  dash: 'Theo dõi tình trạng QC và việc cần xử lý.',
+  entry: 'Ghi kết quả QC và xem biểu đồ theo lô.',
+  westgard: 'Xem vi phạm quy tắc và xu hướng nội kiểm.',
+  sigma: 'Đánh giá Sigma từ CV, Bias và TEa.',
+  reagent: 'Đối chiếu kết quả giữa hai lô hoá chất.',
+  eqa: 'Theo dõi kết quả, lịch và báo cáo ngoại kiểm.',
+  actions: 'Theo dõi hồ sơ sự cố và việc khắc phục.',
+  report: 'Xem và xuất báo cáo, biểu mẫu QC.',
+  manage: 'Quản lý máy, xét nghiệm, lô QC và tiêu chí.',
+  users: 'Quản lý tài khoản và quyền truy cập.',
+  audit: 'Tra cứu lịch sử thao tác trong ứng dụng.',
+  settings: 'Quản lý sao lưu và kết nối của ứng dụng.',
+};
+
 /** Khi tạo tài khoản, chỉ hiện các màn hình của vai trò đã chọn. Hộp sửa quyền
  * vẫn hiện toàn bộ để quản trị viên thấy rõ những màn hình bị giới hạn. */
 function PermGrid({ groupId, labelledBy, role, selected, onToggle, availableOnly = false }: {
@@ -52,10 +62,15 @@ function PermGrid({ groupId, labelledBy, role, selected, onToggle, availableOnly
       {PAGE_DEFS.filter((page) => !availableOnly || allowed.has(page.id)).map((page) => {
         const enabled = allowed.has(page.id);
         return (
-          <label key={page.id} className={`choice-card${enabled ? (selected.has(page.id) ? ' is-selected' : '') : ' is-disabled'}`} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
+          <label key={page.id} className={`choice-card user-perm-card${enabled ? (selected.has(page.id) ? ' is-selected' : '') : ' is-disabled'}`} title={enabled ? undefined : 'Vai trò này không có thẻ này'}>
+            <span className="user-perm-icon" aria-hidden="true"><NavIcon id={page.id} /></span>
+            <span className="user-perm-copy">
+              <strong id={`${groupId}-${page.id}`}>{page.label}</strong>
+              <small id={`${groupId}-${page.id}-description`}>{PAGE_DESCRIPTIONS[page.id]}</small>
+            </span>
             <input type="checkbox" data-field="pagePerms" value={page.id} checked={enabled && selected.has(page.id)} disabled={!enabled}
+              aria-labelledby={`${groupId}-${page.id}`} aria-describedby={`${groupId}-${page.id}-description`}
               onChange={(e) => onToggle(page.id, e.target.checked)} />
-            <span>{page.label}</span>
           </label>
         );
       })}
@@ -77,23 +92,21 @@ function narrowSelection(selected: ReadonlySet<string>, role: string): Set<strin
   return new Set([...selected].filter((id) => allowed.has(id)));
 }
 
-function CreatePanel() {
+function CreateUserModal({ onClose }: { onClose: () => void }) {
   const { create } = useUsersStore(useShallow((s) => ({ create: s.create })));
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('technician');
   const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
   // Mặc định tick sẵn toàn bộ thẻ của vai trò — khớp `userPermChecks()` app
   // cũ khi chưa có lựa chọn nào (`selectedIds` rỗng → dùng `rolePageIds`).
   const [selected, setSelected] = useState<Set<string>>(() => new Set(rolePageIds('technician')));
   const availableCount = rolePageIds(role).length;
   const initials = initialsFromName(name);
-  // Lỗi vẫn hiện bằng hộp thoại như cũ; đóng hộp thoại xong thì ô sai được
-  // đánh dấu và nhận focus. Câu lỗi nằm trong một `span hidden` để ô có
-  // `aria-describedby` trỏ tới mà giao diện không thêm dòng chữ nào.
   const [err, setErr] = useState<FormError | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const errorId = useInvalidField(panelRef, err);
+  const formRef = useRef<HTMLDivElement>(null);
+  const errorId = useInvalidField(formRef, err);
 
   function changeRole(next: string) {
     setRole(next);
@@ -101,6 +114,10 @@ function CreatePanel() {
   }
 
   async function submit() {
+    if (password !== confirmation) {
+      setErr(formError('Mật khẩu xác nhận chưa khớp.', 'confirmation'));
+      return;
+    }
     const pagePerms = [...selected];
     if (!pagePerms.length) {
       setErr(formError('Cần chọn ít nhất một thẻ được phép dùng.', 'pagePerms'));
@@ -108,40 +125,56 @@ function CreatePanel() {
     }
     const result = await create({ username: username.trim().toLowerCase(), name, initials: initialsFromName(name), role, password, pagePerms });
     if (!result.ok) { await reportFormError(formErrorFrom(result.error, USER_FIELD_ERRORS), setErr); return; }
-    setErr(null);
-    setUsername(''); setName(''); setPassword('');
-    setSelected(new Set(rolePageIds(role)));
+    showToast('Đã tạo tài khoản.');
+    onClose();
   }
 
   return (
-    <div className="panel users-create-panel" ref={panelRef}>
-      <h2 className="panel-title">Thêm người dùng</h2>
-      <FormErrorMessage rootRef={panelRef} error={err} id={errorId} />
-      <div className="user-create-layout">
-        <section className="user-create-section" aria-labelledby="userAccountTitle">
-          <h3 id="userAccountTitle">Thông tin tài khoản</h3>
-          <div className="user-create-fields">
-            <div className="field"><label htmlFor="uUser">Tên đăng nhập</label><input id="uUser" data-field="username" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-            <div className="field"><label htmlFor="uName">Họ tên</label><input id="uName" data-field="name" aria-label="Họ tên" value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <div className="field"><label htmlFor="uRole">Vai trò</label><RoleSelect id="uRole" value={role} onChange={changeRole} /></div>
-            <div className="field"><label htmlFor="uPass">Mật khẩu tạm</label><input id="uPass" data-field="password" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-            <div className="user-initials-preview">Mã viết tắt tự tạo <span className="pill">{initials || '—'}</span></div>
+    <Modal title="Thêm người dùng" size="lg" className="user-editor-modal" onClose={onClose}
+      footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu tài khoản</AsyncButton></>}>
+      <div className="user-editor" ref={formRef}>
+        <FormErrorMessage rootRef={formRef} error={err} id={errorId} />
+        <div className="user-create-fields">
+          <div className="field">
+            <label htmlFor="uName">Họ tên</label>
+            <input id="uName" data-field="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-        </section>
-        <section className="user-create-section user-create-perms" aria-labelledby="newUserPermsLabel">
+          <div className="field">
+            <label htmlFor="uUser">Tên đăng nhập</label>
+            <input id="uUser" data-field="username" placeholder="vd: lan.nt" value={username} onChange={(e) => setUsername(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="uRole">Vai trò</label>
+            <RoleSelect id="uRole" value={role} onChange={changeRole} />
+          </div>
+          <div className="field">
+            <label htmlFor="uPass">Mật khẩu tạm</label>
+            <input id="uPass" data-field="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="uConfirm">Xác nhận mật khẩu</label>
+            <input id="uConfirm" data-field="confirmation" type="password" autoComplete="new-password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
+          </div>
+          <div className="user-initials-preview">Mã viết tắt tự tạo <span className="pill">{initials || '—'}</span></div>
+        </div>
+        <p className="hint">Người dùng phải đổi mật khẩu ở lần đăng nhập đầu tiên.</p>
+        <section className="user-access-section" aria-labelledby="newUserPermsLabel">
           <div className="user-perm-heading">
-            <h3 id="newUserPermsLabel">Màn hình truy cập</h3>
+            <h4 id="newUserPermsLabel">Thẻ được truy cập</h4>
             <span className="pill">{selected.size}/{availableCount} đã chọn</span>
           </div>
           <PermGrid groupId="newUserPerms" labelledBy="newUserPermsLabel" role={role} selected={selected} availableOnly
-            onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
+            onToggle={(id, on) => {
+              setSelected((prev) => {
+                const next = new Set(prev);
+                if (on) next.add(id); else next.delete(id);
+                return next;
+              });
+              if (on && err?.fields.includes('pagePerms')) setErr(null);
+            }} />
         </section>
       </div>
-      <div className="user-create-footer">
-        <p>Vai trò quyết định quyền sửa dữ liệu. Người dùng mới phải đổi mật khẩu ở lần đăng nhập đầu tiên.</p>
-        <button className="btn teal" onClick={submit}>Tạo tài khoản</button>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -162,13 +195,19 @@ function UserActions({ user, current, onPerms, onReset }: {
   }
 
   if (current) {
-    return <><span className="hint">(bạn)</span>{' '}<button className="btn ghost sm" onClick={onReset}>Đổi mật khẩu</button></>;
+    return <RowActionButton kind="key" className="user-password-action" label="Đổi mật khẩu của bạn" onClick={onReset} />;
   }
+  const locked = user.active === false;
   return (
     <>
-      <RowActionButton kind="edit" label={`Sửa quyền ${user.name}`} onClick={onPerms} />{' '}
-      <button className="btn ghost sm" onClick={onReset}>Đặt lại MK</button>{' '}
-      <button className="btn ghost sm" onClick={toggle}>{user.active === false ? 'Mở khoá' : 'Khoá'}</button>{' '}
+      <RowActionButton kind="edit" label={`Sửa quyền ${user.name}`} onClick={onPerms} />
+      <RowActionButton kind="key" className="user-password-action" label={`Đặt lại mật khẩu cho ${user.name}`} onClick={onReset} />
+      <RowActionButton
+        kind={locked ? 'unlock' : 'lock'}
+        className={locked ? 'user-unlock-action' : 'user-lock-action'}
+        label={locked ? `Mở khoá tài khoản ${user.name}` : `Khoá tài khoản ${user.name}`}
+        onClick={toggle}
+      />
       <RowActionButton kind="delete" label={`Xoá người dùng ${user.name}`} onClick={removeUser} />
     </>
   );
@@ -177,41 +216,67 @@ function UserActions({ user, current, onPerms, onReset }: {
 export function UsersPage() {
   const { users, load } = useUsersStore(useShallow((s) => ({ users: s.users, load: s.load })));
   const { user: me } = useAuthStore(useShallow((s) => ({ user: s.user })));
+  const [creating, setCreating] = useState(false);
+  const [page, setPage] = useState(1);
   const [permsFor, setPermsFor] = useState<PublicUser | null>(null);
   const [resetFor, setResetFor] = useState<PublicUser | null>(null);
 
   useEffect(() => { load(); }, [load]);
   useStoreInvalidation(['users'], undefined, load);
 
+  const pageCount = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const { from, to } = pageBounds(currentPage, PAGE_SIZE, users.length);
+
   return (
     <>
-      <PageHeader title="Người dùng" subtitle="Phân quyền thao tác và kiểm soát tài khoản" />
+      <PageHeader title="Người dùng" subtitle="Phân quyền truy cập và quản lý tài khoản" />
       <div className="users-layout">
-        <CreatePanel />
-        <div className="panel users-list-panel">
-          <h2 className="panel-title">Danh sách người dùng</h2>
-          <div className="user-table-wrap">
+        <section className="panel users-toolbar" aria-labelledby="users-heading">
+          <span className="users-toolbar-icon" aria-hidden="true"><NavIcon id="users" /></span>
+          <div className="users-toolbar-copy">
+            <h2 id="users-heading">Tài khoản người dùng</h2>
+            <p className="hint">{users.length} tài khoản</p>
+          </div>
+          <button type="button" className="btn teal" onClick={() => setCreating(true)}>+ Thêm người dùng</button>
+        </section>
+        <section aria-label="Danh sách người dùng" className="users-list-panel">
+          {users.length === 0 ? <div className="panel"><EmptyState size="compact" title="Chưa có tài khoản trong danh sách" /></div> : <div className="user-table-wrap">
             <table className="user-table">
-              <thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+              <thead><tr>
+                <th scope="col">Người dùng</th>
+                <th scope="col">Tên đăng nhập</th>
+                <th scope="col">Vai trò</th>
+                <th scope="col">Thẻ được truy cập</th>
+                <th scope="col">Trạng thái</th>
+                <th scope="col">Thao tác</th>
+              </tr></thead>
               <tbody>
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td><b>{user.name || user.username}</b><div className="hint">@{user.username}{user.initials ? ` · ${user.initials}` : ''}</div></td>
-                    <td>{roleLabel(user.role)}{user.role !== 'admin' && user.capabilities.length > 0 && (
-                      <div className="hint">{CAPABILITY_OPTIONS.filter(([id]) => user.capabilities.includes(id)).map(([, label]) => label).join(' · ')}</div>
-                    )}</td>
-                    <td>{user.active === false ? <span className="tag rej">Khoá</span> : <span className="tag ok">Hoạt động</span>}</td>
-                    <td><div className="user-row-actions">
-                      <UserActions user={user} current={user.id === me?.id} onPerms={() => setPermsFor(user)} onReset={() => setResetFor(user)} />
-                    </div></td>
-                  </tr>
-                ))}
+                {users.slice(from - 1, to).map((user) => {
+                  const access = new Set(userPageIds(user));
+                  return (
+                    <tr key={user.id}>
+                      <td><b>{user.name || user.username}</b>{user.id === me?.id && <div className="hint">Đang đăng nhập</div>}</td>
+                      <td>{user.username}{user.initials && <div className="hint">{user.initials}</div>}</td>
+                      <td>{roleLabel(user.role)}{user.role !== 'admin' && user.capabilities.length > 0 && (
+                        <div className="hint">{CAPABILITY_OPTIONS.filter(([id]) => user.capabilities.includes(id)).map(([, label]) => label).join(' · ')}</div>
+                      )}</td>
+                      <td>{access.size === PAGE_DEFS.length ? 'Toàn bộ thẻ' : PAGE_DEFS.filter((item) => access.has(item.id)).map((item) => item.label).join(', ')}</td>
+                      <td>{user.active === false ? <span className="tag rej">Đã khoá</span> : <span className="tag ok">Đang hoạt động</span>}</td>
+                      <td><div className="user-row-actions">
+                        <UserActions user={user} current={user.id === me?.id} onPerms={() => setPermsFor(user)} onReset={() => setResetFor(user)} />
+                      </div></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-          </div>
-        </div>
+          </div>}
+          <Pagination page={currentPage} pageCount={pageCount} from={from} to={to} total={users.length} unit="người dùng" label="Phân trang người dùng" onPageChange={setPage} />
+        </section>
       </div>
 
+      {creating && <CreateUserModal onClose={() => setCreating(false)} />}
       {permsFor && <PermsModal user={permsFor} onClose={() => setPermsFor(null)} />}
       {resetFor && (resetFor.id === me?.id
         ? <OwnPasswordModal onClose={() => setResetFor(null)} />
@@ -244,36 +309,38 @@ function PermsModal({ user, onClose }: { user: PublicUser; onClose: () => void }
   }
 
   return (
-    <Modal title="Sửa quyền người dùng" onClose={onClose}
+    <Modal title="Sửa quyền người dùng" size="lg" className="user-editor-modal" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu quyền</AsyncButton></>}>
-      <div className="hint"><b>{user.name || user.username}</b> · @{user.username}</div>
-      <div className="field">
-        <label htmlFor="editUserRole">Vai trò</label>
-        <RoleSelect id="editUserRole" value={role} onChange={(next) => { setRole(next); setSelected((prev) => narrowSelection(prev, next)); }} />
+      <div className="user-editor">
+        <p className="hint"><b>{user.name || user.username}</b> · @{user.username}</p>
+        <div className="field">
+          <label htmlFor="editUserRole">Vai trò</label>
+          <RoleSelect id="editUserRole" value={role} onChange={(next) => { setRole(next); setSelected((prev) => narrowSelection(prev, next)); }} />
+        </div>
+        <div className="field">
+          <label id="editUserPermsLabel">Thẻ được truy cập</label>
+          <PermGrid groupId="editUserPerms" labelledBy="editUserPermsLabel" role={role} selected={selected}
+            onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
+        </div>
+        <div className="field">
+          <label id="editUserCapLabel">Quyền nghiệp vụ</label>
+          {role === 'admin'
+            ? <div className="hint">Quản trị viên mặc nhiên có mọi quyền nghiệp vụ.</div>
+            : !canWrite(role)
+              ? <div className="hint">Tài khoản chỉ xem không được cấp quyền nghiệp vụ.</div>
+              : (
+                <div className="user-capability-grid" role="group" aria-labelledby="editUserCapLabel">
+                  {CAPABILITY_OPTIONS.map(([id, label]) => (
+                    <label key={id} className={`choice-card${grantedCaps.has(id) ? ' is-selected' : ''}`}>
+                      <input type="checkbox" checked={grantedCaps.has(id)} onChange={(e) => setGrantedCaps((prev) => { const next = new Set(prev); if (e.target.checked) next.add(id); else next.delete(id); return next; })} />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+        </div>
+        <div className="hint">Vai trò quyết định quyền sửa và quản trị; các thẻ quyết định màn hình được mở. Người duyệt hồ sơ NCE phải độc lập với người đã tham gia hồ sơ.</div>
       </div>
-      <div className="field">
-        <label id="editUserPermsLabel">Thẻ được phép dùng</label>
-        <PermGrid groupId="editUserPerms" labelledBy="editUserPermsLabel" role={role} selected={selected}
-          onToggle={(id, on) => setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; })} />
-      </div>
-      <div className="field">
-        <label id="editUserCapLabel">Quyền nghiệp vụ</label>
-        {role === 'admin'
-          ? <div className="hint">Quản trị viên mặc nhiên có mọi quyền nghiệp vụ.</div>
-          : !canWrite(role)
-            ? <div className="hint">Tài khoản chỉ xem không được cấp quyền nghiệp vụ.</div>
-            : (
-              <div className="user-perm-grid" role="group" aria-labelledby="editUserCapLabel">
-                {CAPABILITY_OPTIONS.map(([id, label]) => (
-                  <label key={id} className={`choice-card${grantedCaps.has(id) ? ' is-selected' : ''}`}>
-                    <input type="checkbox" checked={grantedCaps.has(id)} onChange={(e) => setGrantedCaps((prev) => { const next = new Set(prev); if (e.target.checked) next.add(id); else next.delete(id); return next; })} />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-      </div>
-      <div className="hint">Vai trò quyết định quyền sửa và quản trị; các thẻ quyết định màn hình được mở. Người duyệt hồ sơ NCE phải độc lập với người đã tham gia hồ sơ.</div>
     </Modal>
   );
 }

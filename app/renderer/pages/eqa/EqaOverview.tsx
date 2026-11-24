@@ -1,5 +1,6 @@
 // Tổng quan đặt bảng tổng hợp z-score và bằng chứng cạnh nhau; phạm vi đọc theo URL.
 import { useCallback, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useEqaStore } from '../../store/eqa-store';
 import { useAuthStore } from '../../store/auth-store';
@@ -15,16 +16,17 @@ import { EqaScopeControls, useEqaScope, type EqaNavigationContext } from './useE
 import { useEqaRead, useEqaRevision } from './useEqaRead';
 import { EqaResultInspector } from './EqaResultInspector';
 import { EqaOverviewSummary } from './EqaOverviewSummary';
-import { filterOverviewRows, overviewSelection, type EqaOverviewFilter } from './overview-model';
+import { filterOverviewRows, overviewRoundRows, overviewSelection, type EqaOverviewFilter } from './overview-model';
 
 export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
-  onOpen: (id: string, resultId?: string) => void; onOpenSchedule: () => void;
+  onOpen: (id: string, resultId?: string, context?: EqaNavigationContext) => void; onOpenSchedule: () => void;
   onOpenTest: (testId: string, context?: EqaNavigationContext) => void;
 }) {
   const { rounds, schedule, loaded, error, load, instrumentGrid } = useEqaStore(useShallow((s) => ({
     rounds: s.rounds, schedule: s.schedule, loaded: s.loaded, error: s.error, load: s.load, instrumentGrid: s.instrumentGrid,
   })));
   const scope = useEqaScope();
+  const [, setParams] = useSearchParams();
   const { year, programId, instrumentId } = scope;
   const revision = useEqaRevision();
   const read = useCallback(() => programId && instrumentId ? instrumentGrid(programId, year, instrumentId) : Promise.resolve([]), [instrumentGrid, programId, year, instrumentId]);
@@ -34,7 +36,11 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
   const attentionRef = useRef<HTMLElement>(null);
   const writable = canWrite(useAuthStore((s) => s.user?.role));
   const [importing, setImporting] = useState(false);
-  const [showCancelled, setShowCancelled] = useState(false);
+  const requestedCancelled = scope.params.get('roundCancelled') === '1';
+  // Checkbox phản hồi ngay khi bấm, đồng thời nhận lại giá trị khi URL đổi.
+  const [cancelledState, setCancelledState] = useState({ requested: requestedCancelled, value: requestedCancelled });
+  if (cancelledState.requested !== requestedCancelled) setCancelledState({ requested: requestedCancelled, value: requestedCancelled });
+  const showCancelled = cancelledState.requested === requestedCancelled ? cancelledState.value : requestedCancelled;
   const scopeKey = `${programId}:${year}:${instrumentId}`;
   const [filterState, setFilterState] = useState<{ key: string; value: EqaOverviewFilter }>({ key: scopeKey, value: 'all' });
   // Ghi nhận cả phạm vi mới để quay về phạm vi cũ không khôi phục bộ lọc đã bỏ.
@@ -49,8 +55,24 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
     setFilterState({ key: scopeKey, value });
     if (selected) scope.clearSelection();
   }
-  const visible = rounds.filter((r) => r.year === year && r.program_id === programId && (showCancelled || r.status === 'open'));
-  const cancelledCount = rounds.filter((r) => r.year === year && r.program_id === programId && r.status !== 'open').length;
+  const requestedRoundMachine = scope.params.get('roundMachine') ?? '';
+  const roundMachine = scope.machines.some((machine) => machine.id === requestedRoundMachine) ? requestedRoundMachine : '';
+  const roundOptions = rounds.filter((round) => round.year === year && round.program_id === programId && (showCancelled || round.status === 'open'));
+  const requestedRound = scope.params.get('roundFilter') ?? '';
+  const roundFilter = roundOptions.some((round) => round.id === requestedRound) ? requestedRound : '';
+  function changeRoundFilter(key: 'roundFilter' | 'roundMachine' | 'roundCancelled', value: string) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set(key, value); else next.delete(key);
+      // Khi ẩn các đợt đã huỷ, không giữ một đợt đã huỷ trong bộ lọc ẩn.
+      if (key === 'roundCancelled' && !value && rounds.some((round) => round.id === next.get('roundFilter') && round.status === 'cancelled')) next.delete('roundFilter');
+      return next;
+    }, { replace: true });
+  }
+  const machineRounds = overviewRoundRows(rounds, year, programId, roundMachine);
+  const visible = machineRounds.filter(({ round }) => (showCancelled || round.status === 'open') && (!roundFilter || round.id === roundFilter));
+  const cancelledCount = machineRounds.filter(({ round }) => round.status !== 'open').length;
+  const openScopedRound = (id: string, resultId?: string) => onOpen(id, resultId, scope.context);
   const scopedAttention = attentionView.data ?? [];
   const chainAttention = scopedAttention.filter((item) => item.latest.unsuccessful || item.latest.signals.some((signal) => signal !== 'reject'));
   const chainUnsuccessful = chainAttention.filter((item) => item.latest.unsuccessful).length;
@@ -93,7 +115,7 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
           </ul>
         </div>
       </section>
-      {selected && <EqaResultInspector selection={selected} onOpenRound={onOpen} onClose={scope.clearSelection} onOpenTest={() => onOpenTest(selected.testId, { ...scope.context, resultId: selected.resultId, roundId: selected.roundId })} />}
+      {selected && <EqaResultInspector selection={selected} onOpenRound={openScopedRound} onClose={scope.clearSelection} onOpenTest={() => onOpenTest(selected.testId, { ...scope.context, resultId: selected.resultId, roundId: selected.roundId })} />}
     </div>
     {loaded && !error && rounds.length > 0 && <section ref={attentionRef} className="panel eqa-attention-panel" aria-label="Xét nghiệm cần chú ý">
       <div className="panel-head"><h2>Tín hiệu ở đợt mới nhất <span className="count">{attentionView.data === undefined ? '—' : scopedAttention.length}</span></h2></div>
@@ -110,13 +132,27 @@ export function EqaOverview({ onOpen, onOpenSchedule, onOpenTest }: {
       </div>
     </section>}
     <section className="panel" aria-label="Danh sách đợt ngoại kiểm"><div className="panel-head"><h2>Đợt báo cáo <span className="count">{!loaded || error ? '—' : visible.length}</span></h2>
-      {cancelledCount > 0 && <label className="eqa-toggle"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />Hiện đợt đã huỷ</label>}
+      <div className="eqa-filters">
+        {cancelledCount > 0 && <label className="eqa-toggle"><input type="checkbox" checked={showCancelled} onChange={(e) => {
+          const value = e.target.checked;
+          setCancelledState({ requested: requestedCancelled, value });
+          changeRoundFilter('roundCancelled', value ? '1' : '');
+        }} />Hiện đợt đã huỷ</label>}
+        <select className="eqa-round-list-filter" aria-label="Lọc đợt trong danh sách đợt báo cáo" value={roundFilter} onChange={(event) => changeRoundFilter('roundFilter', event.target.value)}>
+          <option value="">Tất cả đợt</option>
+          {roundOptions.map((round) => <option key={round.id} value={round.id}>{roundLabel(round)}{round.status === 'cancelled' ? ' · Đã huỷ' : ''}</option>)}
+        </select>
+        <select className="eqa-round-list-filter" aria-label="Lọc máy trong danh sách đợt báo cáo" value={roundMachine} onChange={(event) => changeRoundFilter('roundMachine', event.target.value)}>
+          <option value="">Tất cả máy</option>
+          {scope.machines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}
+        </select>
+      </div>
     </div><div className="eqa-section-body">
       {error ? <EmptyState size="compact" title="Không tải được danh sách đợt" action={<button className="btn ghost sm" onClick={() => void load()}>Thử lại</button>}>{error}</EmptyState>
         : !loaded ? <EmptyState size="compact" title="Đang tải danh sách đợt…" />
         : !visible.length ? <EmptyState title={rounds.length ? 'Chưa có đợt ngoại kiểm trong phạm vi này' : 'Chưa có đợt ngoại kiểm nào'} action={writable ? <button className="btn sm" onClick={() => setImporting(true)}>Nhập báo cáo PDF</button> : undefined}>Nhập báo cáo của trung tâm để bắt đầu đối chiếu.</EmptyState>
         : <div className="eqa-table-wrap"><table className="eqa-table eqa-center-rest"><thead><tr><th>Chương trình / đợt</th><th>Máy</th><th>Kết quả</th><th>Chấp nhận</th><th>Cảnh báo</th><th>Không chấp nhận</th><th>Ngày báo cáo</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead><tbody>
-          {visible.map((r) => <tr key={r.id}><td><b className="eqa-strong">{roundLabel(r)}</b><span className="eqa-sub">{r.program_name}</span></td><td className="eqa-wrap">{r.instruments.join(', ') || '—'}</td><td>{r.total}</td><td>{r.ok}</td><td>{r.warn}</td><td>{r.rej}</td><td>{vnDate(r.report_date, '—')}</td><td><RoundStatusTag status={r.status} /></td><td><button className="btn ghost sm" onClick={() => onOpen(r.id)}>Xem</button></td></tr>)}
+          {visible.map(({ round: r, instrument: i }) => <tr key={`${r.id}:${i.instrument_id}`}><td><b className="eqa-strong">{roundLabel(r)}</b><span className="eqa-sub">{r.program_name}</span></td><td className="eqa-wrap">{i.instrument_name}</td><td>{i.total}</td><td>{i.ok}</td><td>{i.warn}</td><td>{i.rej}</td><td>{vnDate(r.report_date, '—')}</td><td><RoundStatusTag status={r.status} /></td><td><button className="btn ghost sm" onClick={() => onOpen(r.id, undefined, { year, programId, instrumentId: i.instrument_id })}>Xem</button></td></tr>)}
         </tbody></table></div>}
     </div></section>
     {importing && <EqaImportModal onClose={() => setImporting(false)} onImported={(id) => { setImporting(false); onOpen(id); }} />}

@@ -42,6 +42,25 @@ const ROWS = [
 ];
 const draft = (over = {}) => ({ data: { round: ROUND, rows: ROWS, source: 'pdf', sourceName: 'VEQAS_BC20C_01.pdf', ...over } });
 
+test('chuỗi xét nghiệm giữ cùng căn cứ lưu ý với chi tiết đợt, không đổi xếp loại chính thức', () => {
+  const { db, eqa, ids } = fixture();
+  try {
+    const testId = ids['ALT@AU5800'];
+    for (const [month, z, peer] of [[1, 1, {}], [2, 1, { instrument: { n: 17, mean: 100, sd: 1, cv: 1 } }], [3, .5, {}]]) {
+      const imported = must(eqa.importEqaRound(draft({ round: { ...ROUND, round: `ĐỢT 0${month}`, reportDate: `2026-0${month}-20` },
+        rows: [row('ALT', 'AU5800', 101, 100, 1, z, { peer })], mappings: [{ code: 'ALT', instrument: 'AU5800', testId }] }), admin), 'nhập căn cứ lưu ý');
+      const detail = eqa.getEqaRound(imported.round.id).results[0];
+      const point = eqa.getEqaSeries(testId).points.find(p => p.result_id === detail.id);
+      for (const key of ['assigned_check', 'provider_check', 'warnings']) assert.deepEqual(point[key], detail[key], key);
+      assert.equal(point.class, 'ok');
+      assert.equal(point.z, detail.z_official);
+      if (month === 1) { assert.equal(point.assigned_check, null); assert.deepEqual(point.warnings, []); }
+      if (month === 2) assert.equal(point.assigned_check.uncertain, true);
+      if (month === 3) { assert.equal(point.provider_check, 'mismatch'); assert.ok(point.warnings.length > 0); }
+    }
+  } finally { db.close(); }
+});
+
 test('tín hiệu theo phạm vi: chương trình có mẫu nặng hơn không che tín hiệu chương trình đang xem', () => {
   const { db, eqa, ids } = fixture();
   const mappings = [{ code: 'AST(GOT)', instrument: 'AU5800', testId: ids['AST@AU5800'] }];

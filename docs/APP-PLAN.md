@@ -72,6 +72,8 @@ rộng hoặc chỉnh sửa mã nguồn.
   process tính hoặc xác thực; renderer chỉ trình bày kết quả.
   Bias từ ngoại kiểm dùng bộ lọc chung lúc đề xuất và lưu mẫu mới, đối chiếu
   NCE bằng khoá nội dung nguồn và chặn mã kết quả trùng trong mỗi mức.
+  Tỷ lệ u/σp ước tính > 0,3 chỉ cảnh báo để rà soát giá trị ấn định, không tự
+  loại mẫu khỏi Bias Sigma; mẫu vẫn phải đạt điều kiện thời gian, số liệu và NCE.
   Bias chung lấy mọi mẫu hợp lệ trong số tháng người dùng chọn (nguyên từ 1
   trở lên, mặc định 3), đến hết tháng Sigma, bỏ lọc
   ±25% nồng độ. Thao tác áp dụng Bias chung cập nhật các mức trong đúng kỳ,
@@ -131,9 +133,9 @@ rộng hoặc chỉnh sửa mã nguồn.
   (trang 1 của PDF được cung cấp), kết xuất thành ảnh trong `renderer/assets`.
   Nền phủ kín và giữ tỷ lệ; khung biểu mẫu trắng ở giữa. Tài nguyên được đóng
   gói cùng ứng dụng, không phụ thuộc đường dẫn OneDrive hay kết nối mạng.
-- Thanh điều hướng dùng cùng ảnh nền Naviva của màn xác thực, phủ kín và giữ
-  tỷ lệ; `--naviva-navy` là màu dự phòng. Chữ, nhãn nhóm và biểu tượng sáng đủ
-  tương phản trên vùng hoạ tiết; mục đang chọn giữ điểm nhấn xanh ngọc.
+- Thanh điều hướng dùng nền xanh đen trơn `--sidebar-bg` ở cả chế độ mở rộng
+  và thu gọn. Chữ, nhãn nhóm và biểu tượng dùng màu sáng; mục đang chọn có
+  điểm nhấn xanh ngọc.
 - Tổng quan chọn điểm gần nhất theo ngày và mã lần chạy tự nhiên dùng chung;
   thiếu Mean hoặc SD không được coi là đủ dải QC. Tổng quan và Ngoại kiểm chỉ
   nhận dữ liệu/lỗi của lượt tải mới nhất; biên bản tháng phải mở lại nút tải
@@ -169,11 +171,19 @@ rộng hoặc chỉnh sửa mã nguồn.
   tên đã lưu hiện riêng khi sửa, không đổi theo tài khoản bị đổi tên/ngừng dùng.
 - Ứng dụng được tối ưu cho desktop. Màu sắc, kích thước, khoảng cách, tiêu đề
   và control sử dụng token trong `app/renderer/styles/`.
+  Thang chữ màn hình: nội dung chính/ô nhập/nút 14px, nội dung bảng/tiêu đề
+  cột/nhãn/bộ lọc 13.5px, chữ phụ/thông tin nguồn 13px. Chữ phụ cũ 11–12px
+  dùng lại cỡ 13px; tiêu đề lớn và KPI giữ cấp bậc riêng. Rà bố cục ở cửa sổ
+  hẹp khi đổi thang, cho nhãn xuống dòng hoặc cuộn bảng thay vì cắt chữ.
 - Khi sửa giao diện, ưu tiên component và token dùng chung thay vì thêm giá trị
   cục bộ. Giữ các thao tác nguy hiểm có xác nhận rõ ràng.
 - Ô tìm/chọn xét nghiệm và gợi ý tên trong form Thêm xét nghiệm dùng chung
-  kiểu danh sách nhẹ có đường phân cách. Không tự bôi đen chữ khi nhận focus
-  hoặc bấm chuột; Tab không tự mở danh sách. Các ô chọn chỉ nhận xét nghiệm
+  kiểu danh sách nhẹ có đường phân cách. Bấm vào tên đã chọn sẽ chọn toàn bộ
+  chữ để gõ thay, có nút × để tìm lại nhanh trong toàn app. Với ô chọn có sẵn,
+  nút này chỉ xoá nội dung tìm, giữ xét nghiệm đang xem cho tới khi chọn mục
+  mới; Escape hoặc rời ô khôi phục tên đã chọn. Với ô tên trong form thêm/sửa,
+  nút × xoá tên trong bản nháp và gỡ liên kết gợi ý TEa như khi xoá bằng bàn phím.
+  Tab không tự mở danh sách. Các ô chọn chỉ nhận xét nghiệm
   có sẵn, giữ lựa chọn cũ khi huỷ tìm kiếm; form tạo mới vẫn cho nhập tên tự
   do. Nút xuất trên cùng hàng căn theo ô chọn, không dùng nhãn trống để đẩy nút.
 - Danh sách xổ xuống mở bằng chuột không có vòng focus quanh mục được chọn,
@@ -242,7 +252,14 @@ rộng hoặc chỉnh sửa mã nguồn.
 | Phân tích ngoại kiểm | Tổng quan, lịch, báo cáo xem xét và khắc phục: nhập PDF, đối chiếu z/nhóm so sánh, liên kết kết quả cần điều tra với hồ sơ NCE và căn cứ đã chụp |
 | Khắc phục sự cố | Hồ sơ NCE theo lần chạy: kiểm soát, cho phép hoạt động trở lại, CAPA, hiệu lực và duyệt độc lập |
 | Báo cáo & Biểu mẫu | Báo cáo dữ liệu, báo cáo Sigma, PDF/Excel và mẫu biểu |
-| Cài đặt & Đám mây | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
+| Cài đặt & Kết nối | Hồ sơ đơn vị, sao lưu, đồng bộ và cấu hình tích hợp |
+
+Hai khung Thiết lập phân tích và Tình trạng của Sigma tự giãn bằng chiều cao
+của bên có nhiều nội dung hơn. Thẻ mức QC nhận phần chiều cao còn lại khi
+khung thiết lập dài; khuyến nghị vẫn hiện đầy đủ khi làm khung Tình trạng cao hơn.
+Trong Thiết lập phân tích, ô xét nghiệm rộng bằng ô nguồn TEa. Hai ô đơn vị
+và thiết bị chiếm lần lượt 40% và 60% phần bên phải, ghép lại bằng ô tiêu chí TEa bên dưới.
+Panel hẹp chuyển ô xét nghiệm và TEa sang cả hàng, giữ đơn vị/thiết bị cùng hàng.
 
 Số liệu theo kỳ của Sigma dùng thanh kéo chung giữa lịch sử kỳ và bảng mức
 QC. Kéo chuột hoặc dùng phím trái/phải để đổi độ rộng danh sách, nhớ lựa
@@ -258,9 +275,23 @@ tách đường theo mẫu và ngắt khi thiếu đợt. Chi tiết chỉ mở 
 không tự thay bằng kết quả khác. Tín hiệu chuỗi vẫn lấy từ main theo toàn
 bộ lịch sử chương trình. Phần tín hiệu chỉ hiển thị đúng máy–chương trình–năm
 đang chọn, không có bảng hoặc thông báo tín hiệu ngoài phạm vi.
+Danh sách Đợt báo cáo có bộ lọc Đợt và Máy riêng trên tiêu đề, mặc định
+Tất cả đợt và Tất cả máy; kết hợp hai bộ lọc để tìm nhanh và không đổi
+bảng z-score phía trên. Mỗi dòng là một máy trong một
+đợt; tên máy và số kết quả/xếp loại lấy theo đúng máy đó. Mở dòng nào thì
+chi tiết giữ máy của dòng đó, kể cả khi tải lại. Quay lại giữ bộ lọc danh
+sách, kể cả trạng thái Hiện đợt đã huỷ; khi ẩn đợt đã huỷ thì bỏ lựa chọn
+đợt đã huỷ đang lọc. Đổi năm/chương trình đặt lại hai dropdown về Tất cả.
+Thông tin, dải tổng hợp và
+bảng kết quả chi tiết cùng dùng máy đã mở. Máy chưa có dữ liệu không tự
+chuyển sang xem tất cả máy. Vẫn tra cứu được theo máy khi mọi đợt đã huỷ.
+Chi tiết đợt không có dropdown đổi máy hoặc chế độ Tất cả máy: chỉ hiện máy
+đã mở từ danh sách, chuỗi xét nghiệm hoặc lịch một máy. Liên kết cũ chỉ suy
+ra máy khi có kết quả cụ thể hoặc cả đợt có một máy; nếu chưa xác định được
+thì trở về danh sách chọn dòng máy cần đọc, không gộp kết quả các máy.
 Kỳ báo cáo dùng cùng dải tổng hợp với Tổng quan: tỷ lệ kèm số kết quả,
-không chấp nhận và cảnh báo. Số liệu theo máy đang chọn (hoặc toàn kỳ khi
-chọn tất cả máy); lọc xếp loại chỉ đổi bảng, không đổi mẫu số tổng hợp.
+không chấp nhận và cảnh báo của máy đã mở; lọc xếp loại chỉ đổi bảng,
+không đổi mẫu số tổng hợp.
 Lọc xếp loại ở kỳ báo cáo dùng dropdown, mặc định “Tất cả xét nghiệm”,
 đồng bộ với thao tác bấm số liệu trên dải tổng hợp.
 Hai màn chi tiết dùng chung dropdown đánh giá; đổi máy, xét nghiệm hoặc
@@ -268,6 +299,10 @@ phạm vi xem đặt lại bộ lọc về tất cả. Các lượt tải kỳ c
 phản hồi mới nhất, không ghi đè dữ liệu đã cập nhật bằng phản hồi cũ.
 “Cần xem” ở cả hai màn chi tiết gồm cả kết quả vượt TEa nội bộ; tiêu chí
 lọc này không đổi đánh giá ngoại kiểm chính thức.
+Nhãn “Có lưu ý” và bộ lọc “Cần xem” ở bảng Kết quả từng đợt dùng cùng căn
+cứ với chi tiết đợt: độ không đảm bảo giá trị ấn định, đối chiếu z nhà cung
+cấp và cảnh báo báo cáo. Có thể đọc nhanh nội dung qua nhãn và mở đúng đợt
+để rà soát; xếp loại “Chấp nhận” vẫn giữ theo đánh giá chính thức.
 Bảng kết quả kỳ và bảng kết quả từng đợt dùng chung khung cuộn hai chiều,
 giữ hàng tiêu đề cột trên cùng khi cuộn dọc; cuộn ngang giữ tiêu đề và dữ liệu thẳng cột.
 Trong chi tiết kết quả, z tính lại nằm trong mục đối chiếu; nếu main báo lệch
@@ -360,7 +395,8 @@ không đồng bộ đám mây và không bị thay bằng giấy phép trong b�
 
 Tab Khắc phục ngoại kiểm (17/11/2026) dùng bộ chọn năm/chương trình/đợt/máy,
 dải tổng hợp và danh sách theo trạng thái, kèm khung căn cứ. Bảng kết quả giữ
-lề hai bên và đáy theo khoảng đệm panel, thẳng với thanh lọc. Main phân biệt
+lề hai bên và đáy theo khoảng đệm panel. Số lượng nằm cạnh tiêu đề; bộ lọc
+trạng thái và ô tìm kiếm nằm cùng header, tự xuống hàng khi khung hẹp. Main phân biệt
 kết quả bắt buộc điều tra với cảnh báo đơn lẻ từ chính kết quả và tín hiệu
 chuỗi hiện có. Tạo hồ sơ qua quy trình NCE chung, không có bộ CAPA thứ hai;
 người có quyền ghi và quyền dùng Khắc phục sự cố được lập/mở hồ sơ ngay

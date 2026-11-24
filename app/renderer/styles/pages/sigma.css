@@ -1,12 +1,14 @@
 /* Six Sigma & Sai số: thiết lập, bảng kỳ, nạp CV theo lô IQC, thiết kế QC, MU và
    biểu đồ. */
 
-/* Mỗi panel cao theo nội dung của nó: cột Tình trạng (thẻ Sigma + khuyến nghị)
-   thường dài hơn hẳn phần thiết lập, kéo giãn bằng nhau thì panel trái thành
-   một khoảng trắng lớn bên trong khung (đánh giá giao diện 09/11/2026). */
-.sg-top-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:var(--space-5);align-items:start;}
+/* Hai khung lấy chiều cao của bên có nhiều nội dung hơn, tự cập nhật khi
+   đổi nguồn TEa, mức QC hoặc xuất hiện khuyến nghị, không cần đặt chiều cao cố định. */
+.sg-top-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:var(--space-5);align-items:stretch;}
 .sg-top-grid>.panel{min-width:0;}
 .sg-top-grid>.panel:first-child{container:sigma-setup / inline-size;}
+.sg-status-panel{display:flex;flex-direction:column;}
+.sg-status-panel>h2.panel-title:first-child{flex:none;margin-bottom:0;}
+.sg-status-panel>#sgStatus{display:flex;flex:1;min-height:0;}
 /* Rule riêng của Sigma nằm trong file này; `pages.css` chỉ giữ phần dùng chung. */
 .sg-control-row>.sg-test-picker{flex:1 1 360px;max-width:420px;}
 .sg-sigma-input-note{width:calc(100% - var(--space-4) * 2);margin:var(--panel-content-gap) var(--space-4) var(--space-4);}.sg-sigma-note-list{display:grid;gap:var(--space-1);min-width:0;}.sg-sigma-note-list p,.sg-sigma-note-list ul{margin:0;}.sg-sigma-note-list ul{display:grid;gap:var(--space-1);padding-left:var(--space-3);}
@@ -21,19 +23,19 @@
 .sg-setup-heading + .hint{margin:var(--panel-content-gap) var(--space-4) 0;}
 /* Hàng nhận diện chỉ đọc: xét nghiệm được chọn từ danh mục QC, sau đó hiện
    ngay đơn vị và máy tương ứng để không phải lặp thêm một ô tên xét nghiệm. */
-.sg-setup-heading + .sg-control-row{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);align-items:start;margin:var(--panel-content-gap) var(--space-4) 0;}
+.sg-setup-heading + .sg-control-row,.sg-setup-fields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.4fr) minmax(0,.6fr);gap:var(--field-gap);align-items:start;margin:var(--panel-content-gap) var(--space-4) 0;}
 .sg-setup-heading + .sg-control-row>.sg-test-picker{grid-column:1;max-width:none;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-unit-field{grid-column:2;min-width:0;}
 .sg-setup-heading + .sg-control-row>.sg-instrument-field{grid-column:3;min-width:0;}
 .sg-setup-heading + .sg-control-row input:not([type="checkbox"]):not([type="radio"]),.sg-setup-heading + .sg-control-row select{box-sizing:border-box;height:var(--control-h);min-height:var(--control-h);}
-.sgcards{display:grid;gap:var(--space-5);grid-template-columns:repeat(2,minmax(0,1fr));margin:var(--panel-content-gap);}
-.sgbig{color:var(--on-accent);border-radius:var(--radius-md);box-shadow:var(--on-accent-inset-border);border:1px solid var(--on-accent-border);display:grid;align-content:start;min-height:168px;padding:var(--space-3-5) var(--space-3-5);text-align:center;}
+.sgcards{display:grid;flex:1;gap:var(--space-5);grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;margin:var(--panel-content-gap);}
+.sgbig{color:var(--on-accent);border-radius:var(--radius-md);box-shadow:var(--on-accent-inset-border);border:1px solid var(--on-accent-border);display:grid;align-content:center;min-height:168px;padding:var(--space-3-5);text-align:center;}
 .sgbig .lab{font-size:var(--text-xs);text-transform:uppercase;opacity:.9;letter-spacing:.08em;}
 .sgbig .v{font-size:var(--text-2xl);font-weight:700;line-height:var(--leading-display);margin-top:var(--space-1);margin-bottom:var(--space-1);letter-spacing:-.03em;font-family:var(--font-sans);font-variant-numeric:tabular-nums;}
 .sgbig .grade{font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-1-5);}
 .sgbig .sub{font-size:var(--text-xs);opacity:.92;line-height:var(--leading-body);margin-top:auto;}
 @media(max-width:1280px){ .sgbig{ min-height:154px; padding:var(--space-3) var(--space-3-5); } }
-@media(max-width:1150px){ .sgbig{ min-height:146px; padding:var(--space-3) var(--space-3); } }
+@media(max-width:1150px){ .sgbig{ min-height:146px; padding:var(--space-3); } }
 
 .sg-data-head{min-height:var(--panel-header-h);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-1) var(--panel-header-px);border-bottom:1px solid var(--border-subtle);background:var(--surface-section-header);}
 .sg-data-head h2.panel-title{margin:0;color:var(--text-primary);font-size:var(--title-panel);font-weight:var(--weight-semibold);line-height:var(--leading-heading);}
@@ -43,7 +45,7 @@
    hướng; phiếu đang chọn giữ nguồn CV/Bias và Sigma cạnh nhau. */
 .sg-period-workspace{display:grid;grid-template-columns:208px var(--space-2) minmax(0,1fr);align-items:start;gap:var(--space-1);margin:var(--panel-content-gap) var(--space-4) var(--space-3);}
 .sg-period-history{display:grid;align-content:start;gap:var(--space-2);min-width:0;}
-.sg-period-history-filter{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-1);}.sg-period-history-filter select{box-sizing:border-box;width:100%;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-1);font-size:var(--text-sm);text-align:left;text-align-last:left;}
+.sg-period-history-filter{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:var(--space-1);}.sg-period-history-filter select{box-sizing:border-box;width:100%;height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0 var(--space-1);font-size:var(--text-sm);text-align:left;text-align-last:left;}
 .sg-period-history-list{display:grid;grid-auto-rows:58px;gap:var(--space-1);max-height:244px;overflow-y:auto;overscroll-behavior:contain;}
 .sg-period-history-item{width:100%;height:58px;padding:var(--space-2) var(--space-2-5);border:1px solid transparent;border-radius:var(--radius-md);background:transparent;color:var(--text-primary);font-family:var(--font-sans);text-align:left;cursor:pointer;}
 .sg-period-history-item:hover{border-color:var(--surface-border);background:var(--surface);}.sg-period-history-item:focus-visible{position:relative;z-index:1;}
@@ -71,7 +73,7 @@
 .sg-selected-period-hint{margin:0 0 var(--space-2-5);}
 .sg-design-table-wrap,.sg-cohort-table-wrap,.sg-mu-table-wrap{max-width:100%;overflow-x:auto;}
 /* Thiết kế QC là bảng quyết định chính của thẻ Sigma, không phải bảng tham chiếu
-   gọn. Dùng đúng nhịp chung 13px / header 40px / hàng 44px như các bảng dữ
+   gọn. Dùng đúng nhịp chung 13.5px / header 40px / hàng 44px như các bảng dữ
    liệu khác; nếu màn hình hẹp thì cuộn ngang thay vì ép header xuống hai dòng. */
 .sg-design-table{width:100%;min-width:960px;table-layout:fixed;}
 .sg-design-table th{height:var(--table-header-h);padding:0 var(--table-cell-px);font-size:var(--table-head-size);letter-spacing:var(--table-head-tracking);text-align:center;white-space:nowrap;}
@@ -112,7 +114,7 @@
 .sg-add-period-form{display:grid;gap:var(--space-2-5);}.sg-add-period-form .hint{margin:0;line-height:var(--leading-body);}.sg-add-period-picker{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2-5);}.sg-add-period-picker label{display:grid;gap:var(--space-1);margin:0;color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);}.sg-add-period-picker select{width:100%;height:var(--control-h);min-height:var(--control-h);}
 .sg-eqa-table-wrap{overflow-x:auto;}
 .sg-eqa-table{width:100%;min-width:600px;margin:0 0 var(--space-2-5);border:1px solid var(--surface-border);border-radius:var(--table-radius);border-collapse:separate;border-spacing:0;overflow:hidden;table-layout:fixed;font:var(--table-body-size) var(--font-sans);}
-/* Đây là bảng NHẬP LIỆU chính của modal, nên giữ header chuẩn 13px. Cột thao
+/* Đây là bảng NHẬP LIỆU chính của modal, nên giữ header chuẩn 13.5px. Cột thao
    tác có tiêu đề để nút xoá không
    thành một biểu tượng lơ lửng ở cuối hàng. */
 .sg-eqa-table th{position:static;height:var(--table-header-h);padding:0 var(--table-cell-px-compact);background:var(--table-head-bg);color:var(--table-head-ink);border-bottom:1px solid var(--table-head-border);font-size:var(--table-head-size);font-weight:var(--table-head-weight);letter-spacing:var(--table-head-tracking);text-align:center;text-transform:none;white-space:nowrap;}
@@ -135,7 +137,14 @@
 .sg-eqa-notice{margin:0 0 var(--space-3);}
 .sg-eqa-selection{display:grid;gap:var(--space-2);margin-bottom:var(--space-3);}
 .sg-eqa-selection p{margin:0;}
-.sg-eqa-excluded{margin:var(--space-2) 0 0;padding-left:var(--space-5);color:var(--text-secondary);font-size:var(--text-xs);}
+/* Tách nguồn và lý do thành hai dòng; danh sách dài cuộn riêng trong hộp thoại. */
+.sg-eqa-exclusions{border:1px solid var(--surface-border);border-radius:var(--radius-md);overflow:hidden;}
+.sg-eqa-exclusions>summary{padding:var(--space-3);background:var(--surface-subtle);color:var(--text-secondary);font-size:var(--text-sm);font-weight:var(--weight-semibold);cursor:pointer;}
+.sg-eqa-exclusions[open]>summary{border-bottom:1px solid var(--surface-border);}
+.sg-eqa-excluded{max-height:240px;overflow:auto;overscroll-behavior:contain;list-style:none;margin:0;padding:0 var(--space-3);}
+.sg-eqa-excluded>li{display:grid;gap:var(--space-1);padding:var(--space-3) 0;border-bottom:1px solid var(--border-subtle);line-height:var(--leading-body);overflow-wrap:anywhere;}
+.sg-eqa-excluded>li:last-child{border-bottom:0;}
+.sg-eqa-excluded-source{color:var(--text-primary);font-size:var(--text-sm);}
 .sg-eqa-bias{color:var(--text-tertiary);font-weight:var(--weight-bold);}
 .sg-eqa-del{min-width:0;margin:0 auto;}
 .sg-eqa-add{margin:var(--space-3) 0 0;}
@@ -146,16 +155,23 @@
 .sg-eqa-summary .sg-eqa-average{color:var(--accent-active);}
 .sg-eqa-warning{align-self:center;color:var(--warning-text);font-size:var(--text-xs);font-weight:700;}
 
-/* Thiết lập phân tích dùng lưới ba cột để hiển thị xét nghiệm, đơn vị và máy. */
-.sg-setup-fields{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:var(--field-gap);row-gap:var(--field-gap);margin:var(--panel-content-gap) var(--space-4) 0;}
+/* Hai hàng dùng cùng lưới: xét nghiệm bằng nguồn TEa, đơn vị và máy ghép bằng ô tiêu chí. */
 .sg-setup-fields > div{min-width:0;}
 /* “Thiết lập phân tích” dùng chiều cao control chung. */
 .sg-setup-fields input:not([type="checkbox"]):not([type="radio"]),.sg-setup-fields select{box-sizing:border-box;height:var(--control-h);min-height:var(--control-h);}
-.sg-setup-fields .sg-tea-source{grid-column:1 / span 2;}
-.sg-setup-fields .sg-tea-input{grid-column:3;}
+.sg-setup-fields .sg-tea-source{grid-column:1;}
+.sg-setup-fields .sg-tea-input{grid-column:2 / span 2;}
 .sg-setup-fields .sg-tea-input input[type="number"]{-moz-appearance:textfield;}
 .sg-setup-fields .sg-tea-input input[type="number"]::-webkit-inner-spin-button,
 .sg-setup-fields .sg-tea-input input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+/* Khi panel hẹp, ô xét nghiệm và TEa phủ cả hàng; ô đơn vị nhỏ hơn ô máy. */
+@container sigma-setup (max-width:520px){
+  .sg-setup-heading + .sg-control-row,.sg-setup-fields{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);}
+  .sg-setup-heading + .sg-control-row>.sg-test-picker{grid-column:1 / -1;}
+  .sg-setup-heading + .sg-control-row>.sg-unit-field{grid-column:1;}
+  .sg-setup-heading + .sg-control-row>.sg-instrument-field{grid-column:2;}
+  .sg-setup-fields .sg-tea-source,.sg-setup-fields .sg-tea-input{grid-column:1 / -1;}
+}
 /* Chuyển cột theo bề rộng panel thực tế, vì sidebar cũng chiếm chỗ trên
    desktop. Ngưỡng theo viewport từng khiến ô ngày tràn sang Tình trạng. */
 .sg-eflm-box{display:grid;grid-template-columns:minmax(280px,1.7fr) minmax(144px,.8fr) minmax(168px,1fr);gap:var(--field-gap);margin:var(--panel-content-gap) var(--space-4) 0;padding:var(--space-2-5);border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-subtle);}

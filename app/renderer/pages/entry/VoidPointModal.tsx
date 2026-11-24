@@ -65,12 +65,11 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
   return (
     <Modal title="Huỷ điểm QC" onClose={onClose}
       footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className="btn danger" onClick={submitVoid}>Huỷ điểm này</AsyncButton></>}>
-      <div className="hint">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
+      <div className="void-point-summary">Ngày {vnDate(point.date)} · Mức {point.level} · Giá trị {formatQcValue(point.val, decimals)}</div>
       <div className="field" role="status" aria-live="polite">
         {assessment ? <>
           <div><strong>Phân loại theo Westgard:</strong> {assessment.error_class ? ERROR_CLASS_LABEL[assessment.error_class] : 'Chưa đủ căn cứ phân loại'}</div>
           <div><strong>Luật làm căn cứ:</strong> {assessment.rules.length ? assessment.rules.join(', ') : 'Chưa có luật loại bỏ làm căn cứ phân loại'}</div>
-          <div className="hint">Theo toàn bộ lần chạy trước khi huỷ, kể cả mức QC khác vi phạm. Đây là phân loại thống kê; nguyên nhân thực tế cần được xác minh.</div>
         </> : assessmentError ? <div className="field-error">{assessmentError}</div> : <div className="hint">Đang tải phân loại Westgard của lần chạy…</div>}
       </div>
       {runRejected && <div className="alert warn void-run-rejected">Điểm này thuộc lần chạy bị loại{assessment?.rejected_levels.length ? ` (mức vi phạm: ${assessment.rejected_levels.join(', ')})` : ''}. Bằng chứng lần chạy bị loại vẫn được giữ sau khi huỷ; cần ghi rõ lý do.</div>}
@@ -85,11 +84,7 @@ export function VoidPointModal({ point, decimals, onClose, onVoided }: {
       </div>
       <div className="void-nce-choice">
         <label><input type="checkbox" checked={voidChoice.forced ? voidChoice.openNce : voidOpenNce} disabled={voidChoice.forced}
-          onChange={(e) => setVoidOpenNce(e.target.checked)} /> Lập hồ sơ NCE và yêu cầu chạy lại QC</label>
-        <div className="hint">{voidKind === 'analytical'
-          ? 'Hệ thống sẽ lập hồ sơ NCE mới, hoặc dùng lại hồ sơ đang mở của điểm này, rồi chờ một kết quả QC chạy lại được chấp nhận.'
-          : voidKind === 'data-entry' ? 'Chỉ lưu dấu vết huỷ; không mở NCE và không yêu cầu chạy lại QC.'
-          : 'Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.'}</div>
+          onChange={(e) => setVoidOpenNce(e.target.checked)} /><span>Lập hồ sơ NCE và yêu cầu chạy lại QC</span></label>
       </div>
       <div className="field">
         <label htmlFor="voidReasonInput">{reasonMin ? `Lý do huỷ (bắt buộc, tối thiểu ${reasonMin} ký tự)` : 'Ghi chú / bằng chứng (khuyến nghị)'}</label>

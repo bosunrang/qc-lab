@@ -13,7 +13,7 @@ import { eqaRoundNumber } from '../domain/eqa/evaluation';
 import { eqaNceSourceKey, type EqaSourceKeyInput } from '../domain/eqa/source-key';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 const LIS_IMPORTS_SQL = `
 CREATE TABLE IF NOT EXISTS lis_imports (
@@ -923,7 +923,61 @@ const MIGRATIONS: Migration[] = [
     name: 'Khoá nguồn hồ sơ ngoại kiểm không phụ thuộc tín hiệu chuỗi',
     up(db) { rekeyEqaNceSources(db); },
   },
+  {
+    version: 17,
+    name: 'Luật Westgard bật sẵn theo số mức QC, chốt mặc định cũ cho lần chạy đã có',
+    up(db) { freezeLegacyWestgardDefaults(db); },
+  },
 ];
+
+/** Bộ luật bật sẵn TRƯỚC WG-26, giống nhau ở mọi số mức. Ghi nguyên văn, không
+ * dẫn xuất từ registry: bước này phải cho cùng kết quả dù registry đổi tiếp. */
+const LEGACY_WG_RULE_IDS = ['1-2s', '1-3s', '2-2s', 'R4s', '3-1s', '4-1s', '6x', '8x', '9x', '10x', '12x', '7T', '2of3-2s'];
+const LEGACY_WG_DEFAULT_ON = new Set(['1-2s', '1-3s', '2-2s', 'R4s', '4-1s', '6x', '10x']);
+
+/** Hành động của một luật theo cách phân giải cũ: giá trị đã lưu, hoặc mặc định cũ. */
+function legacyWgAction(ruleId: string, value: unknown): string {
+  if (value === 'inactive' || value === 'alert' || value === 'reject') return value;
+  const on = typeof value === 'boolean' ? value : LEGACY_WG_DEFAULT_ON.has(ruleId);
+  return !on ? 'inactive' : ruleId === '1-2s' ? 'alert' : 'reject';
+}
+
+function parseWgRuleMap(json: string | null | undefined): Record<string, unknown> {
+  try {
+    const value = JSON.parse(json || '{}') as unknown;
+    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  } catch { return {}; }
+}
+
+/** WG-26: mặc định của luật Westgard đổi theo số mức QC (bỏ 6x). Lần chạy đã
+ * nhập giữ kết luận cũ (GV2): mọi phiên bản cấu hình chung đã có được ghi đầy
+ * đủ theo mặc định cũ, và thêm một phiên bản mới có hiệu lực cho lần chạy nhập
+ * sau thời điểm nâng cấp. Mục cấu hình chung chỉ trùng mặc định cũ (ví dụ sau
+ * "Khôi phục") được bỏ, để xét nghiệm dùng mặc định mới theo số mức; mục đã
+ * đặt khác mặc định cũ được giữ nguyên. */
+function freezeLegacyWestgardDefaults(db: SqliteLike): void {
+  const full = (map: Record<string, unknown>) => JSON.stringify(Object.fromEntries(LEGACY_WG_RULE_IDS.map((id) => [id, legacyWgAction(id, map[id])])));
+  const history = db.prepare("SELECT id, rules_json FROM rule_config_history WHERE scope='global'").all() as { id: string; rules_json: string }[];
+  for (const row of history) db.prepare('UPDATE rule_config_history SET rules_json=? WHERE id=?').run(full(parseWgRuleMap(row.rules_json)), row.id);
+
+  const metaRow = db.prepare("SELECT value FROM app_meta WHERE key='westgardRules'").get() as { value: string } | undefined;
+  const current = parseWgRuleMap(metaRow?.value);
+  const customized = Object.fromEntries(Object.entries(current)
+    .filter(([id, value]) => LEGACY_WG_RULE_IDS.includes(id) && legacyWgAction(id, value) !== legacyWgAction(id, undefined)));
+
+  const boundary = Number((db.prepare('SELECT COALESCE(MAX(entry_seq),0) AS n FROM qc_points').get() as { n: number }).n);
+  if (boundary > 0) {
+    const nextSeq = () => Number((db.prepare('SELECT COALESCE(MAX(seq),0) AS n FROM rule_config_history').get() as { n: number }).n) + 1;
+    const insert = db.prepare(`INSERT INTO rule_config_history(id,seq,scope,rules_json,scopes_json,boundary_entry_seq,changed_at,changed_by)
+      VALUES (?,?,'global',?,'{}',?,?,?)`);
+    // Chưa có lịch sử cấu hình chung: dòng gốc là cấu hình cũ, áp từ đầu.
+    if (!history.length) insert.run(uid(), nextSeq(), full(current), null, '', '');
+    insert.run(uid(), nextSeq(), JSON.stringify(customized), boundary, new Date().toISOString(), 'Nâng cấp phần mềm (WG-26)');
+  }
+  if (metaRow || Object.keys(customized).length) {
+    db.prepare("INSERT INTO app_meta(key,value) VALUES('westgardRules',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(customized));
+  }
+}
 
 /** Tính lại khoá nguồn từ ảnh chụp đã lưu. Hai hồ sơ trùng khoá mới (đã bị tạo
  * trùng trước khi sửa) thì giữ khoá cũ cho hồ sơ sau, không tự huỷ hồ sơ nào. */

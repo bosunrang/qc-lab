@@ -4,6 +4,12 @@ import type { EqaSelection } from './useEqaScope';
 
 export type EqaOverviewFilter = 'all' | 'ok' | 'warn' | 'rej' | 'attention';
 
+/** Mỗi dòng là một máy trong đợt; bộ lọc trống giữ tất cả máy riêng biệt. */
+export function overviewRoundRows(rounds: readonly EqaRoundRow[], year: number, programId: string, instrumentId: string) {
+  return rounds.filter((round) => round.year === year && round.program_id === programId).flatMap((round) =>
+    round.by_instrument.filter((item) => !instrumentId || item.instrument_id === instrumentId).map((instrument) => ({ round, instrument })));
+}
+
 export function overviewTotals(rows: readonly EqaInstrumentGridRow[]) {
   const cells = rows.flatMap((row) => row.cells);
   const ok = cells.filter((cell) => cell.class === 'ok').length;

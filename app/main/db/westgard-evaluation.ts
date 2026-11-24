@@ -3,6 +3,7 @@ import { combinedWestgardByPoint, type CombinedPointFlag, type MultiLevelSet, ty
 import { makeIsOnLayered, makeRuleActionLayered, makeScopeOf, type RuleAction } from '../domain/rule-config';
 import type { QcCut } from '../domain/qc-cuts';
 import { qcRunKey } from '../domain/sort-order';
+import { countOperationalLevels } from './operational-levels';
 import { ruleConfigVersions, ruleVersionIndexOf, runEntrySeqs, type RuleConfigVersion } from './rule-config-history';
 
 /** Mốc bắt đầu lại chuỗi của một xét nghiệm (`domain/qc-cuts.ts`). Mốc được
@@ -23,10 +24,10 @@ export interface RuleFunctions {
 }
 
 function ruleFunctions(version: RuleConfigVersion, levelCount: number): RuleFunctions {
-  const on = makeIsOnLayered(version.globalRules, version.actions);
+  const on = makeIsOnLayered(version.globalRules, version.actions, levelCount);
   const scope = makeScopeOf(version.scopes, levelCount);
   return {
-    actionOf: makeRuleActionLayered(version.globalRules, version.actions),
+    actionOf: makeRuleActionLayered(version.globalRules, version.actions, levelCount),
     within: (rule) => on(rule) && ['within', 'both'].includes(scope(rule)),
     across: (rule) => on(rule) && ['across', 'both'].includes(scope(rule)),
   };
@@ -49,7 +50,9 @@ export function ruleResolver(db: Db, testId: string, levelCount: number) {
  * một lần chạy — cùng phép phân giải mà `evaluateQcSets()` dùng để kết luận
  * loại bỏ. Không truyền `run` thì lấy cấu hình hiện hành. */
 export function testRuleActionOf(db: Db, testId: string, run?: { date: string; runId: string }) {
-  const rules = ruleResolver(db, testId, 1);
+  // Luật bật sẵn phụ thuộc số mức đang vận hành (WG-26), cùng số mức mà
+  // `activeEvaluationOf()` dùng để kết luận.
+  const rules = ruleResolver(db, testId, countOperationalLevels(db, testId));
   return (run ? rules.at(run) : rules.latest).actionOf;
 }
 

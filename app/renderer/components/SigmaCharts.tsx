@@ -38,8 +38,8 @@ function EmptyChart({ kind }: { kind: 'trend' | 'mdc' }) {
 
 function Legend({ level, index }: { level: number; index: number }) {
   const color = LEVEL_COLORS[index % LEVEL_COLORS.length];
-  const x = 48 + index * 72;
-  return <g><rect x={x} y="9" width="12" height="3" rx="1.5" fill={color} /><text x={x + 17} y="13" fontSize="10.5" fill={color} fontWeight="700">Mức {level}</text></g>;
+  const x = 56 + index * 88;
+  return <g><rect x={x} y="9" width="12" height="3" rx="1.5" fill={color} /><text x={x + 17} y="13" fontSize="var(--text-xs)" fill={color} fontWeight="700">Mức {level}</text></g>;
 }
 
 export function SigmaTrendChart({ periods }: { periods: SigmaPeriodView[] }) {
@@ -60,8 +60,8 @@ export function SigmaTrendChart({ periods }: { periods: SigmaPeriodView[] }) {
   return <div className="sg-svg-chart"><svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Xu hướng Sigma theo kỳ">
     <rect x={L} y={T} width={width} height={height} fill="#fff" stroke="#dce3e9" />
     {band(6, maxSigma, '#edf5ef')}{band(4, 6, '#f6faf6')}{band(3, 4, '#fff6df')}{band(minSigma, 3, '#fdebea')}
-    {ticks.map((sigma) => <g key={sigma}><line x1={L} y1={py(sigma)} x2={W - R} y2={py(sigma)} stroke="#dde5e9" strokeWidth=".7" /><text x={L - 7} y={py(sigma) + 3} fontSize="10.5" fill="#70818d" textAnchor="end">{Number(sigma.toFixed(1))}</text></g>)}
-    {[3, 6].map((sigma) => <g key={`reference-${sigma}`}><line x1={L} y1={py(sigma)} x2={W - R} y2={py(sigma)} stroke={sigma === 3 ? '#cf5a52' : '#2f7d5b'} strokeWidth=".85" strokeDasharray="4 4" /><text x={W - R - 4} y={py(sigma) - 4} fontSize="10.5" fill={sigma === 3 ? '#b83b33' : '#216b4a'} textAnchor="end" fontWeight="700">{sigma}σ</text></g>)}
+    {ticks.map((sigma) => <g key={sigma}><line x1={L} y1={py(sigma)} x2={W - R} y2={py(sigma)} stroke="#dde5e9" strokeWidth=".7" /><text x={L - 7} y={py(sigma) + 3} fontSize="var(--text-xs)" fill="#70818d" textAnchor="end">{Number(sigma.toFixed(1))}</text></g>)}
+    {[3, 6].map((sigma) => <g key={`reference-${sigma}`}><line x1={L} y1={py(sigma)} x2={W - R} y2={py(sigma)} stroke={sigma === 3 ? '#cf5a52' : '#2f7d5b'} strokeWidth=".85" strokeDasharray="4 4" /><text x={W - R - 4} y={py(sigma) - 4} fontSize="var(--text-xs)" fill={sigma === 3 ? '#b83b33' : '#216b4a'} textAnchor="end" fontWeight="700">{sigma}σ</text></g>)}
     {levels.map((level, levelIndex) => {
       const color = LEVEL_COLORS[levelIndex % LEVEL_COLORS.length];
       const points = rows.flatMap((period, index) => {
@@ -74,9 +74,9 @@ export function SigmaTrendChart({ periods }: { periods: SigmaPeriodView[] }) {
         <Legend level={level} index={levelIndex} />
       </g>;
     })}
-    {rows.map((period, index) => (rows.length <= 6 || index === 0 || index === rows.length - 1) && <text key={period.id} x={px(index)} y={H - B + 14} fontSize="10.5" fill="#70818d" textAnchor="middle">{periodLabel(period.period)}</text>)}
+    {rows.map((period, index) => (rows.length <= 6 || index === 0 || index === rows.length - 1) && <text key={period.id} x={px(index)} y={H - B + 14} fontSize="var(--text-xs)" fill="#70818d" textAnchor="middle">{periodLabel(period.period)}</text>)}
     <line x1={L} y1={H - B} x2={W - R} y2={H - B} stroke="#42515b" strokeWidth=".9" /><line x1={L} y1={T} x2={L} y2={H - B} stroke="#42515b" strokeWidth=".9" />
-    <text transform={`translate(13,${(T + H - B) / 2}) rotate(-90)`} fontSize="10.5" fill="#40515c" textAnchor="middle" fontWeight="700">Sigma</text>
+    <text transform={`translate(13,${(T + H - B) / 2}) rotate(-90)`} fontSize="var(--text-xs)" fill="#40515c" textAnchor="middle" fontWeight="700">Sigma</text>
   </svg></div>;
 }
 
@@ -123,11 +123,11 @@ export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
 
   return <div className="sg-svg-chart"><svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Biểu đồ quyết định phương pháp MDC">
     <rect x={L} y={T} width={W - L - R} height={H - T - B} fill="#fff" stroke="#dce3e9" />
-    {ticks(y).map((value) => <g key={value}><line x1={L} y1={py(value)} x2={W - R} y2={py(value)} stroke="#e5ecef" strokeWidth=".7" /><text x={L - 7} y={py(value) + 3} fontSize="10.5" fill="#70818d" textAnchor="end">{value}</text></g>)}
-    {ticks(x).map((value) => <text key={value} x={px(value)} y={H - B + 15} fontSize="10.5" fill="#70818d" textAnchor="middle">{value}</text>)}
+    {ticks(y).map((value) => <g key={value}><line x1={L} y1={py(value)} x2={W - R} y2={py(value)} stroke="#e5ecef" strokeWidth=".7" /><text x={L - 7} y={py(value) + 3} fontSize="var(--text-xs)" fill="#70818d" textAnchor="end">{value}</text></g>)}
+    {ticks(x).map((value) => <text key={value} x={px(value)} y={H - B + 15} fontSize="var(--text-xs)" fill="#70818d" textAnchor="middle">{value}</text>)}
     {SIGMA_BOUNDS.map(([sigma, color]) => {
       const x2 = Math.min(xMax, 100 / sigma), y2 = 100 - sigma * x2;
-      return <g key={sigma}><line x1={px(0)} y1={py(100)} x2={px(x2)} y2={py(y2)} stroke={color} strokeWidth="1" strokeLinecap="round" opacity=".88" /><text x={px(x2) + 3} y={py(y2) - 6} fontSize="10.5" fill="#fff" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fontWeight="700">{sigma}σ</text><text x={px(x2) + 3} y={py(y2) - 6} fontSize="10.5" fill={color} fontWeight="700">{sigma}σ</text></g>;
+      return <g key={sigma}><line x1={px(0)} y1={py(100)} x2={px(x2)} y2={py(y2)} stroke={color} strokeWidth="1" strokeLinecap="round" opacity=".88" /><text x={px(x2) + 3} y={py(y2) - 6} fontSize="var(--text-xs)" fill="#fff" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fontWeight="700">{sigma}σ</text><text x={px(x2) + 3} y={py(y2) - 6} fontSize="var(--text-xs)" fill={color} fontWeight="700">{sigma}σ</text></g>;
     })}
     {pointGroups.map(({ level, color, points }, levelIndex) => <g key={level}>
       {points.length > 1 && <polyline points={points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke={color} strokeOpacity=".3" strokeWidth=".9" strokeDasharray="3 3" />}
@@ -135,8 +135,8 @@ export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
       <Legend level={level} index={levelIndex} />
     </g>)}
     <line x1={L} y1={H - B} x2={W - R} y2={H - B} stroke="#42515b" strokeWidth=".9" /><line x1={L} y1={T} x2={L} y2={H - B} stroke="#42515b" strokeWidth=".9" />
-    <text x={(L + W - R) / 2} y={H - 7} fontSize="10.5" fill="#40515c" textAnchor="middle" fontWeight="700">CV / TEA (%)</text>
-    <text transform={`translate(13,${(T + H - B) / 2}) rotate(-90)`} fontSize="10.5" fill="#40515c" textAnchor="middle" fontWeight="700">|BIAS| / TEA (%)</text>
+    <text x={(L + W - R) / 2} y={H - 7} fontSize="var(--text-xs)" fill="#40515c" textAnchor="middle" fontWeight="700">CV / TEA (%)</text>
+    <text transform={`translate(13,${(T + H - B) / 2}) rotate(-90)`} fontSize="var(--text-xs)" fill="#40515c" textAnchor="middle" fontWeight="700">|BIAS| / TEA (%)</text>
   </svg>
   {tip && <div className="sg-chart-tooltip"><b>{periodTitle(tip.period)} · Mức {tip.level}</b><div>Sigma: <strong>{Number(tip.levelData.sigma?.sigma).toFixed(2)}</strong></div><div>CV/TEa: {tip.cvRatio.toFixed(1)}% · |Bias|/TEa: {tip.biasRatio.toFixed(1)}%</div><div className="muted">CV {Number(tip.levelData.cv).toFixed(2)}% · Bias {Number(tip.levelData.biasEqa).toFixed(2)}%</div></div>}
   </div>;

@@ -40,7 +40,7 @@ export const PAGE_DEFS: readonly PageDef[] = [
   { id: 'manage', path: '/manage', label: 'Cấu hình chung', roles: ADMIN_ONLY },
   { id: 'users', path: '/users', label: 'Người dùng', roles: ADMIN_ONLY },
   { id: 'audit', path: '/audit', label: 'Nhật ký hoạt động', roles: ADMIN_ONLY },
-  { id: 'settings', path: '/settings', label: 'Cài đặt & Đám mây', roles: ADMIN_ONLY },
+  { id: 'settings', path: '/settings', label: 'Cài đặt & Kết nối', roles: ADMIN_ONLY },
 ];
 
 /** Vai trò khi chưa biết gì (chưa nạp xong phiên, dữ liệu hỏng, vai trò lạ)

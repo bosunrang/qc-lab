@@ -34,7 +34,7 @@ test('LIS: giao diện chặn dữ liệu sai và tự xác nhận lại bản t
     }, record);
     const settings = await page.evaluate(() => window.qcApi.saveLisSettings({ data: { enabled: true, url: 'http://127.0.0.1:8787', token: 'e2e-only' } }));
     assert.equal(settings.ok, true);
-    await openPage(page, 'Cài đặt & Đám mây');
+    await openPage(page, 'Cài đặt & Kết nối');
     await page.getByRole('button', { name: 'Xem hàng chờ QC', exact: true }).click();
     const modal = page.getByRole('dialog', { name: 'Hàng chờ QC từ LIS Gateway', exact: true });
     await modal.getByText('Sẵn sàng nhận (1)', { exact: true }).waitFor();

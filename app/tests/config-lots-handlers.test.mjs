@@ -265,7 +265,8 @@ const hint6x = hints.find(r => r.id === '6x');
 assert.equal(hint6x.scope, 'within', 'scope hieu luc phai theo ghi de rieng');
 assert.equal(hint6x.defaultScope, 'both', 'defaultScope la chuan cua ho dem chuoi, khong phai ghi de');
 assert.equal(hint6x.action, 'alert', 'action hieu luc phai theo ghi de rieng');
-assert.equal(hint6x.defaultAction, 'reject', 'defaultAction la muc do chuan, khong phai ghi de');
+// WG-26: 6x không bật sẵn, nên mức chuẩn khi không ghi đè là "không dùng".
+assert.equal(hint6x.defaultAction, 'inactive', 'defaultAction la muc do chuan, khong phai ghi de');
 
 // Không truyền số mức: main tự đếm mức đang vận hành, không nhận từ renderer.
 const selfCounted = h.listRuleScopes(test1.id);

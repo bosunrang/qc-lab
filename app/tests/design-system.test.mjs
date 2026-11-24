@@ -98,11 +98,17 @@ test('viền bề mặt mảnh được tách khỏi đường chia và trạng 
     'thẻ biểu đồ không giữ trạng thái chọn chỉ để đổi màu mà không đổi dữ liệu');
 });
 
+test('các khung xếp dọc dùng khoảng cách 16 px', () => {
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
+  assert.equal(flat('--panel-stack-gap'), '16px');
+  assert.match(app, /\.panel\{[^}]*margin-bottom:var\(--panel-stack-gap\);/);
+});
+
 test('thang chữ, độ đậm, dãn dòng, khoảng cách, bo góc đúng hình dạng', () => {
   assert.deepEqual(
     ['2xs', 'xs', 'sm', 'base', 'md', 'lg', 'xl', '2xl'].map((k) => TOKEN[`--text-${k}`]),
-    ['11px', '12px', '13px', '14px', '16px', '20px', '24px', '30px'],
-    'thang chữ 8 bậc, toàn số nguyên',
+    ['var(--text-xs)', '13px', '13.5px', '14px', '16px', '20px', '24px', '30px'],
+    'thang chữ đọc 14/13.5/13px, tên 2xs cũ dùng cùng cỡ chữ phụ',
   );
   assert.deepEqual(
     ['normal', 'medium', 'semibold', 'bold'].map((k) => TOKEN[`--weight-${k}`]),
@@ -130,12 +136,16 @@ test('tiêu đề và header bảng đi theo thang, không tự đặt cỡ', ()
   // ở Nhập QC/Cấu hình chung, 13px ở Cài đặt. Tiêu đề hộp thoại thì 20/16/16.
   assert.deepEqual(
     ['page', 'hero', 'panel', 'sub', 'card', 'overline'].map((k) => flat(`--title-${k}`)),
-    ['24px', '24px', '16px', '14px', '13px', '11px'],
+    ['24px', '24px', '16px', '14px', '13.5px', '13px'],
     'thang tiêu đề 6 cấp',
   );
   // Một hệ typography bảng; bảng gọn trong panel chỉ thu nhịp cao/đệm.
-  assert.equal(flat('--table-head-size'), '13px');
-  assert.equal(flat('--table-head-size-sm'), '13px');
+  assert.equal(flat('--table-head-size'), '13.5px');
+  assert.equal(flat('--table-head-size-sm'), '13.5px');
+  assert.equal(flat('--table-body-size'), '13.5px');
+  assert.equal(flat('--text-base'), '14px');
+  assert.equal(flat('--text-xs'), '13px');
+  assert.equal(flat('--sidebar-group-font-size'), '11px');
   assert.equal(flat('--table-header-h'), '40px');
   assert.equal(flat('--table-header-h-sm'), '30px');
   assert.equal(flat('--table-radius'), '8px', 'bảng dữ liệu chỉ bo nhẹ 8px');
@@ -151,7 +161,7 @@ test('tiêu đề và header bảng đi theo thang, không tự đặt cỡ', ()
     '--title-page', '--title-hero', '--title-panel', '--title-sub',
     '--title-card', '--title-overline',
     '--table-head-size', '--table-head-size-sm', '--table-body-size',
-    '--button-font-size',
+    '--button-font-size', '--sidebar-group-font-size',
   ]);
   const bad = [];
   for (const file of PAGE_CSS) {
@@ -169,7 +179,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   const sigma = source('sigma.css');
   const reagent = source('reagent.css');
 
-  // Bảng danh sách Cấu hình, ma trận mục tiêu và OPSpecs là bảng lớn: 13px/40px.
+  // Bảng danh sách Cấu hình, ma trận mục tiêu và OPSpecs là bảng lớn: 13.5px/40px.
   assert.match(manage, /\.rcfg-list>table thead th\{[^}]*font-size:var\(--table-head-size\)/);
   assert.match(manage, /\.config-shell input[^}]*height:var\(--control-h\)[^}]*min-height:var\(--control-h\)/,
     'toàn bộ control trong Cấu hình dùng mật độ 36px, không kéo theo modal');
@@ -177,7 +187,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
   assert.match(sigma, /\.sg-design-table th\{[^}]*height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
   assert.match(sigma, /\.sg-design-table td\{[^}]*height:var\(--table-row-h\)[^}]*vertical-align:middle/);
   assert.match(sigma, /\.sg-level-matrix-head\{[^}]*min-height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/,
-    'workspace kỳ dùng header dữ liệu chuẩn 40px/13px');
+    'workspace kỳ dùng header dữ liệu chuẩn 40px/13.5px');
   assert.match(sigma, /\.sg-period-history-item\.is-selected\{[^}]*border-color:var\(--accent-border\)[^}]*border-left:3px solid var\(--accent\)[^}]*background:var\(--accent-surface\)[^}]*color:var\(--text-accent\);\}/,
     'kỳ đang chọn dùng vạch active teal 3px cùng viền và nền accent chung');
   assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
@@ -190,7 +200,7 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
     'MU chỉ được đánh giá ở bảng chi tiết bên dưới, không lặp lại trong workspace Sigma');
   assert.doesNotMatch(readSigmaPageSources(), /<aside className="sg-period-history"/,
     'lịch sử kỳ không dùng thẻ aside vì selector sidebar toàn cục sẽ biến nó thành nền tối cao toàn viewport');
-  // Cohort và cặp mẫu là bảng phụ: cùng chữ 13px/.02em, chỉ header 30px.
+  // Cohort và cặp mẫu là bảng phụ: cùng chữ 13.5px/.02em, chỉ header 30px.
   for (const selector of ['\\.sg-cohort-table th']) {
     assert.match(sigma, new RegExp(`${selector}\\{[^}]*font-size:var\\(--table-head-size-sm\\)[^}]*letter-spacing:var\\(--table-head-tracking-sm\\)[^}]*height:var\\(--table-header-h-sm\\)`));
   }
@@ -250,11 +260,11 @@ test('nhãn đứng trên control dùng thang form chung', () => {
   const reagent = readFileSync(join(STYLE_DIR, 'pages', 'reagent.css'), 'utf8');
 
   assert.match(appCss, /label\{[^}]*font-size:var\(--text-sm\)[^}]*color:var\(--text-secondary\)[^}]*font-weight:var\(--weight-semibold\);\}/,
-    'nhãn field toàn app dùng token 13px/600/màu phụ — 12px làm dấu tiếng Việt chồng lên nhau khó đọc');
+    'nhãn field toàn app dùng token 13.5px/600/màu phụ');
   assert.match(reagent, /\.rc-field label\s*\{\s*display:\s*block;\s*margin:\s*0 0 var\(--field-label-gap\);\s*\}/,
     'nhãn field So sánh hoá chất dùng khoảng cách chuẩn');
   assert.doesNotMatch(reagent, /\.rc-field label,.rc-toolbar-selcol label\{[^}]*font-size/,
-    'Reagent không tự nâng nhãn control lên 13px/700');
+    'Reagent dùng cùng thang nhãn control và không tự tăng độ đậm lên 700');
   // `.field>label` đã bỏ margin-top ở mọi nơi. Rule trang chỉ để đặt lại
   // `margin-top:0` cho nhãn là thừa — từng có 9 rule như vậy (Cài đặt, Sigma,
   // Cấu hình, Người dùng, Westgard, Nhật ký).
@@ -284,8 +294,10 @@ test('Six Sigma dùng trực tiếp danh mục QC, không giữ bộ chọn theo
     'không giữ CSS chết của hộp chọn theo dõi đã bỏ');
   assert.doesNotMatch(sigmaPage, /<label>Tên xét nghiệm<\/label>/,
     'tên xét nghiệm đã thể hiện ở selector, không lặp lại ở trường chỉ đọc');
-  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row\{display:grid;grid-template-columns:minmax\(0,1fr\) 118px minmax\(0,1fr\);/,
-    'chọn xét nghiệm, đơn vị và thiết bị dùng chung một hàng');
+  assert.match(sigma, /\.sg-setup-heading \+ \.sg-control-row,\.sg-setup-fields\{display:grid;grid-template-columns:minmax\(0,1\.4fr\) minmax\(0,\.4fr\) minmax\(0,\.6fr\);/,
+    'hai hàng thiết lập Sigma dùng chung lưới, ô đơn vị nhỏ hơn ô thiết bị');
+  assert.match(sigma, /\.sg-setup-fields \.sg-tea-source\{grid-column:1;\}/);
+  assert.match(sigma, /\.sg-setup-fields \.sg-tea-input\{grid-column:2 \/ span 2;\}/);
   assert.match(sigmaPage, /<div className="field sg-unit-field"><label htmlFor="sg-unit">Đơn vị<\/label>/,
     'đơn vị nằm trong hàng nhận diện xét nghiệm');
   assert.match(sigmaPage, /const sigmaTestLabel = \(item: typeof tests\[number\]\) => \{[\s\S]*?item\.instrument_id[\s\S]*?`\$\{item\.name\} — \$\{machine\}`/,
@@ -586,7 +598,7 @@ test('thanh thông báo info dùng trạng thái xanh dương chung', () => {
   assert.match(
     appCss,
     /\.alert\{[^}]*border-left:3px solid transparent[^}]*font-size:var\(--text-sm\)[^}]*line-height:var\(--leading-body\);\}/,
-    'mọi thanh thông báo dùng dải nhấn 3px và chữ 13px',
+    'mọi thanh thông báo dùng dải nhấn 3px và chữ 13.5px',
   );
   assert.match(
     appCss,
