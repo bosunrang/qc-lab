@@ -40,7 +40,7 @@ export const EntryLjPanel = memo(function EntryLjPanel({
   }
 
   return (
-    <div className="panel">
+    <div className="panel" data-entry-section="charts">
       <div className="lj-toolbar">
         <h2 className="panel-title">Biểu đồ Levey-Jennings</h2>
         <div className="lj-filter">

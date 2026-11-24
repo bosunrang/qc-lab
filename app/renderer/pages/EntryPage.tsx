@@ -4,7 +4,7 @@
 // do huỷ điểm là vẽ lại cả bảng 31 ngày và mọi biểu đồ. Nay hộp thoại tự giữ
 // form của mình, còn bảng nhập và biểu đồ bọc `memo` và chỉ nhận props ổn
 // định (cột dựng bằng `useMemo`, callback bằng `useCallback`).
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalog } from '../lib/useCatalog';
@@ -36,6 +36,10 @@ import { lotNoOfLevel } from '../lib/lot-label';
 
 const EMPTY_LEVELS: TestLevel[] = [];
 const ENTRY_TREE_COLLAPSE_KEY = 'qclab-entry-tree-collapsed';
+
+function visibleContentTop(viewport: HTMLElement): number {
+  return viewport.querySelector('.head')?.getBoundingClientRect().bottom ?? viewport.getBoundingClientRect().top;
+}
 
 function isoDay(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -70,6 +74,8 @@ export function EntryPage() {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
   const [todayJumpTestId, setTodayJumpTestId] = useState('');
+  const [panelAnchor, setPanelAnchor] = useState<{ testId: string; section: string; offset: number } | null>(null);
+  const entryMainRef = useRef<HTMLDivElement>(null);
   const [voiding, setVoiding] = useState<QcPointView | null>(null);
   // Mỗi mức chỉ mở một chuỗi lô cũ trên biểu đồ/bảng chi tiết. Worksheet vẫn
   // hiện mọi điểm lô cũ theo ngày ở dạng chỉ đọc để lịch sử tháng liền mạch.
@@ -112,14 +118,16 @@ export function EntryPage() {
   // một lượt ngoài lượt của `useStoreInvalidation` (e2e `reload-count`).
   const levelKey = levels.map((l) => l.level).join(',');
   const levelNums = useMemo(() => (levelKey ? levelKey.split(',').map(Number) : []), [levelKey]);
-  const jumpToToday = useEntryStore((s) => !!levelKey && todayJumpTestId === testId
+  const testDataReady = useEntryStore((s) => !!levelKey && (todayJumpTestId === testId || panelAnchor?.testId === testId)
     && s.activeTestId === testId && s.loadedLevelKey === levelKey);
+  const jumpToToday = testDataReady && todayJumpTestId === testId;
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
-  // Đổi xét nghiệm thì dải QC đang xem rơi về mức đầu tiên còn vận hành.
+  // Giữ mức đang xem nếu xét nghiệm mới có mức đó, chờ nạp danh mục mức trước khi chọn lại.
   useEffect(() => {
+    if (testId && allLevels === EMPTY_LEVELS) return;
     if (!levelNums.length) { setRangeLevel(null); return; }
     setRangeLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
-  }, [testId, levelNums]);
+  }, [testId, allLevels, levelNums]);
   useEffect(() => { setPreviousLotOpen({}); }, [testId]);
   useEffect(() => {
     if (testId) loadTestData(testId, levelNums);
@@ -134,17 +142,55 @@ export function EntryPage() {
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
 
-  const selectLeaf = useCallback((summary: TestSummary) => {
-    const now = new Date();
+  const selectLeaf = useCallback((summary: TestSummary, resetMonth = true) => {
     setTodayJumpTestId('');
+    setPanelAnchor(null);
     selectTreeTest(summary.testId, catalog.machineKeyOf(summary), catalog.lotGroupOf(summary).key);
-    setViewYear(now.getFullYear()); setViewMonth(now.getMonth() + 1);
+    if (resetMonth) {
+      const now = new Date();
+      setViewYear(now.getFullYear()); setViewMonth(now.getMonth() + 1);
+    }
   }, [selectTreeTest, catalog]);
   const selectFromTree = useCallback((summary: TestSummary) => {
-    selectLeaf(summary);
-    setTodayJumpTestId(summary.testId);
-  }, [selectLeaf]);
+    const content = entryMainRef.current;
+    const viewport = content?.closest('main');
+    const top = viewport ? visibleContentTop(viewport) : 0;
+    const sections = Array.from(content?.querySelectorAll<HTMLElement>(':scope > [data-entry-section]') ?? []);
+    const atBottom = viewport && viewport.scrollTop > 0 && viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop < 2;
+    const panel = atBottom ? sections.at(-1) : sections.find((section) => section.getBoundingClientRect().bottom > top);
+    const section = panel?.dataset.entrySection;
+    const inWorksheet = !section || section === 'worksheet';
+    const anchor = panel && section && !inWorksheet && summary.testId !== testId
+      ? { testId: summary.testId, section, offset: top - panel.getBoundingClientRect().top }
+      : null;
+    selectLeaf(summary, inWorksheet);
+    if (inWorksheet) setTodayJumpTestId(summary.testId);
+    else if (anchor) setPanelAnchor(anchor);
+  }, [selectLeaf, testId]);
   const clearTodayJump = useCallback(() => setTodayJumpTestId(''), []);
+
+  useLayoutEffect(() => {
+    if (!panelAnchor || panelAnchor.testId !== testId) return;
+    const content = entryMainRef.current;
+    const viewport = content?.closest('main');
+    const panel = content?.querySelector<HTMLElement>(`[data-entry-section="${panelAnchor.section}"]`);
+    if (!viewport || !panel) return;
+
+    const restorePanel = () => {
+      const bounds = panel.getBoundingClientRect();
+      const offset = panelAnchor.offset < bounds.height ? panelAnchor.offset : 0;
+      viewport.scrollTop += bounds.top - visibleContentTop(viewport) + offset;
+    };
+
+    // Các khung phía trên có thể đổi chiều cao khi nạp mức và vẽ biểu đồ mới.
+    restorePanel();
+    if (!testDataReady) return;
+    const frame = requestAnimationFrame(() => {
+      restorePanel();
+      setPanelAnchor((current) => current === panelAnchor ? null : current);
+    });
+    return () => cancelAnimationFrame(frame);
+  });
 
   // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ để mở trang
   // là có ngay bảng nhập. `location.state.testId` cho phép điều hướng chéo từ
@@ -348,16 +394,16 @@ export function EntryPage() {
         <EntryTree summaries={operationalSummaries} instruments={instruments} catalog={catalog} testId={testId}
           treeCollapsed={treeCollapsed} onSelect={selectFromTree} onCollapse={collapseTree} />
 
-        <div className="entry-main" key={testId}>
+        <div className="entry-main" ref={entryMainRef}>
           {!testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở danh mục bên trái.</EmptyState></div>}
           {testId && (
             <>
-              <EntrySheet testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
+              <EntrySheet key={testId} testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
                 pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable}
                 jumpToToday={jumpToToday} onTodayJumpHandled={clearTodayJump}
                 viewYear={viewYear} viewMonth={viewMonth} onViewYear={setViewYear} onViewMonth={setViewMonth}
                 onCommitRun={commitRun} onSaveNote={saveDayNote} />
-              <EntryLjPanel displayColumns={displayColumns} levelCount={levels.length} pointsByLevel={pointsByLevel}
+              <EntryLjPanel key={`charts:${testId}`} displayColumns={displayColumns} levelCount={levels.length} pointsByLevel={pointsByLevel}
                 analysisByLevel={analysisByLevel} previousLotSeries={previousLotSeries} decimals={decimals}
                 ljFrom={ljFrom} ljTo={ljTo} ljDays={ljDays} onFrom={setLjFrom} onTo={setLjTo} onPreset={applyDayPreset}
                 onTogglePreviousLot={togglePreviousLot} />

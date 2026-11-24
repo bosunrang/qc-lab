@@ -18,7 +18,7 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
   const valText = (val: number) => formatQcValue(val, decimals);
   const voidedInWindow = inLjWindow(voidedPoints, ljFrom, ljTo);
   return (
-    <section className="panel entry-secondary-panel">
+    <section className="panel entry-secondary-panel" data-entry-section="points">
       <div className="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã huỷ</small></div>
       <div className="entry-secondary-body">
         <div className="hint qc-cumulative-note">Thống kê tích luỹ tính từ đầu LOT trên các lần chạy được chấp nhận; bảng bên dưới hiển thị theo khoảng xem {vnDate(ljFrom)} – {vnDate(ljTo)}.</div>

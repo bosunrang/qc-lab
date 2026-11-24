@@ -101,7 +101,7 @@ export const EntrySheet = memo(function EntrySheet({
   }
 
   return (
-    <div className="panel qc-sheet-panel">
+    <div className="panel qc-sheet-panel" data-entry-section="worksheet">
       <div className="qc-sheet-heading">
         <div className="qc-sheet-title"><span>Bảng nhập QC</span><strong>{testName}</strong><small>Lô {entryColumns.map((column) => `${column.lot}${column.parallel ? ' (song song)' : ''}`).join(' / ') || '—'}</small></div>
         <div className="qc-month-area">

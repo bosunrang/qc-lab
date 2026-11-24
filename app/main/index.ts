@@ -1,11 +1,11 @@
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, safeStorage, shell, Tray, type WebContents } from 'electron';
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, safeStorage, shell, Tray, type MenuItemConstructorOptions, type WebContents } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openDatabase } from './db/open-database';
 import { type Actor, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier, notifyChanged } from './ipc/shared';
-import { createBusinessOperations, createLanInvoker, registerIpcOperations, sessionContext } from './ipc/operations';
+import { createBusinessOperations, createLanInvoker, errorResult, registerIpcOperations, sessionContext, type CallContext } from './ipc/operations';
 import { createDesktopOperations, desktopActor } from './ipc/desktop-operations';
 import { createAccessGate } from './ipc/access-gate';
 import { createSessionCheck } from './lan/session-check';
@@ -39,6 +39,7 @@ import { readMachineCode } from './licensing/machine-code';
 import { createLicenseService } from './licensing/license-service';
 import { createUpdateService } from './updates/update-service';
 import { createSoftwareOperations } from './ipc/software-operations';
+import type { IpcResult } from '../shared/qc-api';
 
 // Test end-to-end (`app/e2e/`) chạy app thật trên thư mục dữ liệu tạm và một
 // cổng LAN riêng, để không đụng CSDL của người dùng và chạy được cả khi
@@ -162,19 +163,52 @@ function showLanAddresses(port: number, ca: LanCa): void {
     .catch((error) => logEvent({ level: 'error', source: 'lan', message: `Không lưu được chứng chỉ gốc: ${describeError(error).message}` }));
 }
 
-function createTray(port: number, ca: LanCa): void {
+function createTray(port: number, ca: LanCa, actions: {
+  openLogs(): void;
+  exportBackup(): void;
+  checkUpdate(): void;
+}): void {
   tray?.destroy();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'build', 'icon.png'));
-  tray = new Tray(icon);
-  tray.setToolTip(`QC Lab — máy chủ LAN đang chạy tại cổng ${port}`);
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mở QC Lab', click: showMainWindow },
-    { label: `Máy chủ LAN · cổng ${port}`, enabled: false },
-    { label: 'Địa chỉ cho máy nhân viên…', click: () => showLanAddresses(port, ca) },
-    { type: 'separator' },
-    { label: 'Thoát QC Lab (máy nhân viên sẽ mất kết nối)', click: () => { quitting = true; app.quit(); } },
-  ]));
-  tray.on('double-click', showMainWindow);
+  const hostTray = new Tray(icon);
+  tray = hostTray;
+  const version = app.getVersion();
+  const installedOnWindows = app.isPackaged && process.platform === 'win32';
+  const startup = { name: 'QC Lab', path: process.execPath };
+  hostTray.setToolTip(`QC Lab ${version} · Máy chủ LAN · Cổng ${port}`);
+
+  function refreshMenu() {
+    const items: MenuItemConstructorOptions[] = [
+      { label: `QC Lab · Phiên bản ${version}`, enabled: false },
+      { label: `Máy chủ LAN · HTTPS · Cổng ${port}`, enabled: false },
+      { type: 'separator' },
+      { label: 'Mở QC Lab', click: showMainWindow },
+      { label: 'Mở thư mục nhật ký…', click: actions.openLogs },
+      { label: 'Kiểm tra cập nhật…', enabled: installedOnWindows, click: actions.checkUpdate },
+      { label: 'Địa chỉ cho máy nhân viên…', click: () => showLanAddresses(port, ca) },
+      { label: 'Xuất bản sao lưu…', click: actions.exportBackup },
+    ];
+    if (installedOnWindows) {
+      const login = app.getLoginItemSettings(startup);
+      items.push({
+        label: 'Khởi động cùng Windows', type: 'checkbox',
+        checked: login.launchItems.some((item) => item.name === startup.name && item.scope === 'user' && item.enabled),
+        click: (item) => {
+          try { app.setLoginItemSettings({ ...startup, openAtLogin: item.checked }); }
+          catch (error) { dialog.showErrorBox('Không đổi được thiết lập khởi động', describeError(error).message); }
+          refreshMenu();
+        },
+      });
+    }
+    hostTray.setContextMenu(Menu.buildFromTemplate([
+      ...items,
+      { type: 'separator' },
+      { label: 'Thoát và dừng máy chủ LAN', click: () => { quitting = true; app.quit(); } },
+    ]));
+  }
+
+  refreshMenu();
+  hostTray.on('double-click', showMainWindow);
 }
 
 async function createWindow(): Promise<void> {
@@ -299,48 +333,64 @@ async function createWindow(): Promise<void> {
   const softwareOperations = createSoftwareOperations(db, license, updates,
     { get: () => sessionActor, set: (actor) => { sessionActor = actor; } },
     () => { if (app.isPackaged && process.platform === 'win32') void updates.check(); });
+  const desktopOperations = createDesktopOperations({ db, auth, backup, firebase }, {
+    session: { get: () => sessionActor, set: (actor) => { sessionActor = actor; } },
+    pickBackupSavePath: async (defaultName) => {
+      const picked = await dialog.showSaveDialog(win, {
+        title: 'Xuất bản sao lưu QC Lab',
+        defaultPath: defaultName,
+        filters: [{ name: 'Backup QC Lab', extensions: ['sqlite'] }],
+      });
+      return picked.canceled || !picked.filePath ? null : picked.filePath;
+    },
+    pickBackupOpenPath: async () => {
+      const picked = await dialog.showOpenDialog(win, {
+        title: 'Chọn tệp sao lưu để phục hồi',
+        properties: ['openFile'],
+        filters: [{ name: 'Backup QC Lab', extensions: ['sqlite', 'json'] }],
+      });
+      return picked.canceled || !picked.filePaths[0] ? null : picked.filePaths[0];
+    },
+    buildXlsxBase64,
+    printHtmlToPdf: (input) => printHtmlToPdf(win, input.html, input.defaultFileName, input.pageNumbers),
+    basename: (filePath) => path.basename(filePath),
+    logDir: LOG_DIR,
+    openFolder: (folder) => shell.openPath(folder),
+    pickLogBundleSavePath: async (defaultName) => {
+      const picked = await dialog.showSaveDialog(win, {
+        title: 'Xuất gói log để gửi khi báo lỗi',
+        defaultPath: defaultName,
+        filters: [{ name: 'Tệp nén', extensions: ['zip'] }],
+      });
+      return picked.canceled || !picked.filePath ? null : picked.filePath;
+    },
+    writeFile: (filePath, data) => writeFile(filePath, data),
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+  });
   const operationTables = [
     createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis }),
-    createDesktopOperations({ db, auth, backup, firebase }, {
-      session: { get: () => sessionActor, set: (actor) => { sessionActor = actor; } },
-      pickBackupSavePath: async (defaultName) => {
-        const picked = await dialog.showSaveDialog(win, {
-          title: 'Xuất bản sao lưu QC Lab',
-          defaultPath: defaultName,
-          filters: [{ name: 'Backup QC Lab', extensions: ['sqlite'] }],
-        });
-        return picked.canceled || !picked.filePath ? null : picked.filePath;
-      },
-      pickBackupOpenPath: async () => {
-        const picked = await dialog.showOpenDialog(win, {
-          title: 'Chọn tệp sao lưu để phục hồi',
-          properties: ['openFile'],
-          filters: [{ name: 'Backup QC Lab', extensions: ['sqlite', 'json'] }],
-        });
-        return picked.canceled || !picked.filePaths[0] ? null : picked.filePaths[0];
-      },
-      buildXlsxBase64,
-      printHtmlToPdf: (input) => printHtmlToPdf(win, input.html, input.defaultFileName, input.pageNumbers),
-      basename: (filePath) => path.basename(filePath),
-      logDir: LOG_DIR,
-      openFolder: (folder) => shell.openPath(folder),
-      pickLogBundleSavePath: async (defaultName) => {
-        const picked = await dialog.showSaveDialog(win, {
-          title: 'Xuất gói log để gửi khi báo lỗi',
-          defaultPath: defaultName,
-          filters: [{ name: 'Tệp nén', extensions: ['zip'] }],
-        });
-        return picked.canceled || !picked.filePath ? null : picked.filePath;
-      },
-      writeFile: (filePath, data) => writeFile(filePath, data),
-      appVersion: app.getVersion(),
-      electronVersion: process.versions.electron,
-    }),
+    desktopOperations,
     softwareOperations,
   ];
   // Cổng quyền đọc lại tài khoản ở MỖI lời gọi, cho cả máy chính lẫn máy trạm.
   const accessGate = createAccessGate(db, license.allowed);
-  registerIpcOperations(ipcMain, operationTables, sessionContext(() => sessionActor), accessGate);
+  const desktopContext = sessionContext(() => sessionActor);
+  registerIpcOperations(ipcMain, operationTables, desktopContext, accessGate);
+
+  async function runTrayOperation<T>(title: string,
+    operation: { channel: string; run(ctx: CallContext): IpcResult<T> | Promise<IpcResult<T>> },
+    onSuccess?: (data: T) => void | Promise<unknown>,
+  ): Promise<void> {
+    // Menu khay đi qua cùng cổng quyền và thao tác với Cài đặt của máy chính.
+    let result: IpcResult<T>;
+    try {
+      result = await operation.run(accessGate.guard(operation.channel, desktopContext));
+      if (result.ok) { await onSuccess?.(result.data); return; }
+    } catch (error) { result = errorResult(error, operation.channel); }
+    showMainWindow();
+    dialog.showErrorBox(title, result.error.message);
+  }
 
   const lanTls = startLanTls(userDataDir);
   const lan = new LanHttpServer<PublicUser>({
@@ -373,7 +423,18 @@ async function createWindow(): Promise<void> {
   setLanChangeNotifier((payload) => lan.publishChanged(payload));
   console.log(`QC Lab LAN server is listening on port ${lanPort}`);
 
-  createTray(lanPort, lanTls.ca);
+  createTray(lanPort, lanTls.ca, {
+    openLogs: () => void runTrayOperation('Mở thư mục nhật ký', desktopOperations.openLogFolder),
+    exportBackup: () => {
+      showMainWindow();
+      void runTrayOperation('Xuất bản sao lưu', desktopOperations.exportBackup, (exported) => {
+        if (exported) return dialog.showMessageBox(win, { type: 'info', title: 'Sao lưu QC Lab',
+          message: 'Đã xuất bản sao lưu.', detail: exported.path });
+      });
+    },
+    checkUpdate: () => void runTrayOperation('Cập nhật QC Lab', softwareOperations.checkSoftwareUpdate, (status) =>
+      status.phase === 'downloaded' ? promptInstall() : dialog.showMessageBox({ type: 'info', title: 'Cập nhật QC Lab', message: status.message })),
+  });
   win.on('close', (event) => {
     if (quitting) return;
     event.preventDefault();

@@ -23,7 +23,7 @@ export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, r
     ? `N=${p.n} · Mean thực=${p.mean.toFixed(decimals)} · SD thực=${p.sd.toFixed(4)} · CV=${p.cv.toFixed(2)}%`
     : 'Chưa có dữ liệu của lô đang vận hành';
   return (
-    <section className="panel entry-secondary-panel range-summary-panel">
+    <section className="panel entry-secondary-panel range-summary-panel" data-entry-section="range">
       <div className="entry-secondary-summary range-summary-header">
         <span>Thống kê toàn bộ &amp; Dải kiểm soát</span>
         <small>{rangeSummaryText}</small>

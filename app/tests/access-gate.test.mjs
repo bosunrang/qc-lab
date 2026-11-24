@@ -146,7 +146,9 @@ test('bản đóng gói: không DevTools, không menu mặc định, không nh�
   assert.match(source, /const DEV_TOOLS = !app\.isPackaged;/);
   assert.equal(source.match(/devTools: DEV_TOOLS/g)?.length, 2, 'cửa sổ chính và cửa sổ con');
   assert.match(source, /if \(app\.isPackaged\) Menu\.setApplicationMenu\(null\);/);
-  assert.match(source, /registerIpcOperations\(ipcMain, operationTables, sessionContext\(\(\) => sessionActor\), accessGate\)/);
+  assert.match(source, /const desktopContext = sessionContext\(\(\) => sessionActor\);/);
+  assert.match(source, /registerIpcOperations\(ipcMain, operationTables, desktopContext, accessGate\)/);
+  assert.match(source, /operation\.run\(accessGate\.guard\(operation\.channel, desktopContext\)\)/, 'menu khay dùng cùng cổng quyền với IPC');
   assert.match(source, /invoke: createLanInvoker\(operationTables, accessGate\)/);
   assert.match(source, /sessionCheck: createSessionCheck\(db\)/);
 });
