@@ -18,11 +18,25 @@ export interface LanTlsSource {
   caCertificate(): Buffer;
 }
 export interface LanServerDeps<User> {
-  login(input: unknown): Promise<LoginResult<User>> | LoginResult<User>;
+  /** `clientId` = `lan:<ip>` của máy trạm, để nhật ký đăng nhập (kể cả lần
+   * sai) ghi đúng máy đã thử. */
+  login(input: unknown, clientId: string): Promise<LoginResult<User>> | LoginResult<User>;
   /** Nhận diện công khai cho màn hình đăng nhập; không có cài đặt nội bộ. */
   getLoginBrand?(): Promise<unknown> | unknown;
-  actorOf(user: User): Actor;
+  getLicenseStatus?(): unknown;
+  licenseAllowed?(): boolean;
+  actorOf(user: User, clientId: string): Actor;
   currentUser(actor: Actor): User | null;
+  /** Kiểm lại phiên ở mỗi yêu cầu (GV5, xem `ipc/access-gate.ts`). Không khai
+   * thì phiên giữ nguyên actor lúc đăng nhập — chỉ dùng trong test. */
+  sessionCheck?: {
+    /** Dấu vân tay mật khẩu hiện hành của tài khoản, chụp lúc đăng nhập. */
+    stampOf(userId: string): string | null;
+    /** Actor mới nhất, hoặc `null` khi tài khoản không còn, đã khoá hay đổi mật khẩu. */
+    recheck(actor: Actor, stamp: string | undefined): Actor | null;
+  };
+  /** Trả `{ ok:false, error:{ code:'unauthenticated' } }` khi cổng quyền thấy
+   * tài khoản không còn dùng được; máy chủ đổi thành 401 và thu hồi phiên. */
   invoke(method: string, args: unknown[], actor: Actor): Promise<unknown>;
   staticDir?: string;
   tls: LanTlsSource;
@@ -136,7 +150,18 @@ export class LanHttpServer<User> {
     res.end(PLAIN_HTTP_PAGE);
   }
 
-  private session(req: IncomingMessage) { return this.sessions.get(cookies(req).qclab_session); }
+  /** Phiên của yêu cầu sau khi đối chiếu lại với CSDL. Tài khoản đã khoá, bị
+   * xoá hoặc đổi mật khẩu (kể cả do phục hồi bản sao lưu) thì thu hồi phiên
+   * ngay; còn lại cập nhật vai trò mới nhất vào phiên. */
+  private session(req: IncomingMessage) {
+    const token = cookies(req).qclab_session;
+    const session = this.sessions.get(token);
+    if (!session || !this.deps.sessionCheck) return session;
+    const actor = this.deps.sessionCheck.recheck(session.actor, session.stamp);
+    if (!actor) { this.sessions.revoke(token); return null; }
+    session.actor = actor;
+    return session;
+  }
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
       const url = new URL(req.url || '/', 'https://lan.local');
@@ -146,6 +171,7 @@ export class LanHttpServer<User> {
         if (served) { res.writeHead(200, { 'content-type': served.type, 'cache-control': served.html ? 'no-store' : 'public, max-age=3600', 'x-content-type-options': 'nosniff' }); res.end(served.content); return; }
       }
       if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true, data: { service: 'qc-lab-lan' } });
+      if (req.method === 'GET' && url.pathname === '/api/license') return send(res, 200, this.deps.getLicenseStatus?.() ?? null);
       if (req.method === 'GET' && url.pathname === '/api/brand') {
         if (!this.deps.getLoginBrand) return send(res, 404, { ok: false, error: { code: 'not-found', message: 'Chưa có thông tin thương hiệu.' } });
         return send(res, 200, await this.deps.getLoginBrand());
@@ -156,6 +182,7 @@ export class LanHttpServer<User> {
         res.write(': connected\n\n'); this.eventClients.add(res); req.once('close', () => this.eventClients.delete(res)); return;
       }
       if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+        if (this.deps.licenseAllowed && !this.deps.licenseAllowed()) return send(res, 403, { ok: false, error: { code: 'activation-required', message: 'Máy chủ QC Lab chưa được kích hoạt.' } });
         const input = await body(req);
         const username = String((input as { data?: { username?: unknown } })?.data?.username ?? '');
         const gate = this.loginThrottle.begin(remoteAddress(req), username);
@@ -164,10 +191,12 @@ export class LanHttpServer<User> {
           res.setHeader('retry-after', String(Math.ceil(gate.retryAfterMs / 1000)));
           return send(res, 429, { ok: false, error: { code: 'too-many-attempts', message: `Đăng nhập sai quá nhiều lần. Thử lại sau ${minutes} phút.` } });
         }
-        const result = await this.deps.login(input);
+        const clientId = `lan:${remoteAddress(req)}`;
+        const result = await this.deps.login(input, clientId);
         if (!result.ok) return send(res, 401, result);
         gate.attempt.succeed();
-        const session = this.sessions.create(this.deps.actorOf(result.data));
+        const actor = this.deps.actorOf(result.data, clientId);
+        const session = this.sessions.create(actor, this.deps.sessionCheck?.stampOf(actor.userId) ?? undefined);
         res.setHeader('set-cookie', `qclab_session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`);
         return send(res, 200, { ok: true, data: result.data });
       }
@@ -178,7 +207,19 @@ export class LanHttpServer<User> {
       if (req.method === 'POST' && url.pathname === '/api/rpc') {
         const input = await body(req) as { method?: unknown; args?: unknown };
         if (typeof input.method !== 'string' || !Array.isArray(input.args)) return send(res, 400, { ok: false, error: { code: 'invalid-request', message: 'Yêu cầu RPC không hợp lệ.' } });
-        return send(res, 200, await this.deps.invoke(input.method, input.args, session.actor));
+        const result = await this.deps.invoke(input.method, input.args, session.actor) as { ok?: unknown; error?: { code?: unknown } } | null;
+        // Cổng quyền thấy tài khoản không còn dùng được: thu hồi phiên và trả
+        // 401 để máy trạm quay về màn đăng nhập.
+        if (result?.ok === false && result.error?.code === 'unauthenticated') {
+          this.sessions.revoke(session.token);
+          return send(res, 401, result);
+        }
+        // Tự đổi mật khẩu đổi luôn dấu vân tay: giữ phiên đang dùng, mọi phiên
+        // khác của tài khoản này hết hiệu lực ở yêu cầu kế tiếp.
+        if (input.method === 'changeOwnPassword' && result?.ok === true && this.deps.sessionCheck) {
+          session.stamp = this.deps.sessionCheck.stampOf(session.actor.userId) ?? undefined;
+        }
+        return send(res, 200, result);
       }
       return send(res, 404, { ok: false, error: { code: 'not-found', message: 'Không tìm thấy API.' } });
     } catch (error) {
@@ -198,7 +239,7 @@ export class LanHttpServer<User> {
     try {
       const content = await readFile(candidate);
       const extension = extname(candidate).toLowerCase();
-      const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
+      const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/vnd.microsoft.icon', '.woff2': 'font/woff2' };
       return { content, type: types[extension] || 'application/octet-stream', html: extension === '.html' };
     } catch { return null; }
   }

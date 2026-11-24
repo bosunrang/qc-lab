@@ -7,25 +7,45 @@
 // sidebar và route dùng CÙNG một bảng; chặn truy cập thật theo route nằm ở
 // router.tsx, chặn ghi thật nằm ở main. Quyền theo từng người dùng
 // (`pagePerms`) được tính cùng bảng đó qua `canUserAccessPage()`.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageErrorBoundary } from './ErrorBoundary';
 import { useAuthStore } from '../store/auth-store';
 import { useSettingsStore } from '../store/settings-store';
 import { canUserAccessPage, pageById, type PageDef } from '../lib/permissions';
-import { DialogHost } from './DialogHost';
+import { ToastHost } from './ToastHost';
 import { DatePickerPopup } from './DatePickerPopup';
 import { NavIcon } from './NavIcon';
+import { SoftwareLicenseFooter } from './SoftwareLicenseExpiry';
+import { BrandIdentity } from './BrandIdentity';
 
 // Cấu trúc nhóm điều hướng; nhãn/route/vai trò đọc từ PAGE_DEFS, không khai lại.
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Theo dõi', ids: ['dash', 'entry', 'westgard', 'sigma'] },
-  { label: 'Vận hành', ids: ['reagent', 'actions', 'report'] },
+  { label: 'Vận hành', ids: ['reagent', 'eqa', 'actions', 'report'] },
   { label: 'Quản trị', ids: ['manage', 'users', 'audit', 'settings'] },
 ];
 
 const COLLAPSE_KEY = 'qclab-nav-collapsed';
+
+/** Ở cửa sổ hẹp, `app.css` TỰ thu sidebar về dạng chỉ icon bằng CSS
+ * (`@media(max-width:1050px)` ẩn `.nav-label`), trong khi cờ `collapsed`
+ * chỉ biết người dùng có bấm nút thu gọn hay không. Theo dõi đúng truy vấn
+ * đó để mục điều hướng vẫn có `title`/`aria-label` khi chữ bị ẩn —
+ * `display:none` cũng gỡ chữ khỏi cây truy cập, link sẽ không còn tên. Giữ
+ * ngưỡng này trùng với `app.css`. */
+const NAV_ICON_ONLY_QUERY = '(max-width: 1050px)';
+
+function subscribeNavIconOnly(onChange: () => void) {
+  const query = window.matchMedia(NAV_ICON_ONLY_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+function navIconOnlyByViewport(): boolean {
+  return window.matchMedia(NAV_ICON_ONLY_QUERY).matches;
+}
 
 function RuntimeIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h.01M8 15h.01M12 9h4M12 15h4" /></svg>;
@@ -41,6 +61,9 @@ export function AppShell() {
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } });
 
+  // Chỉ còn icon khi người dùng thu gọn HOẶC cửa sổ hẹp tự thu gọn bằng CSS.
+  const iconOnly = useSyncExternalStore(subscribeNavIconOnly, navIconOnlyByViewport) || collapsed;
+
   useEffect(() => { load(); }, [load]);
 
   function toggleCollapsed() {
@@ -51,9 +74,6 @@ export function AppShell() {
     });
   }
 
-  const brandTitle = profile?.brand_title || 'QC Lab';
-  const brandSub = profile?.brand_sub || 'Nội kiểm xét nghiệm';
-  const brandMarkText = (profile?.logo_text || 'QC').slice(0, 4);
   const toggleLabel = collapsed ? 'Mở thanh điều hướng' : 'Thu gọn thanh điều hướng';
 
   return (
@@ -61,14 +81,22 @@ export function AppShell() {
       <aside aria-label="Điều hướng ứng dụng">
         <div className="brand-row">
           <div className="brand">
-            <div className="brand-mark">{profile?.logo_data ? <img src={profile.logo_data} alt="" /> : brandMarkText}</div>
-            {!collapsed && <div className="brand-copy"><div>{brandTitle}</div><small>{brandSub}</small></div>}
+            <BrandIdentity
+              title={profile?.brand_title}
+              subtitle={profile?.brand_sub}
+              logoText={profile?.logo_text}
+              logoData={profile?.logo_data}
+              showCopy={!collapsed}
+            />
+            <button type="button" className="nav-toggle" title={toggleLabel} aria-label={toggleLabel}
+              aria-expanded={!collapsed} aria-controls="primary-navigation" onClick={toggleCollapsed}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
           </div>
-          <button type="button" className="nav-toggle" title={toggleLabel} aria-label={toggleLabel} onClick={toggleCollapsed}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-          </button>
         </div>
-        <nav aria-label="Điều hướng chính">
+        <nav id="primary-navigation" className={iconOnly ? 'nav-icon-only' : undefined} aria-label="Điều hướng chính">
           {NAV_GROUPS.map((group) => {
             const items = group.ids.map(pageById).filter((page): page is PageDef => !!page && canUserAccessPage(page.id, user));
             if (!items.length) return null;
@@ -76,7 +104,7 @@ export function AppShell() {
               <div key={group.label}>
                 {!collapsed && <div className="nav-group">{group.label}</div>}
                 {items.map((item) => (
-                  <NavLink key={item.path} to={item.path} title={collapsed ? item.label : undefined} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <NavLink key={item.path} to={item.path} title={iconOnly ? item.label : undefined} aria-label={iconOnly ? item.label : undefined} className={({ isActive }) => (isActive ? 'active' : '')}>
                     <span className="ic" aria-hidden="true"><NavIcon id={item.id} /></span>
                     {!collapsed && <span className="nav-label">{item.label}</span>}
                   </NavLink>
@@ -85,7 +113,7 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="sidebar-footer" role="status" aria-live="polite" title={collapsed ? `Máy chủ cục bộ · ${RUNTIME_LABEL}` : undefined}>
+        <div className="sidebar-footer" role="status" aria-live="polite" title={iconOnly ? `Máy chủ cục bộ · ${RUNTIME_LABEL}` : undefined}>
           <div className="sidebar-runtime">
             <span className="sidebar-runtime-icon"><RuntimeIcon /></span>
             <div className="sidebar-runtime-copy">
@@ -93,16 +121,19 @@ export function AppShell() {
               <span>{RUNTIME_LABEL}</span>
             </div>
           </div>
+          <SoftwareLicenseFooter compact={iconOnly} />
         </div>
       </aside>
-      <main tabIndex={-1}>
+      {/* Mỗi đường dẫn có vùng cuộn mới ở đầu trang mà không ép trình duyệt
+          tính lại bố cục ngay trong lượt render. Bộ lọc cùng trang giữ vùng cuộn. */}
+      <main key={pathname} tabIndex={-1}>
         {/* Lỗi hiển thị của một trang chỉ thay vùng nội dung; đổi trang thì
             tự bỏ trạng thái lỗi. */}
         <PageErrorBoundary resetKey={pathname}>
           <Outlet />
         </PageErrorBoundary>
       </main>
-      <DialogHost />
+      <ToastHost />
       <DatePickerPopup />
     </div>
   );

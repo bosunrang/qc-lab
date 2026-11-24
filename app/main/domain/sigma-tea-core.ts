@@ -3,15 +3,16 @@
  * kiểu dữ liệu ứng dụng. */
 export type SigmaTeaSourceCore = 'lab' | 'eflm' | 'clia' | 'ricos';
 export type TeaCatalogCore = { id: string; name: string; abbr: string; aliases?: readonly string[]; unit: string; section?: string; clia: number | null; ricos: number | null; cliaAbsolute?: number; cliaAbsoluteUnit?: string };
-export type TeaRefCore = { name: string; analyte_id?: string; aliases_json?: string; lab: number | null; lab_source: string; clia?: number | null; ricos?: number | null; clia_rule?: string; clia_absolute?: number | null; clia_absolute_unit?: string };
+export type TeaRefLevelDefaultCore = { level: number; tea: number };
+export type TeaRefCore = { name: string; analyte_id?: string; aliases_json?: string; lab: number | null; lab_source: string; lab_level_defaults?: readonly TeaRefLevelDefaultCore[]; clia?: number | null; ricos?: number | null; clia_rule?: string; clia_absolute?: number | null; clia_absolute_unit?: string };
 export type TeaTestCore = {
   name: string; tea_ref_key: string; unit: string; tea: number;
   /** Cổng truy vết EFLM: `tea` là một ô nhập tay dùng chung, nên nó CHỈ được
-   * coi là TEa EFLM khi xét nghiệm thật sự khai nguồn EFLM hoặc có ít nhất
-   * một dấu vết tra cứu (analyte/tài liệu/ngày). Thiếu cổng này, mọi xét
-   * nghiệm có `tea` (kể cả TEa gõ tay cho nguồn khác) đều hiện thành "TEa
-   * EFLM đã truy vết". */
+   * coi là TEa EFLM khi có ngày tra cứu database EFLM (xem `resolveTea`).
+   * Thiếu cổng này, mọi xét nghiệm có `tea` (kể cả TEa gõ tay cho nguồn khác)
+   * đều hiện thành "TEa EFLM đã truy vết". */
   tea_source?: string; eflm_analyte?: string; eflm_ref?: string; eflm_lookup_date?: string;
+  operational_tea_source?: string;
   eflm_tea?: number | null;
 };
 /** Tiêu chí CLIA đã phân giải, dạng có cấu trúc — để lớp trình bày in được
@@ -51,38 +52,80 @@ function catalogAliases(item: TeaCatalogCore): string[] {
 }
 
 export function findCatalog<T extends TeaCatalogCore>(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, catalog: readonly T[]): T | null {
-  const wanted = key(test.tea_ref_key || test.name);
-  if (!wanted) return null;
-  return catalog.find((item) => catalogAliases(item).some((value) => key(value) === wanted)) || null;
+  // Ưu tiên khoá đã gán; nếu khoá của dữ liệu cũ không còn hợp lệ thì thử
+  // lại bằng tên hiển thị. Cả hai nhánh vẫn khớp TUYỆT ĐỐI với alias catalog,
+  // không nới thành so gần đúng.
+  const wanted = [test.tea_ref_key, test.name].map(key).filter(Boolean);
+  for (const candidate of wanted) {
+    const found = catalog.find((item) => catalogAliases(item).some((value) => key(value) === candidate));
+    if (found) return found;
+  }
+  return null;
 }
 
 /** `catalogId` là dòng danh mục đã tra được cho xét nghiệm này. Cần nó vì hồ
  * sơ TEa PXN của một analyte CÓ SẴN được lưu với `analyte_id` của danh mục và
  * `name` là tên danh mục ("Sodium"), trong khi xét nghiệm mang tên app tự sinh
  * ("Sodium (Na)") — so tên trần thì không bao giờ gặp nhau. */
-function findRef(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalogId?: string): TeaRefCore | null {
-  const wanted = key(test.tea_ref_key || test.name);
-  const keys = new Set([wanted, catalogId ? key(catalogId) : ''].filter(Boolean));
-  return refs.find((ref) => [ref.analyte_id || '', ref.name, ...aliasesOf(ref)].some((value) => keys.has(key(value)))) || null;
+function findRefs(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalog?: TeaCatalogCore | null): TeaRefCore[] {
+  // Hồ sơ tạo bởi các bản cũ chưa có `analyte_id`, chỉ lưu tên danh mục.
+  // Khi đã tra được catalog, nhận mọi alias CHÍNH XÁC của đúng dòng đó để
+  // tương thích dữ liệu cũ; vẫn không ghép tiền tố hay đoán tên gần giống.
+  const keys = new Set([test.tea_ref_key, test.name, ...(catalog ? catalogAliases(catalog) : [])].map(key).filter(Boolean));
+  return refs.filter((ref) => [ref.analyte_id || '', ref.name, ...aliasesOf(ref)].some((value) => keys.has(key(value))));
 }
 
-export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], source: SigmaTeaSourceCore, targetMean?: number | null): ResolvedTeaCore<T> {
+/** Hồ sơ TEa PXN có dữ liệu (TEa chung hoặc theo mức) trong các hồ sơ khớp. */
+function pickLabRef(refs: readonly TeaRefCore[]): TeaRefCore | null {
+  return refs.find((item) => item.lab != null || !!item.lab_level_defaults?.length) || null;
+}
+
+/** Xét nghiệm có hồ sơ TEa của PXN (TEa chung hoặc theo mức) không. Có thì TEa
+ * PXN là TEa vận hành và là nguồn mặc định ở trang Six Sigma. */
+export function hasLabTea(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): boolean {
+  return !!pickLabRef(findRefs(test, refs, findCatalog(test, catalogRows)));
+}
+
+/** TEa PXN khai riêng theo số mức QC của analyte mà xét nghiệm này khớp. Lớp
+ * trình bày dùng để nói rõ "theo mức QC" thay vì chỉ in TEa chung. */
+export function labLevelTeas(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): readonly TeaRefLevelDefaultCore[] {
   const catalog = findCatalog(test, catalogRows);
-  const ref = findRef(test, refs, catalog?.id);
+  return pickLabRef(findRefs(test, refs, catalog))?.lab_level_defaults || [];
+}
+
+function findRef(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalog?: TeaCatalogCore | null): TeaRefCore | null {
+  return findRefs(test, refs, catalog)[0] || null;
+}
+
+export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], source: SigmaTeaSourceCore, targetMean?: number | null, level?: number | null): ResolvedTeaCore<T> {
+  const catalog = findCatalog(test, catalogRows);
+  const matchingRefs = findRefs(test, refs, catalog);
+  let ref = findRef(test, refs, catalog);
   if (source === 'eflm') {
-    const hasTrace = test.tea_source === 'eflm' || !!(test.eflm_analyte || test.eflm_ref || test.eflm_lookup_date);
+    // Truy vết tối thiểu là NGÀY TRA: database biến thiên sinh học EFLM được
+    // cập nhật theo thời gian, thiếu ngày thì không biết TEa lấy từ phiên bản
+    // nào. Tên xét nghiệm EFLM để trống thì hiểu là tên xét nghiệm (ô nhập ở
+    // trang Sigma mặc định hiện đúng tên đó). Trước đây chỉ cần chọn nguồn
+    // `eflm` là được coi là đã truy vết.
+    const hasTrace = !!String(test.eflm_lookup_date || '').trim();
     const value = Number(test.eflm_tea === undefined ? test.tea : test.eflm_tea);
     return {
       value: hasTrace && Number.isFinite(value) && value > 0 ? value : null,
       criterion: 'TEa EFLM nhập và được truy vết bởi phòng xét nghiệm', catalog,
-      note: hasTrace ? null : 'Chọn EFLM thì cần tra database EFLM và nhập TEa% cùng thông tin truy xuất.',
+      note: hasTrace ? null : 'Chọn EFLM thì cần tra database EFLM, nhập TEa% và ngày tra cứu.',
       criterionDetail: null,
     };
   }
   if (source === 'lab') {
-    const value = Number(ref?.lab);
-    return { value: Number.isFinite(value) && value > 0 ? value : null, criterion: ref?.lab_source || 'Hồ sơ TEa chuẩn hóa của phòng xét nghiệm', catalog, note: null, criterionDetail: null };
+    ref = pickLabRef(matchingRefs) || ref;
+    // TEa riêng của đúng số mức QC thắng TEa chung; mức chưa khai riêng mới
+    // rơi về TEa chung, không bao giờ mượn giá trị của mức khác.
+    const levelTea = Number.isInteger(level) ? ref?.lab_level_defaults?.find((item) => item.level === level) : undefined;
+    const value = Number(levelTea?.tea ?? ref?.lab);
+    return { value: Number.isFinite(value) && value > 0 ? value : null, criterion: ref?.lab_source || 'Hồ sơ TEa chuẩn hoá của phòng xét nghiệm', catalog, note: null, criterionDetail: null };
   }
+  if (source === 'ricos') ref = matchingRefs.find((item) => item.ricos != null) || ref;
+  if (source === 'clia') ref = matchingRefs.find((item) => item.clia != null || item.clia_absolute != null || !!item.clia_rule) || ref;
   const percent = Number(source === 'clia' ? (ref?.clia ?? catalog?.clia) : (ref?.ricos ?? catalog?.ricos));
   if (source === 'ricos') return { value: Number.isFinite(percent) && percent > 0 ? percent : null, criterion: 'Ricos / Westgard biological variation', catalog, note: null, criterionDetail: null };
   // Hồ sơ PXN có thể ghi đè cả quy tắc/giới hạn tuyệt đối CLIA. Catalog tích
@@ -136,6 +179,92 @@ export function teaCriterionText(resolved: Pick<ResolvedTeaCore, 'value' | 'crit
   if (c.rule === 'absolute') return `±${criterionNum(c.absolute, 4)} ${c.unit || 'đơn vị'}`;
   if (c.rule === 'greater-of') return `mức lớn hơn giữa ±${criterionNum(c.percent, 2)}% và ±${criterionNum(c.absolute, 4)} ${c.unit || 'đơn vị'}`;
   return c.percent != null ? `±${criterionNum(c.percent, 2)}%` : 'chưa có';
+}
+
+const KNOWN_SOURCES: readonly SigmaTeaSourceCore[] = ['lab', 'eflm', 'clia', 'ricos'];
+/** Chỉ các nguồn được chọn rõ ở danh mục mới thay cách phân giải cũ. */
+function explicitOperationalSource(test: TeaTestCore): SigmaTeaSourceCore | null {
+  const source = String(test.operational_tea_source || '').trim().toLowerCase();
+  return KNOWN_SOURCES.includes(source as SigmaTeaSourceCore) ? source as SigmaTeaSourceCore : null;
+}
+
+/** Nguồn mặc định khi mở Sigma hoặc tạo kỳ chưa có snapshot TEa. */
+export function operationalTeaSource(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): SigmaTeaSourceCore | '' {
+  const explicit = explicitOperationalSource(test);
+  if (explicit) return explicit;
+  if (hasLabTea(test, refs, catalogRows)) return 'lab';
+  const legacy = String(test.tea_source || '').trim().toLowerCase() as SigmaTeaSourceCore;
+  return KNOWN_SOURCES.includes(legacy) ? legacy : '';
+}
+export const MISSING_LAB_TEA_NOTE = 'Chưa có TEa của PXN: khai ở Cấu hình chung → Bảng TEa tham chiếu.';
+export type OperationalTeaCore<T extends TeaCatalogCore = TeaCatalogCore> = ResolvedTeaCore<T> & {
+  /** Nguồn đã chọn hoặc nguồn được phân giải; `null` khi chưa xác định nguồn. */
+  source: SigmaTeaSourceCore | null;
+};
+
+/** TEa VẬN HÀNH của một xét nghiệm — căn cứ của cổng Bias khi lập dải, cột
+ * "Trong TEa" của ngoại kiểm và mục TEa ở danh mục xét nghiệm. Phòng xét
+ * nghiệm tự xác định yêu cầu chất lượng (ISO 15189:2022 7.3.7). Nguồn được
+ * chọn rõ ở danh mục (`operational_tea_source`) được dùng trực tiếp, không
+ * đổi nguồn khi thiếu giá trị. Với cấu hình cũ chưa chọn riêng, thứ tự là:
+ *
+ * 1. Hồ sơ TEa của PXN (Bảng TEa tham chiếu): TEa riêng của mức nếu truyền
+ *    `level` và mức đó có khai, không thì TEa chung.
+ * 2. Nguồn mà PXN đã chọn cho xét nghiệm ở trang Six Sigma (`tea_source`).
+ * 3. Không có: trả `value = null` kèm lời nhắc, KHÔNG lấy `tests.tea`. Ô đó
+ *    từng được điền một lần từ gợi ý danh mục (vd Natri 0,73% theo Ricos)
+ *    nên lệch với TEa PXN thực dùng (2026-11-03).
+ *
+ * `targetMean` là nồng độ để quy đổi giới hạn tuyệt đối CLIA sang %: Mean của
+ * mức QC, hoặc giá trị ấn định của mẫu ngoại kiểm. */
+export function resolveOperationalTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], targetMean?: number | null, level?: number | null): OperationalTeaCore<T> {
+  const explicit = explicitOperationalSource(test);
+  if (explicit) {
+    const resolved = resolveTea(test, refs, catalogRows, explicit, targetMean, level);
+    // Nguồn đã chọn thiếu dữ liệu thì báo thiếu, không âm thầm đổi sang nguồn khác.
+    return { ...resolved, source: explicit, note: resolved.note || (resolved.value == null ? `Chưa có TEa cho nguồn ${SOURCE_SHORT_LABEL[explicit]} đã chọn.` : null) };
+  }
+  const lab = resolveTea(test, refs, catalogRows, 'lab', targetMean, level);
+  if (lab.value != null) return { ...lab, source: 'lab' };
+  const chosen = String(test.tea_source || '').trim().toLowerCase() as SigmaTeaSourceCore;
+  if (chosen !== 'lab' && KNOWN_SOURCES.includes(chosen)) {
+    const resolved = resolveTea(test, refs, catalogRows, chosen, targetMean, level);
+    if (resolved.value != null) return { ...resolved, source: chosen };
+  }
+  return { ...lab, value: null, source: null, note: MISSING_LAB_TEA_NOTE };
+}
+
+const SOURCE_SHORT_LABEL: Record<SigmaTeaSourceCore, string> = { lab: 'PXN', eflm: 'EFLM', clia: 'CLIA', ricos: 'Ricos' };
+const pct = (value: number) => `${Number(value.toFixed(2))}%`;
+
+/** Dòng hiển thị TEa vận hành của một xét nghiệm khi CHƯA gắn với mức QC hay
+ * nồng độ nào (danh mục xét nghiệm): TEa chung và TEa riêng từng mức của hồ
+ * sơ PXN, hoặc tiêu chí của nguồn dự phòng (CLIA tuyệt đối in nguyên
+ * "±4 mmol/L" vì chưa có nồng độ để quy đổi). */
+export function operationalTeaSummary(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly TeaCatalogCore[]): { text: string; source: SigmaTeaSourceCore | null; sourceLabel: string } {
+  const explicit = explicitOperationalSource(test);
+  if (explicit && explicit !== 'lab') {
+    const resolved = resolveTea(test, refs, catalogRows, explicit);
+    return { text: resolved.value != null || resolved.criterionDetail ? teaCriterionText(resolved) : 'Chưa có TEa', source: explicit, sourceLabel: SOURCE_SHORT_LABEL[explicit] };
+  }
+  const general = resolveTea(test, refs, catalogRows, 'lab').value;
+  const levels = labLevelTeas(test, refs, catalogRows);
+  if (general != null || levels.length) {
+    const parts = [
+      ...(general != null ? [levels.length ? `Chung ${pct(general)}` : pct(general)] : []),
+      ...[...levels].sort((a, b) => a.level - b.level).map((item) => `M${item.level} ${pct(item.tea)}`),
+    ];
+    return { text: parts.join(' · '), source: 'lab', sourceLabel: SOURCE_SHORT_LABEL.lab };
+  }
+  if (explicit === 'lab') return { text: 'Chưa có TEa của PXN', source: 'lab', sourceLabel: SOURCE_SHORT_LABEL.lab };
+  const chosen = String(test.tea_source || '').trim().toLowerCase() as SigmaTeaSourceCore;
+  if (chosen !== 'lab' && KNOWN_SOURCES.includes(chosen)) {
+    const resolved = resolveTea(test, refs, catalogRows, chosen);
+    if (resolved.value != null || resolved.criterionDetail?.absoluteUsable) {
+      return { text: teaCriterionText(resolved), source: chosen, sourceLabel: SOURCE_SHORT_LABEL[chosen] };
+    }
+  }
+  return { text: '', source: null, sourceLabel: '' };
 }
 
 

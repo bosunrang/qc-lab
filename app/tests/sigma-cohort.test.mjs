@@ -116,12 +116,15 @@ assert.ok(unstable.issues.includes('Mean mục tiêu thay đổi'));
     assert.ok(c.cv > clean.cv, 'CV phải phản ánh cả điểm lệch, không được làm đẹp');
   }
 
-  // Điểm đó đã có hồ sơ khắc phục duyệt xong + kết luận hiệu quả: hết chặn.
+  // Lần chạy của điểm đó đã đóng hồ sơ NCE (nguyên nhân xác định, đã khắc phục):
+  // bỏ khỏi CV như thống kê Westgard (SIGMA-REVIEW-2026-11-17 SB-9), hết chặn.
   {
     const [c] = buildSigmaCohorts(withOutlier, '2026-08', [1], '2026-09-07', new Set(['bad']));
+    const clean = buildSigmaCohorts(base, '2026-08', [1], '2026-09-07')[0];
     assert.equal(c.status, 'eligible', 'đã xử lý trọn vẹn thì nhóm dùng lại được');
-    assert.deepEqual(c.outOfControl, { rejected: 1, unresolved: 0 }, 'vẫn ghi nhận là đã từng mất kiểm soát');
-    assert.equal(c.n, 31, 'xử lý xong cũng KHÔNG loại điểm khỏi CV');
+    assert.equal(c.n, 30, 'điểm của lần chạy đã xử lý không vào CV');
+    assert.equal(c.excluded.resolved, 1);
+    assert.equal(c.cv, clean.cv, 'CV như khi chưa có lần chạy bị loại');
   }
 
   // Đúng 3,0 SD là "vượt" theo 1-3s? Không — Westgard nói "exceeds", nên đúng

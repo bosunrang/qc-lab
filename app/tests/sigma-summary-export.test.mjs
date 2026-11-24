@@ -26,7 +26,7 @@ test('xuất Sigma phân biệt báo cáo kỳ, bảng dữ liệu thô và so s
   assert.match(exporter, /sheet\.mergeCells\(4, 1, periods\.length \+ 3, 1\)/);
   assert.match(exporter, /pattern: 'none'/);
   assert.doesNotMatch(exporter, /style: 'hair'/);
-  assert.match(exporter, /Mức \$\{level\}\\nBias RMS/);
+  assert.match(exporter, /Mức \$\{level\}\\nBias \(%\)/);
   assert.match(exporter, /Mức \$\{level\}\\nYield/);
   assert.match(exporter, /function drawPeriodChart\(periods: SigmaPeriodView\[\], levels: number\[\]\)/);
   const sigmaChartRenderer = exporter.slice(exporter.indexOf('function drawPeriodChart'), exporter.indexOf('function drawMdcChart'));

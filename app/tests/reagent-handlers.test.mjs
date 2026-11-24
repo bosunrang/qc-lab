@@ -86,8 +86,8 @@ assert.equal(malformedQuickList.error.code, 'invalid-type');
 
 const fallbackCreated = reagent.createComparison(null, actor);
 assert.equal(fallbackCreated.ok, true);
-assert.equal(fallbackCreated.data.reagent, 'Hóa chất mới');
-// Bản ghi lỗi từ backup cũ không được làm trang So sánh hóa chất crash.
+assert.equal(fallbackCreated.data.reagent, 'Hoá chất mới');
+// Bản ghi lỗi từ backup cũ không được làm trang So sánh hoá chất crash.
 db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run('{"khong":"phai mang cap"}', fallbackCreated.data.id);
 const recovered = reagent.listComparisons().find((row) => row.id === fallbackCreated.data.id);
 assert.equal(recovered.result, null);

@@ -21,7 +21,7 @@ makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignment
 const beforeLock = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-05', val: 5, runId: 'r1' } }, actor);
 assert.equal(beforeLock.ok, true);
 
-const lock = report.lockPeriod({ data: { ym: '2026-08', note: 'Chot ky' } }, actor);
+const lock = report.lockPeriod({ data: { ym: '2026-08', note: 'Chot ky', acknowledge: true } }, actor);
 assert.equal(lock.ok, true);
 
 const blockedAdd = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-20', val: 6, runId: 'r1' } }, actor);

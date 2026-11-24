@@ -14,7 +14,7 @@ const configText = JSON.stringify({ apiKey: 'test-key', authDomain: 'test.fireba
 
 let remote = null;
 const fakeClient = {
-  async signIn(_config, email, password) { if (password !== 'secret') throw new Error('INVALID_PASSWORD'); return { idToken: 'token', uid: `uid-${email}` }; },
+  async signIn(_config, email, password) { if (password !== 'secret') throw new Error('INVALID_PASSWORD'); return { idToken: 'token', uid: `uid-${email}`, refreshToken: 'refresh', expiresAt: Date.now() + 3600_000 }; },
   async read() { return remote; },
   // Handler gửi chuỗi JSON đã dựng và đo cỡ sẵn (`writeJson`), không gửi object.
   async writeJson(_config, _code, _token, json) { remote = JSON.parse(json); },

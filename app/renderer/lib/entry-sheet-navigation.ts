@@ -67,7 +67,12 @@ export function handleSheetKeyDown(event: KeyboardEvent<HTMLInputElement>): void
     [...document.querySelectorAll<HTMLInputElement>('.qc-sheet .qc-inline-input')].filter((el) => !el.disabled && el.offsetParent !== null),
   );
   const next = sheetNavigationTarget(inputs, current, event.key, event.shiftKey);
-  if (!next) return;
+  if (!next) {
+    // Ô duy nhất còn lại trong cột (vd vừa bấm "+ Thêm" ở tháng đã nhập đủ):
+    // không có ô kế tiếp để nhảy tới, nhưng Enter vẫn phải lưu giá trị.
+    if (event.key === 'Enter') { event.preventDefault(); current.blur(); }
+    return;
+  }
   event.preventDefault();
   const pendingDate = next.dataset.focusDate;
   const pendingLevel = next.dataset.focusLevel;

@@ -1,9 +1,11 @@
 // Luồng nghiệp vụ chính trên app thật: nhập điểm QC ở bảng Nhập QC, điểm vi
-// phạm 1-3s hiện đúng cảnh báo, lập hồ sơ NCE từ trang Khắc phục sự cố, rồi
-// huỷ một điểm theo quy trình huỷ (không xoá cứng) và thấy hồ sơ NCE tự mở.
+// phạm 1-3s hiện đúng cảnh báo, lần chạy bị loại vào hàng chờ của trang Khắc
+// phục sự cố, lập hồ sơ NCE từ hàng chờ, rồi huỷ một điểm theo quy trình huỷ
+// (không xoá cứng). Vòng đời đầy đủ của hồ sơ ở `nce-flow.e2e.mjs`.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bootstrapAndLogin, enterValue, launchApp, openPage, seedOperationalTest, todayIn } from './helpers.mjs';
+import path from 'node:path';
+import { ADMIN, bootstrapAndLogin, enterValue, launchApp, openPage, seedOperationalTest, todayIn } from './helpers.mjs';
 
 function ddmmyyyy(iso) {
   const [y, m, d] = iso.split('-');
@@ -11,7 +13,7 @@ function ddmmyyyy(iso) {
 }
 
 test('nhập điểm, điểm vi phạm, lập NCE, huỷ điểm', { timeout: 180_000 }, async () => {
-  const { app, page, errors } = await launchApp();
+  const { app, page, errors, userDataDir } = await launchApp();
   try {
     await bootstrapAndLogin(page);
     const seeded = await seedOperationalTest(page);
@@ -22,33 +24,48 @@ test('nhập điểm, điểm vi phạm, lập NCE, huỷ điểm', { timeout: 1
 
     // Mức 1: Mean 5, SD 0,2 → 5,1 đạt.
     await enterValue(page, today, 1, 5.1);
-    await page.locator('.entry-sheet-message .alert.ok', { hasText: 'Mức 1' }).waitFor();
+    await page.locator('.toast-ok', { hasText: 'Mức 1' }).waitFor();
+    await page.getByRole('button', { name: `Huỷ điểm QC ngày ${ddmmyyyy(today)}` }).first().click();
+    const cleanDialog = page.getByRole('dialog', { name: 'Huỷ điểm QC', exact: true });
+    await cleanDialog.getByText('Chưa đủ căn cứ phân loại', { exact: false }).waitFor();
+    assert.equal(await cleanDialog.locator('#voidKindInput').inputValue(), 'analytical');
+    assert.equal(await cleanDialog.locator('#voidReasonInput').inputValue(), '', 'xem phân loại không tự điền lý do');
+    await cleanDialog.getByRole('button', { name: 'Đóng', exact: true }).click();
     // Mức 2: Mean 15, SD 0,5 → 17,1 là +4,2SD, vi phạm 1-3s.
     await enterValue(page, today, 2, 17.1);
-    await page.locator('.entry-sheet-message .alert.rej', { hasText: '1-3s' }).waitFor();
+    await page.locator('.toast-rej', { hasText: '1-3s' }).waitFor();
 
     const points = await page.evaluate((testId) => Promise.all([1, 2].map((level) => window.qcApi.queryPoints(testId, level))), seeded.testId);
     assert.deepEqual(points.map((list) => list.map((p) => p.val)), [[5.1], [17.1]], 'hai điểm đã lưu vào CSDL');
 
-    // Lập hồ sơ NCE cho mức vi phạm từ danh sách "Sự cố cần xử lý".
+    // Lần chạy bị loại vào hàng chờ, một dòng cho một lần chạy; lập hồ sơ ngay trên dòng đó.
     await openPage(page, 'Khắc phục sự cố');
-    const issue = page.locator('.issue-row.rej', { hasText: 'M2' });
-    await issue.getByRole('button', { name: 'Lập hồ sơ' }).click();
-    await page.locator('.field', { hasText: 'Xử lý tức thời đã thực hiện' }).locator('textarea')
-      .fill('Dừng trả kết quả mức 2, chạy lại QC với lọ mới.');
-    await page.getByRole('button', { name: 'Lập hồ sơ NCE' }).click();
-    const logRow = page.locator('table.action-log-table tbody tr', { hasText: seeded.testName }).first();
-    await logRow.waitFor();
-    assert.match(await logRow.innerText(), /NCE-/);
+    const queueRow = page.locator(`tr.nce-queue-item[aria-label^="Sự cố ${seeded.testName} "]`).first();
+    await queueRow.waitFor();
+    assert.match(await queueRow.innerText(), /M2 \(1-3s\)/);
+    await queueRow.getByRole('button', { name: 'Lập hồ sơ' }).click();
+    const modal = page.locator('.modal[role=dialog]', { hasText: 'Lập hồ sơ NCE' });
+    await modal.locator('#nceCorrection').fill('Dừng trả kết quả mức 2, chạy lại QC với lọ mới.');
+    await modal.getByLabel('Có, đã dừng/giữ').check();
+    await modal.getByRole('button', { name: 'Lập hồ sơ' }).click();
+    const heading = page.locator('.panel-head h2', { hasText: /Hồ sơ NCE-/ });
+    await heading.waitFor();
+    await page.locator('.tag', { hasText: 'Đang xử lý' }).first().waitFor();
 
     // Huỷ điểm mức 1 do nhập sai: điểm được giữ lại với dấu huỷ, không mở NCE.
     await openPage(page, 'Nhập QC & Biểu đồ');
-    await page.getByRole('button', { name: `Hủy điểm QC ngày ${ddmmyyyy(today)}` }).first().click();
-    const dialog = page.locator('.modal[role=dialog]', { hasText: 'Hủy điểm QC' });
+    await page.getByRole('button', { name: `Huỷ điểm QC ngày ${ddmmyyyy(today)}` }).first().click();
+    const dialog = page.locator('.modal[role=dialog]', { hasText: 'Huỷ điểm QC' });
+    const assessment = dialog.getByRole('status');
+    await assessment.getByText(/RE.*Sai số ngẫu nhiên/).waitFor();
+    assert.match(await assessment.innerText(), /Luật làm căn cứ: 1-3s/);
+    await dialog.screenshot({ path: path.join(userDataDir, 'void-westgard.png') });
+    console.log(`Ảnh hộp thoại huỷ có căn cứ Westgard: ${path.join(userDataDir, 'void-westgard.png')}`);
     await dialog.locator('#voidKindInput').selectOption('data-entry');
     await dialog.locator('#voidReasonInput').fill('Gõ nhầm giá trị khi nhập tay.');
-    await dialog.getByRole('button', { name: 'Hủy điểm này' }).click();
-    await page.locator('.alert.warn', { hasText: 'Đã hủy điểm QC' }).waitFor();
+    await dialog.getByRole('button', { name: 'Huỷ điểm này' }).click();
+    await page.locator('.toast-warn', { hasText: 'Đã huỷ điểm QC' }).waitFor();
+    await page.locator('.qc-voided-table').getByRole('cell', { name: ADMIN.name, exact: true }).waitFor();
 
     const voided = await page.evaluate(async (testId) => {
       const active = await window.qcApi.queryPoints(testId, 1);

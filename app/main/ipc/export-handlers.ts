@@ -2,12 +2,13 @@ import { BrowserWindow, dialog } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import ExcelJS from 'exceljs';
 import { type IpcResult } from './shared';
+import { safeSheetName } from '../domain/xlsx-sheet-name';
 
 export interface ExportTableInput { sheetName: string; headers: string[]; rows: (string | number | null)[][] }
 
 export async function buildXlsxBase64(input: ExportTableInput): Promise<string> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet((input.sheetName || 'Sheet1').slice(0, 31));
+  const sheet = workbook.addWorksheet(safeSheetName(input.sheetName));
   const headerRow = sheet.addRow(input.headers);
   headerRow.font = { bold: true };
   headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F4' } }; });

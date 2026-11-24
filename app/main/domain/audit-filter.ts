@@ -8,6 +8,17 @@ export interface ActivityLike {
   type: string; detail: string; target: string; prevHash: string; hash: string;
 }
 
+/** Ngưỡng nhắc quản trị viên lưu trữ nhật ký. Chỉ là cảnh báo: app không tự
+ * xoá dòng nào (trước 2026-11-02 vượt 50.000 dòng thì tự cắt còn 40.000 mà
+ * không xuất CSV). Cắt bảng chỉ qua "Lưu trữ nhật ký cũ", có CSV kèm hash. */
+export const AUDIT_SIZE_WARNING_ROWS = 50_000;
+
+/** Lời nhắc dùng chung cho trang Nhật ký và Cài đặt; `null` khi chưa tới ngưỡng. */
+export function auditSizeWarning(total: number): string | null {
+  if (!(total > AUDIT_SIZE_WARNING_ROWS)) return null;
+  return `Nhật ký đã có ${total.toLocaleString('vi-VN')} dòng, vượt mức khuyến nghị ${AUDIT_SIZE_WARNING_ROWS.toLocaleString('vi-VN')}. Phần mềm không tự xoá nhật ký; hãy dùng "Lưu trữ nhật ký cũ" (xuất CSV trước khi gỡ) để trang Nhật ký và gói đồng bộ không phình mãi.`;
+}
+
 /** Ngày của dòng nhật ký theo GIỜ ĐỊA PHƯƠNG — đúng ngày bảng Nhật ký hiện
  * (`formatAuditDateTimeVN`). Trước đây lấy ngày UTC, nên thao tác lúc
  * 00:00–06:59 sáng giờ Việt Nam bị lọc vào ngày hôm trước. */

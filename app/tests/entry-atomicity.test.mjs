@@ -33,21 +33,22 @@ const point = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09
 
 // Tạo khoảng trống 01,03. Cách COUNT(*) cũ sẽ sinh lại 03 và đụng UNIQUE;
 // cách mới phải lấy MAX suffix + 1 = 04.
-const today = new Date().toISOString().slice(0, 10);
+// Mã hồ sơ dùng ngày địa phương, không lấy ngày UTC lúc đầu ngày ở Việt Nam.
+const today = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const prefix = `NCE-${today.replace(/-/g, '')}`;
 db.prepare('INSERT INTO actions(id,nce_id) VALUES (?,?)').run('gap-01', `${prefix}-01`);
 db.prepare('INSERT INTO actions(id,nce_id) VALUES (?,?)').run('gap-03', `${prefix}-03`);
-const voided = entry.voidPoint({ data: { pointId: point.id, kind: 'analytical' } }, actor);
+const voided = entry.voidPoint({ data: { pointId: point.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor);
 assert.equal(voided.ok, true, JSON.stringify(voided));
 assert.equal(voided.data.nceId, `${prefix}-04`);
 
-// Nếu audit của thao tác hủy lỗi, cả cờ voided và NCE mới đều phải rollback.
+// Nếu audit của thao tác huỷ lỗi, cả cờ voided và NCE mới đều phải rollback.
 const second = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-03', val: 14.2 } }, actor).data;
 const actionCount = db.prepare('SELECT COUNT(*) n FROM actions').get().n;
-db.exec("CREATE TRIGGER fail_void_audit BEFORE INSERT ON activity WHEN NEW.type='Hủy điểm QC' BEGIN SELECT RAISE(FAIL, 'void-audit-failed'); END");
-assert.throws(() => entry.voidPoint({ data: { pointId: second.id, kind: 'analytical' } }, actor), /void-audit-failed/);
+db.exec("CREATE TRIGGER fail_void_audit BEFORE INSERT ON activity WHEN NEW.type='Huỷ điểm QC' BEGIN SELECT RAISE(FAIL, 'void-audit-failed'); END");
+assert.throws(() => entry.voidPoint({ data: { pointId: second.id, kind: 'analytical', reason: 'Máy báo lỗi hút mẫu lúc chạy QC' } }, actor), /void-audit-failed/);
 assert.equal(db.prepare('SELECT voided FROM qc_points WHERE id=?').get(second.id).voided, 0);
-assert.equal(db.prepare('SELECT COUNT(*) n FROM actions').get().n, actionCount, 'hủy lỗi không được tạo NCE dở dang');
+assert.equal(db.prepare('SELECT COUNT(*) n FROM actions').get().n, actionCount, 'huỷ lỗi không được tạo NCE dở dang');
 
 console.log('app entry atomicity + NCE id regression tests passed');
 

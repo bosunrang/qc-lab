@@ -8,9 +8,26 @@ import { withTransaction } from './transaction';
 import { cleanId, uid } from '../domain/text-utils';
 import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 import { quoteIdent } from './sql-ident';
+import { mapLegacyAction, type LegacyActionRow } from '../domain/nce/legacy';
+import { eqaRoundNumber } from '../domain/eqa/evaluation';
+import { eqaNceSourceKey, type EqaSourceKeyInput } from '../domain/eqa/source-key';
 
 /** Phiên bản schema hiện tại = `version` của bước cuối trong `MIGRATIONS`. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 17;
+
+const LIS_IMPORTS_SQL = `
+CREATE TABLE IF NOT EXISTS lis_imports (
+  id TEXT PRIMARY KEY,
+  gateway_origin TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  point_id TEXT NOT NULL REFERENCES qc_points(id) ON DELETE CASCADE,
+  record_json TEXT NOT NULL,
+  imported_at TEXT NOT NULL,
+  imported_by TEXT NOT NULL,
+  acknowledged_at TEXT NOT NULL DEFAULT '',
+  UNIQUE(gateway_origin, message_id)
+);
+`;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -148,6 +165,7 @@ CREATE TABLE IF NOT EXISTS tests (
   reagent TEXT NOT NULL DEFAULT '',
   tea REAL NOT NULL DEFAULT 0,
   tea_source TEXT NOT NULL DEFAULT '',
+  operational_tea_source TEXT NOT NULL DEFAULT '',
   tea_ref_key TEXT NOT NULL DEFAULT '',
   eflm_analyte TEXT NOT NULL DEFAULT '',
   eflm_aps TEXT NOT NULL DEFAULT 'desirable',
@@ -221,7 +239,11 @@ CREATE TABLE IF NOT EXISTS qc_points (
   void_kind TEXT NOT NULL DEFAULT '',
   void_requires_rerun INTEGER NOT NULL DEFAULT 0,
   voided_at TEXT NOT NULL DEFAULT '',
-  voided_by TEXT NOT NULL DEFAULT ''
+  voided_by TEXT NOT NULL DEFAULT '',
+  entry_seq INTEGER NOT NULL DEFAULT 0, -- thứ tự nhập, xem POST_MIGRATION_SQL
+  -- Lần chạy của điểm bị loại lúc huỷ: JSON {rules, rejectedLevels}; rỗng nếu
+  -- không. Giữ bằng chứng run bị loại sau khi huỷ/nhập lại (N4, migration 9).
+  void_rejection_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_level_date ON qc_points(test_id, level, date);
 CREATE INDEX IF NOT EXISTS idx_qc_points_test_run ON qc_points(test_id, run_id);
@@ -231,6 +253,12 @@ CREATE INDEX IF NOT EXISTS idx_qc_points_active ON qc_points(test_id, level, dat
 -- nhiều năm rồi mới lọc: bài đo 60 xét nghiệm × 5 năm (2026-09-26) mở Tổng
 -- quan mất 3,2 s, có chỉ mục này còn 0,6 s.
 CREATE INDEX IF NOT EXISTS idx_qc_points_lot_active ON qc_points(test_id, level, lot, date) WHERE voided = 0;
+-- Danh sách điểm đã huỷ của một xét nghiệm (Nhập QC nạp lại sau mỗi lần ghi):
+-- thiếu chỉ mục này phải đọc mọi điểm của xét nghiệm rồi sắp lại, ~20 ms trên
+-- bộ 5 năm (2026-11-03).
+CREATE INDEX IF NOT EXISTS idx_qc_points_voided ON qc_points(test_id, date, run_id) WHERE voided = 1;
+
+${LIS_IMPORTS_SQL}
 
 CREATE TABLE IF NOT EXISTS sigma_data (
   id TEXT PRIMARY KEY,
@@ -285,6 +313,257 @@ CREATE INDEX IF NOT EXISTS idx_actions_test ON actions(test_id);
 CREATE INDEX IF NOT EXISTS idx_actions_approval ON actions(approval_status);
 CREATE INDEX IF NOT EXISTS idx_actions_due ON actions(due_date);
 
+-- Hồ sơ NCE protocol 4 (docs/NCE-REDESIGN-2026-10-12.md mục 6). Bảng
+-- actions ở trên giữ nguyên để migration đọc và để phục hồi được backup cũ;
+-- mã nghiệp vụ không đọc/ghi nó nữa. test_id cố ý không khoá ngoại, cùng lý
+-- do với actions.test_id: xoá xét nghiệm không được xoá hồ sơ NCE.
+CREATE TABLE IF NOT EXISTS nce_records (
+  eqa_result_id TEXT REFERENCES eqa_results(id),
+  eqa_source_key TEXT NOT NULL DEFAULT '',
+  eqa_snapshot_json TEXT NOT NULL DEFAULT '',
+  id TEXT PRIMARY KEY,
+  nce_id TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'other',
+  phase TEXT NOT NULL DEFAULT 'exam',
+  test_id TEXT,
+  detected_at TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  correction TEXT NOT NULL DEFAULT '',
+  -- NULL = chưa xác định (hồ sơ tự mở khi hủy điểm).
+  hold_results INTEGER,
+  containment_note TEXT NOT NULL DEFAULT '',
+  occurred_note TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  tier TEXT NOT NULL DEFAULT '',
+  tier_reason TEXT NOT NULL DEFAULT '',
+  risk_severity INTEGER NOT NULL DEFAULT 0,
+  risk_probability INTEGER NOT NULL DEFAULT 0,
+  risk_level TEXT NOT NULL DEFAULT '',
+  risk_basis TEXT NOT NULL DEFAULT '',
+  checklist_json TEXT NOT NULL DEFAULT '{}',
+  cause_status TEXT NOT NULL DEFAULT '',
+  cause_category TEXT NOT NULL DEFAULT '',
+  cause_text TEXT NOT NULL DEFAULT '',
+  cause_check_plan TEXT NOT NULL DEFAULT '',
+  effectiveness_criteria TEXT NOT NULL DEFAULT '',
+  effectiveness_review_due TEXT NOT NULL DEFAULT '',
+  owner_user_id TEXT NOT NULL DEFAULT '',
+  due_date TEXT NOT NULL DEFAULT '',
+  reported_by_user_id TEXT NOT NULL DEFAULT '',
+  reported_by_name TEXT NOT NULL DEFAULT '',
+  -- SE/RE của lần chạy khởi đầu: dùng cho phát hiện tái diễn và cổng đổi dải.
+  error_class TEXT NOT NULL DEFAULT '',
+  -- 1 = điểm bị loại của hồ sơ đã được xử lý trọn vẹn (Sigma, D-11). Hồ sơ mới
+  -- đặt khi duyệt đóng; hồ sơ cũ chỉ khi đã duyệt VÀ hiệu quả, giữ đúng cách
+  -- tính trước khi đổi.
+  qc_resolved INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  -- Khoá lạc quan: mọi lệnh sửa gửi kèm phiên bản đang xem.
+  row_version INTEGER NOT NULL DEFAULT 1,
+  protocol_version INTEGER NOT NULL DEFAULT 4,
+  legacy_action_id TEXT,
+  legacy_json TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_nce_records_test ON nce_records(test_id);
+CREATE INDEX IF NOT EXISTS idx_nce_records_status ON nce_records(status);
+CREATE INDEX IF NOT EXISTS idx_nce_records_nce_id ON nce_records(nce_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nce_records_legacy ON nce_records(legacy_action_id) WHERE legacy_action_id IS NOT NULL;
+
+-- Lần chạy gắn với hồ sơ: khởi đầu, bị loại thêm, rerun. Snapshot chụp giá
+-- trị, Mean/SD, z, luật và kết luận của mọi mức tại lúc gắn.
+CREATE TABLE IF NOT EXISTS nce_runs (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  test_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  run_id TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL DEFAULT '{}',
+  attached_at TEXT NOT NULL DEFAULT '',
+  attached_by_user_id TEXT NOT NULL DEFAULT '',
+  attached_by_name TEXT NOT NULL DEFAULT '',
+  UNIQUE (nce_record_id, test_id, date, run_id)
+);
+CREATE INDEX IF NOT EXISTS idx_nce_runs_run ON nce_runs(test_id, date, run_id);
+
+CREATE TABLE IF NOT EXISTS nce_actions (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  kind TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  owner_user_id TEXT NOT NULL DEFAULT '',
+  due_date TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  done_at TEXT NOT NULL DEFAULT '',
+  done_by_user_id TEXT NOT NULL DEFAULT '',
+  done_by_name TEXT NOT NULL DEFAULT '',
+  evidence TEXT NOT NULL DEFAULT '',
+  cancel_reason TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  created_by_user_id TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_nce_actions_record ON nce_actions(nce_record_id);
+
+-- Quyết định append-only: cho chạy lại, ảnh hưởng bệnh nhân, hiệu lực, nộp,
+-- duyệt, trả lại, hủy. Không sửa, không xoá.
+CREATE TABLE IF NOT EXISTS nce_decisions (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  type TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  actor_user_id TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  decided_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_nce_decisions_record ON nce_decisions(nce_record_id);
+
+-- Lịch sử sửa nội dung, append-only: changes_json = { trường: [trước, sau] }.
+CREATE TABLE IF NOT EXISTS nce_revisions (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  actor_user_id TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL DEFAULT '',
+  changes_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_nce_revisions_record ON nce_revisions(nce_record_id);
+
+-- Mốc bắt đầu lại chuỗi Westgard/CUSUM (domain/qc-cuts.ts). run_id NULL là
+-- mốc theo ngày của hồ sơ cũ (giai đoạn mới từ ngày sau date).
+CREATE TABLE IF NOT EXISTS nce_cuts (
+  id TEXT PRIMARY KEY,
+  nce_record_id TEXT NOT NULL REFERENCES nce_records(id),
+  test_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  run_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_nce_cuts_test ON nce_cuts(test_id);
+
+-- Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md). Chương trình của một đơn vị tổ chức;
+-- ánh xạ mã thông số × tên máy của chương trình sang xét nghiệm trong danh
+-- mục, dùng lại cho các kỳ sau.
+CREATE TABLE IF NOT EXISTS eqa_programs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT '',
+  program_code TEXT NOT NULL DEFAULT '',
+  unit_code TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  sample_type TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS eqa_test_map (
+  id TEXT PRIMARY KEY,
+  program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+  pair_key TEXT NOT NULL,
+  code TEXT NOT NULL,
+  instrument_label TEXT NOT NULL,
+  test_id TEXT NOT NULL REFERENCES tests(id),
+  UNIQUE(program_id, pair_key)
+);
+-- Một kỳ (đợt) của chương trình. Nhập lại tăng version; kết quả các phiên
+-- bản cũ vẫn giữ trong eqa_results. Không xoá cứng: huỷ có lý do.
+CREATE TABLE IF NOT EXISTS eqa_rounds (
+  id TEXT PRIMARY KEY,
+  program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+  year INTEGER NOT NULL,
+  round TEXT NOT NULL,
+  round_no INTEGER NOT NULL DEFAULT 0,
+  report_code TEXT NOT NULL DEFAULT '',
+  -- received_date, entered_by: cột của luồng nhập Excel đã bỏ; báo cáo PDF
+  -- không ghi nên bản ghi mới để trống, app không đọc.
+  received_date TEXT NOT NULL DEFAULT '',
+  report_date TEXT NOT NULL DEFAULT '',
+  assigned_level TEXT NOT NULL DEFAULT '',
+  entered_by TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'pdf',
+  source_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  version INTEGER NOT NULL DEFAULT 1,
+  row_version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  UNIQUE(program_id, year, round)
+);
+CREATE TABLE IF NOT EXISTS eqa_results (
+  id TEXT PRIMARY KEY,
+  round_id TEXT NOT NULL REFERENCES eqa_rounds(id),
+  version INTEGER NOT NULL,
+  test_id TEXT NOT NULL REFERENCES tests(id),
+  code TEXT NOT NULL,
+  instrument_label TEXT NOT NULL,
+  level_label TEXT NOT NULL DEFAULT '',
+  sample TEXT NOT NULL DEFAULT '',
+  unit TEXT NOT NULL DEFAULT '',
+  result REAL NOT NULL,
+  assigned REAL NOT NULL,
+  sigma_p REAL NOT NULL,
+  z REAL NOT NULL,
+  z_provider REAL,
+  z_official REAL NOT NULL,
+  pct REAL,
+  class TEXT NOT NULL,
+  provider_check TEXT NOT NULL DEFAULT 'none',
+  -- swapped, tolerance_pct, within_tolerance, run_date, reagent_lot, operator,
+  -- iqc_note, level_label: cột của luồng nhập Excel đã bỏ; báo cáo PDF không
+  -- có các thông tin này nên bản ghi mới để mặc định, app không đọc.
+  swapped INTEGER NOT NULL DEFAULT 0,
+  tolerance_pct REAL,
+  within_tolerance INTEGER,
+  run_date TEXT NOT NULL DEFAULT '',
+  reagent_lot TEXT NOT NULL DEFAULT '',
+  method TEXT NOT NULL DEFAULT '',
+  operator TEXT NOT NULL DEFAULT '',
+  iqc_note TEXT NOT NULL DEFAULT '',
+  peer_group TEXT NOT NULL DEFAULT '',
+  peer_json TEXT NOT NULL DEFAULT '{}',
+  warnings_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS idx_eqa_results_round ON eqa_results(round_id, version);
+CREATE INDEX IF NOT EXISTS idx_eqa_results_test ON eqa_results(test_id);
+-- Lịch đợt ngoại kiểm: ngày nhận mẫu, ngày chạy, hạn nộp kết quả cho trung tâm.
+-- Gắn với đợt có báo cáo (eqa_rounds) theo chương trình + năm + số đợt. Nộp trễ
+-- hạn thì đợt bị tính không đạt, nên app nhắc trước hạn.
+CREATE TABLE IF NOT EXISTS eqa_schedule (
+  id TEXT PRIMARY KEY,
+  program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+  year INTEGER NOT NULL,
+  round TEXT NOT NULL,
+  round_no INTEGER NOT NULL,
+  sample_type TEXT NOT NULL DEFAULT '',
+  receive_date TEXT NOT NULL DEFAULT '',
+  run_date TEXT NOT NULL DEFAULT '',
+  due_date TEXT NOT NULL,
+  assignee TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  submitted_at TEXT NOT NULL DEFAULT '',
+  submitted_by TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_eqa_schedule_due ON eqa_schedule(due_date);
+CREATE INDEX IF NOT EXISTS idx_eqa_schedule_scope ON eqa_schedule(program_id, year, round_no);
+-- Máy chạy mẫu của một đợt trong lịch. Mỗi máy nộp phiếu kết quả riêng (mã đơn
+-- vị riêng), nên "đã nộp" ghi theo từng máy; đợt chỉ tính đã nộp khi đủ máy.
+CREATE TABLE IF NOT EXISTS eqa_schedule_instruments (
+  schedule_id TEXT NOT NULL REFERENCES eqa_schedule(id),
+  instrument_id TEXT NOT NULL REFERENCES instruments(id),
+  submitted_at TEXT NOT NULL DEFAULT '',
+  submitted_by TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY(schedule_id, instrument_id)
+);
+-- Quyết định append-only của kỳ: nhập, bổ sung máy, nhập lại, huỷ.
+CREATE TABLE IF NOT EXISTS eqa_decisions (
+  id TEXT PRIMARY KEY,
+  round_id TEXT NOT NULL REFERENCES eqa_rounds(id),
+  type TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  actor_user_id TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  decided_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_eqa_decisions_round ON eqa_decisions(round_id);
+
 -- Nhật ký audit — append-only, chuỗi hash tamper-evident. Xem
 -- app/main/domain/audit-chain.ts cho thuật toán hash.
 CREATE TABLE IF NOT EXISTS activity (
@@ -316,7 +595,10 @@ CREATE TABLE IF NOT EXISTS users (
   pass_hash TEXT NOT NULL DEFAULT '',
   active INTEGER NOT NULL DEFAULT 1,
   must_change_password INTEGER NOT NULL DEFAULT 0,
-  avatar TEXT NOT NULL DEFAULT ''
+  avatar TEXT NOT NULL DEFAULT '',
+  -- Quyền nghiệp vụ NCE cấp riêng cho KTV (nce.release, nce.approve); quản
+  -- trị viên mặc nhiên có cả hai (domain/nce/permissions.ts).
+  capabilities_json TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS reagent_tests (
@@ -334,6 +616,22 @@ CREATE TABLE IF NOT EXISTS reagent_tests (
   extra_json TEXT NOT NULL DEFAULT '{}',
   rows_json TEXT NOT NULL DEFAULT '[]'
 );
+
+-- Biên bản xem xét dữ liệu QC theo tháng (GV4 mục 2, ISO 15189:2022 7.3.7.2).
+-- Mỗi lần ký một dòng; dòng mới nhất của tháng là kết luận hiện hành. summary_json
+-- là ảnh chụp số liệu lúc ký, vì dữ liệu tháng còn đổi được khi kỳ chưa khoá.
+CREATE TABLE IF NOT EXISTS qc_month_reviews (
+  id TEXT PRIMARY KEY,
+  ym TEXT NOT NULL,
+  conclusion TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  reviewer_user_id TEXT NOT NULL DEFAULT '',
+  reviewer_username TEXT NOT NULL DEFAULT '',
+  reviewer_name TEXT NOT NULL DEFAULT '',
+  reviewed_at TEXT NOT NULL DEFAULT '',
+  summary_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_qc_month_reviews_ym ON qc_month_reviews(ym);
 
 CREATE TABLE IF NOT EXISTS period_locks (
   id TEXT PRIMARY KEY,
@@ -363,6 +661,74 @@ CREATE TABLE IF NOT EXISTS tea_refs (
   clia_absolute_unit TEXT NOT NULL DEFAULT '',
   sources_json TEXT NOT NULL DEFAULT '{}'
 );
+
+-- TEa theo SỐ MỨC QC của analyte, không phụ thuộc xét nghiệm đã được gán
+-- máy hay chưa. Đây là cấu hình người dùng quản lý trực tiếp trong hồ sơ TEa.
+CREATE TABLE IF NOT EXISTS tea_ref_level_defaults (
+  tea_ref_id TEXT NOT NULL REFERENCES tea_refs(id) ON DELETE CASCADE,
+  level INTEGER NOT NULL CHECK (level > 0),
+  tea REAL NOT NULL CHECK (tea > 0),
+  PRIMARY KEY (tea_ref_id, level)
+);
+
+-- Phiên bản hồ sơ TEa của PXN (N8, ISO 15189:2022 8.3): mỗi lần lưu hoặc xoá
+-- giữ nguyên ảnh chụp, vì TEa PXN là căn cứ của cổng lập dải và ngoại kiểm.
+-- action: 'baseline' (hồ sơ có từ trước khi lưu phiên bản), 'save', 'remove'.
+-- Không khoá ngoại tới tea_refs: xoá hồ sơ không được xoá lịch sử của nó;
+-- analyte_id/name giữ để nối lại khi hồ sơ được lập lại.
+CREATE TABLE IF NOT EXISTS tea_ref_versions (
+  id TEXT PRIMARY KEY,
+  tea_ref_id TEXT NOT NULL,
+  analyte_id TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL DEFAULT 'save',
+  saved_at TEXT NOT NULL DEFAULT '',
+  saved_by TEXT NOT NULL DEFAULT '',
+  lab REAL,
+  levels_json TEXT NOT NULL DEFAULT '[]',
+  lab_source TEXT NOT NULL DEFAULT '',
+  lab_prepared_by TEXT NOT NULL DEFAULT '',
+  lab_next_review_date TEXT NOT NULL DEFAULT '',
+  sources_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_tea_ref_versions_ref ON tea_ref_versions(tea_ref_id);
+
+-- Lịch sử cấu hình luật Westgard (GV2): mỗi lần đổi ghi một phiên bản, để
+-- kết luận của các lần chạy đã có không đổi theo cấu hình mới. scope =
+-- 'global' (cấu hình chung) hoặc id xét nghiệm. boundary_entry_seq: số thứ tự
+-- nhập lớn nhất của qc_points lúc đổi; NULL là dòng gốc (cấu hình trước lần
+-- đổi đầu tiên, áp từ đầu). Xem db/rule-config-history.ts.
+CREATE TABLE IF NOT EXISTS rule_config_history (
+  id TEXT PRIMARY KEY,
+  seq INTEGER NOT NULL,
+  scope TEXT NOT NULL,
+  rules_json TEXT NOT NULL DEFAULT '{}',
+  scopes_json TEXT NOT NULL DEFAULT '{}',
+  boundary_entry_seq INTEGER,
+  changed_at TEXT NOT NULL DEFAULT '',
+  changed_by TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_rule_config_history_scope ON rule_config_history(scope, seq);
+`;
+
+/** Chạy SAU mọi bước migration (cột `qc_points.entry_seq` có từ bước 8), mỗi
+ * lần mở và sau mỗi lần phục hồi. `entry_seq` là thứ tự nhập điểm QC trong
+ * toàn CSDL — DB không có giờ nhập, mà ngày của điểm có thể là ngày lùi.
+ * Trigger tự đánh số cho mọi đường chèn (nhập QC, LIS, phục hồi backup cũ
+ * thiếu cột này); dòng chèn kèm sẵn số (phục hồi backup mới) giữ nguyên. */
+const POST_MIGRATION_SQL = `
+CREATE INDEX IF NOT EXISTS idx_qc_points_entry_seq ON qc_points(entry_seq);
+-- Thứ tự nhập theo lần chạy (\`runEntrySeqs\`, chạy ở mọi lần đánh giá sau khi
+-- đã đổi cấu hình luật): chỉ mục phủ đủ cột nên không phải đọc từng dòng của
+-- bảng. Bộ 5 năm (2026-11-03): một lượt nhập điểm 630 → 280 ms. Cố ý để
+-- entry_seq đứng trước date: chỉ mục bắt đầu bằng (test_id, date) làm SQLite
+-- bỏ \`idx_qc_points_lot_active\` cho câu đọc theo lô có ORDER BY date
+-- (test \`qc-points-index\`).
+CREATE INDEX IF NOT EXISTS idx_qc_points_test_run_seq ON qc_points(test_id, entry_seq, date, run_id);
+CREATE TRIGGER IF NOT EXISTS qc_points_entry_seq AFTER INSERT ON qc_points WHEN NEW.entry_seq = 0
+BEGIN
+  UPDATE qc_points SET entry_seq = (SELECT COALESCE(MAX(entry_seq), 0) FROM qc_points) + 1 WHERE rowid = NEW.rowid;
+END;
 `;
 
 function hasColumn(db: SqliteLike, table: string, column: string): boolean {
@@ -417,7 +783,299 @@ const MIGRATIONS: Migration[] = [
       normalizeErrorTypes(db);
     },
   },
+  {
+    version: 3,
+    name: 'Hồ sơ NCE protocol 4: bảng nce_*, quyền NCE, chuyển hồ sơ cũ',
+    up(db) {
+      addColumnIfMissing(db, 'users', 'capabilities_json', "TEXT NOT NULL DEFAULT '[]'");
+      migrateLegacyNce(db);
+    },
+  },
+  {
+    version: 4,
+    name: 'NCE: phạm vi kiểm soát, thông báo và diễn biến thời gian',
+    up(db) {
+      addColumnIfMissing(db, 'nce_records', 'containment_note', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'nce_records', 'occurred_note', "TEXT NOT NULL DEFAULT ''");
+    },
+  },
+  {
+    version: 5,
+    // Các bảng eqa_* do SCHEMA_SQL tạo (CREATE TABLE IF NOT EXISTS); bước này
+    // chỉ đánh dấu phiên bản để bản cũ hơn từ chối mở CSDL có dữ liệu ngoại kiểm.
+    name: 'Ngoại kiểm: bảng eqa_*',
+    up() { /* bảng đã tạo trong SCHEMA_SQL */ },
+  },
+  {
+    version: 6,
+    // `tea_ref_level_defaults` do SCHEMA_SQL tạo; bước này đánh dấu phiên bản
+    // để bản cũ hơn từ chối mở CSDL đã có TEa theo mức QC.
+    name: 'TEa chuẩn hóa theo số mức QC của analyte',
+    up() { /* bảng đã tạo trong SCHEMA_SQL */ },
+  },
+  {
+    version: 7,
+    // Bản phát triển từng có bảng `tea_ref_levels` (TEa theo cặp xét
+    // nghiệm–máy) nhưng chưa phát hành. Bỏ hẳn để chỉ còn một mô hình; CSDL
+    // xem trước đã lên số 7 vẫn mở được vì không hạ số phiên bản.
+    name: 'Bỏ bảng TEa theo xét nghiệm–máy của bản phát triển',
+    up(db) { db.exec('DROP TABLE IF EXISTS tea_ref_levels;'); },
+  },
+  {
+    version: 8,
+    // `rule_config_history` do SCHEMA_SQL tạo. Không nạp sẵn dòng gốc: lần
+    // đổi luật đầu tiên tự ghi cấu hình trước đó làm dòng gốc
+    // (`recordRuleConfigChange`). Điểm đã có lấy thứ tự theo rowid — thứ tự
+    // đúng giữa chúng không quan trọng vì mọi điểm này có trước mọi lần đổi.
+    // Bản cũ hơn — vốn tính lại mọi kết luận theo cấu hình hiện hành — từ chối
+    // mở CSDL từ bước này.
+    name: 'Lịch sử cấu hình luật Westgard (không hồi tố)',
+    up(db) {
+      addColumnIfMissing(db, 'qc_points', 'entry_seq', 'INTEGER NOT NULL DEFAULT 0');
+      db.exec('UPDATE qc_points SET entry_seq = rowid WHERE entry_seq = 0;');
+    },
+  },
+  {
+    version: 9,
+    // Điểm huỷ trước bước này để rỗng: không tính lại kết luận lúc huỷ được,
+    // vì điểm đã ra khỏi chuỗi đánh giá.
+    name: 'Điểm huỷ giữ bằng chứng lần chạy bị loại',
+    up(db) { addColumnIfMissing(db, 'qc_points', 'void_rejection_json', "TEXT NOT NULL DEFAULT ''"); },
+  },
+  {
+    version: 10,
+    name: 'Loại mẫu của chương trình ngoại kiểm',
+    up(db) { addColumnIfMissing(db, 'eqa_programs', 'sample_type', "TEXT NOT NULL DEFAULT ''"); },
+  },
+  {
+    version: 11,
+    // Bản trước lấy "CYCLE 23" làm kỳ của RIQAS, nên sample sau ghi đè sample
+    // trước của cùng máy. Từ bước này mỗi sample là một đợt (N-16). Kỳ cũ chỉ
+    // từng có MỘT sample (mọi phiên bản) thì đổi tên đúng như bộ đọc mới đặt;
+    // kỳ đã lẫn nhiều sample giữ nguyên để không đoán lại lịch sử phiên bản.
+    name: 'Ngoại kiểm RIQAS: mỗi sample là một đợt',
+    up(db) { splitRiqasCycleRounds(db); },
+  },
+  {
+    version: 12,
+    name: 'Nguồn TEa vận hành được chọn riêng cho xét nghiệm',
+    up(db) { addColumnIfMissing(db, 'tests', 'operational_tea_source', "TEXT NOT NULL DEFAULT ''"); },
+  },
+  {
+    version: 13,
+    name: 'Dấu vết nhận bản tin LIS và trạng thái xác nhận Gateway',
+    up(db) { db.exec(LIS_IMPORTS_SQL); },
+  },
+  {
+    version: 14,
+    name: 'Lịch ngoại kiểm riêng theo nhóm máy và loại mẫu',
+    up(db) {
+      if (hasColumn(db, 'eqa_schedule', 'sample_type')) {
+        // Phục hồi backup cũ vào bảng mới: cột chưa có trong backup nhận mặc
+        // định rỗng; chụp lại loại mẫu chương trình của chính bản sao lưu.
+        db.exec(`UPDATE eqa_schedule SET sample_type=COALESCE((SELECT p.sample_type FROM eqa_programs p WHERE p.id=eqa_schedule.program_id),'') WHERE sample_type=''`);
+        return;
+      }
+      // Dựng lại cả bảng cha và bảng con trong cùng transaction, giữ khoá
+      // ngoại bật và toàn bộ mã lịch, dấu nộp, ngày giờ, người thực hiện.
+      db.exec(`
+        CREATE TABLE eqa_schedule_v14 (
+          id TEXT PRIMARY KEY, program_id TEXT NOT NULL REFERENCES eqa_programs(id),
+          year INTEGER NOT NULL, round TEXT NOT NULL, round_no INTEGER NOT NULL,
+          sample_type TEXT NOT NULL DEFAULT '', receive_date TEXT NOT NULL DEFAULT '',
+          run_date TEXT NOT NULL DEFAULT '', due_date TEXT NOT NULL,
+          assignee TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+          submitted_at TEXT NOT NULL DEFAULT '', submitted_by TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT ''
+        );
+        INSERT INTO eqa_schedule_v14
+          (id,program_id,year,round,round_no,sample_type,receive_date,run_date,due_date,assignee,note,submitted_at,submitted_by,created_at,updated_at)
+          SELECT s.id,s.program_id,s.year,s.round,s.round_no,COALESCE(p.sample_type,''),s.receive_date,s.run_date,s.due_date,s.assignee,s.note,s.submitted_at,s.submitted_by,s.created_at,s.updated_at
+          FROM eqa_schedule s LEFT JOIN eqa_programs p ON p.id=s.program_id;
+        CREATE TABLE eqa_schedule_instruments_v14 (
+          schedule_id TEXT NOT NULL REFERENCES eqa_schedule_v14(id),
+          instrument_id TEXT NOT NULL REFERENCES instruments(id),
+          submitted_at TEXT NOT NULL DEFAULT '', submitted_by TEXT NOT NULL DEFAULT '',
+          PRIMARY KEY(schedule_id,instrument_id)
+        );
+        INSERT INTO eqa_schedule_instruments_v14 SELECT schedule_id,instrument_id,submitted_at,submitted_by FROM eqa_schedule_instruments;
+        DROP TABLE eqa_schedule_instruments;
+        DROP TABLE eqa_schedule;
+        ALTER TABLE eqa_schedule_v14 RENAME TO eqa_schedule;
+        ALTER TABLE eqa_schedule_instruments_v14 RENAME TO eqa_schedule_instruments;
+        CREATE INDEX idx_eqa_schedule_due ON eqa_schedule(due_date);
+        CREATE INDEX idx_eqa_schedule_scope ON eqa_schedule(program_id,year,round_no);
+      `);
+    },
+  },
+  {
+    version: 15,
+    name: 'Liên kết hồ sơ khắc phục với kết quả ngoại kiểm và căn cứ đã chụp',
+    up(db) {
+      addColumnIfMissing(db, 'nce_records', 'eqa_result_id', 'TEXT REFERENCES eqa_results(id)');
+      addColumnIfMissing(db, 'nce_records', 'eqa_source_key', "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing(db, 'nce_records', 'eqa_snapshot_json', "TEXT NOT NULL DEFAULT ''");
+      db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_nce_eqa_source ON nce_records(eqa_source_key) WHERE eqa_source_key<>'' AND status<>'cancelled'");
+    },
+  },
+  {
+    version: 16,
+    name: 'Khoá nguồn hồ sơ ngoại kiểm không phụ thuộc tín hiệu chuỗi',
+    up(db) { rekeyEqaNceSources(db); },
+  },
+  {
+    version: 17,
+    name: 'Luật Westgard bật sẵn theo số mức QC, chốt mặc định cũ cho lần chạy đã có',
+    up(db) { freezeLegacyWestgardDefaults(db); },
+  },
 ];
+
+/** Bộ luật bật sẵn TRƯỚC WG-26, giống nhau ở mọi số mức. Ghi nguyên văn, không
+ * dẫn xuất từ registry: bước này phải cho cùng kết quả dù registry đổi tiếp. */
+const LEGACY_WG_RULE_IDS = ['1-2s', '1-3s', '2-2s', 'R4s', '3-1s', '4-1s', '6x', '8x', '9x', '10x', '12x', '7T', '2of3-2s'];
+const LEGACY_WG_DEFAULT_ON = new Set(['1-2s', '1-3s', '2-2s', 'R4s', '4-1s', '6x', '10x']);
+
+/** Hành động của một luật theo cách phân giải cũ: giá trị đã lưu, hoặc mặc định cũ. */
+function legacyWgAction(ruleId: string, value: unknown): string {
+  if (value === 'inactive' || value === 'alert' || value === 'reject') return value;
+  const on = typeof value === 'boolean' ? value : LEGACY_WG_DEFAULT_ON.has(ruleId);
+  return !on ? 'inactive' : ruleId === '1-2s' ? 'alert' : 'reject';
+}
+
+function parseWgRuleMap(json: string | null | undefined): Record<string, unknown> {
+  try {
+    const value = JSON.parse(json || '{}') as unknown;
+    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  } catch { return {}; }
+}
+
+/** WG-26: mặc định của luật Westgard đổi theo số mức QC (bỏ 6x). Lần chạy đã
+ * nhập giữ kết luận cũ (GV2): mọi phiên bản cấu hình chung đã có được ghi đầy
+ * đủ theo mặc định cũ, và thêm một phiên bản mới có hiệu lực cho lần chạy nhập
+ * sau thời điểm nâng cấp. Mục cấu hình chung chỉ trùng mặc định cũ (ví dụ sau
+ * "Khôi phục") được bỏ, để xét nghiệm dùng mặc định mới theo số mức; mục đã
+ * đặt khác mặc định cũ được giữ nguyên. */
+function freezeLegacyWestgardDefaults(db: SqliteLike): void {
+  const full = (map: Record<string, unknown>) => JSON.stringify(Object.fromEntries(LEGACY_WG_RULE_IDS.map((id) => [id, legacyWgAction(id, map[id])])));
+  const history = db.prepare("SELECT id, rules_json FROM rule_config_history WHERE scope='global'").all() as { id: string; rules_json: string }[];
+  for (const row of history) db.prepare('UPDATE rule_config_history SET rules_json=? WHERE id=?').run(full(parseWgRuleMap(row.rules_json)), row.id);
+
+  const metaRow = db.prepare("SELECT value FROM app_meta WHERE key='westgardRules'").get() as { value: string } | undefined;
+  const current = parseWgRuleMap(metaRow?.value);
+  const customized = Object.fromEntries(Object.entries(current)
+    .filter(([id, value]) => LEGACY_WG_RULE_IDS.includes(id) && legacyWgAction(id, value) !== legacyWgAction(id, undefined)));
+
+  const boundary = Number((db.prepare('SELECT COALESCE(MAX(entry_seq),0) AS n FROM qc_points').get() as { n: number }).n);
+  if (boundary > 0) {
+    const nextSeq = () => Number((db.prepare('SELECT COALESCE(MAX(seq),0) AS n FROM rule_config_history').get() as { n: number }).n) + 1;
+    const insert = db.prepare(`INSERT INTO rule_config_history(id,seq,scope,rules_json,scopes_json,boundary_entry_seq,changed_at,changed_by)
+      VALUES (?,?,'global',?,'{}',?,?,?)`);
+    // Chưa có lịch sử cấu hình chung: dòng gốc là cấu hình cũ, áp từ đầu.
+    if (!history.length) insert.run(uid(), nextSeq(), full(current), null, '', '');
+    insert.run(uid(), nextSeq(), JSON.stringify(customized), boundary, new Date().toISOString(), 'Nâng cấp phần mềm (WG-26)');
+  }
+  if (metaRow || Object.keys(customized).length) {
+    db.prepare("INSERT INTO app_meta(key,value) VALUES('westgardRules',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(customized));
+  }
+}
+
+/** Tính lại khoá nguồn từ ảnh chụp đã lưu. Hai hồ sơ trùng khoá mới (đã bị tạo
+ * trùng trước khi sửa) thì giữ khoá cũ cho hồ sơ sau, không tự huỷ hồ sơ nào. */
+function rekeyEqaNceSources(db: SqliteLike): void {
+  const rows = db.prepare("SELECT id, status, eqa_snapshot_json FROM nce_records WHERE eqa_source_key<>'' ORDER BY created_at, id").all() as { id: string; status: string; eqa_snapshot_json: string }[];
+  const taken = new Set<string>();
+  for (const row of rows) {
+    let snapshot: EqaSourceKeyInput;
+    try { snapshot = JSON.parse(row.eqa_snapshot_json) as EqaSourceKeyInput; } catch { continue; }
+    if (!snapshot?.round?.id || !snapshot.result?.test_id) continue;
+    const key = eqaNceSourceKey(snapshot);
+    if (row.status !== 'cancelled') { if (taken.has(key)) continue; taken.add(key); }
+    db.prepare('UPDATE nce_records SET eqa_source_key=? WHERE id=?').run(key, row.id);
+  }
+}
+
+function splitRiqasCycleRounds(db: SqliteLike): void {
+  const rounds = db.prepare(`SELECT r.id, r.program_id, r.year, r.round FROM eqa_rounds r JOIN eqa_programs p ON p.id=r.program_id
+    WHERE p.provider LIKE 'RIQAS%'`).all() as { id: string; program_id: string; year: number; round: string }[];
+  for (const round of rounds) {
+    const cycle = round.round.trim().match(/^CYCLE\s+(\d+)$/i)?.[1];
+    if (!cycle) continue;
+    const samples = db.prepare('SELECT DISTINCT sample FROM eqa_results WHERE round_id=?').all(round.id) as { sample: string }[];
+    const sample = samples.length === 1 ? samples[0].sample.trim() : '';
+    if (!/^\d+$/.test(sample)) continue;
+    const name = `CYCLE ${cycle} SAMPLE ${sample}`;
+    if (db.prepare('SELECT 1 FROM eqa_rounds WHERE program_id=? AND year=? AND round=?').get(round.program_id, round.year, name)) continue;
+    const roundNo = Number(cycle) * 100 + Number(sample);
+    db.prepare('UPDATE eqa_rounds SET round=?, round_no=? WHERE id=?').run(name, roundNo, round.id);
+    db.prepare("UPDATE eqa_results SET sample='' WHERE round_id=?").run(round.id);
+    // Lịch nối với đợt theo (chương trình, năm, số đợt): dòng lịch đang trỏ vào
+    // kỳ cũ ("CYCLE 23" → 23) đi theo đợt vừa đổi số. Dòng lịch ghi sẵn
+    // "CYCLE x SAMPLE y" thì để vòng dưới tính theo chính tên của nó.
+    const schedule = db.prepare('SELECT id, round FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=?')
+      .get(round.program_id, round.year, Number(cycle)) as { id: string; round: string } | undefined;
+    if (schedule && !RIQAS_SAMPLE_ROUND.test(schedule.round)
+      && !db.prepare('SELECT 1 FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=?').get(round.program_id, round.year, roundNo)) {
+      db.prepare('UPDATE eqa_schedule SET round=?, round_no=? WHERE id=?').run(name, roundNo, schedule.id);
+    }
+  }
+  // Số đợt của lịch được tính khi lưu bằng `eqaRoundNumber` bản cũ, nên
+  // "CYCLE 23 SAMPLE 7" từng thành 23; tính lại theo cách đánh số mới. Trùng
+  // với một dòng lịch khác thì giữ nguyên để không vỡ ràng buộc duy nhất.
+  const scheduleRows = db.prepare('SELECT id, program_id, year, round, round_no FROM eqa_schedule').all() as
+    { id: string; program_id: string; year: number; round: string; round_no: number }[];
+  for (const row of scheduleRows) {
+    if (!RIQAS_SAMPLE_ROUND.test(row.round)) continue;
+    const roundNo = eqaRoundNumber(row.round);
+    if (roundNo === row.round_no) continue;
+    if (db.prepare('SELECT 1 FROM eqa_schedule WHERE program_id=? AND year=? AND round_no=?').get(row.program_id, row.year, roundNo)) continue;
+    db.prepare('UPDATE eqa_schedule SET round_no=? WHERE id=?').run(roundNo, row.id);
+  }
+}
+
+const RIQAS_SAMPLE_ROUND = /CYCLE\s*\d+\D+?SAMPLE\s*\d+/i;
+
+/** Chuyển các dòng `actions` sang mô hình NCE mới (kế hoạch mục 6.1). Chạy lại
+ * được: dòng đã chuyển (theo `legacy_action_id`) bị bỏ qua, và lần chạy/mốc
+ * cắt chỉ ghi cho hồ sơ vừa được chèn. Hồ sơ đổi dải QC không chuyển (D-12). */
+function migrateLegacyNce(db: SqliteLike): void {
+  const users = db.prepare("SELECT id, name FROM users WHERE name<>''").all() as { id: string; name: string }[];
+  const counts = new Map<string, number>();
+  for (const user of users) counts.set(user.name.trim(), (counts.get(user.name.trim()) ?? 0) + 1);
+  // Chỉ nhận tên khớp đúng MỘT tài khoản; trùng tên thì không đoán.
+  const ownerIdByName = new Map(users.filter((user) => counts.get(user.name.trim()) === 1).map((user) => [user.name.trim(), user.id]));
+  const rows = db.prepare('SELECT * FROM actions ORDER BY created_at, id').all() as unknown as LegacyActionRow[];
+  for (const row of rows) {
+    const mapped = mapLegacyAction(row, ownerIdByName);
+    if (mapped.skip) continue;
+    const cols = Object.keys(mapped.record);
+    const inserted = db.prepare(`INSERT OR IGNORE INTO nce_records(${cols.map(quoteIdent).join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
+      .run(...cols.map((col) => mapped.record[col]));
+    if (Number(inserted.changes) !== 1) continue;
+    const point = row.point_id
+      ? db.prepare('SELECT test_id, date, run_id FROM qc_points WHERE id=?').get(row.point_id) as { test_id: string; date: string; run_id: string } | undefined
+      : undefined;
+    if (point) {
+      const points = db.prepare('SELECT id, level, lot, val, voided, qc_mean, qc_sd FROM qc_points WHERE test_id=? AND date=? AND run_id=? ORDER BY level')
+        .all(point.test_id, point.date, point.run_id) as { id: string; level: number; lot: string; val: number; voided: number; qc_mean: number | null; qc_sd: number | null }[];
+      // Migration không chạy lại engine: chỉ điểm của hồ sơ mang kết luận đã
+      // lưu; các mức khác ghi "chưa đánh giá".
+      const verdict = row.qc_verdict === 'rej' || row.qc_verdict === 'warn' ? row.qc_verdict : 'none';
+      const snapshot = {
+        legacy: true, testId: point.test_id, date: point.date, runId: point.run_id,
+        points: points.map((p) => ({
+          pointId: p.id, level: p.level, lot: p.lot, voided: !!p.voided, val: p.val, mean: p.qc_mean, sd: p.qc_sd, z: null,
+          verdict: p.id === row.point_id ? verdict : 'none',
+          rules: p.id === row.point_id && row.rule ? row.rule.split(',').map((r) => r.trim()).filter(Boolean) : [],
+        })),
+      };
+      db.prepare(`INSERT OR IGNORE INTO nce_runs(id,nce_record_id,test_id,date,run_id,role,snapshot_json,attached_at,attached_by_user_id,attached_by_name)
+        VALUES (?,?,?,?,?,'trigger',?,?,?,?)`).run(uid(), row.id, point.test_id, point.date, point.run_id, JSON.stringify(snapshot), row.created_at || '', row.created_by_user_id || '', row.created_by_username || '');
+    }
+    if (mapped.cutDate && row.test_id) {
+      db.prepare('INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES (?,?,?,?,NULL)').run(uid(), row.id, row.test_id, mapped.cutDate);
+    }
+  }
+}
 
 /** `actions.error_type` chỉ được chứa MÃ `SE`/`RE`/`''`. Ba nguồn ghi từng
  * dùng ba bộ từ vựng khác nhau — form NCE ghi `SE`, huỷ điểm ghi
@@ -463,6 +1121,7 @@ export function applySchema(db: SqliteLike): void {
         .run(String(migration.version));
     });
   }
+  db.exec(POST_MIGRATION_SQL);
 }
 
 /** Chèn các dòng khởi tạo bắt buộc: dòng `lab` id=1 (hồ sơ phòng xét nghiệm,

@@ -1,0 +1,12 @@
+{
+  "messageId": "QC-20261114-0001",
+  "analyzerId": "MAY01",
+  "testCode": "GLU",
+  "qcLevel": "L1",
+  "qcLotCode": "LOT01",
+  "value": 5.1,
+  "unit": "mmol/L",
+  "measuredAt": "2026-11-14T08:00:00+07:00",
+  "runId": "RUN-20261114-01",
+  "operator": "KTV mẫu"
+}

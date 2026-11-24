@@ -8,10 +8,14 @@ export type TreeVerdict = 'ok' | 'warn' | 'rej' | 'none';
 
 export interface OperationalCatalog {
   isOperationalTest: (summary: TestSummary) => boolean;
+  machineKeyOf: (summary: TestSummary) => string;
   lotGroupOf: (summary: TestSummary) => { key: string; name: string };
 }
 
 export function createOperationalCatalog(tests: Test[], panels: QcPanel[], lots: QcLot[], lotGroups: LotGroup[]): OperationalCatalog {
+  const testsById = new Map(tests.map((test) => [test.id, test]));
+  const machineKeyOf = (summary: TestSummary) => testsById.get(summary.testId)?.instrument_id || summary.instrumentName;
+
   /** Nhóm lô có đang hoạt động không: `active!==false && status!=='stopped' &&
    * status!=='planned'`. Nhóm
    * đã dừng/dự kiến, và nhóm "Đã lưu trữ" (`active=0`, do CHẤP NHẬN chuyển
@@ -39,7 +43,7 @@ export function createOperationalCatalog(tests: Test[], panels: QcPanel[], lots:
    * trong cây điều hướng. Xét nghiệm chưa đủ điều kiện không hiển thị trong
    * cây để tránh trộn với xét nghiệm hợp lệ. */
   const isOperationalTest = (summary: TestSummary): boolean => {
-    const test = tests.find((t) => t.id === summary.testId);
+    const test = testsById.get(summary.testId);
     if (!test || test.active === 0) return false;
     if (!panels.some((p) => p.active !== 0 && p.testIds.includes(summary.testId))) return false;
     return summary.levels.some((l) => !!operationalGroupOfLot(l.qcLotId));
@@ -53,13 +57,14 @@ export function createOperationalCatalog(tests: Test[], panels: QcPanel[], lots:
       const group = operationalGroupOfLot(level.qcLotId);
       if (group) {
         const nos = group.lotIds.map((id) => lots.find((l) => l.id === id)?.lot_no).filter(Boolean);
-        return { key: 'grp:' + group.id, name: group.name || `Nhóm lô ${nos.join('/')}` };
+        // Một nhóm lô có thể xuất hiện dưới nhiều máy, mỗi nhánh mở độc lập.
+        return { key: JSON.stringify([machineKeyOf(summary), group.id]), name: group.name || `Nhóm lô ${nos.join('/')}` };
       }
     }
     return { key: 'none', name: 'Chưa gán nhóm lô' };
   };
 
-  return { isOperationalTest, lotGroupOf };
+  return { isOperationalTest, machineKeyOf, lotGroupOf };
 }
 
 /** Verdict của điểm cuối trên mọi mức, không phải điểm xấu nhất từng có. */

@@ -3,8 +3,15 @@
 // không vẽ lại bảng nhập và biểu đồ của trang.
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
-import { reauthDialog } from '../../state/dialog-store';
+import { AsyncButton } from '../../components/AsyncButton';
+import { FormErrorMessage } from '../../components/FormErrorMessage';
+import { errorDialog, reauthDialog } from '../../state/dialog-store';
+import { formError } from '../../lib/field-error';
+import { useFormError } from '../../lib/useFormError';
 import { useEntryStore } from '../../store/entry-store';
+import { useAuthStore } from '../../store/auth-store';
+import { hasUserCapability, QC_CONFIG_DENIED_MESSAGE } from '../../../main/domain/capabilities';
+import { manualRangeDeviation, MANUAL_MEAN_SHIFT_LIMIT_SD, MANUAL_SD_RATIO_LIMIT } from '../../../main/domain/range-workflow';
 import type { RangeCandidateView } from '../../../shared/qc-api';
 
 export type RangeMode = 'apply' | 'revert';
@@ -23,20 +30,32 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
   const revertManufacturerRange = useEntryStore((s) => s.revertManufacturerRange);
   const proposed = rangeCandidate.proposed;
   const [rangeReason, setRangeReason] = useState('');
-  const [rangeSubmitError, setRangeSubmitError] = useState<string | null>(null);
   const [rangeCauseConfirmed, setRangeCauseConfirmed] = useState(false);
   const [rangeBias, setRangeBias] = useState('');
   const [rangeSelection, setRangeSelection] = useState<'proposed' | 'manual'>('proposed');
   const [rangeManualMean, setRangeManualMean] = useState(() => (proposed ? proposed.mean.toFixed(decimals) : ''));
   const [rangeManualSd, setRangeManualSd] = useState(() => (proposed ? proposed.sd.toFixed(4) : ''));
+  const formIssue = useFormError({
+    'reason-too-short': 'rangeReasonInput',
+    'incomplete-manual-range': ['rangeManualMean', 'rangeManualSd'],
+    'invalid-manual-range': ['rangeManualMean', 'rangeManualSd'],
+    'cause-not-confirmed': 'rangeCauseConfirmed',
+    'bias-out-of-range': 'rangeBias',
+  });
+  // Main chặn bằng `qc.config`; ở đây chỉ khoá nút và nói rõ lý do, người
+  // không có quyền vẫn xem được dải đề xuất.
+  const canConfigure = hasUserCapability(useAuthStore((s) => s.user), 'qc.config');
+  const manualDeviation = mode === 'apply' && rangeSelection === 'manual' && proposed
+    ? manualRangeDeviation({ mean: proposed.mean, sd: proposed.sd }, { mean: Number(rangeManualMean), sd: Number(rangeManualSd) })
+    : null;
 
   async function submitRangeWorkflow() {
     const minimum = mode === 'apply' ? 10 : 5;
-    if (rangeReason.trim().length < minimum) { setRangeSubmitError(`Cần ghi lý do tối thiểu ${minimum} ký tự.`); return; }
+    if (rangeReason.trim().length < minimum) { formIssue.set(formError(`Cần ghi lý do tối thiểu ${minimum} ký tự.`, 'rangeReasonInput')); return; }
     const manual = mode === 'apply' && rangeSelection === 'manual';
     const manualMean = Number(rangeManualMean), manualSd = Number(rangeManualSd);
     if (manual && (!rangeManualMean.trim() || !rangeManualSd.trim() || !Number.isFinite(manualMean) || !Number.isFinite(manualSd) || manualSd <= 0)) {
-      setRangeSubmitError('Nhập Mean hợp lệ và SD lớn hơn 0.'); return;
+      formIssue.set(formError('Nhập Mean hợp lệ và SD lớn hơn 0.', !rangeManualMean.trim() || !Number.isFinite(manualMean) ? 'rangeManualMean' : 'rangeManualSd')); return;
     }
     const verified = await reauthDialog({ title: 'Xác thực thay đổi dải QC', message: 'Nhập lại mật khẩu để xác nhận thay đổi Mean/SD đang dùng.' });
     if (!verified) return;
@@ -44,14 +63,19 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
     const result = mode === 'apply'
       ? await applyLabRange(testId, level, rangeReason.trim(), rangeCauseConfirmed, rangeBias === '' ? undefined : Number(rangeBias), manual ? manualMean : undefined, manual ? manualSd : undefined)
       : await revertManufacturerRange(testId, level, rangeReason.trim());
-    if (!result.ok) { setRangeSubmitError(result.error.message); return; }
+    if (!result.ok) {
+      if (!formIssue.handle(result.error)) await errorDialog(result.error.message, { title: 'Chưa đổi được dải QC' });
+      return;
+    }
     await onApplied();
     onClose();
   }
 
   return (
     <Modal title={mode === 'apply' ? 'Thiết lập dải QC mới' : 'Hoàn dải QC nhà sản xuất'} onClose={onClose} size="lg" className="range-workflow-modal"
-      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><button className={`btn ${mode === 'apply' ? 'teal' : 'danger'}`} disabled={mode === 'apply' && !rangeCandidate.eligible} onClick={submitRangeWorkflow}>{mode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</button></>}>
+      footer={<><button className="btn ghost" onClick={onClose}>Đóng</button><AsyncButton className={`btn ${mode === 'apply' ? 'teal' : 'danger'}`} disabled={!canConfigure || (mode === 'apply' && !rangeCandidate.eligible)} onClick={submitRangeWorkflow}>{mode === 'apply' ? (rangeSelection === 'manual' ? 'Áp dụng dải chỉnh tay' : 'Áp dụng dải đề xuất') : 'Hoàn dải'}</AsyncButton></>}>
+      <div ref={formIssue.rootRef}>
+      <FormErrorMessage rootRef={formIssue.rootRef} error={formIssue.error} id={formIssue.errorId} />
       {mode === 'apply' && proposed && (
         <>
           <p className="range-workflow-meta">{testName || 'Xét nghiệm'} · Mức {rangeCandidate.level}{rangeCandidate.lot ? ` · Lô ${rangeCandidate.lot}` : ''}</p>
@@ -78,27 +102,36 @@ export function RangeWorkflowModal({ mode, testId, testName, rangeCandidate, dec
               </tbody>
             </table></div>
           </section>
-          <div className="range-workflow-note">Mean/SD đề xuất được tính trên toàn bộ tập dữ liệu đang xét; hệ thống không tự loại điểm để làm đẹp SD.</div>
+          <div className="range-workflow-note">Mean/SD đề xuất được tính trên mọi kết quả của các lần chạy không bị loại{proposed.rejected > 0 ? ` (đã bỏ ${proposed.rejected} điểm thuộc lần chạy bị loại)` : ''}; hệ thống không tự loại thêm điểm nào để làm đẹp SD.</div>
           <div className="range-apply-choice" role="group" aria-label="Chọn cách áp dụng dải">
             <span>Giá trị áp dụng</span>
             <div className="dayseg"><button type="button" className={rangeSelection === 'proposed' ? 'on' : ''} aria-pressed={rangeSelection === 'proposed'} onClick={() => setRangeSelection('proposed')}>Dải đề xuất</button><button type="button" className={rangeSelection === 'manual' ? 'on' : ''} aria-pressed={rangeSelection === 'manual'} onClick={() => setRangeSelection('manual')}>Chỉnh thủ công</button></div>
           </div>
           {rangeSelection === 'manual' && <div className="range-manual-fields">
-            <label className="field"><span>Mean chốt <b>*</b></span><input aria-label="Mean chốt thủ công" type="number" inputMode="decimal" step="any" value={rangeManualMean} onChange={(e) => setRangeManualMean(e.target.value)} /></label>
-            <label className="field"><span>SD chốt <b>*</b></span><input aria-label="SD chốt thủ công" type="number" inputMode="decimal" min="0" step="any" value={rangeManualSd} onChange={(e) => setRangeManualSd(e.target.value)} /></label>
+            <label className="field"><span>Mean chốt <b>*</b></span><input id="rangeManualMean" aria-label="Mean chốt thủ công" type="number" inputMode="decimal" step="any" value={rangeManualMean} onChange={(e) => { formIssue.clear(); setRangeManualMean(e.target.value); }} /></label>
+            <label className="field"><span>SD chốt <b>*</b></span><input id="rangeManualSd" aria-label="SD chốt thủ công" type="number" inputMode="decimal" min="0" step="any" value={rangeManualSd} onChange={(e) => { formIssue.clear(); setRangeManualSd(e.target.value); }} /></label>
           </div>}
+          {manualDeviation?.exceeds && (
+            <div className="alert warn">
+              SD chốt gấp {manualDeviation.sdRatio.toFixed(2)} lần SD quan sát, Mean lệch {manualDeviation.meanShiftSd.toFixed(2)} SD so với dải đề xuất
+              (ngưỡng cảnh báo: {MANUAL_SD_RATIO_LIMIT} lần SD, {MANUAL_MEAN_SHIFT_LIMIT_SD} SD). Giới hạn rộng hơn dữ liệu quan sát làm luật Westgard khó phát hiện lỗi;
+              ghi rõ căn cứ trong lý do. Mức lệch này được ghi vào nhật ký.
+            </div>
+          )}
           {rangeCandidate.safety.needed && (
             <div className="alert warn range-safety-gate">
               <b>Cổng an toàn sai số hệ thống {rangeCandidate.safety.nceId ? `· ${rangeCandidate.safety.nceId}` : ''}</b>
-              <label><input type="checkbox" checked={rangeCauseConfirmed} onChange={(e) => setRangeCauseConfirmed(e.target.checked)} /> Đã xác nhận và xử lý nguyên nhân hệ thống</label>
-              <label className="field"><span>Bias đo được (%) · yêu cầu trong ±{rangeCandidate.safety.biasThreshold?.toFixed(2) ?? '—'}% (TEa/4)</span><input type="number" step="any" value={rangeBias} onChange={(e) => setRangeBias(e.target.value)} /></label>
+              <p>TEa/4 là ngưỡng mặc định của phần mềm, không phải yêu cầu bắt buộc của ISO; áp dụng theo SOP của phòng xét nghiệm. Không đổi Mean/SD chỉ để che sai số.</p>
+              <div data-field-container><label><input id="rangeCauseConfirmed" type="checkbox" checked={rangeCauseConfirmed} onChange={(e) => { formIssue.clear(); setRangeCauseConfirmed(e.target.checked); }} /> Đã xác nhận và xử lý nguyên nhân hệ thống</label></div>
+              <label className="field"><span>Bias đo được (%) · yêu cầu trong ±{rangeCandidate.safety.biasThreshold?.toFixed(2) ?? '—'}% (TEa/4)</span><input id="rangeBias" type="number" step="any" value={rangeBias} onChange={(e) => { formIssue.clear(); setRangeBias(e.target.value); }} /></label>
             </div>
           )}
         </>
       )}
       {mode === 'revert' && <p>Khôi phục Mean={rangeCandidate.manufacturer.mean?.toFixed(decimals) ?? '—'} và SD={rangeCandidate.manufacturer.sd?.toFixed(4) ?? '—'} của nhà sản xuất.</p>}
-      <label className="field"><span>Lý do <b>*</b></span><textarea rows={3} value={rangeReason} onChange={(e) => setRangeReason(e.target.value)} placeholder={mode === 'apply' ? 'Tối thiểu 10 ký tự' : 'Tối thiểu 5 ký tự'} /></label>
-      {rangeSubmitError && <div className="alert warn">{rangeSubmitError}</div>}
+      <label className="field"><span>Lý do <b>*</b></span><textarea id="rangeReasonInput" rows={3} value={rangeReason} onChange={(e) => { formIssue.clear(); setRangeReason(e.target.value); }} placeholder={mode === 'apply' ? 'Tối thiểu 10 ký tự' : 'Tối thiểu 5 ký tự'} /></label>
+      {!canConfigure && <div className="alert info">{QC_CONFIG_DENIED_MESSAGE}</div>}
+      </div>
     </Modal>
   );
 }

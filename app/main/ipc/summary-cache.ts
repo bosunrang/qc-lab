@@ -12,15 +12,21 @@ import type { StoreChangedPayload } from './shared';
  */
 
 /** Bảng mà mỗi dòng thuộc đúng một xét nghiệm, và mọi chỗ ghi các bảng này
- * báo kèm đủ `testIds` (đã rà từng lời gọi `notifyChanged`, 2026-09-26). */
-export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points', 'test_levels', 'tests', 'actions']);
+ * báo kèm đủ `testIds` (đã rà từng lời gọi `notifyChanged`, 2026-09-26).
+ * `rule_config_history`: dòng của cấu hình chung được báo KHÔNG kèm `testIds`
+ * nên vẫn bỏ toàn bộ, đúng phạm vi tác động. */
+export const SUMMARY_PER_TEST_TABLES: ReadonlySet<string> = new Set(['qc_points', 'test_levels', 'tests', 'nce_cuts', 'rule_config_history']);
 
 /** Bảng mà phần tóm tắt KHÔNG đọc tới (đã đối chiếu các câu SQL của
  * `listTestSummaries` và các hàm nó gọi). Bảng không có ở đây và cũng không ở
  * nhóm theo xét nghiệm — kể cả bảng mới thêm sau này — làm bỏ toàn bộ. */
 export const SUMMARY_IGNORED_TABLES: ReadonlySet<string> = new Set([
-  'activity', 'users', 'lab', 'tea_refs', 'reagent_tests', 'report_templates',
+  'activity', 'users', 'lab', 'tea_refs', 'tea_ref_level_defaults', 'tea_ref_versions', 'qc_month_reviews', 'reagent_tests', 'report_templates',
   'period_locks', 'sigma_data', 'planned_targets', 'lot_transitions',
+  // Tóm tắt chỉ đọc mốc cắt `nce_cuts`; nội dung hồ sơ NCE không đổi kết quả Westgard.
+  'nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions',
+  // Ngoại kiểm không đổi kết quả Westgard của nội kiểm.
+  'eqa_programs', 'eqa_test_map', 'eqa_rounds', 'eqa_results', 'eqa_decisions', 'eqa_schedule', 'eqa_schedule_instruments',
 ]);
 
 export class TestSummaryCache<T> {

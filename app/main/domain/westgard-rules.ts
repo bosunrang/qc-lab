@@ -3,6 +3,13 @@
 // tiên của primaryErrorRule, họ WG_RUN_RULES) đều tính từ bảng này — thêm
 // một luật chỉ cần thêm một dòng, không sửa nhiều nơi.
 //
+// `defaultOn` — luật bật sẵn khi phòng xét nghiệm chưa cấu hình, THEO SỐ MỨC QC
+// đang vận hành (WG-26, docs/WESTGARD-REVIEW-2026-09-22-lan2.md). Theo bảng đa
+// quy tắc của Westgard: 1–2 mức dùng 1-3s/2-2s/R4s/4-1s/10x, từ 3 mức dùng
+// 1-3s/2of3-2s/R4s/3-1s/12x; 1-2s là cảnh báo ở mọi số mức. 6x, 8x, 9x, 7T
+// không bật sẵn: 6x làm khoảng 10–15% lần chạy ổn định bị loại giả, chỉ dùng
+// khi thiết kế QC theo Sigma thấp (Westgard Sigma Rules).
+//
 // `alert: true` = luật CHỈ cảnh báo, không loại điểm. Theo Westgard chỉ `1-2s`
 // thuộc loại này; `6x`/`7T` là luật loại bỏ. Phòng xét nghiệm
 // muốn hạ một luật xuống cảnh báo thì đặt ghi đè theo TỪNG xét nghiệm ở cột
@@ -28,11 +35,14 @@ export const RULE_SCOPES: RuleScope[] = ['within', 'across', 'both'];
 
 export type WgRunPredicate = readonly [n: number, pos: (z: number) => boolean, neg: (z: number) => boolean];
 
+/** Luật bật sẵn ở số mức nào: mọi số mức, 1–2 mức, từ 3 mức, hoặc không bật sẵn. */
+export type WgDefaultOn = 'always' | 'upTo2' | 'from3' | 'never';
+
 export interface WgRuleDef {
   readonly id: string;
   readonly desc: string;
   readonly err: 'SE' | 'RE' | '';
-  readonly defaultOn: boolean;
+  readonly defaultOn: WgDefaultOn;
   readonly alert: boolean;
   readonly scope: RuleScope;
   readonly scopeMin: number;
@@ -42,26 +52,35 @@ export interface WgRuleDef {
 }
 
 const REGISTRY: WgRuleDef[] = [
-  { id: '1-2s', desc: '1 điểm QC vượt ±2SD', err: '', defaultOn: true, alert: true, scope: 'within', scopeMin: 2, priority: 13, run: null, fix: 'Theo dõi điểm kế tiếp, chưa loại bỏ nếu không kèm luật khác.' },
-  { id: '1-3s', desc: '1 điểm QC vượt ±3SD', err: 'RE', defaultOn: true, alert: false, scope: 'within', scopeMin: 2, priority: 1, run: null, fix: 'Kiểm tra sai số ngẫu nhiên: thao tác, bọt khí, pipet, QC pha/bảo quản.' },
-  { id: '2-2s', desc: '2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 3, run: [2, z => z > 2, z => z < -2], fix: 'Nghi sai số hệ thống: hiệu chuẩn, lô QC/hóa chất, nhiệt độ, máy.' },
-  { id: 'R4s', desc: 'Cùng lần chạy có 1 mức > +2SD và 1 mức < -2SD, chênh nhau trên 4SD', err: 'RE', defaultOn: true, alert: false, scope: 'across', scopeMin: 2, priority: 2, run: null, fix: 'Nghi sai số ngẫu nhiên lớn: hút mẫu, bọt khí, thao tác, điện áp.' },
-  { id: '3-1s', desc: '3 điểm liên tiếp hoặc 3 mức cùng phía vượt ±1SD', err: 'SE', defaultOn: false, alert: false, scope: 'both', scopeMin: 3, priority: 5, run: [3, z => z > 1, z => z < -1], fix: 'Nghi dịch chuyển hệ thống nhỏ; kiểm tra hiệu chuẩn và lô thuốc thử.' },
-  { id: '4-1s', desc: '4 điểm liên tiếp cùng phía vượt ±1SD', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 6, run: [4, z => z > 1, z => z < -1], fix: 'Nghi lệch hệ thống nhẹ, kiểm tra xu hướng và hiệu chuẩn.' },
-  { id: '6x', desc: '6 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 7, run: [6, z => z > 0, z => z < 0], fix: 'Phát hiện dịch chuyển sớm, khá nhạy khi gộp nhiều mức; xem lại Mean, hiệu chuẩn và lô mới. Muốn chỉ cảnh báo thì hạ hành động xuống "Cảnh báo" cho từng xét nghiệm theo SOP.' },
-  { id: '8x', desc: '8 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: false, alert: false, scope: 'both', scopeMin: 2, priority: 8, run: [8, z => z > 0, z => z < 0], fix: 'Biến thể thường dùng khi chạy 2 hoặc 4 mức QC; nghi lệch hệ thống.' },
-  { id: '9x', desc: '9 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: false, alert: false, scope: 'both', scopeMin: 2, priority: 9, run: [9, z => z > 0, z => z < 0], fix: 'Biến thể phù hợp khi chạy 3 mức QC qua nhiều lần chạy.' },
-  { id: '10x', desc: '10 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: true, alert: false, scope: 'both', scopeMin: 2, priority: 10, run: [10, z => z > 0, z => z < 0], fix: 'Nghi dịch chuyển nền, xem lại Mean/SD, lô mới, hiệu chuẩn.' },
-  { id: '12x', desc: '12 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: false, alert: false, scope: 'both', scopeMin: 2, priority: 11, run: [12, z => z > 0, z => z < 0], fix: 'Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.' },
-  { id: '7T', desc: '7 điểm QC liên tiếp tăng dần hoặc giảm dần', err: 'SE', defaultOn: false, alert: false, scope: 'within', scopeMin: 2, priority: 12, run: null, fix: 'Kiểm tra bảo quản QC, thuốc thử, môi trường. Muốn chỉ cảnh báo thì hạ hành động xuống "Cảnh báo" cho từng xét nghiệm theo SOP.' },
-  { id: '2of3-2s', desc: 'Trong 3 kết quả, có ít nhất 2 điểm cùng phía vượt ±2SD', err: 'SE', defaultOn: false, alert: false, scope: 'across', scopeMin: 3, priority: 4, run: null, fix: 'Nghi sai số hệ thống; đặc biệt hữu ích khi chạy 3 mức QC.' },
+  { id: '1-2s', desc: '1 điểm QC vượt ±2SD', err: '', defaultOn: 'always', alert: true, scope: 'within', scopeMin: 2, priority: 13, run: null, fix: 'Theo dõi điểm kế tiếp, chưa loại bỏ nếu không kèm luật khác.' },
+  { id: '1-3s', desc: '1 điểm QC vượt ±3SD', err: 'RE', defaultOn: 'always', alert: false, scope: 'within', scopeMin: 2, priority: 1, run: null, fix: 'Kiểm tra sai số ngẫu nhiên: thao tác, bọt khí, pipet, QC pha/bảo quản.' },
+  { id: '2-2s', desc: '2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD', err: 'SE', defaultOn: 'upTo2', alert: false, scope: 'both', scopeMin: 2, priority: 3, run: [2, z => z > 2, z => z < -2], fix: 'Nghi sai số hệ thống: hiệu chuẩn, lô QC/hoá chất, nhiệt độ, máy.' },
+  { id: 'R4s', desc: 'Cùng lần chạy có 1 mức > +2SD và 1 mức < -2SD, chênh nhau trên 4SD', err: 'RE', defaultOn: 'always', alert: false, scope: 'across', scopeMin: 2, priority: 2, run: null, fix: 'Nghi sai số ngẫu nhiên lớn: hút mẫu, bọt khí, thao tác, điện áp.' },
+  { id: '3-1s', desc: '3 điểm liên tiếp hoặc 3 mức cùng phía vượt ±1SD', err: 'SE', defaultOn: 'from3', alert: false, scope: 'both', scopeMin: 3, priority: 5, run: [3, z => z > 1, z => z < -1], fix: 'Nghi dịch chuyển hệ thống nhỏ; kiểm tra hiệu chuẩn và lô thuốc thử.' },
+  { id: '4-1s', desc: '4 điểm liên tiếp cùng phía vượt ±1SD', err: 'SE', defaultOn: 'upTo2', alert: false, scope: 'both', scopeMin: 2, priority: 6, run: [4, z => z > 1, z => z < -1], fix: 'Nghi lệch hệ thống nhẹ, kiểm tra xu hướng và hiệu chuẩn.' },
+  { id: '6x', desc: '6 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: 'never', alert: false, scope: 'both', scopeMin: 2, priority: 7, run: [6, z => z > 0, z => z < 0], fix: 'Phát hiện dịch chuyển sớm nhưng loại giả nhiều; chỉ bật cho xét nghiệm Sigma dưới 4 theo Westgard Sigma Rules. Xem lại Mean, hiệu chuẩn và lô mới.' },
+  { id: '8x', desc: '8 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: 'never', alert: false, scope: 'both', scopeMin: 2, priority: 8, run: [8, z => z > 0, z => z < 0], fix: 'Biến thể thường dùng khi chạy 2 hoặc 4 mức QC; nghi lệch hệ thống.' },
+  { id: '9x', desc: '9 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: 'never', alert: false, scope: 'both', scopeMin: 2, priority: 9, run: [9, z => z > 0, z => z < 0], fix: 'Biến thể phù hợp khi chạy 3 mức QC qua nhiều lần chạy.' },
+  { id: '10x', desc: '10 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: 'upTo2', alert: false, scope: 'both', scopeMin: 2, priority: 10, run: [10, z => z > 0, z => z < 0], fix: 'Nghi dịch chuyển nền, xem lại Mean/SD, lô mới, hiệu chuẩn.' },
+  { id: '12x', desc: '12 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: 'from3', alert: false, scope: 'both', scopeMin: 2, priority: 11, run: [12, z => z > 0, z => z < 0], fix: 'Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.' },
+  { id: '7T', desc: '7 điểm QC liên tiếp tăng dần hoặc giảm dần', err: 'SE', defaultOn: 'never', alert: false, scope: 'within', scopeMin: 2, priority: 12, run: null, fix: 'Kiểm tra bảo quản QC, thuốc thử, môi trường. Muốn chỉ cảnh báo thì hạ hành động xuống "Cảnh báo" cho từng xét nghiệm theo SOP.' },
+  { id: '2of3-2s', desc: 'Trong 3 kết quả, có ít nhất 2 điểm cùng phía vượt ±2SD', err: 'SE', defaultOn: 'from3', alert: false, scope: 'across', scopeMin: 3, priority: 4, run: null, fix: 'Nghi sai số hệ thống; đặc biệt hữu ích khi chạy 3 mức QC.' },
 ];
 REGISTRY.forEach(r => { if (r.run) Object.freeze(r.run); Object.freeze(r); });
 export const WG_RULE_REGISTRY: readonly WgRuleDef[] = Object.freeze(REGISTRY);
 
 export const WG_RULE_BY_ID: Readonly<Record<string, WgRuleDef>> = Object.freeze(Object.fromEntries(WG_RULE_REGISTRY.map(r => [r.id, r])));
 export const WG_RULES: readonly string[] = WG_RULE_REGISTRY.map(r => r.id);
-export const WG_DEFAULT_ON: ReadonlySet<string> = new Set(WG_RULE_REGISTRY.filter(r => r.defaultOn).map(r => r.id));
+/** Luật có bật sẵn ở `levelCount` mức QC đang vận hành không (WG-26). */
+export function ruleDefaultOn(ruleId: string, levelCount: number): boolean {
+  const when = WG_RULE_BY_ID[ruleId]?.defaultOn;
+  return when === 'always' || (when === 'upTo2' && levelCount < 3) || (when === 'from3' && levelCount >= 3);
+}
+
+/** Bộ luật bật sẵn cho `levelCount` mức QC. */
+export function wgDefaultOn(levelCount: number): ReadonlySet<string> {
+  return new Set(WG_RULE_REGISTRY.filter(r => ruleDefaultOn(r.id, levelCount)).map(r => r.id));
+}
 export const WG_ALERT_RULES: readonly string[] = WG_RULE_REGISTRY.filter(r => r.alert).map(r => r.id);
 export const WG_RULE_DESCRIPTIONS: Readonly<Record<string, string>> = Object.freeze(Object.fromEntries(WG_RULE_REGISTRY.map(r => [r.id, r.desc])));
 export const WG_RUN_RULES: readonly [string, number, (z: number) => boolean, (z: number) => boolean][] =
@@ -80,17 +99,30 @@ export function defaultRuleScope(ruleId: string, levelCount: number): RuleScope 
   return rule.scope;
 }
 
-/** Một số luật chỉ có một kênh đánh giá thật. Không cho UI/backup ghi một
- * scope không có engine tương ứng, vì nó sẽ biến luật đang bật thành im lặng. */
-export function allowedRuleScopes(ruleId: string): readonly RuleScope[] {
-  const scope = WG_RULE_BY_ID[ruleId]?.scope;
-  return scope === 'both' ? RULE_SCOPES : scope ? [scope] : [];
+/** 2of3-2s khai phạm vi chuẩn `across` nhưng engine có cả kênh trong-mức
+ * (`westgardByPoint`: 2 trong 3 điểm liên tiếp của một mức) — đó là phạm vi
+ * mặc định khi xét nghiệm có dưới 3 mức. */
+const WITHIN_CHANNEL_ALSO: ReadonlySet<string> = new Set(['2of3-2s']);
+
+/** Phạm vi mà engine thực sự đánh giá được. Không cho UI/backup ghi một scope
+ * không có engine tương ứng, vì nó sẽ biến luật đang bật thành im lặng.
+ *
+ * `levelCount` (số mức đang vận hành) loại thêm kênh liên mức khi chưa đủ
+ * `scopeMin` mức (N7): 2of3-2s/3-1s liên mức cần ≥ 3 mức, nên ở xét nghiệm 2
+ * mức chọn "chéo mức" là luật không bao giờ chạy. Không truyền thì chỉ xét
+ * kênh engine (đọc dữ liệu đã lưu, khi chưa biết số mức). */
+export function allowedRuleScopes(ruleId: string, levelCount?: number): readonly RuleScope[] {
+  const rule = WG_RULE_BY_ID[ruleId];
+  if (!rule) return [];
+  const within = rule.scope !== 'across' || WITHIN_CHANNEL_ALSO.has(ruleId);
+  const across = rule.scope !== 'within' && (levelCount === undefined || levelCount >= rule.scopeMin);
+  return RULE_SCOPES.filter((scope) => (scope === 'within' ? within : scope === 'across' ? across : within && across));
 }
 
 /** Kiểm tra cả enum và kênh engine hỗ trợ; dùng chung ở lớp đọc backup và IPC
  * để không có đường ghi nào tạo scope "chết". */
-export function isAllowedRuleScope(ruleId: string, scope: unknown): scope is RuleScope {
-  return typeof scope === 'string' && RULE_SCOPES.includes(scope as RuleScope) && allowedRuleScopes(ruleId).includes(scope as RuleScope);
+export function isAllowedRuleScope(ruleId: string, scope: unknown, levelCount?: number): scope is RuleScope {
+  return typeof scope === 'string' && RULE_SCOPES.includes(scope as RuleScope) && allowedRuleScopes(ruleId, levelCount).includes(scope as RuleScope);
 }
 
 export function primaryErrorRule(ruleIds: readonly string[]): string | null {
@@ -146,8 +178,8 @@ export function normalizeErrorClass(value: unknown): 'SE' | 'RE' | '' {
   return '';
 }
 
-/** Quét zs[]: mỗi rule bật, mọi cửa sổ N liên tiếp mà TẤT CẢ thỏa pos (hoặc
- * tất cả thỏa neg) → onHit(mảngChỉSố, tên luật). */
+/** Quét zs[]: mỗi rule bật, mọi cửa sổ N liên tiếp mà TẤT CẢ thoả pos (hoặc
+ * tất cả thoả neg) → onHit(mảngChỉSố, tên luật). */
 export function wgScanRuns(
   zs: readonly number[],
   rules: readonly [string, number, (z: number) => boolean, (z: number) => boolean][],

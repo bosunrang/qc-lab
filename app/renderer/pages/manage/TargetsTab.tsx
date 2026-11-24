@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
-import { confirmDialog, reauthDialog, infoDialog, choiceDialog } from '../../state/dialog-store';
-import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
+import { infoDialog, errorDialog, reauthDialog, choiceDialog } from '../../state/dialog-store';
+import { showToast } from '../../state/toast-store';
+import { normalizeTargetPick, syncTargetRange, targetInputText } from '../../lib/target-range';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 
@@ -106,7 +107,7 @@ export function TargetsTab() {
         meanRaw: read('.tm-mean'), lowRaw: read('.tm-low'), highRaw: read('.tm-high'), sdRaw: read('.tm-sd'),
         k: Number(row.getAttribute('data-k') || 2) || 2,
       });
-      if ('error' in result) { await infoDialog(result.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+      if ('error' in result) { await errorDialog(result.message, { title: 'Chưa lưu được Mean/SD' }); return; }
       picked.push({
         testId, level, mean: result.mean, sd: result.sd, low: result.low, high: result.high, qcLotId: lotId, name: test.name,
         switching: !!(current?.qc_lot_id && lotId && current.qc_lot_id !== lotId),
@@ -122,7 +123,7 @@ export function TargetsTab() {
         message: `${switching.length} dòng (${switching.map((item) => item.name).join(', ')}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:`,
         options: [
           { key: 'planned', label: 'Dự kiến', variant: 'ghost', hint: 'chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.' },
-          { key: 'switch', label: 'Chuyển qua nhóm lô này', variant: 'teal', hint: 'áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).' },
+          { key: 'switch', label: 'Chuyển qua nhóm lô này', variant: 'teal', hint: 'áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khoá).' },
         ],
       });
       if (!choice) return;
@@ -138,10 +139,10 @@ export function TargetsTab() {
         const result = await savePlannedTargets({
           items: switching.map((item) => ({ testId: item.testId, level: item.level, qcLotId: item.qcLotId, mean: item.mean, sd: item.sd, low: item.low, high: item.high })),
         });
-        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD dự kiến' }); return; }
+        if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được Mean/SD dự kiến' }); return; }
         for (const item of picked.filter((row) => !row.switching)) {
           const saved = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
-          if (!saved.ok) { await infoDialog(saved.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+          if (!saved.ok) { await errorDialog(saved.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
         }
         await infoDialog(
           `Đã lưu Mean/SD dự kiến cho ${result.data.saved} xét nghiệm ở mức ${level}. Nhóm lô đang dùng vẫn tiếp tục như bình thường — vào tab "Lô & Nhóm QC" bấm "Kích hoạt" khi bắt đầu dùng nhóm lô này.`,
@@ -151,20 +152,20 @@ export function TargetsTab() {
       }
       for (const item of picked) {
         const result = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
-        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+        if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
       }
       for (const item of unlink) {
         const result = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: '' });
-        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+        if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
       }
       const total = picked.length + unlink.length;
-      await infoDialog(`Đã lưu Mean/SD mức ${level} cho ${total} xét nghiệm.`, { type: 'success', title: 'Đã lưu Mean/SD' });
+      showToast(`Đã lưu Mean/SD mức ${level} cho ${total} xét nghiệm.`);
     } finally {
       setSaving(false);
     }
   }
 
-  /** Nhãn ô chọn Panel QC gồm cả tên máy ("Panel Hóa sinh ·
+  /** Nhãn ô chọn Panel QC gồm cả tên máy ("Panel Hoá sinh ·
    * EasyLyte Expand") — cùng một tên panel có thể tồn tại trên 2 máy. */
   const panelLabel = (item: QcPanel) => {
     const instrument = instruments.find((machine) => machine.id === item.instrument_id);
@@ -173,22 +174,21 @@ export function TargetsTab() {
 
   return (
     <>
-      <div className="rcfg-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." /></div></div>
+      <div className="rcfg-toolbar target-toolbar"><div><h2>Mean/SD theo nhóm lô QC</h2><p>Chọn Panel QC và nhóm lô, phần mềm tự đưa các xét nghiệm trong panel vào bảng Mean/SD.</p></div><div className="rcfg-tools"><input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm..." aria-label="Tìm xét nghiệm trong bảng Mean/SD" /></div></div>
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.</EmptyState> : <>
       <div className="target-selector target-config-selector">
-        <div className="field target-config-panel-field"><label>Panel QC</label><select value={panelId} onChange={(e) => { setPanelId(e.target.value); setLevel(1); }}>{panels.length ? panels.map((item) => <option key={item.id} value={item.id}>{panelLabel(item)}</option>) : <option value="">Chưa có panel</option>}</select></div>
-        <div className="field target-config-group-field"><label>Nhóm lô QC</label><select value={groupId} onChange={(e) => setGroupId(e.target.value)}>{lotGroups.length ? lotGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>) : <option value="">Không tìm thấy nhóm lô QC phù hợp</option>}</select></div>
+        <div className="field target-config-panel-field"><label htmlFor="target-panel">Panel QC</label><select id="target-panel" value={panelId} onChange={(e) => { setPanelId(e.target.value); setLevel(1); }}>{panels.length ? panels.map((item) => <option key={item.id} value={item.id}>{panelLabel(item)}</option>) : <option value="">Chưa có panel</option>}</select></div>
+        <div className="field target-config-group-field"><label htmlFor="target-lot-group">Nhóm lô QC</label><select id="target-lot-group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>{lotGroups.length ? lotGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>) : <option value="">Không tìm thấy nhóm lô QC phù hợp</option>}</select></div>
         {panel && selectedGroup ? <div className="target-summary"><span className="tag ok"><b>{linked}</b> đã gán mức này</span><span className={`tag ${other ? 'warn' : 'none'}`}><b>{other}</b> đang dùng lô khác</span><span className={`tag ${empty ? 'warn' : 'none'}`}><b>{empty}</b> chưa gán lô</span><span className={`tag ${missing ? 'warn' : 'ok'}`}><b>{missing}</b> thiếu Mean/SD</span></div> : null}
       </div>
       {panel && selectedGroup ? <>
-        <div className="target-level-toolbar"><div><b>Mức {level}</b><span className="target-level-lot">{levelLots.map((lot) => lot.lot_no).join(' / ') || '—'}</span></div><div className="dayseg">{groupLevels.map((item) => <button type="button" key={item} className={item === level ? 'on' : ''} onClick={() => setLevel(item)}>Mức {item}</button>)}</div></div>
+        <div className="target-level-toolbar"><div><b>Mức {level}</b><span className="target-level-lot">{levelLots.map((lot) => lot.lot_no).join(' / ') || '—'}</span></div><div className="dayseg" role="group" aria-label="Chọn mức QC">{groupLevels.map((item) => <button type="button" key={item} className={item === level ? 'on' : ''} aria-pressed={item === level} onClick={() => setLevel(item)}>Mức {item}</button>)}</div></div>
           <div className="target-table">
             <div className="target-head"><span>Dùng</span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>
             {rows.map(({ test, target }) => {
               const decimals = test.decimal_places ?? 2;
               const k = target?.range_k && target.range_k > 0 ? target.range_k : 2;
-              const ready = target?.mean != null && target?.sd != null && target.sd > 0;
               const linkedLot = target ? groupLots.find((lot) => lot.id === target.qc_lot_id) : undefined;
               // Ưu tiên lô đang gắn; nếu chưa gắn thì chọn lô còn dùng đầu
               // tiên của mức. Lô `depleted` bị khoá.
@@ -219,12 +219,12 @@ export function TargetsTab() {
               const shownSd = planned ? planned.sd : target?.sd;
               const shownReady = shownMean != null && shownSd != null && shownSd > 0;
               return <div className="target-row" key={`${test.id}:${level}:${lotId}:${planned ? `p${planned.mean}/${planned.sd}` : 'live'}`} data-test={test.id} data-lot={lotId} data-decimals={decimals} data-k={k}>
-              <label className="lot-assay-check" title={locked ? 'Lô QC đã hết dùng' : ''}><input className="tm-use" type="checkbox" disabled={locked} defaultChecked={checked} onChange={(e) => toggleTargetRow(e.currentTarget)} /><span /></label>
+              <label className="lot-assay-check" title={locked ? 'Lô QC đã hết dùng' : ''}><input className="tm-use" type="checkbox" disabled={locked} defaultChecked={checked} onChange={(e) => toggleTargetRow(e.currentTarget)} aria-label={`Dùng Mean/SD mức ${level} cho ${test.name}`} /><span /></label>
               <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
-              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={shownMean ?? ''} placeholder="Trung bình" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
-              <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! - k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! + k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={shownSd ?? ''} placeholder="Độ lệch chuẩn" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownMean, decimals)} placeholder="Trung bình" aria-label={`Trung bình mục tiêu mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! - k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" aria-label={`Giới hạn dưới mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
+              <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! + k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" aria-label={`Giới hạn trên mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
+              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={targetInputText(shownSd, decimals)} placeholder="Độ lệch chuẩn" aria-label={`Độ lệch chuẩn mức ${level} – ${test.name}`} onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
               <span>{status}</span>
             </div>;
             })}

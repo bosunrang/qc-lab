@@ -1,5 +1,5 @@
 // Thao tác riêng của máy chính Electron: phiên đăng nhập trong bộ nhớ, hộp
-// thoại tệp backup, cửa sổ in PDF, Firebase. Phần phụ thuộc Electron (hộp
+// thoại tệp sao lưu, cửa sổ in PDF, Firebase. Phần phụ thuộc Electron (hộp
 // thoại, `BrowserWindow`) được truyền vào qua `DesktopHost`, nên module này
 // không import `electron` và test chạy được bằng Node.
 import type { PublicUser } from '../../shared/qc-api';
@@ -10,7 +10,7 @@ import type { createAuthHandlers } from './auth-handlers';
 import type { BackupHandlers } from './backup-handlers';
 import type { createFirebaseHandlers } from './firebase-handlers';
 import type { ExportTableInput } from './export-handlers';
-import type { HostApiName, OperationTable } from './operations';
+import type { HostApiName, OperationTable, SoftwareApiName } from './operations';
 import { logEvent } from '../logging/log-sink';
 import { buildLogBundle } from '../logging/log-bundle';
 
@@ -21,9 +21,9 @@ export interface DesktopSession {
 
 export interface DesktopHost {
   session: DesktopSession;
-  /** Hộp thoại lưu tệp backup; `null` khi người dùng huỷ. */
+  /** Hộp thoại lưu tệp sao lưu; `null` khi người dùng huỷ. */
   pickBackupSavePath(defaultName: string): Promise<string | null>;
-  /** Hộp thoại chọn tệp backup để phục hồi; `null` khi người dùng huỷ. */
+  /** Hộp thoại chọn tệp sao lưu để phục hồi; `null` khi người dùng huỷ. */
   pickBackupOpenPath(): Promise<string | null>;
   buildXlsxBase64(input: ExportTableInput): Promise<string>;
   printHtmlToPdf(input: { html: string; defaultFileName: string; pageNumbers?: boolean }): Promise<{ ok: true; data: { path: string } } | { ok: false; error: { code: string; message: string } }>;
@@ -46,11 +46,13 @@ export interface DesktopHandlers {
   firebase: ReturnType<typeof createFirebaseHandlers>;
 }
 
-export function desktopActor(user: PublicUser): Actor {
-  return { userId: user.id, username: user.username, name: user.name, role: user.role, clientId: 'app-desktop' };
+/** `clientId` mặc định là máy chính; máy trạm LAN truyền `lan:<ip>` để mọi
+ * dòng nhật ký của phiên đó ghi đúng máy đã thao tác. */
+export function desktopActor(user: PublicUser, clientId = 'app-desktop'): Actor {
+  return { userId: user.id, username: user.username, name: user.name, role: user.role, clientId };
 }
 
-export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): OperationTable<HostApiName> {
+export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): OperationTable<Exclude<HostApiName, SoftwareApiName>> {
   const { db, auth, backup, firebase } = h;
   const { session } = host;
   // Tệp được chọn để phục hồi giữ ở đây sau bước kiểm tra, nên bước phục hồi
@@ -128,15 +130,24 @@ export function createDesktopOperations(h: DesktopHandlers, host: DesktopHost): 
         return { ok: true as const, data: { ...verified.data, fileName: host.basename(filePath) } };
       },
     },
-    // Không nhận tham số: chỉ phục hồi đúng tệp main vừa kiểm tra.
+    // Chỉ phục hồi đúng tệp main vừa kiểm tra; renderer chỉ chọn có giữ tài khoản hay không.
     importBackup: {
       channel: 'backup:import', lan: false,
-      run: (ctx) => {
+      run: (ctx, input) => {
         const actor = ctx.actor();
-        if (!pendingRestorePath) return { ok: false as const, error: { code: 'no-file', message: 'Chưa chọn tệp backup để phục hồi.' } };
+        if (!pendingRestorePath) return { ok: false as const, error: { code: 'no-file', message: 'Chưa chọn tệp sao lưu để phục hồi.' } };
         const filePath = pendingRestorePath;
         pendingRestorePath = null;
-        return backup.importBackupFrom(filePath, actor);
+        const keepAccounts = !!(input && typeof input === 'object' && (input as { keepAccounts?: unknown }).keepAccounts === true);
+        const result = backup.importBackupFrom(filePath, { keepAccounts }, actor);
+        // Phục hồi thay cả bảng users: tài khoản đang đăng nhập có thể không còn
+        // trong dữ liệu mới. Kết thúc phiên ngay để renderer về màn đăng nhập
+        // (hoặc khởi tạo quản trị) thay vì mọi lời gọi sau đó báo "Chưa đăng nhập".
+        if (!result.ok) return result;
+        const still = auth.getUser(actor.userId);
+        if (still && still.active) return result;
+        session.set(null);
+        return { ok: true as const, data: { ...result.data, signedOut: true } };
       },
     },
     backupStatus: { channel: 'backup:status', lan: true, run: () => backup.backupStatus() },

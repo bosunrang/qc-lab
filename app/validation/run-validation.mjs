@@ -45,6 +45,8 @@ function createCaseTest(ctx, item) {
   const { config, westgard } = ctx;
   const test = must(config.saveTest({ data: {
     name: `${item.id} ${item.title}`.slice(0, 120), instrumentId: ctx.instrumentId, unit: 'mmol/L', decimalPlaces: 3,
+    // Ca TEa theo CLIA gắn xét nghiệm với đúng dòng danh mục, như khi chọn ở Cấu hình chung.
+    ...(item.sigma?.teaRefKey ? { teaRefKey: item.sigma.teaRefKey } : {}),
     ...(item.cusum ? { cusumOn: true, cusumK: item.cusum.k, cusumH: item.cusum.h } : {}),
   } }, ADMIN), `${item.id} tạo xét nghiệm`);
   const lots = {};
@@ -65,18 +67,22 @@ function createCaseTest(ctx, item) {
 
 /** Nhập các lần chạy qua `addPoint`; các bước khác (đổi Mean/SD, NCE) chen giữa. */
 function enterRuns(ctx, item, created, inputs) {
-  const { config, entry, nce } = ctx;
+  const { config, entry, nce, westgard } = ctx;
   const runDates = [];
   for (const step of item.runs || []) {
+    if (step.setRule) {
+      must(westgard.saveRuleAction(created.testId, step.setRule.rule, step.setRule.action, ADMIN), `${item.id} đổi luật ${step.setRule.rule}`);
+      continue;
+    }
     if (step.setTarget) {
       const { level, mean, sd } = step.setTarget;
       must(config.saveTestLevel({ testId: created.testId, data: { level, mean, sd, qcLotId: created.lots[level].id } }, ADMIN), `${item.id} đổi Mean/SD`);
       created.targets[level] = { mean, sd };
       continue;
     }
-    if (step.nceEffective) {
-      const date = runDates[step.nceEffective.completedRun - 1];
-      closeNceEffective(nce, created.testId, date, `${item.id}-M1`);
+    if (step.nceRelease) {
+      const date = runDates[step.nceRelease.verifyRun - 1];
+      releaseNceAt(nce, created.testId, date, `${date}-1`);
       continue;
     }
     const runIndex = runDates.length;
@@ -95,20 +101,24 @@ function enterRuns(ctx, item, created, inputs) {
   return runDates;
 }
 
-/** NCE đầy đủ tới "khắc phục hiệu quả, đã duyệt" — đúng cổng mà trang Khắc phục sự cố đi qua. */
-function closeNceEffective(nce, testId, date, lot) {
-  const record = must(nce.create({ data: { testId, level: 1, lot, date, rule: 'CUSUM', errorType: 'SE', correction: 'Tạm dừng trả kết quả, kiểm tra hiệu chuẩn và chạy lại QC', dueDate: date } }, ADMIN), 'NCE tạo');
-  must(nce.setActionCompletedDate({ data: { id: record.id, actionCompletedDate: date } }, ADMIN), 'NCE ngày hoàn thành');
-  must(nce.saveProtocol({ data: { id: record.id, dueDate: date, protocol: {
-    eventSource: 'iqc', processPhase: 'exam', owner: 'Người thẩm định', containmentStatus: 'none', correction: 'Tạm dừng trả kết quả, kiểm tra hiệu chuẩn và chạy lại QC',
-    riskSeverity: 2, riskOccurrence: 2, riskDetectability: 2, riskLevel: 'low', riskBasis: 'Ca thẩm định',
-    qcMaterialStatus: 'ok', instrumentStatus: 'ok', reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
-    causeCategory: 'calibration', cause: 'Hiệu chuẩn lệch', action: 'Hiệu chuẩn lại và xác nhận bằng QC',
-    patientImpact: 'none', effectivenessStatus: 'pending',
-    residualSeverity: 1, residualOccurrence: 1, residualDetectability: 1, residualRiskLevel: 'low', residualRiskBasis: 'Theo dõi sau hiệu chuẩn',
-  } } }, ADMIN), 'NCE hồ sơ');
-  must(nce.markEffectiveness({ data: { id: record.id, status: 'effective', residualRisk: 'Rủi ro còn lại thấp', note: 'QC ổn định sau hiệu chuẩn' } }, ADMIN), 'NCE hiệu quả');
-  must(nce.approve({ data: { id: record.id } }, REVIEWER), 'NCE duyệt');
+/** Hồ sơ NCE cho phép hoạt động trở lại bằng một lần chạy QC xác minh — đúng
+ * cổng mà trang Khắc phục sự cố đi qua. Mốc bắt đầu lại chuỗi Westgard/CUSUM
+ * là chính lần chạy đó (D-03, docs/NCE-REDESIGN-2026-10-12.md). Nguồn
+ * "hiệu chuẩn" vì tín hiệu CUSUM không loại lần chạy nào để làm lần khởi đầu. */
+function releaseNceAt(nce, testId, date, runId) {
+  const record = must(nce.createNce({ data: {
+    source: 'calibration', testId, description: 'Tín hiệu CUSUM, nghi lệch hiệu chuẩn', correction: 'Tạm dừng trả kết quả, hiệu chuẩn lại',
+    holdResults: true, detectedAt: date, ownerUserId: ADMIN.userId,
+  } }, ADMIN), 'NCE tạo');
+  const impact = must(nce.recordNcePatientImpact({ data: { id: record.record.id, expectedVersion: record.record.row_version, impact: {
+    outcome: 'not_reported', description: 'Đã giữ toàn bộ kết quả trong khoảng nghi ngờ',
+  } } }, ADMIN), 'NCE ảnh hưởng bệnh nhân');
+  const checked = must(nce.updateNce({ data: { id: record.record.id, expectedVersion: impact.record.row_version, patch: {
+    checklist: Object.fromEntries(['calibrator', 'calibration', 'iqcHistory'].map((key) => [key, { status: 'ok', note: '' }])),
+  } } }, ADMIN), 'NCE kiểm tra nhanh');
+  must(nce.releaseNce({ data: { id: record.record.id, expectedVersion: checked.record.row_version, release: {
+    reason: 'Hiệu chuẩn lại, QC xác minh đạt', rerun: { date, runId },
+  } } }, ADMIN), 'NCE cho chạy lại');
 }
 
 /** Điểm của mọi mức theo `lần chạy/mức`, đọc như trang Phân tích Westgard. */
@@ -177,10 +187,15 @@ function sigmaChecks(ctx, item, created) {
     }));
     if (!levels.length) throw new Error('Không có nhóm IQC nào cho kỳ ' + period);
   } else {
-    // TEa ghi ngay ở mức (ưu tiên cao nhất), để kết quả không phụ thuộc danh mục TEa.
-    levels = item.sigma.levels.map((level) => ({ ...level, tea: item.sigma.tea }));
+    // TEa % ghi ngay ở mức (ưu tiên cao nhất), để kết quả không phụ thuộc danh
+    // mục TEa. Ca CLIA không ghi TEa: main tự giải theo Mean của từng mức như
+    // khi trang Six Sigma tạo kỳ mới. Mean mục tiêu gửi kèm như trang Sigma.
+    levels = item.sigma.levels.map((level) => ({
+      ...level, targetMean: created.targets[level.level].mean, ...(item.sigma.tea != null ? { tea: item.sigma.tea } : {}),
+    }));
   }
-  must(ctx.sigma.savePeriod({ testId: created.testId, period, tea: cohort ? cohort.tea : item.sigma.tea, levels }, ADMIN), `${item.id} lưu kỳ Sigma`);
+  const teaSource = cohort ? undefined : item.sigma.teaSource;
+  must(ctx.sigma.savePeriod({ testId: created.testId, period, tea: cohort ? cohort.tea : item.sigma.tea, ...(teaSource ? { teaSource } : {}), levels }, ADMIN), `${item.id} lưu kỳ Sigma`);
   // Trang Six Sigma nạp lại kỳ bằng `listSigmaPeriods` sau khi lưu.
   const view = ctx.sigma.listPeriods(created.testId).find((row) => row.period === period);
   const checks = [];
@@ -194,6 +209,7 @@ function sigmaChecks(ctx, item, created) {
     const add = (label, expected, actual, pass) => checks.push({ check: `Mức ${level}: ${label}`, expected, actual, pass });
     if ('cohortN' in want) add('Số điểm IQC của nhóm', fmt(want.cohortN), fmt(got?.cohortN), got?.cohortN === want.cohortN);
     if ('cohortStatus' in want) add('Trạng thái nhóm IQC', want.cohortStatus, got?.cohortStatus || '—', got?.cohortStatus === want.cohortStatus);
+    if ('tea' in want) add('TEa% của mức', fmt(want.tea), fmt(got?.tea), sameNumber(got?.tea, want.tea));
     if ('cv' in want) add('CV% dùng cho Sigma', fmt(want.cv), fmt(got?.cv), sameNumber(got?.cv, want.cv));
     if ('sigma' in want) add('Sigma', fmt(want.sigma), fmt(sigma), sameNumber(sigma, want.sigma));
     if ('dpmo' in want) {
@@ -201,8 +217,11 @@ function sigmaChecks(ctx, item, created) {
       add('DPMO', fmt(want.dpmo), fmt(round(dpmo, 3)), dpmo != null && Math.abs(dpmo - want.dpmo) <= Math.max(0.5, want.dpmo * 1e-3));
     }
     if ('biasEqa' in want) add('Bias% dùng cho Sigma', fmt(want.biasEqa), fmt(got?.biasEqa), sameNumber(got?.biasEqa, want.biasEqa));
-    if ('biasMean' in want) add('Bias% trung bình có dấu (tham khảo)', fmt(want.biasMean), fmt(got?.biasMean), sameNumber(got?.biasMean, want.biasMean));
+    if ('biasRms' in want) add('Bias% RMS (chỉ cho MU)', fmt(want.biasRms), fmt(got?.biasRms), sameNumber(got?.biasRms, want.biasRms));
+    if ('biasMean' in want) add('Bias% trung bình có dấu', fmt(want.biasMean), fmt(got?.biasMean), sameNumber(got?.biasMean, want.biasMean));
     if ('mixedSigns' in want) add('Cảnh báo vòng EQA trái dấu', want.mixedSigns ? 'Có' : 'Không', got?.mixedSigns ? 'Có' : 'Không', got?.mixedSigns === want.mixedSigns);
+    if (want.noTable) add(`Bảng gợi ý thiết kế QC${designSource}`, 'Không có (Westgard chỉ công bố bảng 2 và 3 mức)', design ? `Có (bậc ${design.tier})` : 'Không có', design === null);
+    if (want.mu) checks.push(...muChecks(level, want.mu, got?.mu));
     if ('tier' in want) add(`Bậc Sigma${designSource}`, want.tier, design?.tier ?? '—', design?.tier === want.tier);
     if ('capable' in want) add(`Đủ năng lực${designSource}`, want.capable ? 'Có' : 'Không', design ? (design.capable ? 'Có' : 'Không') : '—', design?.capable === want.capable);
     if ('rules' in want) add(`Bộ luật gợi ý${designSource}`, fmt(want.rules), fmt(design?.rules ?? []), sameSet(design?.rules ?? [], want.rules));
@@ -212,6 +231,22 @@ function sigmaChecks(ctx, item, created) {
     const wantShown = want.designShown === true;
     add('Trang Sigma hiện gợi ý thiết kế', wantShown ? 'Có' : 'Không (CV nhập tay, chưa từ nhóm IQC đã rà soát)', shown ? 'Có' : 'Không', shown === wantShown);
   }
+  return checks;
+}
+
+/** Ngân sách MU mà hộp thoại MU của trang Six Sigma hiển thị cho một mức. */
+function muChecks(level, want, got) {
+  const checks = [];
+  const add = (label, expected, actual, pass) => checks.push({ check: `Mức ${level}: MU ${label}`, expected, actual, pass });
+  const yesNo = (value) => (value == null ? 'Chưa kết luận' : value ? 'Có' : 'Không');
+  for (const [key, label] of [['uRw', 'u(Rw)%'], ['uBias', 'u(bias)%'], ['uCal', 'u(cal)%'], ['uc', 'u_c%'], ['U', 'U% (k = 2)'], ['absoluteU', 'U theo đơn vị'], ['teaRatio', 'U / TEa']]) {
+    if (!(key in want)) continue;
+    const value = got?.[key] ?? null;
+    add(label, fmt(want[key]), fmt(value), sameNumber(value, want[key]));
+  }
+  if ('complete' in want) add('ngân sách đủ thành phần', want.complete ? 'Có' : 'Không', got ? (got.complete ? 'Có' : 'Không') : '—', got?.complete === want.complete);
+  if ('missing' in want) add('thành phần còn thiếu', fmt(want.missing), fmt(got?.missing ?? []), sameSet(got?.missing ?? [], want.missing));
+  if ('withinTea' in want) add('U ≤ TEa', yesNo(want.withinTea), got ? yesNo(got.withinTea) : '—', (got?.withinTea ?? null) === want.withinTea);
   return checks;
 }
 
@@ -246,12 +281,26 @@ function cusumChecks(item, analyses) {
 
 function describeInput(item) {
   if (item.cohort) return `30 điểm IQC mức 1 (Mean/SD 100/2), kỳ ${item.cohort.period}; TEa ${fmt(item.cohort.tea)}%, Bias ${fmt(item.cohort.biasEqa)}%; CV lấy từ nhóm IQC, người phụ trách xác nhận đã rà soát`;
-  if (item.sigma) return `TEa ${fmt(item.sigma.tea)}%; ` + item.sigma.levels.map((l) => `mức ${l.level}: CV ${fmt(l.cv)}%` + (l.biasEqa != null ? `, Bias ${fmt(l.biasEqa)}%` : l.eqaRounds ? `, EQA ${l.eqaRounds.map((r) => `${fmt(r.lab)}/${fmt(r.target)}`).join(', ')}` : ', chưa có Bias')).join('; ');
+  if (item.sigma) {
+    const { clia } = item.sigma;
+    const tea = clia
+      ? `TEa theo CLIA ${clia.percent != null ? `lớn hơn giữa ±${fmt(clia.percent)}% và ` : ''}±${fmt(clia.absolute)} ${clia.unit}`
+      : `TEa ${fmt(item.sigma.tea)}%`;
+    const mean = (level) => item.levels.find((l) => l.level === level)?.mean;
+    const mu = (l) => [
+      l.uCref != null ? `u(Cref) ${fmt(l.uCref)}%` : '', l.uCal != null ? `u(cal) ${fmt(l.uCal)}%` : '',
+      l.muBiasMode === 'exclude' ? 'MU không cộng u(bias)' : '',
+    ].filter(Boolean).map((text) => `, ${text}`).join('');
+    return `${tea}; ` + item.sigma.levels.map((l) => `mức ${l.level} (Mean ${fmt(mean(l.level))}): CV ${fmt(l.cv)}%`
+      + (l.biasEqa != null ? `, Bias ${fmt(l.biasEqa)}%` : l.eqaRounds ? `, EQA ${l.eqaRounds.map((r) => `${fmt(r.lab)}/${fmt(r.target)}`).join(', ')}` : ', chưa có Bias')
+      + mu(l)).join('; ') + `; ${item.levels.length} mức QC`;
+  }
   if ('bias' in item && 'cv' in item) return `TEa ${fmt(item.tea)}%, Bias ${fmt(item.bias)}%, CV ${fmt(item.cv)}%`;
   const levels = item.levels.map((l) => `M${l.level} ${fmt(l.mean)}/${fmt(l.sd)}`).join(', ');
   const steps = (item.runs || []).map((step) => {
     if (step.setTarget) return `[đổi Mean/SD M${step.setTarget.level} → ${fmt(step.setTarget.mean)}/${fmt(step.setTarget.sd)}]`;
-    if (step.nceEffective) return '[NCE khắc phục hiệu quả]';
+    if (step.nceRelease) return `[NCE cho chạy lại bằng lần ${step.nceRelease.verifyRun}]`;
+    if (step.setRule) return `[đổi luật ${step.setRule.rule} → ${step.setRule.action}]`;
     if (step.z) return Object.values(step.z).map((z) => (z > 0 ? '+' : '') + fmt(z)).join('|');
     return Object.values(step.val).map(fmt).join('|');
   });
@@ -275,6 +324,8 @@ export function runValidation() {
   const results = [];
   const inputs = [];
   try {
+    // Người phụ trách hồ sơ NCE phải là một tài khoản có thật trong CSDL.
+    db.prepare("INSERT INTO users(id,username,name,role,active) VALUES (?,?,?,'admin',1)").run(ADMIN.userId, ADMIN.username, ADMIN.name);
     ctx.instrumentId = must(ctx.config.saveInstrument({ data: { name: 'Máy thẩm định' } }, ADMIN), 'máy').id;
     for (const group of ALL_GROUPS) {
       for (const item of group.cases) {

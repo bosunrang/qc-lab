@@ -3,10 +3,14 @@
 // ra trong trình xử lý sự kiện (`onClick`…) — hai loại mà `PageErrorBoundary`
 // không bắt được. Trước đây các lỗi này chỉ nằm trong console: nút bấm im
 // lặng, người dùng không biết thao tác đã không xong.
-import { dialogStore, infoDialog } from '../state/dialog-store';
+import { dialogStore, errorDialog } from '../state/dialog-store';
+import { announceSessionEnded } from './session-events';
 
 /** Lỗi trình duyệt tự phát, vô hại, không phải lỗi của thao tác. */
 const BENIGN = [/ResizeObserver loop/i];
+/** Main từ chối vì phiên không còn (tài khoản bị xoá, khoá, hoặc vừa phục hồi
+ * dữ liệu không có tài khoản này) — `NotSignedInError` qua IPC. */
+const SIGNED_OUT = /Chưa đăng nhập\./;
 
 export function unhandledMessage(reason: unknown): string {
   if (reason instanceof Error) return reason.message || reason.name;
@@ -32,13 +36,16 @@ export interface UnhandledReporterDeps {
   log: (...args: unknown[]) => void;
   /** Ghi vào tệp log của máy chính. */
   report?: (reason: unknown) => void;
+  /** Phiên đã kết thúc: về màn đăng nhập thay vì báo lỗi thao tác. */
+  sessionEnded?: () => void;
 }
 
 const defaultDeps: UnhandledReporterDeps = {
   dialogOpen: () => dialogStore.getState().dialog.kind !== 'none',
-  show: (message) => { void infoDialog(message, { title: 'Thao tác không hoàn tất', type: 'warn' }); },
+  show: (message) => { void errorDialog(message, { title: 'Thao tác không hoàn tất' }); },
   log: (...args) => console.error(...args),
   report: sendClientError,
+  sessionEnded: announceSessionEnded,
 };
 
 /** Ghi console và, nếu không có hộp thoại nào đang mở, hiện một thông báo.
@@ -47,6 +54,7 @@ const defaultDeps: UnhandledReporterDeps = {
 export function reportUnhandled(reason: unknown, deps: UnhandledReporterDeps = defaultDeps): void {
   const message = unhandledMessage(reason);
   if (BENIGN.some((pattern) => pattern.test(message))) return;
+  if (SIGNED_OUT.test(message) && deps.sessionEnded) { deps.sessionEnded(); return; }
   deps.log('Lỗi không được xử lý', reason);
   deps.report?.(reason);
   if (deps.dialogOpen()) return;

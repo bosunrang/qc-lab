@@ -6,17 +6,21 @@ import { useAuditStore, type ChainVerifyView } from '../store/audit-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { Modal } from '../components/Modal';
 import { DateField } from '../components/DateField';
-import { confirmDialog, reauthDialog, infoDialog } from '../state/dialog-store';
+import { confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
 import { roleLabel } from '../lib/permissions';
 import { formatAuditDateTimeVN, formatAuditDetailVN } from '../../main/domain/audit-format';
+import { auditSizeWarning } from '../../main/domain/audit-filter';
 import { downloadCsv } from '../lib/export';
+import { AsyncButton } from '../components/AsyncButton';
 
 const AUTO_VERIFY_MAX = 5000;
 
 export function AuditPage() {
-  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow, archive } = useAuditStore(useShallow((s) => ({ result: s.result, error: s.error, query: s.query, from: s.from, to: s.to, pageSize: s.pageSize, load: s.load, setQuery: s.setQuery, setRange: s.setRange, setPage: s.setPage, setPageSize: s.setPageSize, clearFilters: s.clearFilters, exportCsv: s.exportCsv, verifyChainNow: s.verifyChainNow, archive: s.archive })));
+  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow } = useAuditStore(useShallow((s) => ({ result: s.result, error: s.error, query: s.query, from: s.from, to: s.to, pageSize: s.pageSize, load: s.load, setQuery: s.setQuery, setRange: s.setRange, setPage: s.setPage, setPageSize: s.setPageSize, clearFilters: s.clearFilters, exportCsv: s.exportCsv, verifyChainNow: s.verifyChainNow })));
   const [archiving, setArchiving] = useState(false);
   const [chain, setChain] = useState<ChainVerifyView | null>(null);
   const chainEpoch = useRef(0);
@@ -53,21 +57,22 @@ export function AuditPage() {
 
   async function onExport() {
     const csv = await exportCsv();
-    if (!csv.ok) { await infoDialog(csv.error.message); return; }
+    if (!csv.ok) { await errorDialog(csv.error.message); return; }
     downloadCsv(csv.data, `nhat-ky-hoat-dong-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function onVerify() {
     const r = await refreshChain();
-    if (!r.ok) { await infoDialog(r.error.message); return; }
+    if (!r.ok) { await errorDialog(r.error.message); return; }
   }
 
   const hasFilter = !!(query || from || to);
+  const sizeWarning = auditSizeWarning(result.total);
 
   return (
     <div>
       <PageHeader title="Nhật ký hoạt động" subtitle="Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem" />
-      {error && <div className="panel"><p className="field-error audit-page-error">{error}</p></div>}
+      {error && <div className="alert rej audit-page-error" role="alert">{error}</div>}
       <div className="panel audit-tools-panel">
         <div className="panel-head audit-tools-head"><h2>Công cụ</h2></div>
         <div className="audit-tools-body">
@@ -79,6 +84,7 @@ export function AuditPage() {
             <div className="audit-integrity-total"><b>{result.total}</b><span>dòng hoạt động đã ghi nhận</span></div>
             <AuditIntegrityStatus chain={chain} total={result.total} needsManualVerification={result.total > AUTO_VERIFY_MAX} onVerify={onVerify} />
           </div>
+          {sizeWarning && <div className="alert warn" role="status">{sizeWarning}</div>}
         </div>
       </div>
 
@@ -90,12 +96,12 @@ export function AuditPage() {
         <div className="audit-filterbar">
           <DateField label="Từ ngày" className="audit-date" value={from} onChange={(v) => setRange(v, to)} />
           <DateField label="Đến ngày" className="audit-date" value={to} onChange={(v) => setRange(from, v)} />
-          <div className="field"><label>Số dòng mỗi trang</label>
-            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+          <div className="field"><label htmlFor="audit-page-size">Số dòng mỗi trang</label>
+            <select id="audit-page-size" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
               <option value={25}>25 dòng</option><option value={50}>50 dòng</option><option value={100}>100 dòng</option>
             </select>
           </div>
-          {hasFilter && <button className="btn ghost sm audit-clear-filter" onClick={clearFilters}>Xóa bộ lọc</button>}
+          {hasFilter && <button className="btn ghost sm audit-clear-filter" onClick={clearFilters}>Xoá bộ lọc</button>}
           <div className="audit-filter-summary" role="status">{result.filteredCount}/{result.total} dòng</div>
         </div>
 
@@ -120,16 +126,7 @@ export function AuditPage() {
           <EmptyState title="Không có dữ liệu phù hợp">Thử xoá bộ lọc hoặc chọn khoảng ngày khác.</EmptyState>
         )}
 
-        {result.resultTo > 0 && (
-          <div className="table-pagination">
-            <span className="hint">Hiển thị {result.resultFrom}–{result.resultTo} / {result.filteredCount} dòng</span>
-            <div>
-              <button className="btn ghost sm" disabled={result.page <= 1} onClick={() => setPage(result.page - 1)}>‹ Trước</button>
-              <b>Trang {result.page}/{result.pageCount}</b>
-              <button className="btn ghost sm" disabled={result.page >= result.pageCount} onClick={() => setPage(result.page + 1)}>Sau ›</button>
-            </div>
-          </div>
-        )}
+        <Pagination page={result.page} pageCount={result.pageCount} from={result.resultFrom} to={result.resultTo} total={result.filteredCount} unit="dòng" label="Phân trang nhật ký" onPageChange={setPage} />
       </div>
 
       {archiving && <ArchiveModal onClose={() => setArchiving(false)} />}
@@ -157,7 +154,7 @@ function AuditIntegrityStatus({
     return (
       <div className="audit-integrity-status">
         <span className="tag ok">Chuỗi hash hợp lệ</span>
-        <span>{chain.checked} dòng đã khóa hash{chain.unhashed ? ` · ${chain.unhashed} dòng chưa có hash` : ''}</span>
+        <span>{chain.checked} dòng đã khoá hash{chain.unhashed ? ` · ${chain.unhashed} dòng chưa có hash` : ''}</span>
       </div>
     );
   }
@@ -172,11 +169,10 @@ function AuditIntegrityStatus({
 function ArchiveModal({ onClose }: { onClose: () => void }) {
   const { archive, previewArchive } = useAuditStore(useShallow((s) => ({ archive: s.archive, previewArchive: s.previewArchive })));
   const [months, setMonths] = useState<'12' | '24' | '36'>('24');
-  const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
     const preview = await previewArchive(Number(months) as 12 | 24 | 36);
-    if (!preview.ok) { setErr(preview.error.message); return; }
+    if (!preview.ok) { await errorDialog(preview.error.message, { title: 'Chưa lưu trữ được nhật ký' }); return; }
     if (!preview.data.removedCount) {
       await infoDialog('Không có dòng nhật ký nào cũ hơn mốc đã chọn.');
       onClose();
@@ -184,7 +180,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     }
     const firstConfirm = await confirmDialog(
       `Xuất CSV rồi gỡ ${preview.data.removedCount} dòng nhật ký cũ hơn ${months} tháng? Còn lại ${preview.data.retainedCount} dòng trong hệ thống. File CSV giữ nguyên PrevHash/Hash để nối tiếp và kiểm chứng chuỗi còn lại.`,
-      { title: 'Lưu trữ nhật ký cũ', confirmLabel: 'Lưu trữ', cancelLabel: 'Hủy', danger: true },
+      { title: 'Lưu trữ nhật ký cũ', confirmLabel: 'Lưu trữ', cancelLabel: 'Huỷ', danger: true },
     );
     if (!firstConfirm) return;
     const ok = await reauthDialog({ message: 'Lưu trữ (xoá) nhật ký cũ là thao tác không thể hoàn tác — xác thực lại mật khẩu.' });
@@ -194,7 +190,7 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     try {
       downloadCsv(preview.data.csv, `luu-tru-nhat-ky-${preview.data.cutoffIso.slice(0, 10)}.csv`);
     } catch {
-      setErr('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.');
+      await errorDialog('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.', { title: 'Chưa tạo được tệp lưu trữ' });
       return;
     }
     const downloaded = await confirmDialog(
@@ -203,19 +199,18 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     );
     if (!downloaded) return;
     const result = await archive(Number(months) as 12 | 24 | 36);
-    if (!result.ok) { setErr(result.error.message); return; }
-    await infoDialog(result.data.removedCount > 0 ? `Đã lưu trữ ${result.data.removedCount} dòng cũ hơn ${months} tháng.` : 'Không có dòng nào cũ hơn mốc đã chọn.', { type: 'success' });
+    if (!result.ok) { await errorDialog(result.error.message, { title: 'Chưa lưu trữ được nhật ký' }); return; }
+    showToast(result.data.removedCount > 0 ? `Đã lưu trữ ${result.data.removedCount} dòng cũ hơn ${months} tháng.` : 'Không có dòng nào cũ hơn mốc đã chọn.');
     onClose();
   }
 
   return (
     <Modal title="Lưu trữ nhật ký cũ" onClose={onClose}
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Lưu trữ</button></>}>
-      {err && <p className="field-error">{err}</p>}
-      <p className="audit-archive-copy">Xuất CSV của đúng phần sẽ lưu trữ, gồm PrevHash/Hash để đối chiếu chuỗi. Sau khi xác thực lại, hệ thống chỉ xoá khi bạn xác nhận đã kiểm tra file tải về.</p>
+      footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Lưu trữ</AsyncButton></>}>
+      <p className="audit-archive-copy">Xuất CSV phần sẽ lưu trữ, kèm PrevHash/Hash để đối chiếu chuỗi. Chỉ xoá sau khi bạn xác thực lại và xác nhận đã kiểm tra tệp.</p>
       <div className="field">
-        <label>Giữ lại dữ liệu trong</label>
-        <select value={months} onChange={(e) => setMonths(e.target.value as never)}>
+        <label htmlFor="audit-archive-months">Giữ lại dữ liệu trong</label>
+        <select id="audit-archive-months" value={months} onChange={(e) => setMonths(e.target.value as never)}>
           <option value="12">12 tháng gần nhất</option><option value="24">24 tháng gần nhất</option><option value="36">36 tháng gần nhất</option>
         </select>
       </div>

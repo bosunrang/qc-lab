@@ -17,7 +17,7 @@ const page = readSigmaPageSources();
 const muModalSource = readFileSync(new URL('../renderer/pages/sigma/MuModal.tsx', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../renderer/lib/sigma-workflow.ts', import.meta.url), 'utf8');
 function evaluate(source, context = {}) { return vm.runInNewContext(stripTypeScriptTypes(source.replace(/^import .*;\r?$/gm, '').replace(/export /g, '')), context); }
-const helpers = evaluate(workflow + '\n({parseEqaDraft, mdcRatios, governingSigmaLevel, sigmaMuExport})');
+const helpers = evaluate(workflow + '\n({parseEqaDraft, mdcRatios, governingSigmaLevel})');
 function section(source, start, end) {
   const a = source.indexOf(start), b = source.indexOf(end, a);
   assert.ok(a >= 0 && b > a, start);
@@ -43,10 +43,9 @@ function scenario(t) {
 
 test('SG01: actual Add period sends an enum for each TEa source, with per-level snapshot', async () => {
   const add = section(page, '  async function addPeriod(', '  async function commitBias(');
-  const assignment = section(page, '  const configuredTeaSource =', '  const targetMeanForLevel');
   for (const teaSource of ['lab', 'eflm', 'clia', 'ricos']) {
     let payload;
-    const fn = evaluate(assignment + add + '\naddPeriod', {
+    const fn = evaluate(add + '\naddPeriod', {
       teaSource, teaResolution: { criterion: 'Descriptive source, not an enum' }, periods: [], testId: 'A', currentTest: { current: 'A' },
       configuredTea: 4, operationalLevels: [1, 2], teaForLevel: level => 4 / level, targetMeanForLevel: level => 100 * level,
       savePeriod: async (...args) => { payload = args; return { ok: true, data: { id: 'A:2026-08' } }; }, setSelectedPeriodId() {},
@@ -59,11 +58,13 @@ test('SG01: actual Add period sends an enum for each TEa source, with per-level 
 });
 
 test('SG01b: sửa kỳ dùng nguồn TEa hiện hành nếu mã snapshot không hợp lệ', async () => {
-  const teaSources = section(page, 'const TEA_SOURCES', 'function formatDpmo');
+  const teaLibrary = readFileSync(new URL('../renderer/lib/sigma-tea.ts', import.meta.url), 'utf8');
+  const teaSources = section(teaLibrary, 'export const TEA_SOURCES', 'export type ResolvedSigmaTea')
+    + section(page, 'export function isKnownTeaSource', '/** DPMO');
   const saveOwned = section(page, '  function saveOwnedPeriod(', '  function periodTeaText(');
   let payload;
   const save = evaluate(teaSources + saveOwned + '\nsaveOwnedPeriod', {
-    configuredTeaSource: 'eflm',
+    teaSource: 'eflm',
     currentTest: { current: 'A' },
     useSigmaStore: { getState: () => ({ loading: false }) },
     savePeriod: async (...args) => { payload = args; return { ok: true }; },
@@ -72,6 +73,9 @@ test('SG01b: sửa kỳ dùng nguồn TEa hiện hành nếu mã snapshot không
   assert.equal(payload[3], 'eflm', 'mã nguồn cũ không được gửi qua ranh giới IPC');
   await save({ testId: 'A', period: '2026-08', tea: 5, teaSource: 'clia' }, []);
   assert.equal(payload[3], 'clia', 'snapshot nguồn hợp lệ phải được giữ nguyên');
+  await save({ testId: 'A', period: '2026-08', tea: null, teaSource: 'clia', savedTea: { tea: 0.73, source: 'ricos' } }, []);
+  assert.equal(payload[2], 0.73, 'sửa CV/Bias trong màn tính hiện hành giữ TEa gốc');
+  assert.equal(payload[3], 'ricos', 'nguồn hiện hành không bị ghi đè vào nguồn lịch sử');
 });
 
 test('SG01c: nạp CV theo lô xác nhận rà soát bằng hộp trung tâm và ghi audit', () => {
@@ -88,13 +92,13 @@ test('SG02/11: actual blur handlers preserve unchanged values; switching test re
   period.levels[0].cvSource = 'iqc-cohort';
   const payload = section(page, '  function levelPayload(', '  function periodTeaText(');
   const cv = section(page, '  async function commitCv(', '  /** Kỳ mới');
-  const bias = section(page, '  async function commitBias(', '  if (!sigmaTests.length)');
+  const bias = section(page, '  async function commitBias(', '  if (!tests.length)');
   let calls = 0, confirmations = 0, accept = false;
   const currentTest = { current: period.testId };
   const methods = evaluate(payload + cv + bias + '\n({commitCv,commitBias})', {
     currentTest, useSigmaStore: { getState: () => ({ loading: false }) },
     editablePercent: value => value == null ? '' : value.toFixed(2),
-    savePeriod: async () => { calls++; return { ok: true }; }, infoDialog: async () => {},
+    savePeriod: async () => { calls++; return { ok: true }; }, infoDialog: async () => {}, errorDialog: async () => {},
     confirmDialog: async () => { confirmations++; return accept; },
   });
   assert.equal(await methods.commitCv(period, 1, period.levels[0].cv.toFixed(2)), true);
@@ -120,20 +124,21 @@ test('SG03: blank EQA is not zero; actual zero stays valid; partial objects cann
   assert.equal(save([{ level: 1, eqaRounds: [{ lab: null, target: null, bias: -2 }] }]).ok, false);
 });
 
-test('SG03c: Bias RMS giữ thêm trung bình có dấu để truy xuất hướng lệch', t => {
+test('SG03c (đổi theo SIGMA-REVIEW-2026-11-17 SB-1): Sigma dùng Bias trung bình có dấu, RMS chỉ cho MU', t => {
   const { save } = scenario(t);
   const result = save([{ level: 1, eqaRounds: [{ lab: 97, target: 100 }, { lab: 95, target: 100 }] }]);
-  assert.equal(result.data.levels[0].biasEqa, Math.sqrt(17));
-  assert.equal(result.data.levels[0].biasMean, -4, 'RMS là độ lớn; trung bình có dấu phải còn để truy xuất');
-  assert.match(page, /Bias RMS EQA\/EQC/);
+  assert.equal(result.data.levels[0].biasEqa, -4);
+  assert.equal(result.data.levels[0].biasMean, -4);
+  assert.equal(result.data.levels[0].biasRms, Math.sqrt(17), 'RMS vẫn có cho ngân sách MU');
+  assert.match(page, /<span>Bias EQA\/EQC<\/span>/);
   const printReport = readFileSync(new URL('../renderer/lib/sigma-print-report.ts', import.meta.url), 'utf8');
-  assert.match(printReport, /Bias TB có dấu%/);
+  assert.match(printReport, /Bias RMS \(cho MU\)%/);
 });
 
 test('SG03b: lỗi nhập Bias dùng thông báo trung tâm, không chen vào phía trên bảng', () => {
   const modal = section(page, 'function BiasModal(', 'function CohortModal(');
   assert.match(modal, /infoDialog\('Nhập ít nhất 1 vòng EQA\/EQC\.', \{ title: 'Chưa thể áp dụng Bias%', type: 'warn' \}\)/);
-  assert.match(modal, /infoDialog\(result\.error\?\.message \|\| 'Lỗi không xác định\.', \{ title: 'Không thể áp dụng Bias%', type: 'warn' \}\)/);
+  assert.match(modal, /errorDialog\(result\.error\?\.message \|\| 'Lỗi không xác định\.', \{ title: 'Không thể áp dụng Bias%' \}\)/);
   assert.doesNotMatch(modal, /field-error|setErr\(/);
 });
 
@@ -149,7 +154,8 @@ test('SG04: MDC uses exact same per-level TEa as Sigma', t => {
 
 test('SG05: EFLM survives source switches; old shared value is never migrated as confirmed EFLM', t => {
   const { db, sigma, assay } = scenario(t);
-  const input = { testId: assay.id, source: 'eflm', tea: 10, eflmRef: 'Certificate' };
+  // Truy vết EFLM cần ngày tra cứu (đánh giá tổng thể 2026-10-31, N8).
+  const input = { testId: assay.id, source: 'eflm', tea: 10, eflmRef: 'Certificate', eflmLookupDate: '2026-09-01' };
   assert.equal(sigma.saveTeaConfig(input, actor).ok, true);
   sigma.saveTeaConfig({ testId: assay.id, source: 'clia', tea: 4 / 140 * 100 }, actor);
   const restored = sigma.saveTeaConfig({ testId: assay.id, source: 'eflm' }, actor).data;
@@ -232,15 +238,14 @@ test('SG08: common design requires ALL levels; choose worst only after every lev
   assert.equal(helpers.governingSigmaLevel({ levels }), undefined);
 });
 
-test('SG09: incomplete MU never reports acceptance or numeric final U in export', () => {
+// Hàm xuất MU riêng (sigmaMuExport) đã bỏ vì không còn nơi gọi; bản in PDF kiểm
+// riêng việc chỉ hiện U khi đủ thành phần (sigma-print-report.test.mjs).
+test('SG09: incomplete MU never reports acceptance or numeric final U', () => {
   const mu = uncertaintyBudget({ cv: 1, bias: 0, tea: 10, target: 100 });
   assert.equal(mu.complete, false); assert.equal(mu.withinTea, null); assert.equal(mu.teaRatio, null);
-  const cells = helpers.sigmaMuExport({ mu, cvSource: 'manual' });
-  assert.equal(cells[0], ''); assert.equal(cells[1], ''); assert.equal(cells[2], '');
-  assert.match(cells[3], /u\(Cref\).*u\(cal\)/);
+  assert.match(mu.missing.join(', '), /u\(Cref\).*u\(cal\)/);
   const full = uncertaintyBudget({ cv: 1, bias: 0, uCref: 0, uCal: 0, tea: 10 });
-  assert.equal(full.complete, true); assert.equal(full.withinTea, true);
-  assert.equal(helpers.sigmaMuExport({ mu: full, cvSource: 'manual' })[0], 2);
+  assert.equal(full.complete, true); assert.equal(full.withinTea, true); assert.equal(full.U, 2);
 });
 
 test('SG10: every Sigma write rolls back when audit fails, including rename', t => {
@@ -287,7 +292,7 @@ test('SG11: delayed and failed requests cannot replace newest test, including re
 test('SG12 and supplementary: units, draft preview, no clipped trend, and shared export are wired', () => {
   assert.match(page, /u = U\/k/); assert.match(page, /chỉ chia 2 khi k = 2/);
   assert.match(page, /100 × u \/ \|giá trị tham chiếu\|/);
-  assert.match(page, /const preview = uncertaintyBudget\(\{ cv: level.cv, bias: level.biasEqa, uCref, uCal, includeBias/);
+  assert.match(page, /const preview = uncertaintyBudget\(\{ cv: level.cv, bias: level.biasRms \?\? level.biasEqa, uCref, uCal, includeBias/);
   const printReport = readFileSync(new URL('../renderer/lib/sigma-print-report.ts', import.meta.url), 'utf8');
   assert.match(page, /buildSigmaPeriodPrintHtml\(\{/);
   assert.match(printReport, /mu\?\.complete \? number\(mu\.U, 4\) : '—'/);
@@ -333,8 +338,9 @@ test('actual MU modal renders the edited draft, not stored MU, and marks incompl
     const MuModal = vm.runInNewContext(transformed.code + '\nMuModal', {
       React, uncertaintyBudget, useState: () => [drafts.shift(), () => {}],
       Modal: ({ children }) => React.createElement('section', null, children),
+      AsyncButton: ({ children }) => React.createElement('button', null, children),
     });
-    return renderToStaticMarkup(React.createElement(MuModal, { level: { cv: 1, biasEqa: 0, tea: 10, mu: { U: 2 } } }));
+    return renderToStaticMarkup(React.createElement(MuModal, { level: { cv: 1, biasEqa: 0, eqaRounds: [], tea: 10, mu: { U: 2 } } }));
   }
   assert.match(render(['0', '5', false, null]), /10\.198/);
   assert.match(render(['', '', true, null]), /Tạm tính chưa đầy đủ/);

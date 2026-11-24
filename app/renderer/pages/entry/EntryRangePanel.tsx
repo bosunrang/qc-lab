@@ -5,6 +5,9 @@ import { EmptyState } from '../../components/EmptyState';
 import type { RangeMode } from './RangeWorkflowModal';
 import type { RangeCandidateView } from '../../../shared/qc-api';
 
+/** Lần chạy bị loại chỉ bị bỏ khỏi phép tính dải (CLSI C24), không chặn. */
+const excludedText = (rejected: number) => rejected > 0 ? `, đã bỏ ${rejected} điểm thuộc lần chạy bị loại` : '';
+
 export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, rangeError, levelNums, rangeLevel, decimals, writable, onRangeLevel, onOpen }: {
   rangeCandidate: RangeCandidateView | null;
   rangeError: string | null;
@@ -20,13 +23,13 @@ export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, r
     ? `N=${p.n} · Mean thực=${p.mean.toFixed(decimals)} · SD thực=${p.sd.toFixed(4)} · CV=${p.cv.toFixed(2)}%`
     : 'Chưa có dữ liệu của lô đang vận hành';
   return (
-    <section className="panel entry-secondary-panel range-summary-panel">
+    <section className="panel entry-secondary-panel range-summary-panel" data-entry-section="range">
       <div className="entry-secondary-summary range-summary-header">
         <span>Thống kê toàn bộ &amp; Dải kiểm soát</span>
         <small>{rangeSummaryText}</small>
         {levelNums.length > 1 && (
-          <div className="dayseg" role="tablist" aria-label="Chọn mức QC cho thống kê và dải kiểm soát">
-            {levelNums.map((level) => <button type="button" key={level} role="tab" aria-selected={rangeLevel === level}
+          <div className="dayseg" role="group" aria-label="Chọn mức QC cho thống kê và dải kiểm soát">
+            {levelNums.map((level) => <button type="button" key={level} aria-pressed={rangeLevel === level}
               className={rangeLevel === level ? 'on' : ''} onClick={() => onRangeLevel(level)}>Mức {level}</button>)}
           </div>
         )}
@@ -41,8 +44,8 @@ export const EntryRangePanel = memo(function EntryRangePanel({ rangeCandidate, r
                 <div className="range-band-body">· Mức {rangeCandidate.level}: Mean={rangeCandidate.current.mean != null ? rangeCandidate.current.mean.toFixed(decimals) : '—'} SD={rangeCandidate.current.sd != null ? rangeCandidate.current.sd.toFixed(4) : '—'}.
                   {rangeCandidate.proposed
                     ? rangeCandidate.eligible
-                      ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
-                      : ` Cần ≥20 kết quả trên ≥20 ngày độc lập và không lần chạy nào bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày, ${rangeCandidate.proposed.rejected} điểm thuộc lần chạy bị loại.`
+                      ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập${excludedText(rangeCandidate.proposed.rejected)}). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
+                      : ` Cần ≥20 kết quả trên ≥20 ngày độc lập, không tính lần chạy bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày${excludedText(rangeCandidate.proposed.rejected)}.`
                     : ' Chưa có dữ liệu của lô đang vận hành.'}
                 </div>
               </div>

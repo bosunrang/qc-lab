@@ -1,35 +1,31 @@
+import { FormErrorMessage } from '../../components/FormErrorMessage';
 // Tab "LotsTab" của trang Cấu hình chung — tách khỏi ManagePage.tsx
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useManageStore } from '../../store/manage-store';
 import { useWestgardStore } from '../../store/westgard-store';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
-import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-store';
+import { Pagination, pageBounds } from '../../components/Pagination';
+import { reportFormError, confirmDialog, infoDialog, errorDialog, reauthDialog } from '../../state/dialog-store';
+import { showToast } from '../../state/toast-store';
 import { vnDate } from '../../lib/format';
 import { EmptyState, lotStatus } from './shared';
 import type { QcLot, LotGroup } from '../../../shared/qc-api';
+import { useAsyncAction } from '../../components/AsyncButton';
+import { formErrorFrom, type FieldErrorMap, type FormError } from '../../lib/field-error';
+import { useInvalidField } from '../../lib/useInvalidField';
 
 const LOTS_PAGE_SIZE = 15;
 const LOT_GROUPS_PAGE_SIZE = 10;
 
-function ListPagination({ page, pageCount, pageSize, total, itemLabel, onPageChange }: {
-  page: number; pageCount: number; pageSize: number; total: number; itemLabel: string; onPageChange: (page: number) => void;
-}) {
-  if (pageCount <= 1) return null;
-  const from = (page - 1) * pageSize + 1;
-  const to = Math.min(total, from + pageSize - 1);
-  return <nav className="lot-list-pagination" aria-label={`Phân trang ${itemLabel}`}>
-    <span className="hint" role="status">{from}–{to} trên {total} {itemLabel}</span>
-    <div className="lot-page-controls">
-      <button className="btn ghost lot-page-button" type="button" aria-label="Trang trước" title="Trang trước" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>‹</button>
-      <b aria-current="page">{page}/{pageCount}</b>
-      <button className="btn ghost lot-page-button" type="button" aria-label="Trang sau" title="Trang sau" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>›</button>
-    </div>
-  </nav>;
-}
+/** Mã lỗi `saveLot` (`validateLot` + handler) → ô cần sửa. */
+const LOT_FIELD_ERRORS: FieldErrorMap = { 'missing-lot-no': 'lotNo', 'duplicate-lot': 'lotNo', 'level-in-use': 'level' };
+/** Mã lỗi `saveLotGroup` → ô cần sửa. `duplicate-group` cố ý không gắn ô:
+ * trùng có thể do tên HOẶC do bộ lô, chỉ ra một ô sẽ dẫn người dùng sai chỗ. */
+const LOT_GROUP_FIELD_ERRORS: FieldErrorMap = { 'not-enough-lots': 'lotIds', 'missing-name': 'name' };
 
 /** Thứ tự hiển thị nhóm lô: nhóm đang thật sự hoạt động lên ĐẦU, "Đã dừng"/
  * "Đã lưu trữ" đẩy xuống CUỐI — người dùng yêu cầu để nhóm đang dùng không
@@ -65,8 +61,12 @@ export function LotsTab() {
   const [lotGroupPage, setLotGroupPage] = useState(1);
   const [editingLot, setEditingLot] = useState<QcLot | 'new' | null>(null);
   const [editingGroup, setEditingGroup] = useState<LotGroup | 'new' | null>(null);
-  const [lotErr, setLotErr] = useState<string | null>(null);
-  const [groupErr, setGroupErr] = useState<string | null>(null);
+  const [lotErr, setLotErr] = useState<FormError | null>(null);
+  const [groupErr, setGroupErr] = useState<FormError | null>(null);
+  const lotFormRef = useRef<HTMLFormElement>(null);
+  const groupFormRef = useRef<HTMLFormElement>(null);
+  const lotErrorId = useInvalidField(lotFormRef, lotErr);
+  const groupErrorId = useInvalidField(groupFormRef, groupErr);
   const [groupChecked, setGroupChecked] = useState<Set<string>>(new Set());
 
   // Lọc theo bộ field của tab này (số lô, mô tả, nhà cung cấp, chương trình,
@@ -88,15 +88,15 @@ export function LotsTab() {
   const pagedLotGroups = sortedLotGroups.slice((currentLotGroupPage - 1) * LOT_GROUPS_PAGE_SIZE, currentLotGroupPage * LOT_GROUPS_PAGE_SIZE);
 
   async function removeLotRow(lot: QcLot) {
-    if (!(await confirmDialog(`Xóa lô QC ${lot.lot_no}?`, { title: 'Xóa lô QC', danger: true, confirmLabel: 'Xóa lô QC' }))) return;
+    if (!(await confirmDialog(`Xoá lô QC ${lot.lot_no}?`, { title: 'Xoá lô QC', danger: true, confirmLabel: 'Xoá lô QC' }))) return;
     const result = await removeLot(lot.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   async function removeGroup(group: LotGroup) {
-    if (!(await confirmDialog(`Xóa nhóm lô ${group.name}? Các lô QC bên trong vẫn được giữ nguyên.`, { title: 'Xóa nhóm lô', danger: true, confirmLabel: 'Xóa nhóm lô' }))) return;
+    if (!(await confirmDialog(`Xoá nhóm lô ${group.name}? Các lô QC bên trong vẫn được giữ nguyên.`, { title: 'Xoá nhóm lô', danger: true, confirmLabel: 'Xoá nhóm lô' }))) return;
     const result = await removeLotGroup(group.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   /** Kích hoạt nhóm lô — áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
@@ -107,21 +107,21 @@ export function LotsTab() {
     if (!(await confirmDialog(
       `Áp dụng Mean/SD của nhóm lô ${group.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`
       + ' Nhóm lô đang giữ các mức đó sẽ được đánh dấu đã dừng.',
-      { title: 'Kích hoạt nhóm lô', confirmLabel: 'Áp dụng' },
+      { title: 'Kích hoạt nhóm lô', confirmLabel: 'Áp dụng', danger: false },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực Mean/SD', message: 'Nhập lại mật khẩu trước khi áp Mean/SD của nhóm lô này.' }))) return;
     const result = await activateLotGroup(group.id);
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
-    await infoDialog(result.data.status === 'applied'
+    if (!result.ok) { await errorDialog(result.error.message); return; }
+    showToast(result.data.status === 'applied'
       ? `Đã áp Mean/SD cho ${result.data.applied} mức QC.`
         + (result.data.stoppedGroups.length ? ` Dừng ${result.data.stoppedGroups.length} nhóm lô bị thay thế.` : '')
-      : 'Nhóm lô này đã đang được dùng — không có mức nào cần áp thêm.', { type: 'success' });
+      : 'Nhóm lô này đã đang được dùng — không có mức nào cần áp thêm.');
   }
 
   async function stopGroup(group: LotGroup) {
-    if (!(await confirmDialog(`Dừng nhóm lô ${group.name}? Nhóm đã dừng vẫn giữ nguyên lịch sử Mean/SD của các xét nghiệm đã dùng nó.`, { title: 'Dừng nhóm lô', confirmLabel: 'Dừng nhóm lô' }))) return;
+    if (!(await confirmDialog(`Dừng nhóm lô ${group.name}? Nhóm đã dừng vẫn giữ nguyên lịch sử Mean/SD của các xét nghiệm đã dùng nó.`, { title: 'Dừng nhóm lô', confirmLabel: 'Dừng nhóm lô', danger: false }))) return;
     const result = await stopLotGroup(group.id);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   async function submitLot(form: HTMLFormElement) {
@@ -142,18 +142,18 @@ export function LotsTab() {
       if (preview.ok && preview.data.rename && preview.data.rename.affected > 0) {
         const plan = preview.data.rename;
         const lockNote = plan.lockedCount
-          ? ` Trong đó ${plan.lockedCount} điểm thuộc kỳ đã khóa (${plan.lockedPeriods.join(', ')}).`
+          ? ` Trong đó ${plan.lockedCount} điểm thuộc kỳ đã khoá (${plan.lockedPeriods.join(', ')}).`
           : '';
         const ok = await confirmDialog(
           `Đổi số lô "${plan.oldLotNo}" thành "${plan.newLotNo}" sẽ cập nhật ${plan.affected} điểm QC đã ghi.`
           + ` Số lô là nhãn nhận dạng — giá trị, ngày và Mean/SD của từng điểm không đổi.${lockNote}`,
-          { title: 'Đổi số lô QC', confirmLabel: 'Đổi số lô' },
+          { title: 'Đổi số lô QC', confirmLabel: 'Đổi số lô', danger: false },
         );
         if (!ok) return;
       }
     }
     const result = await saveLot(id, data);
-    if (!result.ok) { setLotErr(result.error.message); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, LOT_FIELD_ERRORS), setLotErr); return; }
     setEditingLot(null);
   }
 
@@ -175,10 +175,12 @@ export function LotsTab() {
     };
     const id = editingGroup !== 'new' && editingGroup ? editingGroup.id : undefined;
     const result = await saveLotGroup(id, data);
-    if (!result.ok) { setGroupErr(result.error.message); return; }
+    if (!result.ok) { await reportFormError(formErrorFrom(result.error, LOT_GROUP_FIELD_ERRORS), setGroupErr); return; }
     setEditingGroup(null);
   }
 
+  const savingLot = useAsyncAction(submitLot);
+  const savingGroup = useAsyncAction(submitGroup);
   async function openNewGroup() {
     if (!lots.length) { await infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.'); return; }
     setGroupErr(null); setGroupChecked(new Set()); setEditingGroup('new');
@@ -192,7 +194,7 @@ export function LotsTab() {
           <p>Quản lý từng lô và nhóm lô QC.</p>
         </div>
         <div className="rcfg-tools">
-          <input value={query} onChange={(e) => { setQuery(e.target.value); setLotPage(1); setLotGroupPage(1); }} placeholder="Tìm theo số lô, nhóm lô QC..." />
+          <input className="search-input" value={query} onChange={(e) => { setQuery(e.target.value); setLotPage(1); setLotGroupPage(1); }} placeholder="Tìm theo số lô, nhóm lô QC..." aria-label="Tìm lô hoặc nhóm lô QC" />
         </div>
       </div>
       <div className="lot-config-grid">
@@ -208,13 +210,13 @@ export function LotsTab() {
                 <td className="num">{allLevels.filter((level) => level.qcLotId === l.id).length}</td>
                 <td><div className="lot-row-actions">
                   <RowActionButton kind="edit" label={`Sửa lô QC ${l.lot_no}`} onClick={() => { setLotErr(null); setEditingLot(l); }} />
-                  <RowActionButton kind="delete" label={`Xóa lô QC ${l.lot_no}`} onClick={() => removeLotRow(l)} />
+                  <RowActionButton kind="delete" label={`Xoá lô QC ${l.lot_no}`} onClick={() => removeLotRow(l)} />
                 </div></td>
               </tr>
             ))}
           </tbody>
         </table> : <EmptyState title="Chưa có lô QC">Tạo từng lô QC độc lập, sau đó ghép nhóm và thiết lập Mean/SD.</EmptyState>}
-        <ListPagination page={currentLotPage} pageCount={lotPageCount} pageSize={LOTS_PAGE_SIZE} total={lots.length} itemLabel="lô" onPageChange={setLotPage} />
+        <Pagination page={currentLotPage} pageCount={lotPageCount} {...pageBounds(currentLotPage, LOTS_PAGE_SIZE, lots.length)} total={lots.length} unit="lô QC" label="Phân trang lô QC" onPageChange={setLotPage} />
       </div>
 
       <div className="panel rcfg-list lot-config-right">
@@ -233,31 +235,31 @@ export function LotsTab() {
                 ? <button className="btn ghost sm btn-stop-tint" onClick={() => stopGroup(g)}>Dừng</button>
                 : <button className="btn teal sm" onClick={() => activateGroup(g)}>Kích hoạt</button>)}
               <RowActionButton kind="edit" label={`Sửa nhóm lô ${g.name}`} onClick={() => { setGroupErr(null); setGroupChecked(new Set(g.lotIds)); setEditingGroup(g); }} />
-              <RowActionButton kind="delete" label={`Xóa nhóm lô ${g.name}`} onClick={() => removeGroup(g)} />
+              <RowActionButton kind="delete" label={`Xoá nhóm lô ${g.name}`} onClick={() => removeGroup(g)} />
             </div>
           </article>;
         })}</div> : <EmptyState title="Chưa có nhóm lô QC">Chọn ít nhất hai lô QC để tạo một nhóm lô dùng cho Mean/SD.</EmptyState>}
-        <ListPagination page={currentLotGroupPage} pageCount={lotGroupPageCount} pageSize={LOT_GROUPS_PAGE_SIZE} total={lotGroups.length} itemLabel="nhóm lô" onPageChange={setLotGroupPage} />
+        <Pagination page={currentLotGroupPage} pageCount={lotGroupPageCount} {...pageBounds(currentLotGroupPage, LOT_GROUPS_PAGE_SIZE, lotGroups.length)} total={lotGroups.length} unit="nhóm lô" label="Phân trang nhóm lô" onPageChange={setLotGroupPage} />
       </div>
       </div>
 
       {editingLot && (
-        <Modal title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
-          footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-form">{editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
-          <form id="lot-form" onSubmit={(e) => { e.preventDefault(); submitLot(e.currentTarget); }}>
-            {lotErr && <p className="field-error">{lotErr}</p>}
+        <Modal busy={savingLot.busy} title={editingLot === 'new' ? 'Thêm lô QC' : 'Sửa thông tin lô QC'} onClose={() => setEditingLot(null)} size="md" className="rcfg-modal"
+          footer={<><button className="btn ghost" onClick={() => setEditingLot(null)}>Huỷ</button><button className="btn teal" type="submit" form="lot-form" disabled={savingLot.busy}>{savingLot.busy ? 'Đang lưu…' : editingLot === 'new' ? 'Thêm lô QC' : 'Lưu thay đổi'}</button></>}>
+          <form id="lot-form" ref={lotFormRef} onSubmit={(e) => { e.preventDefault(); void savingLot.run(e.currentTarget); }}>
+            <FormErrorMessage rootRef={lotFormRef} error={lotErr} id={lotErrorId} />
             <div className="grid2">
-              <div className="field"><label>Số lô</label><input name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
+              <div className="field"><label htmlFor="lot-no">Số lô</label><input id="lot-no" name="lotNo" placeholder="VD: 1234UE" defaultValue={editingLot !== 'new' ? editingLot.lot_no : ''} autoFocus /></div>
               <div className="field">
-                <label>Mức QC</label>
-                <select name="level" defaultValue={editingLot !== 'new' ? editingLot.level : 1}>
+                <label htmlFor="lot-level">Mức QC</label>
+                <select id="lot-level" name="level" defaultValue={editingLot !== 'new' ? editingLot.level : 1}>
                   {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
             </div>
             <div className="grid2">
-              <div className="field"><label>Mô tả</label><input name="description" placeholder="VD: Acusera Assayed Chemistry Control" defaultValue={editingLot !== 'new' ? editingLot.description : ''} /></div>
-              <div className="field"><label>Nhà cung cấp</label><input name="supplier" placeholder="Randox" defaultValue={editingLot !== 'new' ? editingLot.supplier : ''} /></div>
+              <div className="field"><label htmlFor="lot-description">Mô tả</label><input id="lot-description" name="description" placeholder="VD: Acusera Assayed Chemistry Control" defaultValue={editingLot !== 'new' ? editingLot.description : ''} /></div>
+              <div className="field"><label htmlFor="lot-supplier">Nhà cung cấp</label><input id="lot-supplier" name="supplier" placeholder="Randox" defaultValue={editingLot !== 'new' ? editingLot.supplier : ''} /></div>
             </div>
             <div className="grid2">
               <DateField id="lot-opened" name="opened" label="Ngày mở" defaultValue={editingLot !== 'new' ? editingLot.opened : ''} />
@@ -268,12 +270,12 @@ export function LotsTab() {
       )}
 
       {editingGroup && (
-        <Modal title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
-          footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Hủy</button><button className="btn teal" type="submit" form="lot-group-form">{editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
-          <form id="lot-group-form" onSubmit={(e) => { e.preventDefault(); submitGroup(e.currentTarget); }}>
-            {groupErr && <p className="field-error">{groupErr}</p>}
-            <label className="lot-group-picker-label">Chọn các lô QC</label>
-            <div className="lot-level-picker">
+        <Modal busy={savingGroup.busy} title={editingGroup === 'new' ? 'Thêm nhóm lô' : 'Sửa nhóm lô'} onClose={() => setEditingGroup(null)} size={groupLevelCount >= 3 ? 'xl' : groupLevelCount === 2 ? 'lg' : 'md'} className={`rcfg-modal rcfg-group-modal levels-${groupLevelCount >= 3 ? '3plus' : groupLevelCount || 1}`}
+          footer={<><button className="btn ghost" onClick={() => setEditingGroup(null)}>Huỷ</button><button className="btn teal" type="submit" form="lot-group-form" disabled={savingGroup.busy}>{savingGroup.busy ? 'Đang lưu…' : editingGroup === 'new' ? 'Thêm nhóm lô' : 'Lưu thay đổi'}</button></>}>
+          <form id="lot-group-form" ref={groupFormRef} onSubmit={(e) => { e.preventDefault(); void savingGroup.run(e.currentTarget); }}>
+            <FormErrorMessage rootRef={groupFormRef} error={groupErr} id={groupErrorId} />
+            <label id="lot-group-picker-label" className="lot-group-picker-label">Chọn các lô QC</label>
+            <div className="lot-level-picker" role="group" aria-labelledby="lot-group-picker-label">
               {[1, 2, 3, 4, 5, 6].map((level) => {
                 const levelLots = lots.filter((lot) => lot.level === level);
                 if (!levelLots.length) return null;
@@ -281,8 +283,8 @@ export function LotsTab() {
                   <div className="lot-level-title">Mức {level}</div>
                   {levelLots.map((lot) => {
                     const locked = !!lot.depleted && !groupChecked.has(lot.id);
-                    return <label className={lot.depleted ? 'lot-opt-depleted' : ''} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
-                      <input type="checkbox" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
+                    return <label className={`choice-card${lot.depleted ? ' lot-opt-depleted' : ''}`} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
+                      <input type="checkbox" data-field="lotIds" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
                         const next = new Set(groupChecked);
                         if (e.target.checked) next.add(lot.id); else next.delete(lot.id);
                         setGroupChecked(next);
@@ -295,7 +297,7 @@ export function LotsTab() {
               })}
               {!lots.length && <EmptyState size="compact">Chưa có lô QC để tạo nhóm.</EmptyState>}
             </div>
-            <div className="field"><label>Tên nhóm lô</label><input name="name" placeholder="Tự động: 1102/1103" defaultValue={editingGroup !== 'new' ? editingGroup.name : ''} autoFocus /></div>
+            <div className="field"><label htmlFor="lot-group-name">Tên nhóm lô</label><input id="lot-group-name" name="name" placeholder="Tự động: 1102/1103" defaultValue={editingGroup !== 'new' ? editingGroup.name : ''} autoFocus /></div>
           </form>
         </Modal>
       )}

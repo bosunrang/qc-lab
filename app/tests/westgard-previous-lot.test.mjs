@@ -1,12 +1,14 @@
 //
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import testCase from 'node:test';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createWestgardHandlers } = require('../../app-dist/main/ipc/westgard-handlers.js');
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
+const { notifyChanged } = require('../../app-dist/main/ipc/shared.js');
 
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri', role: 'admin', clientId: 'test-client' };
 
@@ -89,6 +91,9 @@ for (const status of ['planned', 'active', 'rejected']) {
   db.prepare("UPDATE test_levels SET mean_sd_history_json='[]' WHERE test_id=?").run(test.id);
   assert.equal(westgard.listPreviousLotBlocks(test.id)[0].mean, 200, 'fallback snapshot tren diem');
   db.prepare("UPDATE qc_points SET qc_mean=NULL, qc_sd=NULL WHERE lot='OLD-1'").run();
+  // Sửa thẳng bằng SQL nên phải tự báo như mọi thao tác ghi thật, để bộ nhớ
+  // đệm lô cũ (`ipc/previous-lot-cache.ts`) bỏ kết quả đã giữ.
+  notifyChanged(['qc_points'], [test.id]);
   assert.deepEqual(westgard.listPreviousLotBlocks(test.id), [], 'het nguon Mean/SD thi bo qua');
 }
 
@@ -103,5 +108,28 @@ console.log('app Westgard previous-lot blocks tests passed');
   assert.deepEqual(block.analysis.points.map(p => p.accepted), [true, false]);
   assert.deepEqual(entry.listPreviousLotSeries(test.id)[0].points.map(p => p.accepted), [true, false]);
 }
+
+testCase('Nhập QC chỉ gửi điểm lô cũ của tháng bảng nhập hoặc lô được mở trong khoảng biểu đồ', () => {
+  const { db, test, westgard, entry } = scenario();
+  try {
+    const request = {
+      worksheetFrom: '2026-07-01', worksheetTo: '2026-07-31',
+      chartFrom: '2026-06-02', chartTo: '2026-06-02', previousLots: {},
+    };
+    const initial = entry.getEntryWindow(test.id, request);
+    assert.deepEqual(westgard.listPreviousLotLevels(test.id), [1]);
+    assert.deepEqual(initial.current[1].points.map(p => p.id), ['n1']);
+    assert.deepEqual(initial.previousLotSeries[0].points, []);
+    assert.equal(initial.previousLotSeries[0].lotId, 'lOld');
+    const opened = entry.getEntryWindow(test.id, { ...request, previousLots: { 1: 'lOld' } });
+    const [history] = opened.previousLotSeries;
+    assert.deepEqual(history.points.map(p => [p.id, p.verdict]), [['o2', 'rej']]);
+    assert.deepEqual(history.cumulative, { recorded: 2, excluded: 1, n: 1, mean: 200, sd: null, cv: null });
+    const worksheet = entry.getEntryWindow(test.id, { ...request, worksheetFrom: '2026-06-01', worksheetTo: '2026-06-30' });
+    assert.deepEqual(worksheet.previousLotSeries[0].points.map(p => p.id), ['o1', 'o2']);
+  } finally {
+    db.close();
+  }
+});
 
 

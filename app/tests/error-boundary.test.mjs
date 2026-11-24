@@ -59,9 +59,9 @@ test('PageErrorBoundary: đổi trang thì bỏ trạng thái lỗi, ở lại t
 // Bọc từng trang trong `AppShell` và báo lỗi không được bắt được kiểm trên app
 // thật ở `e2e/window-shell.e2e.mjs`. Lớp ngoài cùng chỉ bắt lỗi của chính
 // khung app, không dựng được lỗi đó từ ngoài nên vẫn kiểm theo mã.
-test('lớp ngoài cùng bọc cả app', () => {
+test('lớp ngoài cùng bọc cả app và hộp thoại hệ thống', () => {
   const entry = readFileSync(new URL('../renderer/main.tsx', import.meta.url), 'utf8');
-  assert.match(entry, /render\(<PageErrorBoundary><AppRouter \/><\/PageErrorBoundary>\)/);
+  assert.match(entry, /<PageErrorBoundary>[\s\S]*<SoftwareLicenseBoundary><AppRouter \/><\/SoftwareLicenseBoundary>[\s\S]*<DialogHost \/>[\s\S]*<\/PageErrorBoundary>/);
 });
 
 test('lỗi không được bắt: báo người dùng, không mở đè hộp thoại đang chờ, bỏ qua lỗi vô hại', async () => {
@@ -88,6 +88,14 @@ test('lỗi không được bắt: báo người dùng, không mở đè hộp t
   reportUnhandled(new Error('ResizeObserver loop limit exceeded'), { ...deps, report: (reason) => reported.push(reason.message) });
   assert.deepEqual(reported, ['lỗi cần ghi log'], 'lỗi thật được gửi về tệp log của máy chính, lỗi vô hại thì không');
 
+  // Mất phiên (tài khoản bị xoá, khoá hoặc vừa phục hồi dữ liệu không có tài
+  // khoản này): về màn đăng nhập, không hiện hộp "Thao tác không hoàn tất".
+  let ended = 0;
+  const before = shown.length;
+  reportUnhandled(new Error("Error invoking remote method 'nce:getConfig': Error: Chưa đăng nhập."), { ...deps, sessionEnded: () => { ended += 1; } });
+  assert.equal(ended, 1);
+  assert.equal(shown.length, before);
+
   assert.equal(unhandledMessage('chuỗi'), 'chuỗi');
   assert.equal(unhandledMessage({ code: 1 }), 'không có mô tả');
 });
@@ -96,7 +104,7 @@ test('Tổng quan không treo ở trạng thái tải khi IPC lỗi, và nạp l
   let fail = true;
   globalThis.window = { qcApi: {
     listTestSummaries: async () => { if (fail) throw new Error('IPC hỏng'); return []; },
-    listNceRecords: async () => [], listTests: async () => [], listPanels: async () => [], listLots: async () => [],
+    listNce: async () => [], listTests: async () => [], listPanels: async () => [], listLots: async () => [],
   } };
   try {
     const { useDashboardStore } = await load('/store/dashboard-store.ts');

@@ -8,16 +8,19 @@
 // chạy bằng tệp CSDL (`sync/firebase-push-worker.ts`); đo cỡ trước khi gửi.
 import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
-import { listTableNames, restoreAllTables, writeSafetySnapshot } from '../db/table-io';
+import { chainWarningNote, listTableNames, recordsLostByRestore, replaceAllTables, withRestoreSource, writeSafetySnapshot, type RestoreSource } from '../db/table-io';
 import { validateBackupEnvelope } from '../domain/backup';
 import { buildFirebasePayload, formatMb, sizeVerdict, FIREBASE_MAX_WRITE_BYTES, type FirebasePayload } from '../sync/firebase-payload';
 import type { PushResponse, PushRunner } from '../sync/firebase-payload';
+import type { FirebaseSecretStore } from '../sync/firebase-secret-store';
 import { DEFAULT_REAGENT_NAME, prepareReagentRows } from '../domain/reagent-validation';
 import { cleanFirebaseEmail, cleanLabCode, parseFirebaseConfig, type FirebaseConfig } from '../domain/firebase-validation';
-import { createFirebaseClient, type FirebaseSession } from '../domain/firebase-client';
+import { createFirebaseClient, FirebaseSessionExpiredError, type FirebaseSession } from '../domain/firebase-client';
+import { MACHINE_LOCAL_META_KEYS, mergeUsersForPull } from '../domain/cloud-backup';
 import { type IpcResult } from './shared';
 import { writeCommand, writeCommandAsync, type WriteSteps } from './write-command';
 import { quoteIdent } from '../db/sql-ident';
+import { keepOperationMode, operationModeRestoreMessage, readOperationMode } from '../db/operation-mode';
 
 const CONFIG_KEY = 'firebaseConfig';
 const EMAIL_KEY = 'firebaseEmail';
@@ -36,13 +39,23 @@ type FirebaseClient = ReturnType<typeof createFirebaseClient>;
 /** Chu kỳ đẩy tự động khi có thay đổi (người dùng chốt 2026-09-26). */
 export const FIREBASE_PUSH_PERIOD_MS = 15 * 60 * 1000;
 
+
 export interface FirebaseHandlerOptions {
   /** Đường dẫn tệp CSDL + bộ chạy tiến trình phụ. Thiếu một trong hai (test,
    * CSDL trong bộ nhớ, bản xem trước) thì dựng và gửi ngay trên luồng này. */
   dbPath?: string;
   pushRunner?: PushRunner;
   periodMs?: number;
+  /** Nơi giữ refresh token ngoài CSDL, để sao lưu tự động chạy tiếp sau khi
+   * mở lại app mà không lưu mật khẩu. Không có (test, bản xem trước) thì phiên
+   * chỉ sống trong RAM như trước. */
+  secretStore?: FirebaseSecretStore;
+  now?: () => number;
 }
+
+/** idToken được làm mới khi còn dưới mức này trước hạn. */
+const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000;
+const SESSION_EXPIRED_STATUS = 'Phiên đám mây đã hết hạn — cần kết nối lại bằng mật khẩu Firebase';
 
 export function createFirebaseHandlers(db: Db, userDataDir: string, client: FirebaseClient = createFirebaseClient(), options: FirebaseHandlerOptions = {}) {
   let session: FirebaseSession | null = null;
@@ -59,12 +72,13 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
    * hỏng cách đủ một chu kỳ. */
   let lastAttemptAt: number | null = null;
   const periodMs = options.periodMs ?? FIREBASE_PUSH_PERIOD_MS;
+  const now = options.now ?? Date.now;
 
   const meta = (key: string) => (db.prepare('SELECT value FROM app_meta WHERE key=?').get(key) as { value: string } | undefined)?.value || '';
   const setMeta = (key: string, value: string) => db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, value);
   const setStatus = (value: string) => setMeta(STATUS_KEY, value);
   /** Trạng thái lỗi chung, trừ khi `pushNow()` vừa ghi lý do cụ thể (gói quá cỡ). */
-  const setFailureStatus = (value: string) => { if (!meta(STATUS_KEY).startsWith(TOO_LARGE_PREFIX)) setStatus(value); };
+  const setFailureStatus = (value: string) => { const current = meta(STATUS_KEY); if (!current.startsWith(TOO_LARGE_PREFIX) && current !== SESSION_EXPIRED_STATUS) setStatus(value); };
 
   function storedConfig(): FirebaseConfig | null {
     try { return meta(CONFIG_KEY) ? parseFirebaseConfig(meta(CONFIG_KEY)) : null; } catch { return null; }
@@ -83,30 +97,66 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     const at = nextPushAt ? ` · tự đẩy lúc ${new Date(nextPushAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : '';
     return ` · Có thay đổi chưa đẩy${at}`;
   }
+  /** Lưu refresh token ra ngoài CSDL (null = xoá). */
+  function rememberSession(value: FirebaseSession | null): void {
+    options.secretStore?.write(value?.refreshToken ? JSON.stringify({ refreshToken: value.refreshToken, uid: value.uid }) : null);
+  }
+  function forgetSession(): void {
+    session = null;
+    rememberSession(null);
+    if (timer) { clearTimeout(timer); timer = null; }
+    nextPushAt = null;
+  }
+
+  /** idToken còn hạn; sắp hết thì đổi bằng refresh token (GV6). Trước đây token
+   * không được làm mới nên sao lưu tự động hỏng sau khoảng 1 giờ. Phiên không
+   * làm mới được nữa thì quên phiên và báo cần kết nối lại. */
+  async function token(): Promise<string> {
+    if (!session || !config) throw new Error('Chưa kết nối Firebase.');
+    if (session.idToken && session.expiresAt - TOKEN_REFRESH_MARGIN_MS > now()) return session.idToken;
+    if (!session.refreshToken) {
+      forgetSession();
+      setStatus(SESSION_EXPIRED_STATUS);
+      throw new FirebaseSessionExpiredError(SESSION_EXPIRED_STATUS);
+    }
+    try {
+      session = await client.refresh(config, session.refreshToken);
+    } catch (error) {
+      if (error instanceof FirebaseSessionExpiredError) {
+        forgetSession();
+        setStatus(SESSION_EXPIRED_STATUS);
+        throw new FirebaseSessionExpiredError(SESSION_EXPIRED_STATUS);
+      }
+      throw error;
+    }
+    rememberSession(session);
+    return session.idToken;
+  }
+
   /** Dựng gói, đo cỡ và gửi (hoặc chỉ dựng để lấy checksum khi `upload = false`). */
   async function runPush(upload: boolean): Promise<PushResponse> {
     if (!session || !config || !labCode) throw new Error('Chưa kết nối Firebase.');
     if (options.dbPath && options.pushRunner) {
-      return options.pushRunner({ dbPath: options.dbPath, uploadUrl: upload ? client.uploadUrl(config, labCode, session.idToken) : null });
+      return options.pushRunner({ dbPath: options.dbPath, uploadUrl: upload ? client.uploadUrl(config, labCode, await token()) : null });
     }
     const payload = buildFirebasePayload(db);
     const json = JSON.stringify(payload);
     const size = sizeVerdict(Buffer.byteLength(json));
     if (size.kind === 'too-large') return { ok: false, code: 'too-large', message: 'Gói đồng bộ vượt giới hạn một lần ghi của Firebase.', bytes: size.bytes, ratio: size.ratio };
-    if (upload) await client.writeJson(config, labCode, session.idToken, json);
+    if (upload) await client.writeJson(config, labCode, await token(), json);
     return { ok: true, bytes: size.bytes, ts: payload._ts, checksum: payload.backup.checksum, ratio: size.ratio };
   }
   function parsePayload(value: unknown): { ok: true; data: FirebasePayload } | { ok: false; message: string } {
     if (!value) return { ok: false, message: 'empty' };
     const row = value as Partial<FirebasePayload>;
     if (row._format !== 'qclab-firebase' || !row.backup) {
-      return { ok: false, message: 'Dữ liệu Firebase này không đúng định dạng backup được hỗ trợ.' };
+      return { ok: false, message: 'Dữ liệu Firebase này không đúng định dạng sao lưu được hỗ trợ.' };
     }
     const checked = validateBackupEnvelope(row.backup, SCHEMA_VERSION);
     return checked.ok ? { ok: true, data: row as FirebasePayload } : { ok: false, message: checked.message };
   }
   function localHasOperationalData(): boolean {
-    const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'period_locks'];
+    const tables = ['instruments', 'tests', 'qc_lots', 'qc_panels', 'qc_points', 'sigma_data', 'actions', 'nce_records', 'period_locks'];
     return tables.some((table) => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${quoteIdent(table)}`).get() as { n: number }).n) > 0)
       || hasEnteredReagentComparison()
       || !!(db.prepare('SELECT name FROM lab WHERE id=1').get() as { name: string }).name;
@@ -138,7 +188,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
       if (hadPending != null && dirtySince == null) dirtySince = hadPending;
       if (dirtySince != null) schedule();
       if (result.code === 'too-large') {
-        const text = `${TOO_LARGE_PREFIX}: gói đồng bộ ${formatMb(result.bytes ?? 0)} vượt giới hạn ${formatMb(FIREBASE_MAX_WRITE_BYTES)} mỗi lần ghi của Firebase. Dữ liệu vẫn lưu cục bộ; hãy dùng Xuất backup (.sqlite).`;
+        const text = `${TOO_LARGE_PREFIX}: gói đồng bộ ${formatMb(result.bytes ?? 0)} vượt giới hạn ${formatMb(FIREBASE_MAX_WRITE_BYTES)} mỗi lần ghi của Firebase. Dữ liệu vẫn lưu cục bộ; hãy dùng Xuất bản sao lưu (.sqlite).`;
         setStatus(text);
         throw new Error(text);
       }
@@ -156,16 +206,34 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
 
   /** Tải dữ liệu đám mây về, trong lần ghi `w` của thao tác gọi nó. Cấu hình
    * kết nối `keep` không bị remote cũ ghi đè; luôn tạo đường lùi vật lý trước
-   * khi RESTORE toàn bộ bảng. `restoreAllTables()` tự chạy transaction riêng
-   * (cần tắt khoá ngoại NGOÀI transaction), `w.commit()` giữ phần còn lại. */
+   * khi RESTORE toàn bộ bảng. Nhật ký của máy được gộp, không bị thay — xem
+   * hàm `replaceAllTables()`. */
   async function pullNow(w: WriteSteps, remote: FirebasePayload, keep: Connection): Promise<void> {
+    // GV6: tài khoản của máy giữ nguyên, tài khoản chỉ có trên đám mây vào ở
+    // trạng thái khoá (`mergeUsersForPull`); khoá riêng của máy (LIS, kết nối
+    // Firebase) không bị bản đám mây ghi đè.
+    const localUsers = db.prepare('SELECT * FROM users').all() as Record<string, unknown>[];
+    const { users, addedLocked } = mergeUsersForPull(localUsers, remote.backup.data.users ?? []);
+    const source: RestoreSource = { kind: 'json', data: { ...remote.backup.data, users } };
+    // Chế độ vận hành: bản đám mây cũ hơn máy này không được xoá cứng điểm QC
+    // hay hồ sơ (NCE, kỳ khoá, biên bản tháng, EQA…).
+    if (readOperationMode(db)) {
+      const losses = recordsLostByRestore(db, source);
+      if (losses.length) throw new Error(operationModeRestoreMessage(losses));
+    }
     const snapshot = writeSafetySnapshot(db, userDataDir, 'pre-firebase-pull');
-    restoreAllTables(db, remote.backup.data);
-    w.commit((tx) => {
+    // Thay dữ liệu, giữ cờ chế độ vận hành, lưu kết nối và ghi nhật ký là MỘT
+    // đơn vị; khoá ngoại phải tắt ngoài transaction nên `withRestoreSource` bọc ngoài.
+    withRestoreSource(db, source, () => w.commit((tx) => {
+      const outcome = keepOperationMode(db, () => replaceAllTables(db, source, { keepMetaKeys: MACHINE_LOCAL_META_KEYS }));
       writeConnection(keep);
-      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây; bản an toàn trước đó tại ${snapshot}`, '');
+      const usersNote = localUsers.length
+        ? `; giữ nguyên ${localUsers.length} tài khoản của máy${addedLocked.length ? `, thêm ${addedLocked.length} tài khoản từ đám mây ở trạng thái khoá (${addedLocked.join(', ')})` : ''}`
+        : '';
+      const keptNote = outcome.keptActivity ? `; giữ ${outcome.keptActivity} dòng nhật ký của máy chưa có trên đám mây` : '';
+      tx.audit('Tải dữ liệu từ Firebase', `Phục hồi dữ liệu đám mây${usersNote}${keptNote}; bản an toàn trước đó tại ${snapshot}${chainWarningNote(outcome)}`, '');
       tx.changed(listTableNames(db));
-    });
+    }));
     await pushNow(); // ghi lại audit vừa phát sinh để hai phía thực sự cùng trạng thái.
   }
 
@@ -184,13 +252,14 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
       // Chỉ lưu thông tin cần cho lần kết nối sau. Password và token chỉ sống
       // trong RAM main process, mất khi đóng ứng dụng.
       config = nextConfig; session = nextSession; labCode = nextCode;
+      rememberSession(nextSession);
       const connection: Connection = { config: JSON.stringify(nextConfig), email, code: nextCode };
       const commitConnection = (detail: string) => w.commit((tx) => {
         writeConnection(connection);
         tx.audit('Kết nối Firebase', detail, nextCode);
         tx.changed(['app_meta']);
       });
-      const raw = await client.read(nextConfig, nextCode, nextSession.idToken);
+      const raw = await client.read(nextConfig, nextCode, await token());
       const parsed = parsePayload(raw);
       if (!raw) {
         commitConnection(`Kết nối ${nextCode} với UID ${nextSession.uid}`);
@@ -231,7 +300,7 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
         const sent = await pushNow();
         return { ok: true, data: { state: 'pushed', remoteUpdatedAt: new Date(sent.ts).toISOString() } };
       }
-      const parsed = parsePayload(await client.read(config, labCode, session.idToken));
+      const parsed = parsePayload(await client.read(config, labCode, await token()));
       if (!parsed.ok) return { ok: false, error: { code: 'invalid-remote', message: parsed.message === 'empty' ? 'Chưa có dữ liệu trên Firebase để tải về.' : parsed.message } };
       await pullNow(w, parsed.data, savedConnection());
       return { ok: true, data: { state: 'pulled', remoteUpdatedAt: new Date(parsed.data._ts).toISOString() } };
@@ -248,14 +317,13 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
       tx.audit('Ngắt Firebase', 'Ngắt đồng bộ đám mây; dữ liệu cục bộ được giữ nguyên', '');
       tx.changed(['app_meta']);
     });
-    session = null; config = null; labCode = '';
-    if (timer) { clearTimeout(timer); timer = null; }
-    dirtySince = null; nextPushAt = null;
+    forgetSession(); config = null; labCode = '';
+    dirtySince = null;
     return { ok: true, data: null };
   });
 
   function schedule(): void {
-    if (timer || dirtySince == null) return;
+    if (timer || dirtySince == null || !session) return;
     // Tính từ mốc muộn hơn giữa thay đổi đầu tiên và lần thử gần nhất: sau một
     // lần đẩy hỏng (mạng, quá cỡ) thì chờ đủ một chu kỳ mới thử lại, không để
     // mỗi thao tác ghi mới kích hoạt một lần đẩy ngay.
@@ -276,6 +344,17 @@ export function createFirebaseHandlers(db: Db, userDataDir: string, client: Fire
     // khi đóng app phần còn chờ đã được `flushPending()` đẩy nốt.
     timer.unref?.();
   }
+
+  /** Mở lại app: dùng refresh token đã lưu để tiếp tục sao lưu tự động mà
+   * không cần nhập lại mật khẩu (GV6). idToken được xin ở lần dùng đầu. */
+  (function resumeSession() {
+    let saved: { refreshToken?: unknown; uid?: unknown } | null = null;
+    try { saved = JSON.parse(options.secretStore?.read() || 'null'); } catch { saved = null; }
+    const storedCode = meta(LAB_CODE_KEY), stored = storedConfig();
+    if (!saved || typeof saved.refreshToken !== 'string' || !saved.refreshToken || !stored || !storedCode) return;
+    config = stored; labCode = storedCode;
+    session = { idToken: '', refreshToken: saved.refreshToken, uid: String(saved.uid || ''), expiresAt: 0 };
+  })();
 
   /** Được gọi tập trung từ writeAudit() sau mỗi thao tác ghi đã hoàn tất:
    * chỉ đánh dấu "có thay đổi" và hẹn lần đẩy sau 15 phút tính từ thay đổi

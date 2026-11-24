@@ -33,13 +33,14 @@ export const PAGE_DEFS: readonly PageDef[] = [
   { id: 'entry', path: '/entry', label: 'Nhập QC & Biểu đồ', roles: ALL },
   { id: 'westgard', path: '/westgard', label: 'Phân tích Westgard', roles: ALL },
   { id: 'sigma', path: '/sigma', label: 'Six Sigma & Sai số', roles: ALL },
-  { id: 'reagent', path: '/reagent', label: 'So sánh hóa chất', roles: ALL },
+  { id: 'reagent', path: '/reagent', label: 'So sánh hoá chất', roles: ALL },
+  { id: 'eqa', path: '/eqa', label: 'Phân tích ngoại kiểm', roles: ALL },
   { id: 'actions', path: '/actions', label: 'Khắc phục sự cố', roles: STAFF },
   { id: 'report', path: '/report', label: 'Báo cáo & Biểu mẫu', roles: ALL },
   { id: 'manage', path: '/manage', label: 'Cấu hình chung', roles: ADMIN_ONLY },
   { id: 'users', path: '/users', label: 'Người dùng', roles: ADMIN_ONLY },
   { id: 'audit', path: '/audit', label: 'Nhật ký hoạt động', roles: ADMIN_ONLY },
-  { id: 'settings', path: '/settings', label: 'Cài đặt & Đám mây', roles: ADMIN_ONLY },
+  { id: 'settings', path: '/settings', label: 'Cài đặt & Kết nối', roles: ADMIN_ONLY },
 ];
 
 /** Vai trò khi chưa biết gì (chưa nạp xong phiên, dữ liệu hỏng, vai trò lạ)

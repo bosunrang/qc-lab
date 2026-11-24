@@ -1,6 +1,6 @@
 {
   "name": "qc-lab",
-  "version": "1.0.5",
+  "version": "1.1.6",
   "description": "QC Lab - Nội kiểm chất lượng xét nghiệm (IQC) cho phòng xét nghiệm lâm sàng",
   "author": "QC Lab",
   "license": "UNLICENSED",
@@ -16,17 +16,26 @@
     "test:performance": "npm run app:build:main && node --test app/tests/large-dataset-performance.perf.mjs app/tests/realistic-dataset-performance.perf.mjs",
     "typecheck": "npm run app:typecheck",
     "lint": "eslint app",
-    "app:typecheck": "tsc -p tsconfig.app-main.json --noEmit && tsc -p tsconfig.app-renderer.json",
+    "app:typecheck": "tsc -p tsconfig.app-main.json --noEmit && tsc -p tsconfig.app-renderer.json && tsc -p tsconfig.license-issuer.json",
     "app:test": "node app/scripts/run-tests.cjs",
     "app:build:main": "tsc -p tsconfig.app-main.json",
     "app:build:renderer": "vite build --config vite.app-renderer.config.mjs",
     "app:build": "npm run app:build:main && npm run app:build:renderer",
     "app:dev": "vite --config vite.app-renderer.config.mjs",
+    "lis:gateway": "npm run app:build:main && node app-dist/main/gateway/cli.js",
+    "lis:mock": "node app/scripts/lis-gateway.mjs",
+    "lis:demo": "npm run build && node app/scripts/lis-demo.mjs",
     "app:css-parity": "node app/scripts/css-parity-check.cjs",
     "verify-release": "npm run typecheck && npm run lint && npm test && npm run app:css-parity && npm run build && node app/scripts/run-e2e.cjs",
     "patch-build": "node scripts/patch-7za-symlink.js",
-    "dist": "npm run app:build && node scripts/patch-7za-symlink.js && electron-builder --win nsis",
-    "dist:publish": "npm run app:build && node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
+    "license:keygen": "node app/scripts/license-issuer.cjs keygen",
+    "license:issue": "node app/scripts/license-issuer.cjs issue",
+    "license:check": "node app/scripts/license-issuer.cjs check",
+    "license:build": "node app/scripts/build-license-issuer.cjs",
+    "license:gui": "npm run license:build && electron .cache/license-issuer",
+    "license:dist": "npm run license:check && npm run license:build && electron-builder --config app/license-issuer/electron-builder.cjs --win portable --publish never",
+    "dist": "npm run license:check && npm run app:build && node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish never",
+    "dist:publish": "npm run license:check && npm run app:build && node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
@@ -63,6 +72,7 @@
     },
     "files": [
       "app-dist/**/*",
+      "!app-dist/mock/**/*",
       "build/icon.png",
       "!app-dist/renderer/assets/*.wasm",
       "package.json"
@@ -94,6 +104,9 @@
     }
   },
   "dependencies": {
-    "exceljs": "^4.4.0"
+    "electron-updater": "^6.8.11",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "6.4.299"
   }
 }

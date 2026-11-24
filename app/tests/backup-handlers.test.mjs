@@ -1,5 +1,5 @@
 // Xuất/phục hồi toàn bộ dữ liệu app. Kiểm chứng END-TO-END thật: tạo dữ liệu
-// qua các handler đã có → xuất ra tệp backup SQLite → phục hồi vào 1 DB KHÁC
+// qua các handler đã có → xuất ra tệp sao lưu SQLite → phục hồi vào 1 DB KHÁC
 // (mô phỏng máy khác/cài lại) → đối chiếu dữ liệu, cộng các điều kiện chặn
 // phục hồi khi tệp hỏng, sai định dạng hoặc từ phiên bản mới hơn. Tệp .json
 // xuất trước 2026-09-25 vẫn phải phục hồi được.
@@ -40,7 +40,7 @@ const exported = sourceBackup.exportBackupTo(backupPath, actor);
 assert.equal(exported.ok, true, JSON.stringify(exported));
 assert.equal(exported.data.path, backupPath);
 assert.ok(exported.data.bytes > 0);
-assert.equal(readFileSync(backupPath).subarray(0, 16).toString('latin1'), 'SQLite format 3\u0000', 'tệp backup là SQLite');
+assert.equal(readFileSync(backupPath).subarray(0, 16).toString('latin1'), 'SQLite format 3\u0000', 'tệp sao lưu là SQLite');
 assert.deepEqual(readdirSync(dir).filter((n) => n.includes('.partial-')), [], 'không để lại tệp tạm');
 assert.equal(sourceBackup.backupStatus().lastBackupBytes, exported.data.bytes, 'ghi đúng kích thước tệp vừa xuất');
 assert.ok(sourceBackup.backupStatus().lastBackupAt);
@@ -78,7 +78,7 @@ snapshot.close();
 assert.deepEqual(targetConfig.listInstruments().map((i) => i.name), ['Máy A']);
 assert.deepEqual(targetConfig.listTests().map((t) => t.name), ['Glucose']);
 assert.equal(targetConfig.listTestLevels(test1.id)[0].mean, 5);
-assert.equal(targetDb.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='backup_info'").get().n, 0, 'bảng mô tả backup không lọt vào DB đang dùng');
+assert.equal(targetDb.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='backup_info'").get().n, 0, 'bảng mô tả bản sao lưu không lọt vào DB đang dùng');
 
 // ── 4) Tệp hỏng / sai định dạng / phiên bản mới hơn ──────────────────────
 const target = () => createBackupHandlers(openDatabase(':memory:'), dir);
@@ -93,9 +93,9 @@ assert.equal(corruptResult.error.code, 'corrupt');
 const plain = new DatabaseSync(file('khong-phai-backup.sqlite'));
 plain.exec('CREATE TABLE x(a); INSERT INTO x VALUES (1);');
 plain.close();
-assert.equal(target().importBackupFrom(file('khong-phai-backup.sqlite'), actor).error.code, 'wrong-format', 'SQLite lạ không có phần mô tả backup');
+assert.equal(target().importBackupFrom(file('khong-phai-backup.sqlite'), actor).error.code, 'wrong-format', 'SQLite lạ không có phần mô tả bản sao lưu');
 
-writeFileSync(file('ngau-nhien.bin'), Buffer.from('không phải tệp backup'));
+writeFileSync(file('ngau-nhien.bin'), Buffer.from('không phải tệp sao lưu'));
 assert.equal(target().importBackupFrom(file('ngau-nhien.bin'), actor).error.code, 'wrong-format');
 assert.equal(target().importBackupFrom(file('khong-ton-tai.sqlite'), actor).error.code, 'not-found');
 
@@ -133,7 +133,29 @@ assert.equal(target().importBackupFrom(file('cu-sua.json'), actor).error.code, '
 writeFileSync(file('cu-hong.json'), '{khong-phai-json');
 assert.equal(target().importBackupFrom(file('cu-hong.json'), actor).error.code, 'invalid-json');
 
-// ── 7) Xoá sạch dữ liệu test ─────────────────────────────────────────────
+// ── 6b) Giữ tài khoản hiện tại: chỉ thay dữ liệu, bảng users giữ nguyên ──
+// Bản sao lưu cũ mang tài khoản và mật khẩu cũ; mặc định trên giao diện là
+// giữ tài khoản của máy này để phục hồi xong vẫn đăng nhập được.
+const accountSource = openDatabase(':memory:');
+accountSource.prepare("INSERT INTO users(id,username,name,role,active,pass_hash) VALUES ('u-old','admin','Tài khoản cũ','admin',1,'pbkdf2$1$aa$bb')").run();
+createConfigHandlers(accountSource).saveInstrument({ data: { name: 'Máy của bản sao lưu' } }, actor);
+const accountSqlite = file('tai-khoan.sqlite');
+assert.equal(createBackupHandlers(accountSource, dir).exportBackupTo(accountSqlite, actor).ok, true);
+const accountJson = file('tai-khoan.json');
+writeFileSync(accountJson, JSON.stringify(buildBackupEnvelope(dumpAllTables(accountSource), SCHEMA_VERSION, 'app', new Date().toISOString())));
+for (const source of [accountSqlite, accountJson]) {
+  for (const keepAccounts of [true, false]) {
+    const machine = openDatabase(':memory:');
+    machine.prepare("INSERT INTO users(id,username,name,role,active,pass_hash) VALUES ('u-now','admin','Đang dùng','admin',1,'pbkdf2$1$cc$dd')").run();
+    const result = createBackupHandlers(machine, dir).importBackupFrom(source, { keepAccounts }, actor);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const ids = machine.prepare('SELECT id FROM users ORDER BY id').all().map((u) => u.id);
+    assert.deepEqual(ids, keepAccounts ? ['u-now'] : ['u-old'], `${path.basename(source)} keepAccounts=${keepAccounts}`);
+    assert.deepEqual(createConfigHandlers(machine).listInstruments().map((i) => i.name), ['Máy của bản sao lưu'], 'dữ liệu luôn lấy theo bản sao lưu');
+  }
+}
+
+// ── 7) Xoá sạch dữ liệu thử ─────────────────────────────────────────────
 const resetDb = openDatabase(':memory:');
 const resetConfig = createConfigHandlers(resetDb);
 const resetBackup = createBackupHandlers(resetDb, dir);
@@ -158,7 +180,7 @@ assert.equal(resetConfig.listInstruments().length, 0, 'dữ liệu vận hành p
 const { createReagentHandlers } = require('../../app-dist/main/ipc/reagent-handlers.js');
 const resetComparisons = createReagentHandlers(resetDb).listComparisons();
 assert.equal(resetComparisons.length, 1, 'sau khi xoá sạch vẫn có một phép so sánh hoá chất trống để nhập');
-assert.equal(resetComparisons[0].reagent, 'Hóa chất mới');
+assert.equal(resetComparisons[0].reagent, 'Hoá chất mới');
 assert.equal(resetAuth.listUsers(resetActor).data.length, usersBefore, 'tài khoản phải còn nguyên');
 const activityAfter = listActivity(resetDb, 1000);
 assert.equal(activityAfter.length, activityBefore + 1, 'giữ nhật ký cũ + ghi thêm 1 dòng xoá sạch');

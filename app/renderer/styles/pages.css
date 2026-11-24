@@ -2,18 +2,10 @@
    app/renderer/styles/pages/*.css; token và component nền nằm ở tokens.css
    + app.css theo hệ Clinical Precision. */
 
-/* CSS riêng So sánh hóa chất đã chuyển về `pages/reagent.css`. */
-.sg-eflm-box > div,.lot-table,.top-user .meta,.range-summary-panel > h3:first-child > span{min-width:0;}
-.dash-main .panel>.dash-list>.shift-item,.dash-main .panel>.dash-list>.hint{margin:0;}
-
-.dash-list {display:grid;gap:10px;}
-.dash-list .shift-item.rej {border-color:var(--danger-border); border-left:3px solid var(--danger-accent); background:var(--danger-surface); color:var(--danger-text);}
-.dash-list .shift-item.warn {border-color:var(--warning-border); border-left:3px solid var(--warning-accent); background:var(--warning-surface); color:var(--warning-text);}
-.dash-list .shift-item.rej .meta {color:var(--danger-text);}
-.dash-list .shift-item.warn .meta {color:var(--warning-text);}
-.dash-main .panel > .alert, .panel > .panel-title:first-child + .dash-list, .panel > .panel-title:first-child ~ .dash-list {margin:var(--panel-content-gap) 16px 14px;}
+/* CSS riêng So sánh hoá chất đã chuyển về `pages/reagent.css`. */
+.lot-table,.range-summary-panel > h3:first-child > span{min-width:0;}
 
 
-.wg-export-actions { display: flex; align-items: center; gap: 8px; min-height: var(--control-h); }
+.wg-export-actions { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-h); }
 
 

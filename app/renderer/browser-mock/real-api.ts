@@ -17,6 +17,7 @@
 // và PDF có đường thay thế thuần trình duyệt ở `lib/browser-export.ts`, để xem và
 // xuất báo cáo ngay trên cổng 5174.
 import { openPreviewDatabase } from './sqlite-loader';
+import { previewLicense, previewUpdate } from '../lib/software-preview';
 import { setBrowserDbSizeSource } from '../../main/ipc/db-file-size-browser';
 import { type Actor, setBroadcastWindow, writeAudit } from '../../main/ipc/shared';
 import { createConfigHandlers } from '../../main/ipc/config-handlers';
@@ -25,12 +26,15 @@ import { createWestgardHandlers } from '../../main/ipc/westgard-handlers';
 import { createSigmaHandlers } from '../../main/ipc/sigma-handlers';
 import { createNceHandlers } from '../../main/ipc/nce-handlers';
 import { createReagentHandlers } from '../../main/ipc/reagent-handlers';
+import { createEqaHandlers } from '../../main/ipc/eqa-handlers';
 import { createAuthHandlers, type PublicUser } from '../../main/ipc/auth-handlers';
 import { createAuditHandlers } from '../../main/ipc/audit-handlers';
 import { createSettingsHandlers } from '../../main/ipc/settings-handlers';
 import { createReportHandlers } from '../../main/ipc/report-handlers';
 import { createLisHandlers } from '../../main/ipc/lis-handlers';
 import { bindOperations, createBusinessOperations, sessionContext } from '../../main/ipc/operations';
+import { createAccessGate } from '../../main/ipc/access-gate';
+import { readOperationMode } from '../../main/db/operation-mode';
 import type { QcApi, IpcResult } from '../../shared/qc-api';
 import { exportTableXlsxInBrowser, printHtmlToPdfInBrowser } from '../lib/browser-export';
 
@@ -77,6 +81,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   const sigma = createSigmaHandlers(db);
   const nce = createNceHandlers(db);
   const reagent = createReagentHandlers(db);
+  const eqa = createEqaHandlers(db);
   const auth = createAuthHandlers(db);
   const audit = createAuditHandlers(db);
   const settings = createSettingsHandlers(db, PREVIEW_DB_PATH);
@@ -115,8 +120,11 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     };
   }
   const business = bindOperations(
-    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis }),
+    createBusinessOperations({ auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis }),
     sessionContext(() => sessionActor),
+    // Cùng cổng quyền với Electron (GV5): khoá tài khoản, quyền theo trang và
+    // cờ phải đổi mật khẩu có hiệu lực cả ở bản xem trước.
+    createAccessGate(db),
   );
 
   // Khôi phục phiên sau F5 — đọc lại từ DB (không tin dữ liệu trong
@@ -131,6 +139,14 @@ export async function createRealBrowserApi(): Promise<QcApi> {
   } catch { /* không có sessionStorage: coi như chưa đăng nhập */ }
 
   const api = {
+    getLicenseStatus: async () => ({ ...previewLicense }),
+    // Cần định danh Windows và bộ cài Electron thật; tab trình duyệt không
+    // được nhận mã kích hoạt hoặc tự tải/chạy một bộ cài hệ điều hành.
+    activateSoftware: async () => notAvailable(),
+    getSoftwareUpdateStatus: async () => ({ ...previewUpdate }),
+    checkSoftwareUpdate: async () => notAvailable(),
+    downloadSoftwareUpdate: async () => notAvailable(),
+    installSoftwareUpdate: async () => notAvailable(),
     currentUser: async () => (sessionActor ? auth.getUser(sessionActor.userId) : null),
     bootstrapAdmin: async (input) => {
       const result = await auth.bootstrapAdmin(input);
@@ -160,6 +176,8 @@ export async function createRealBrowserApi(): Promise<QcApi> {
       return {
         lastBackupAt: at,
         lastBackupBytes: Number.isFinite(bytes) ? bytes : 0,
+        activityRows: Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n),
+        operationMode: readOperationMode(db),
       };
     },
 

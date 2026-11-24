@@ -5,7 +5,7 @@
  *
  * Hiện các tên đó đều lấy từ `sqlite_master`, `PRAGMA table_info` hoặc hằng số
  * trong mã, nên chưa có đường nào đưa tên lạ vào; đây là lớp phòng xa — đặc
- * biệt với tệp backup người dùng chọn, nơi danh sách cột đến từ tệp ngoài.
+ * biệt với tệp sao lưu người dùng chọn, nơi danh sách cột đến từ tệp ngoài.
  */
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

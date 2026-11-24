@@ -4,7 +4,6 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const RENDERER = path.join(ROOT, 'app', 'renderer');
-const STYLES_DIR = path.join(RENDERER, 'styles');
 const BASELINE = path.join(ROOT, 'app', 'tests', 'css-dead-class-baseline.json');
 
 function walk(dir, ext, out = []) {
@@ -32,7 +31,9 @@ for (const file of walk(RENDERER, '.tsx')) {
   }
 }
 
-const stylesCss = stripComments(readAll(walk(STYLES_DIR, '.css')));
+// Bao gồm stylesheet bản in được nạp bằng ?raw; chúng không thuộc CSS màn
+// hình nhưng vẫn là nơi định nghĩa hợp lệ cho các class trong JSX báo cáo.
+const stylesCss = stripComments(readAll(walk(RENDERER, '.css')));
 const hasRule = (cls) => new RegExp('\\.' + cls.replace(/-/g, '\\-') + '(?![\\w-])').test(stylesCss);
 
 const dead = [...usedClasses].filter((cls) => !hasRule(cls)).sort();
@@ -54,7 +55,7 @@ const fixed = [...allowed].filter((cls) => usedClasses.has(cls) && hasRule(cls))
 console.log(`Class chết: ${usedClasses.size} class app đang dùng, ${dead.length} không có rule CSS (baseline ${allowed.size}).`);
 if (fixed.length) console.log(`  ${fixed.length} class trong baseline nay đã có CSS — chạy --update-baseline để siết: ${fixed.join(', ')}`);
 if (added.length) {
-  console.error(`\nFAIL: ${added.length} class MỚI không có rule CSS nào trong app/renderer/styles/:`);
+  console.error(`\nFAIL: ${added.length} class MỚI không có rule CSS màn hình/bản in nào trong app/renderer/:`);
   for (const cls of added) console.error('  - ' + cls);
   console.error('\nHoặc viết CSS cho nó, hoặc bỏ class khỏi JSX. Nếu đây là class định danh');
   console.error('cố ý không style, chạy --update-baseline để ghi nhận.');

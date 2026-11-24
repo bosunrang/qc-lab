@@ -54,6 +54,7 @@ export interface TestInput {
   tea?: unknown;
   section?: unknown;
   teaSource?: unknown;
+  operationalTeaSource?: unknown;
   teaRefKey?: unknown;
   method?: unknown;
   reagent?: unknown;
@@ -72,6 +73,7 @@ export interface PreparedTest {
   tea: number;
   section: string;
   teaSource: string;
+  operationalTeaSource: string;
   teaRefKey: string;
   method: string;
   reagent: string;
@@ -100,7 +102,9 @@ export function prepareTest(input: TestInput = {}): PreparedTest {
     // để báo lỗi rõ ràng ('invalid-tea'), thay vì âm thầm ép về 0 như trước.
     tea: finiteNumber(input.tea, 0),
     section: cleanText(input.section).trim(),
-    teaSource: cleanText(input.teaSource, 200).trim(),
+    // Hai màn hình dùng cùng nguồn vận hành; giữ trường cũ cho client cũ.
+    teaSource: cleanText(input.operationalTeaSource, 20).trim().toLowerCase() || cleanText(input.teaSource, 200).trim(),
+    operationalTeaSource: cleanText(input.operationalTeaSource, 20).trim().toLowerCase(),
     teaRefKey: cleanText(input.teaRefKey, 80).trim(),
     method: cleanText(input.method, 200).trim(),
     reagent: cleanText(input.reagent, 200).trim(),
@@ -123,6 +127,9 @@ export function validateTest(
     return { ok: false, code: 'missing-instrument', message: 'Chọn máy xét nghiệm.' };
   }
   if (cleaned.tea < 0) return { ok: false, code: 'invalid-tea', message: 'TEa không được âm.' };
+  if (!['', 'lab', 'clia', 'ricos', 'eflm'].includes(cleaned.operationalTeaSource)) {
+    return { ok: false, code: 'invalid-operational-tea-source', message: 'Chọn nguồn TEa vận hành hợp lệ.' };
+  }
   // Chặn trùng trên CÙNG máy theo tên HOẶC `teaRefKey` (khoá analyte của
   // danh mục TEa); nhờ đó "Glucose" và "GLU" không thể thành hai cấu hình
   // của cùng analyte trên một máy, còn cùng analyte trên hai máy khác nhau
@@ -209,12 +216,36 @@ export function validateTestLevel(input: TestLevelInput, _existingLevels: readon
 
 export interface MeanSdHistoryEntry {
   at: string; mean: number | null; sd: number | null; qcLotId: string;
-  /** Ảnh chụp nghiệp vụ của chính mốc cũ. Các trường tùy chọn giữ khả năng
+  /** Ảnh chụp nghiệp vụ của chính mốc cũ. Các trường tuỳ chọn giữ khả năng
    * đọc dữ liệu đã tạo trước khi lịch sử được làm đầy đủ. */
   lot?: string; low?: number | null; high?: number | null;
   effectiveFrom?: string; effectiveTo?: string; source?: 'mfg' | 'lab';
 }
 
+
+/** Mean/SD đang hiệu lực của lô `qcLotId` vào ngày `date` (N9). Điểm nhập
+ * lùi về trước lần đổi dải gần nhất phải mang dải của chính ngày chạy, không
+ * phải dải hiện hành: snapshot trên điểm quyết định z và kết luận Westgard.
+ * Mốc lịch sử có hiệu lực trong `[effectiveFrom, effectiveTo)` — `effectiveTo`
+ * là ngày đổi dải, dải mới áp từ chính ngày đó. Mốc cũ thiếu ngày, khác lô
+ * hoặc không có SD dương thì không dùng được; khi đó giữ dải hiện hành. */
+export function meanSdOnDate(
+  historyJson: string | null | undefined, qcLotId: string, date: string,
+  current: { mean: number | null; sd: number | null; effectiveFrom: string },
+): { mean: number | null; sd: number | null; fromHistory: boolean } {
+  const now = { mean: current.mean, sd: current.sd, fromHistory: false };
+  if (!current.effectiveFrom || date >= current.effectiveFrom) return now;
+  let history: MeanSdHistoryEntry[];
+  try { history = JSON.parse(historyJson || '[]'); if (!Array.isArray(history)) return now; } catch { return now; }
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (!entry || entry.qcLotId !== qcLotId || !entry.effectiveTo || date >= entry.effectiveTo) continue;
+    if (entry.effectiveFrom && date < entry.effectiveFrom) continue;
+    if (!Number.isFinite(Number(entry.mean)) || !(Number(entry.sd) > 0)) continue;
+    return { mean: Number(entry.mean), sd: Number(entry.sd), fromHistory: true };
+  }
+  return now;
+}
 
 export function appendMeanSdHistory(
   historyJson: string | null | undefined,

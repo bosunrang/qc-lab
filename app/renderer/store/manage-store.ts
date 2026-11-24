@@ -40,7 +40,7 @@ interface ManageState {
   loadPanels: () => Promise<void>;
   loadLotTransitions: () => Promise<void>;
   historyPointsByTestId: Record<string, HistoryQcPointView[]>;
-  loadHistoryPoints: (testId: string) => Promise<void>;
+  loadHistoryPoints: (testId: string) => Promise<HistoryQcPointView[]>;
   loadTeaRefs: () => Promise<void>;
   loadRuleScopes: (testId: string) => Promise<void>;
 
@@ -98,6 +98,7 @@ export const useManageStore = create<ManageState>((set, get) => ({
   loadHistoryPoints: async (testId: string) => {
     const points = await window.qcApi.listEntryHistoryPoints(testId);
     set((state) => ({ historyPointsByTestId: { ...state.historyPointsByTestId, [testId]: points } }));
+    return points;
   },
 
   loadTeaRefs: async () => set({ teaRefs: await window.qcApi.listTeaRefs() }),

@@ -1,17 +1,21 @@
 import type { Db } from '../db/sqlite-like';
-import { listOperationalLevels, isTestInActivePanel } from '../db/operational-levels';
 import { readGlobalRules, writeGlobalRules } from '../db/rule-settings';
 import { createHistoricalWestgard } from '../db/historical-westgard';
-import { evaluateQcSets, effectiveQcFixDates } from '../db/westgard-evaluation';
+import { qcCuts } from '../db/westgard-evaluation';
+import { qcEpochOf } from '../domain/qc-cuts';
 import { cusumScan, acceptedRunPoints, rejectedLevelsByRun, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
-import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
+import { parseRuleActions, parseRuleScopes, serializeRuleActions, isRuleAction, globalRuleList, makeRuleActionLayered, NOT_RETROACTIVE_NOTE, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
+import { GLOBAL_RULE_SCOPE, recordRuleConfigChange } from '../db/rule-config-history';
 import { WG_RULE_REGISTRY, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
-import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
+import { qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { observedStats } from '../domain/observed-stats';
 import { type IpcResult, addChangeListener } from './shared';
 import { writeCommand } from './write-command';
 import { TestSummaryCache } from './summary-cache';
+import { previousLotsOf } from './previous-lot-cache';
+import { listPreviousLotMetadata } from '../db/lot-lineage';
+import { activeEvaluationOf } from './active-evaluation';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
 
@@ -33,44 +37,43 @@ function cusumSignalAt(cs: CusumResult, index: number): 'CUSUM +h' | 'CUSUM −h
 }
 
 // Nguồn duy nhất: hợp đồng dùng chung.
-import type { TestSummary, LevelAnalysis } from '../../shared/qc-api';
+import type { TestSummary, LevelAnalysis, ArchivedBlock } from '../../shared/qc-api';
 
 export type { TestSummary };
 
 export type { LevelAnalysis } from '../../shared/qc-api';
 
 export function createWestgardHandlers(db: Db) {
-  type ActivePoint = QcPointLike & { id: string; date: string; run_id: string; val: number; qcMean: number | null; qcSd: number | null };
-  type ActiveLevel = { level: number; mean: number | null; sd: number | null; qc_lot_id: string | null; lot_no: string; exp: string; pts: ActivePoint[] };
-  const pointOrder = compareQcPointOrder;
-
-  /** Mức QC ĐANG VẬN HÀNH của một xét nghiệm — hai cổng nằm ở
-   * `db/operational-levels.ts` (nguồn DUY NHẤT, dùng chung với Nhập QC; lý do
-   * và ca lệch đã đo được ghi ở đầu file đó). Ở đây chỉ còn phần riêng của
-   * trang này: nạp điểm chưa hủy của đúng lô đang gán từng mức.
-   * Nhóm lô đã dừng/lưu trữ có tab riêng (`listArchivedGroupTests`), đây
-   * không phải chỗ hiển thị chúng. */
-  function activeLevels(testId: string): ActiveLevel[] {
-    const levels = listOperationalLevels(db, testId);
-    const inActivePanel = isTestInActivePanel(db, testId);
-    return levels.map((level) => {
-      const rows = inActivePanel ? db.prepare(`SELECT id,date,run_id,val,qc_mean,qc_sd FROM qc_points
-        WHERE test_id=? AND level=? AND voided=0 AND lot=?`).all(testId, level.level, level.lot_no) as
-        { id: string; date: string; run_id: string; val: number; qc_mean: number | null; qc_sd: number | null }[] : [];
-      const pts = rows.map((row) => ({ ...row, runId: row.run_id, qcMean: row.qc_mean, qcSd: row.qc_sd })).sort(pointOrder);
-      return { ...level, pts };
-    });
-  }
+  // Mức QC ĐANG VẬN HÀNH của một xét nghiệm cùng kết luận Westgard của chúng
+  // lấy từ `activeEvaluationOf()` — chung với Nhập QC, nên hai trang luôn
+  // đánh giá trên cùng một tập dữ liệu. Nhóm lô đã dừng/lưu trữ có tab riêng
+  // (`listArchivedGroupTests`), đây không phải chỗ hiển thị chúng.
 
   const globalRules = (): RuleActionsMap => readGlobalRules(db);
+  /** Hai cấu hình chung cho cùng hành động ở mọi luật — so theo kết quả phân
+   * giải, không theo chuỗi JSON (`{}` và bảng mặc định đầy đủ là một). Lưu lại
+   * đúng cấu hình đang dùng không phải một lần đổi, không ghi phiên bản mới. */
+  // Mặc định khác nhau giữa 1–2 mức và từ 3 mức (WG-26): hai cấu hình chỉ
+  // giống nhau khi phân giải giống nhau ở cả hai nhóm số mức.
+  const sameResolvedRules = (a: RuleActionsMap, b: RuleActionsMap) => [2, 3].every((levelCount) => {
+    const actionA = makeRuleActionLayered(a, {}, levelCount), actionB = makeRuleActionLayered(b, {}, levelCount);
+    return WG_RULE_REGISTRY.every(rule => actionA(rule.id) === actionB(rule.id));
+  });
+  const settingsOf = (rules: RuleActionsMap, levelCount: number) => globalRuleList(rules, levelCount).map(r => {
+    const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
+    return { id: r.id, on: r.on, custom: r.custom, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
+  });
+  const cleanLevelCount = (value: unknown) => {
+    const n = Number(value);
+    return Number.isInteger(n) && n > 0 && n <= 20 ? n : 2;
+  };
 
   /** Cấu hình luật CHUNG (panel "Cấu hình chung của luật"): trạng thái bật/tắt
-   * + mô tả + gợi ý xử lý của từng luật, KHÔNG phụ thuộc xét nghiệm nào. */
-  function listRuleSettings(): { id: string; desc: string; on: boolean; fix: string; alert: boolean }[] {
-    return globalRuleList(globalRules()).map(r => {
-      const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
-      return { id: r.id, on: r.on, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
-    });
+   * + mô tả + gợi ý xử lý của từng luật, không phụ thuộc xét nghiệm nào. Luật
+   * chưa đặt riêng theo mặc định của `levelCount` mức QC (số mức của xét
+   * nghiệm đang xem; mặc định 2). */
+  function listRuleSettings(levelCount?: unknown): { id: string; desc: string; on: boolean; custom: boolean; fix: string; alert: boolean }[] {
+    return settingsOf(globalRules(), cleanLevelCount(levelCount));
   }
 
   /** Bật/tắt một luật ở tầng chung: đổi mặc định cho mọi xét nghiệm, không
@@ -80,28 +83,31 @@ export function createWestgardHandlers(db: Db) {
   const saveRuleSetting = writeCommand(db, 'saveRuleSetting', 'admin', (w, ruleId: string, on: boolean): IpcResult<{ ruleId: string; on: boolean }> => {
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (typeof on !== 'boolean') return { ok: false, error: { code: 'invalid-value', message: 'Trạng thái luật không hợp lệ.' } };
+    const before = globalRules();
+    const map = { ...before, [ruleId]: on };
+    if (sameResolvedRules(before, map)) return w.noChange({ ruleId, on });
     w.commit((tx) => {
-      const map = globalRules(); map[ruleId] = on;
       writeGlobalRules(db, map);
-      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${on ? 'bật' : 'tắt'} (cấu hình chung)`, ruleId);
-      tx.changed(['app_meta']);
+      recordRuleConfigChange(db, GLOBAL_RULE_SCOPE, { rules: before, scopes: {} }, { rules: map, scopes: {} }, w.actor.name || w.actor.username);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${on ? 'bật' : 'tắt'} (cấu hình chung). ${NOT_RETROACTIVE_NOTE}`, ruleId);
+      tx.changed(['app_meta', 'rule_config_history']);
     });
     return { ok: true, data: { ruleId, on } };
   });
 
-  /** Khôi phục toàn bộ cấu hình mặc định của `WG_RULE_REGISTRY`, không phải
-   * bật tất cả luật. */
-  const resetRuleSettings = writeCommand(db, 'resetRuleSettings', 'admin', (w): IpcResult<{ id: string; on: boolean; desc: string; fix: string; alert: boolean }[]> => {
+  /** Khôi phục mặc định của `WG_RULE_REGISTRY`: xoá mọi luật đặt riêng ở cấu
+   * hình chung, để mỗi xét nghiệm dùng bộ luật mặc định theo số mức QC của nó
+   * (WG-26). Không phải bật tất cả luật. */
+  const resetRuleSettings = writeCommand(db, 'resetRuleSettings', 'admin', (w, levelCount: unknown): IpcResult<{ id: string; on: boolean; custom: boolean; desc: string; fix: string; alert: boolean }[]> => {
     const defaults: RuleActionsMap = {};
-    for (const rule of WG_RULE_REGISTRY) defaults[rule.id] = rule.defaultOn;
+    const data = settingsOf(defaults, cleanLevelCount(levelCount));
+    const before = globalRules();
+    if (sameResolvedRules(before, defaults)) return w.noChange(data);
     w.commit((tx) => {
       writeGlobalRules(db, defaults);
-      tx.audit('Sửa cấu hình luật Westgard', 'Khôi phục cấu hình chung của luật về mặc định', 'Westgard');
-      tx.changed(['app_meta']);
-    });
-    const data = globalRuleList(defaults).map(r => {
-      const rule = WG_RULE_REGISTRY.find(x => x.id === r.id);
-      return { id: r.id, on: r.on, desc: rule?.desc || '', fix: rule?.fix || '', alert: !!rule?.alert };
+      recordRuleConfigChange(db, GLOBAL_RULE_SCOPE, { rules: before, scopes: {} }, { rules: defaults, scopes: {} }, w.actor.name || w.actor.username);
+      tx.audit('Sửa cấu hình luật Westgard', `Khôi phục cấu hình chung của luật về mặc định. ${NOT_RETROACTIVE_NOTE}`, 'Westgard');
+      tx.changed(['app_meta', 'rule_config_history']);
     });
     return { ok: true, data };
   });
@@ -135,9 +141,8 @@ export function createWestgardHandlers(db: Db) {
   }
 
   function summarizeLevels(t: { test_id: string; cusum_on: number; cusum_k: number; cusum_h: number }, today: string): TestSummary['levels'] {
-    const active = { levels: activeLevels(t.test_id) };
-    const byPoint = evaluateQcSets(db, t.test_id, active.levels);
-    const levels = active.levels.map(lv => {
+    const { levels: activeLevels, byPoint } = activeEvaluationOf(db, t.test_id);
+    const levels = activeLevels.map(lv => {
       const points = lv.pts;
       let worstVerdict: RuleVerdict = 'ok';
       // `latestVerdict`/`latestRules` là kết luận của ĐIỂM CUỐI CÙNG, KHÁC
@@ -189,12 +194,14 @@ export function createWestgardHandlers(db: Db) {
     mean: unknown, sd: unknown, k: unknown, h: unknown, maWindow: number,
   ): CusumResult {
     const accepted = rows.filter(r => acceptedIds.has(r.id));
-    const fixDates = effectiveQcFixDates(db, testId);
-    let fixCursor = 0;
+    // Đặt lại khi điểm sang giai đoạn mới so với điểm được chấp nhận trước nó
+    // — cùng mốc cắt với luật Westgard (`domain/qc-cuts.ts`).
+    const cuts = qcCuts(db, testId);
+    let epoch = 0;
     const scan = cusumScan(accepted as unknown as QcPointLike[], mean, sd, Number(k), Number(h), maWindow, (point) => {
-      const date = String((point as { date?: unknown }).date || '');
-      let reset = false;
-      while (fixCursor < fixDates.length && fixDates[fixCursor] < date) { reset = true; fixCursor++; }
+      const next = qcEpochOf(point, cuts);
+      const reset = next > epoch;
+      epoch = next;
       return reset;
     });
     // Ánh xạ về đúng độ dài `rows`: điểm ngoài chuỗi giữ nguyên trạng thái
@@ -216,8 +223,8 @@ export function createWestgardHandlers(db: Db) {
 
   function analyzeLevel(testId: string, level: number): LevelAnalysis {
     const test = db.prepare('SELECT cusum_on, cusum_k, cusum_h FROM tests WHERE id=?').get(testId) as { cusum_on: number; cusum_k: number; cusum_h: number } | undefined;
-    const active = { levels: activeLevels(testId) }, levelRow = active.levels.find((item) => item.level === level), rows = levelRow?.pts || [];
-    const byPoint = evaluateQcSets(db, testId, active.levels);
+    const { levels: activeLevels, byPoint } = activeEvaluationOf(db, testId);
+    const levelRow = activeLevels.find((item) => item.level === level), rows = levelRow?.pts || [];
     const hasTarget = !!(levelRow && levelRow.mean != null && levelRow.sd != null);
     // CUSUM chỉ tính khi xét nghiệm đã bật và mức có Mean/SD hợp lệ; dùng đúng
     // ngưỡng cấu hình của xét nghiệm.
@@ -238,7 +245,7 @@ export function createWestgardHandlers(db: Db) {
     // Lý do loại theo LẦN CHẠY — cùng trường mà `entry:queryPoints` và tab
     // lô lịch sử trả, để ba đường đọc không mô tả cùng một điểm bằng ba hình
     // dạng khác nhau.
-    const rejectedBy = rejectedLevelsByRun(active.levels, byPoint);
+    const rejectedBy = rejectedLevelsByRun(activeLevels, byPoint);
     const points = rows.map((r, i) => {
       // Mức chưa có Mean/SD hợp lệ: điểm chưa được đánh giá ('none'), không
       // phải 'ok'; Z không có nghĩa (giữ
@@ -252,28 +259,41 @@ export function createWestgardHandlers(db: Db) {
     return { points, cusum: { cPos: cs.cPos, cNeg: cs.cNeg, flags: cs.flags, k: cs.k, h: cs.h, ma: cs.ma || [] }, cusumOn };
   }
 
-  const { listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks } = createHistoricalWestgard(db);
+  const { listArchivedBlocks, listArchivedGroupTests } = createHistoricalWestgard(db);
+  const listPreviousLotBlocks = (testId: string): ArchivedBlock[] => previousLotsOf(db, testId).blocks;
+  const listPreviousLotLevels = (testId: string): number[] => [...new Set(listPreviousLotMetadata(db, testId).map(lot => lot.level))];
 
   /** Ghi đè riêng cho một xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
-   * hình chung. */
-  const saveRuleAction = writeCommand(db, 'saveRuleAction', 'write', (w, testId: string, ruleId: string, value: RuleAction | ''): IpcResult<{ ruleId: string; action: RuleAction | '' }> => {
-    const test = db.prepare('SELECT id, name, rule_actions_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string } | undefined;
+   * hình chung.
+   *
+   * CHỈ admin, cùng mức với `saveRuleScope` và cấu hình luật chung: hành động
+   * của luật quyết định lần chạy nào bị loại (ISO 15189:2022 7.3.7.2). Trước
+   * đây cổng là `write`, nên KTV đổi được 1-3s thành "Cảnh báo" qua máy trạm
+   * LAN dù giao diện chỉ mở ở trang Cấu hình chung của admin. */
+  const saveRuleAction = writeCommand(db, 'saveRuleAction', 'admin', (w, testId: string, ruleId: string, value: RuleAction | ''): IpcResult<{ ruleId: string; action: RuleAction | '' }> => {
+    const test = db.prepare('SELECT id, name, rule_actions_json, rule_scopes_json FROM tests WHERE id=?').get(testId) as { id: string; name: string; rule_actions_json: string; rule_scopes_json: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (!WG_RULE_REGISTRY.some(r => r.id === ruleId)) return { ok: false, error: { code: 'invalid-rule', message: 'Mã luật không hợp lệ.' } };
     if (value !== '' && !isRuleAction(value)) return { ok: false, error: { code: 'invalid-action', message: 'Hành động luật không hợp lệ.' } };
     const overrides = parseRuleActions(test.rule_actions_json);
+    const before = { ...overrides }, scopes = parseRuleScopes(test.rule_scopes_json);
+    const previous = overrides[ruleId];
     const action: RuleAction | '' = value;
+    if ((previous ?? '') === action) return w.noChange({ ruleId, action });
     if (action) overrides[ruleId] = action; else delete overrides[ruleId];
-    const label = action === '' ? 'theo cấu hình chung' : action === 'inactive' ? 'không dùng' : action === 'alert' ? 'cảnh báo' : 'loại bỏ';
+    // Bản ghi cũ có thể là boolean (`true`/`false` từ trước khi có hành động).
+    const labelOf = (item: RuleAction | boolean | '' | undefined) => item === '' || item === undefined ? 'theo cấu hình chung'
+      : item === true ? 'bật (hành động mặc định)' : item === false || item === 'inactive' ? 'không dùng' : item === 'alert' ? 'cảnh báo' : 'loại bỏ';
     w.commit((tx) => {
       db.prepare('UPDATE tests SET rule_actions_json=? WHERE id=?').run(serializeRuleActions(overrides), testId);
-      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId} chuyển thành ${label}`, test.name);
-      tx.changed(['tests'], [testId]);
+      recordRuleConfigChange(db, testId, { rules: before, scopes }, { rules: overrides, scopes }, w.actor.name || w.actor.username);
+      tx.audit('Sửa cấu hình luật Westgard', `Luật ${ruleId}: ${labelOf(previous)} → ${labelOf(action)}. ${NOT_RETROACTIVE_NOTE}`, test.name);
+      tx.changed(['tests', 'rule_config_history'], [testId]);
     });
     return { ok: true, data: { ruleId, action } };
   });
 
-  return { listTestSummaries, analyzeLevel, saveRuleAction, listRuleSettings, saveRuleSetting, resetRuleSettings, listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks };
+  return { listTestSummaries, analyzeLevel, saveRuleAction, listRuleSettings, saveRuleSetting, resetRuleSettings, listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks, listPreviousLotLevels };
 }
 
 export type WestgardHandlers = ReturnType<typeof createWestgardHandlers>;

@@ -3,7 +3,7 @@
 // nhanh 1 bảng); Excel do main dựng và trả base64 (`exportTableXlsx`).
 // PDF: gọi thẳng IPC, main tự lo cửa sổ ẩn + hộp thoại lưu file native (khác
 // Excel có chủ đích — xem export-handlers.ts).
-function downloadBlob(blob: Blob, filename: string) {
+export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;

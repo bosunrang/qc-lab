@@ -2,19 +2,12 @@
 // ngày 2026-09-26 (kế hoạch kiến trúc D.7), giữ nguyên thứ tự khai báo.
 import { vnDate as formatVnDate } from '../../lib/format';
 import type { SigmaCohortView, SigmaLevelResult } from '../../../shared/qc-api';
-import type { SigmaTeaSource } from '../../lib/sigma-tea';
+import { TEA_SOURCES, type SigmaTeaSource } from '../../lib/sigma-tea';
+export { TEA_SOURCES } from '../../lib/sigma-tea';
+export { cohortStatusLabel } from '../../lib/sigma-workflow';
 
 /** Dải năm cho bộ lọc và hộp thêm kỳ: năm nay ± 5. */
 export const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
-
-/** Nguồn TEa được hỗ trợ. Cấu hình được chụp vào kỳ Sigma khi tạo để lịch sử
- * không bị thay đổi ngầm. */
-export const TEA_SOURCES: ReadonlyArray<{ value: SigmaTeaSource; label: string }> = [
-  { value: 'lab', label: 'TEa chuẩn hóa của phòng xét nghiệm' },
-  { value: 'eflm', label: 'EFLM - nhập từ database' },
-  { value: 'clia', label: 'CLIA PT (CMS-3355-F)' },
-  { value: 'ricos', label: 'Ricos / Westgard biological variation' },
-];
 
 export function isKnownTeaSource(value: string): value is SigmaTeaSource {
   return TEA_SOURCES.some((source) => source.value === value);
@@ -53,14 +46,10 @@ export function missingSigmaInputs(level: SigmaLevelResult): string[] {
   const missing: string[] = [];
   if (level.tea == null) missing.push('TEa');
   if (level.cv == null) missing.push('CV IQC%');
-  if (level.biasEqa == null) missing.push('Bias RMS EQA%');
+  if (level.biasEqa == null) missing.push('Bias EQA%');
   return missing;
 }
 
-export function cohortStatusLabel(status: SigmaCohortView['status'] | string): string {
-  return status === 'eligible' ? 'Đủ số điểm — cần rà soát' : status === 'provisional' ? 'Tạm thời (20–29)' : status === 'insufficient' ? 'Chưa đủ (<20)'
-    : status === 'out-of-control' ? 'Mất kiểm soát chưa xử lý' : 'Không ổn định';
-}
 
 /** Màu trạng thái dùng bộ badge chung, để bảng chọn cohort không tự tạo một
  * ngôn ngữ cảnh báo riêng với phần còn lại của ứng dụng. */
@@ -78,13 +67,16 @@ export function designRunText(design: { n: number; r: number; alternatives: { n:
   return [one(design.n, design.r), ...alts].join(' hoặc ');
 }
 
-/** Năm bậc màu và ngưỡng diễn giải Sigma dùng thống nhất trong toàn thẻ. */
+/** Năm bậc màu và ngưỡng diễn giải Sigma dùng thống nhất trong toàn thẻ.
+ * Cận biên và Tốt làm đậm ngày 09/11/2026 (U5/U19, người dùng chọn): chữ trắng
+ * trên #dd8b1f chỉ 2,70:1 và trên #3f9a55 chỉ 3,52:1; nay 5,14:1 và 5,08:1,
+ * giữ nguyên tông màu. Cùng giá trị với dải màu ở `SigmaCharts.tsx`. */
 export function sigmaZone(value: number | null | undefined): { c: string; label: string } {
   const sigma = value == null ? NaN : Number(value);
   if (!Number.isFinite(sigma)) return { c: '#506674', label: '—' };
   if (sigma >= 6) return { c: '#13603f', label: 'Đẳng cấp thế giới' };
   if (sigma >= 5) return { c: '#2c7d5c', label: 'Xuất sắc' };
-  if (sigma >= 4) return { c: '#3f9a55', label: 'Tốt' };
-  if (sigma >= 3) return { c: '#dd8b1f', label: 'Cận biên' };
+  if (sigma >= 4) return { c: '#2e7d43', label: 'Tốt' };
+  if (sigma >= 3) return { c: '#a35c00', label: 'Cận biên' };
   return { c: '#c0362c', label: 'Không đạt' };
 }

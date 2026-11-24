@@ -9,7 +9,7 @@ import test from 'node:test';
 import { bootstrapAndLogin, countIpcCalls, enterValue, launchApp, openPage, seedOperationalTest, todayIn } from './helpers.mjs';
 
 const SUMMARIES = 'westgard:listTestSummaries';
-const QUERY_POINTS = 'entry:queryPoints';
+const ENTRY_WINDOW = 'entry:getWindow';
 
 /** Chờ các lệnh nạp lại do thông báo thay đổi kịp chạy xong. */
 const settle = (page) => page.waitForTimeout(800);
@@ -20,16 +20,16 @@ test('một thao tác ghi chỉ làm nạp lại một lần', { timeout: 180_00
     await bootstrapAndLogin(page);
     const seeded = await seedOperationalTest(page);
     const today = await todayIn(page);
-    const counter = await countIpcCalls(app, [SUMMARIES, QUERY_POINTS]);
+    const counter = await countIpcCalls(app, [SUMMARIES, ENTRY_WINDOW]);
 
     await openPage(page, 'Nhập QC & Biểu đồ');
     await page.locator('.qc-sheet-title strong', { hasText: seeded.testName }).waitFor();
     await settle(page);
     await counter.reset();
     await enterValue(page, today, 1, 5.1);
-    await page.locator('.entry-sheet-message .alert.ok').waitFor();
+    await page.locator('.toast-ok').waitFor();
     await settle(page);
-    assert.deepEqual(await counter.read(), { [SUMMARIES]: 1, [QUERY_POINTS]: 2 },
+    assert.deepEqual(await counter.read(), { [SUMMARIES]: 1, [ENTRY_WINDOW]: 1 },
       'nhập một điểm: cây xét nghiệm nạp lại 1 lần, bảng hai mức nạp lại 1 lần');
 
     await openPage(page, 'Tổng quan');

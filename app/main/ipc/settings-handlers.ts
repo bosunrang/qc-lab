@@ -3,8 +3,9 @@
 import { dbFileBytes } from './db-file-size';
 import type { Db } from '../db/sqlite-like';
 import { prepareLabProfile, type LabProfileInput } from '../domain/settings-validation';
-import { type IpcResult } from './shared';
+import { type IpcResult, nowIso } from './shared';
 import { writeCommand } from './write-command';
+import { readOperationMode, writeOperationMode, type OperationModeState } from '../db/operation-mode';
 
 export interface LabProfile {
   id: number; name: string; dept: string; address: string;
@@ -69,7 +70,22 @@ export function createSettingsHandlers(db: Db, dbPath: string) {
     };
   }
 
-  return { getLabProfile, getLoginBrand, saveLabProfile, getStorageInfo };
+  /** Bật chế độ vận hành (`db/operation-mode.ts`) — một chiều, không có thao
+   * tác tắt. Renderer xác thực lại mật khẩu trước khi gọi, như các thao tác
+   * không hoàn tác khác. Chặn "Xoá sạch dữ liệu thử" ở `backup-handlers.ts`. */
+  const enableOperationMode = writeCommand(db, 'enableOperationMode', 'admin', (w): IpcResult<OperationModeState> => {
+    const current = readOperationMode(db);
+    if (current) return w.noChange(current);
+    const state: OperationModeState = { enabledAt: nowIso(), enabledBy: w.actor.name || w.actor.username };
+    w.commit((tx) => {
+      writeOperationMode(db, state);
+      tx.audit('Bật chế độ vận hành', 'Từ nay không còn "Xoá sạch dữ liệu thử"; dữ liệu QC chỉ thay đổi qua các quy trình có nhật ký. Không thể tắt chế độ này.', '');
+      tx.changed(['app_meta']);
+    });
+    return { ok: true, data: state };
+  });
+
+  return { getLabProfile, getLoginBrand, saveLabProfile, getStorageInfo, enableOperationMode };
 }
 
 export type SettingsHandlers = ReturnType<typeof createSettingsHandlers>;

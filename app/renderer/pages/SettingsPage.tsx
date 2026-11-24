@@ -2,12 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store/settings-store';
+import { useAuthStore } from '../store/auth-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
-import { infoDialog, confirmDialog, reauthDialog } from '../state/dialog-store';
+import { choiceDialog, confirmDialog, infoDialog, errorDialog, reauthDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
+import { BrandIdentity } from '../components/BrandIdentity';
+import { ImagePlusIcon } from '../components/BtnIcons';
+import type { LisQueueRecord } from '../../shared/qc-api';
+import { NceConfigPanel } from './settings/NceConfigPanel';
+import { auditSizeWarning } from '../../main/domain/audit-filter';
+import { formatAuditDateTimeVN } from '../../main/domain/audit-format';
 
 const LOGO_SIZE = 96;
 
@@ -23,23 +30,6 @@ const FIREBASE_CONFIG_PLACEHOLDER = `const firebaseConfig = {
 
 function formatMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function UnitProfileIcon() {
-  return (
-    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 21h18M5 21v-7c0-.6.4-1 1-1h4v8M10 21V5c0-.6.4-1 1-1h7c.6 0 1 .4 1 1v16M7 16h1M7 18h1M13 8h1M16 8h1M13 12h1M16 12h1M13 16h1M16 16h1" />
-    </svg>
-  );
-}
-
-function BrandIcon() {
-  return (
-    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="m8 15 2.4-2.5 2.2 2 2.1-2.2L18 16M8 9h.01" />
-    </svg>
-  );
 }
 
 function CloudSyncIcon() {
@@ -66,10 +56,10 @@ export function SettingsPage() {
   const {
     profile, backup: backupInfo, lis, lisQueue, firebase,
     loadAll, loadStorage, save, loadFirebase,
-    exportBackup, chooseBackupFile, importBackup, resetOperationalData,
+    exportBackup, chooseBackupFile, importBackup, resetOperationalData, enableOperationMode,
     saveLis, pullLisQueue, importLisResult, rejectLisResult,
     connectFirebase: connectFirebaseApi, syncFirebase, disconnectFirebase: disconnectFirebaseApi,
-  } = useSettingsStore(useShallow((s) => ({ profile: s.profile, backup: s.backup, lis: s.lis, lisQueue: s.lisQueue, firebase: s.firebase, loadAll: s.loadAll, loadStorage: s.loadStorage, save: s.save, loadFirebase: s.loadFirebase, exportBackup: s.exportBackup, chooseBackupFile: s.chooseBackupFile, importBackup: s.importBackup, resetOperationalData: s.resetOperationalData, saveLis: s.saveLis, pullLisQueue: s.pullLisQueue, importLisResult: s.importLisResult, rejectLisResult: s.rejectLisResult, connectFirebase: s.connectFirebase, syncFirebase: s.syncFirebase, disconnectFirebase: s.disconnectFirebase })));
+  } = useSettingsStore(useShallow((s) => ({ profile: s.profile, backup: s.backup, lis: s.lis, lisQueue: s.lisQueue, firebase: s.firebase, loadAll: s.loadAll, loadStorage: s.loadStorage, save: s.save, loadFirebase: s.loadFirebase, exportBackup: s.exportBackup, chooseBackupFile: s.chooseBackupFile, importBackup: s.importBackup, resetOperationalData: s.resetOperationalData, enableOperationMode: s.enableOperationMode, saveLis: s.saveLis, pullLisQueue: s.pullLisQueue, importLisResult: s.importLisResult, rejectLisResult: s.rejectLisResult, connectFirebase: s.connectFirebase, syncFirebase: s.syncFirebase, disconnectFirebase: s.disconnectFirebase })));
   const [name, setName] = useState('');
   const [dept, setDept] = useState('');
   const [address, setAddress] = useState('');
@@ -85,6 +75,7 @@ export function SettingsPage() {
   const [lisUrl, setLisUrl] = useState('');
   const [lisToken, setLisToken] = useState('');
   const [lisErr, setLisErr] = useState<string | null>(null);
+  const [lisUrlErr, setLisUrlErr] = useState<string | null>(null);
   const [lisQueueOpen, setLisQueueOpen] = useState(false);
   const [fbCode, setFbCode] = useState('khoaXN');
   const [fbEmail, setFbEmail] = useState('');
@@ -147,13 +138,13 @@ export function SettingsPage() {
 
   if (!profile) return <div className="panel"><EmptyState>Đang tải…</EmptyState></div>;
 
-  const showError = (message: string) => infoDialog(message, { type: 'warn' });
+  const showError = (message: string) => errorDialog(message);
 
   async function submit() {
     const result = await save({ name, dept, address, brandTitle, brandSub, logoText, logoData: pendingLogo || undefined });
     if (!result.ok) { await showError(result.error.message); return; }
     setPendingLogo(null);
-    await infoDialog('Đã lưu cài đặt.', { type: 'success' });
+    showToast('Đã lưu cài đặt.');
   }
 
   function pickLogo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -195,7 +186,7 @@ export function SettingsPage() {
     const result = await exportBackup();
     if (!result.ok) { await showError(result.error.message); return; }
     if (!result.data) return;
-    await infoDialog(`Đã xuất backup ${formatMb(result.data.bytes)} (${result.data.points} điểm QC) tại:\n${result.data.path}`, { type: 'success' });
+    await infoDialog(`Đã xuất bản sao lưu ${formatMb(result.data.bytes)} (${result.data.points} điểm QC) tại:\n${result.data.path}`, { type: 'success' });
   }
 
   /** Log và tệp crash chỉ lưu tại máy; người quản trị mở thư mục để gửi kèm
@@ -214,25 +205,40 @@ export function SettingsPage() {
 
   async function pickBackupFile() {
     const verified = await chooseBackupFile();
-    if (!verified.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`, { type: 'warn' }); return; }
+    if (!verified.ok) { await errorDialog(`Tệp sao lưu KHÔNG hợp lệ: ${verified.error.message}`); return; }
     if (!verified.data) return;
     const created = verified.data.createdAt ? ` tạo lúc ${new Date(verified.data.createdAt).toLocaleString('vi-VN')}` : '';
-    if (!(await confirmDialog(
-      `File ${verified.data.fileName} hợp lệ (${verified.data.points} điểm QC${created}). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè. Tiếp tục?`,
-      { title: 'Phục hồi từ backup', danger: true, confirmLabel: 'Phục hồi' },
-    ))) return;
-    if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ backup là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
-    const result = await importBackup();
+    // Bản sao lưu cũ thường mang tài khoản và mật khẩu cũ: mặc định giữ tài
+    // khoản của máy này để phục hồi xong vẫn đăng nhập được.
+    const mode = await choiceDialog({
+      title: 'Phục hồi từ bản sao lưu',
+      message: `File ${verified.data.fileName} hợp lệ (${verified.data.points} điểm QC${created}). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè.`,
+      options: [
+        { key: 'all', label: 'Thay cả tài khoản', variant: 'danger', hint: 'danh sách tài khoản lấy theo bản sao lưu; phải đăng nhập bằng mật khẩu của bản sao lưu.' },
+        { key: 'keep', label: 'Giữ tài khoản hiện tại', variant: 'teal', hint: 'chỉ thay dữ liệu; tài khoản và mật khẩu đang dùng trên máy này giữ nguyên.' },
+      ],
+    });
+    if (!mode) return;
+    if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ bản sao lưu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
+    const result = await importBackup(mode === 'keep');
     if (!result.ok) { await showError(result.error.message); return; }
+    if (result.data.signedOut) {
+      await useAuthStore.getState().endSession(`Đã phục hồi thành công. Tài khoản vừa dùng không có trong bản sao lưu: đăng nhập bằng tài khoản của bản sao lưu, hoặc tạo quản trị mới nếu bản sao lưu không kèm tài khoản. Bản an toàn trước khi phục hồi: ${result.data.preRestoreSnapshotPath}`);
+      return;
+    }
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
 
   // Lưu cấu hình LIS Gateway (xem main/ipc/lis-handlers.ts).
   async function saveLisSettings() {
-    setLisErr(null);
+    setLisErr(null); setLisUrlErr(null);
     const result = await saveLis({ enabled: lisEnabled, url: lisUrl, token: lisToken });
-    if (!result.ok) { setLisErr(result.error.message); return; }
-    await infoDialog('Đã lưu cấu hình LIS Gateway.', { type: 'success' });
+    if (!result.ok) {
+      if (result.error.code === 'invalid-url') setLisUrlErr(result.error.message);
+      else await errorDialog(result.error.message, { title: 'Chưa lưu được cấu hình LIS' });
+      return;
+    }
+    showToast('Đã lưu cấu hình LIS Gateway.');
   }
 
   async function refreshFirebase() {
@@ -247,37 +253,37 @@ export function SettingsPage() {
       if (!result.ok) { await showError(result.error.message); return; }
       if (result.data.state === 'conflict') {
         const push = await confirmDialog(
-          'Cả máy này và Firebase đều có dữ liệu khác nhau. Chọn “Đẩy dữ liệu máy” để ghi đè bản đám mây. Chọn “Hủy” để giữ nguyên và chọn tải dữ liệu đám mây ở bước tiếp theo.',
+          'Cả máy này và Firebase đều có dữ liệu khác nhau. Chọn “Đẩy dữ liệu máy” để ghi đè bản đám mây. Chọn “Huỷ” để giữ nguyên và chọn tải dữ liệu đám mây ở bước tiếp theo.',
           { title: 'Chọn hướng đồng bộ', danger: true, confirmLabel: 'Đẩy dữ liệu máy' },
         );
         if (push) {
           const synced = await syncFirebase('push');
           if (!synced.ok) { await showError(synced.error.message); return; }
-          await infoDialog('Đã ghi dữ liệu trên máy lên Firebase.', { type: 'success' });
-        } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một backup an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
+          showToast('Đã ghi dữ liệu trên máy lên Firebase.');
+        } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một bản sao lưu an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
           if (!(await reauthDialog({ title: 'Xác thực trước khi tải Firebase', message: 'Tải dữ liệu đám mây sẽ thay thế dữ liệu cục bộ — xác thực lại mật khẩu.' }))) return;
           const synced = await syncFirebase('pull');
           if (!synced.ok) { await showError(synced.error.message); return; }
-          await infoDialog('Đã tải dữ liệu từ Firebase. Nếu tài khoản hiện tại không còn trong dữ liệu đám mây, hãy đăng nhập lại.', { type: 'success' });
+          await infoDialog('Đã tải dữ liệu từ Firebase. Tài khoản trên máy được giữ nguyên; tài khoản chỉ có trên đám mây được thêm ở trạng thái khoá — mở ở trang Người dùng nếu cần.', { type: 'success' });
         }
       } else {
-        await infoDialog(result.data.state === 'pushed' ? 'Đã kết nối và đưa dữ liệu hiện tại lên Firebase.' : 'Đã kết nối Firebase; dữ liệu đã đồng bộ.', { type: 'success' });
+        showToast(result.data.state === 'pushed' ? 'Đã kết nối và đưa dữ liệu hiện tại lên Firebase.' : 'Đã kết nối Firebase; dữ liệu đã đồng bộ.');
       }
       await refreshFirebase();
     } finally { setFbBusy(false); }
   }
 
   async function disconnectFirebase() {
-    if (!(await confirmDialog('Ngắt Firebase? Dữ liệu vẫn được giữ nguyên trên máy.', { title: 'Ngắt đồng bộ đám mây' }))) return;
+    if (!(await confirmDialog('Ngắt Firebase? Dữ liệu vẫn được giữ nguyên trên máy.', { title: 'Ngắt đồng bộ đám mây', danger: false }))) return;
     const result = await disconnectFirebaseApi();
     if (!result.ok) { await showError(result.error.message); return; }
     await refreshFirebase();
-    await infoDialog('Đã ngắt Firebase.', { type: 'success' });
+    showToast('Đã ngắt Firebase.');
   }
 
 
   async function openLisQueue() {
-    if (!lisEnabled) { setLisErr('Bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.'); return; }
+    if (!lisEnabled) { await infoDialog('Bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.', { title: 'LIS Gateway đang tắt' }); return; }
     setLisErr(null);
     const result = await pullLisQueue();
     if (!result.ok) { setLisErr(result.error.message); return; }
@@ -293,14 +299,14 @@ export function SettingsPage() {
     // `importLisResult` của store tự làm mới hàng chờ TỪ NGUỒN THẬT sau khi
     // ghi thành công (không tự suy đoán trạng thái mới) — xem settings-store.
     const result = await importLisResult(record);
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
+    if (!result.ok) { await errorDialog(result.error.message); return; }
     if (result.data.gatewayWarning) await infoDialog(result.data.gatewayWarning, { type: 'warn' });
   }
 
   async function rejectLisRecord(messageId: string) {
     if (!(await confirmDialog('Bỏ kết quả QC này khỏi hàng chờ LIS?', { title: 'Hàng chờ LIS', danger: true }))) return;
     const result = await rejectLisResult(messageId);
-    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
+    if (!result.ok) await errorDialog(result.error.message);
   }
 
   function backupStatusText(): string {
@@ -309,16 +315,16 @@ export function SettingsPage() {
     return days <= 0 ? 'Sao lưu gần nhất: hôm nay.' : `Sao lưu gần nhất: ${days} ngày trước.`;
   }
   function backupCapacityText(): string {
-    return backupInfo?.lastBackupBytes ? `Backup gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
+    return backupInfo?.lastBackupBytes ? `Bản sao lưu gần nhất ${formatMb(backupInfo.lastBackupBytes)}.` : '';
   }
 
-  /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký.
+  /** "Xoá sạch dữ liệu thử" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký.
    * Không thể hoàn tác nên đi qua đủ confirm + reauth, và main tự chốt 1 bản
    * an toàn ra đĩa trước. */
   async function resetAll() {
     if (!(await confirmDialog(
       'Toàn bộ máy xét nghiệm, xét nghiệm, mức QC, điểm QC, hồ sơ NCE, so sánh hoá chất, kỳ Sigma, khoá kỳ báo cáo và bảng TEa sẽ bị xoá. Tài khoản người dùng và nhật ký hoạt động được giữ lại. Một bản sao lưu an toàn sẽ được tạo tự động trước khi xoá. Tiếp tục?',
-      { title: 'Xóa sạch dữ liệu test', danger: true, confirmLabel: 'Xóa sạch' },
+      { title: 'Xoá sạch dữ liệu thử', danger: true, confirmLabel: 'Xoá sạch' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi xoá', message: 'Xoá sạch dữ liệu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
     const result = await resetOperationalData();
@@ -327,12 +333,26 @@ export function SettingsPage() {
     await infoDialog(`Đã xoá ${result.data.clearedTables.length} bảng dữ liệu vận hành.\n\nBản sao lưu trước khi xoá: ${result.data.preResetSnapshotPath}`, { type: 'success' });
   }
 
+  /** Bật chế độ vận hành: một chiều, nên đi qua confirm + reauth như xoá sạch. */
+  async function turnOnOperationMode() {
+    if (!(await confirmDialog(
+      'Sau khi bật, "Xoá sạch dữ liệu thử" bị khoá vĩnh viễn trên máy này; dữ liệu QC chỉ còn thay đổi qua các quy trình có nhật ký (huỷ điểm, lưu trữ nhật ký…). Phục hồi bản sao lưu hay tải từ Firebase cũng không tắt được chế độ này. Chỉ bật khi đã bắt đầu dùng dữ liệu QC thật. Tiếp tục?',
+      { title: 'Bật chế độ vận hành', danger: true, confirmLabel: 'Bật chế độ vận hành' },
+    ))) return;
+    if (!(await reauthDialog({ title: 'Xác thực bật chế độ vận hành', message: 'Bật chế độ vận hành là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
+    const result = await enableOperationMode();
+    if (!result.ok) { await showError(result.error.message); return; }
+    await infoDialog('Đã bật chế độ vận hành. "Xoá sạch dữ liệu thử" không còn dùng được.', { type: 'success' });
+  }
+  const operationMode = backupInfo?.operationMode ?? null;
+  const auditWarning = backupInfo ? auditSizeWarning(backupInfo.activityRows) : null;
+
   return (
     <>
-      <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
+      <PageHeader title="Cài đặt & Kết nối" subtitle="Thông tin đơn vị, sao lưu và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">
-          <h2 className="panel-title settings-panel-title"><UnitProfileIcon />Thông tin đơn vị</h2>
+          <h2 className="panel-title">Thông tin đơn vị</h2>
           <div className="settings-unit-fields">
             <div className="field"><label htmlFor="labName">Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="field"><label htmlFor="labDept">Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value={dept} onChange={(e) => setDept(e.target.value)} /></div>
@@ -342,7 +362,7 @@ export function SettingsPage() {
         </div>
 
         <div className="panel">
-          <h2 className="panel-title settings-panel-title"><BrandIcon />Logo &amp; tên phần mềm</h2>
+          <h2 className="panel-title">Logo &amp; tên phần mềm</h2>
           <div className="grid2">
             <div className="settings-brand-fields">
               <div className="field"><label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} /></div>
@@ -352,15 +372,22 @@ export function SettingsPage() {
             <div className="settings-logo-fields">
               <div className="field">
                 <label>Logo hiện tại</label>
-                <div className="brand-preview">
-                  <div className="brand-mark">{currentLogo ? <img src={currentLogo} alt="" /> : (logoText || 'QC')}</div>
-                  <div><b>{brandTitle}</b><small>{brandSub}</small></div>
+                <div className="brand brand-preview">
+                  <BrandIdentity
+                    title={brandTitle.trim()}
+                    subtitle={brandSub.trim()}
+                    logoText={logoText.trim() || profile.logo_text}
+                    logoData={currentLogo}
+                  />
                 </div>
               </div>
               <div className="field">
-                <label>Chọn ảnh logo</label>
+                <label htmlFor="logoFilePick">Chọn ảnh logo</label>
                 <div className="file-pick">
-                  <button type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>Chọn tệp</button>
+                  <button id="logoFilePick" type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
+                    <ImagePlusIcon />
+                    Chọn tệp
+                  </button>
                   <span id="logoFileName" className="hint">{logoFileName || 'Chưa chọn tệp'}</span>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickLogo} />
@@ -377,32 +404,49 @@ export function SettingsPage() {
 
       <div className="panel settings-admin-panel">
         <h2 className="panel-title settings-panel-title"><DataAdminIcon />Quản trị dữ liệu</h2>
+        {auditWarning && <div className="alert warn" role="status">{auditWarning} Mở trang Nhật ký hoạt động để lưu trữ.</div>}
         <div className="admin-tools">
           <div className="admin-tool">
-            <b>Xuất backup</b>
+            <b>Xuất bản sao lưu</b>
             <span>Lưu toàn bộ dữ liệu ra một tệp .sqlite. {backupStatusText()} {backupCapacityText()}</span>
-            <button className="btn ghost" onClick={exportBackupFile}>Xuất backup</button>
+            <button className="btn ghost" onClick={exportBackupFile}>Xuất bản sao lưu</button>
           </div>
           <div className="admin-tool">
-            <b>Nhập backup</b>
+            <b>Nhập bản sao lưu</b>
             <span>Chọn file để kiểm tra tự động rồi khôi phục dữ liệu. Chỉ quản trị viên được nhập.</span>
-            <button className="btn ghost" onClick={pickBackupFile}>Chọn file backup</button>
+            <button className="btn ghost" onClick={pickBackupFile}>Chọn tệp sao lưu</button>
           </div>
           <div className="admin-tool">
             <b>Nhật ký lỗi của ứng dụng</b>
-            <span>Lỗi và tệp crash chỉ lưu trên máy này, không gửi đi đâu. Xuất gói log (một tệp .zip) để gửi kèm khi báo lỗi; tệp log không chứa mật khẩu, token hay dữ liệu QC.</span>
+            <span>Nhật ký lỗi chỉ lưu trên máy này. Khi báo lỗi, xuất gói log (.zip) để gửi kèm; gói không chứa mật khẩu, token hay dữ liệu QC.</span>
             <div className="admin-tool-actions">
               <button className="btn ghost" onClick={exportLogs}>Xuất gói log…</button>
               <button className="btn ghost" onClick={openLogs}>Mở thư mục log</button>
             </div>
           </div>
-          <div className="admin-tool">
-            <b>Xóa sạch dữ liệu test</b>
-            <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
-            <button className="btn danger" onClick={resetAll}>Xóa sạch dữ liệu</button>
-          </div>
+          {operationMode ? (
+            <div className="admin-tool">
+              <b>Chế độ vận hành</b>
+              <span>Đã bật lúc {formatAuditDateTimeVN(operationMode.enabledAt)}{operationMode.enabledBy ? ` bởi ${operationMode.enabledBy}` : ''}. "Xoá sạch dữ liệu thử" đã bị khoá; dữ liệu QC chỉ thay đổi qua các quy trình có nhật ký.</span>
+            </div>
+          ) : (
+            <>
+              <div className="admin-tool">
+                <b>Xoá sạch dữ liệu thử</b>
+                <span>Xoá toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
+                <button className="btn danger" onClick={resetAll}>Xoá sạch dữ liệu</button>
+              </div>
+              <div className="admin-tool">
+                <b>Chế độ vận hành</b>
+                <span>Bật khi bắt đầu dùng dữ liệu QC thật: khoá vĩnh viễn "Xoá sạch dữ liệu thử". Không thể tắt lại.</span>
+                <button className="btn ghost" onClick={turnOnOperationMode}>Bật chế độ vận hành</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      <NceConfigPanel />
 
       <div className="settings-cloud-grid">
         <div className="panel firebase-sync-panel">
@@ -425,18 +469,18 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="panel lis-gateway-panel">
-          <h2 className="panel-title">LIS Gateway (thử nghiệm)</h2>
+        <div className="panel">
+          <h2 className="panel-title">LIS Gateway</h2>
           <div className="lis-gateway-body">
             <div className="lis-gateway-grid">
-              <div className="field"><label htmlFor="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value={lisUrl} onChange={(e) => setLisUrl(e.target.value)} placeholder="http://127.0.0.1:8787" /></div>
-              <div className="field"><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Dán token in ra khi chạy npm run lis:gateway" /></div>
+              <div className="field"><label htmlFor="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value={lisUrl} aria-invalid={!!lisUrlErr || undefined} aria-describedby={lisUrlErr ? 'lis-url-error' : undefined} onChange={(e) => { setLisUrl(e.target.value); setLisUrlErr(null); }} placeholder="http://127.0.0.1:8787" />{lisUrlErr && <p id="lis-url-error" className="field-error" role="alert">{lisUrlErr}</p>}</div>
+              <div className="field"><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Nhập token kết nối QC Lab do quản trị Gateway cấp" /></div>
               <label className="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" checked={lisEnabled} onChange={(e) => setLisEnabled(e.target.checked)} /><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label>
             </div>
-            <div id="lisGatewayStatus" className={`alert lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
+            <div id="lisGatewayStatus" role="status" className={`lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
               {LIS_STATUS_LABEL[lisStatus.kind]}{lisErr ? ` · ${lisErr}` : lisStatus.detail ? ` · ${lisStatus.detail}` : ''}
             </div>
-            <div className="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div>
+            <div className="hint">Nhận kết quả nội kiểm từ Gateway cục bộ tại localhost:8787. Mỗi kết quả chỉ thành điểm QC sau khi bạn xác nhận trong hàng chờ. Bộ kết nối theo từng LIS được triển khai riêng; chỉ tiếp nhận kết quả QC.</div>
           </div>
           <div className="settings-panel-actions">
             <button className="btn teal" onClick={saveLisSettings}>Lưu &amp; kiểm tra</button>

@@ -16,6 +16,11 @@ const machine2 = config.saveInstrument({ data: { name: 'Máy 2', section: 'Khu v
 const machine3 = config.saveInstrument({ data: { name: 'Máy 3', section: 'Khu vực 2' } }, actor).data;
 const machine4 = config.saveInstrument({ data: { name: 'Máy 4', section: 'Khu vực 3' } }, actor).data;
 
+const blank = config.saveTest({ data: { name: '', instrumentIds: [] } }, actor);
+assert.equal(blank.error.code, 'missing-name', 'cả tên và máy trống thì phải báo tên xét nghiệm trước');
+const namedWithoutMachine = config.saveTest({ data: { name: 'Chưa gán máy', instrumentIds: [] } }, actor);
+assert.equal(namedWithoutMachine.error.code, 'missing-instrument', 'đã có tên mới chuyển sang kiểm máy áp dụng');
+
 const created = config.saveTest({ data: {
   name: 'Sodium (Na)', teaRefKey: 'qclab-sodium', unit: 'mmol/L', tea: 0.73,
   instrumentIds: [machine1.id, machine2.id],
@@ -40,29 +45,29 @@ rows = config.listTests();
 assert.equal(rows.length, 3, 'thêm máy không được nhân đôi các máy đã gán');
 
 // Sửa từ dropdown chỉ cập nhật cấu hình của máy đang chọn. Đây là điều kiện
-// bắt buộc khi cùng một xét nghiệm dùng hóa chất khác nhau trên từng máy.
+// bắt buộc khi cùng một xét nghiệm dùng hoá chất khác nhau trên từng máy.
 const machine2Row = rows.find(row => row.instrument_id === machine2.id);
 const singleUpdated = config.saveTest({ id: machine2Row.id, data: {
   name: 'Sodium (Na)', instrumentId: machine2.id, section: 'Khu vực 2',
-  teaRefKey: 'qclab-sodium', unit: 'mmol/L', tea: 0.73, reagent: 'Hóa chất máy 2',
+  teaRefKey: 'qclab-sodium', unit: 'mmol/L', tea: 0.73, reagent: 'Hoá chất máy 2',
 } }, actor);
 assert.equal(singleUpdated.ok, true);
 rows = config.listTests();
-assert.equal(rows.find(row => row.instrument_id === machine2.id).reagent, 'Hóa chất máy 2');
-assert.equal(rows.find(row => row.instrument_id === machine1.id).reagent, '', 'không được ghi đè hóa chất máy khác');
+assert.equal(rows.find(row => row.instrument_id === machine2.id).reagent, 'Hoá chất máy 2');
+assert.equal(rows.find(row => row.instrument_id === machine1.id).reagent, '', 'không được ghi đè hoá chất máy khác');
 
 const assignedMore = config.saveTest({ id: machine2Row.id, data: {
   name: 'Sodium (Na)', teaRefKey: 'qclab-sodium', unit: 'mmol/L', tea: 0.73,
-  reagent: 'Hóa chất máy 2', analyteId: machine2Row.analyte_id,
+  reagent: 'Hoá chất máy 2', analyteId: machine2Row.analyte_id,
   assignmentIds: rows.map(row => row.id), instrumentIds: [...rows.map(row => row.instrument_id), machine4.id],
   preserveExistingAssignments: true,
 } }, actor);
 assert.equal(assignedMore.ok, true);
 rows = config.listTests();
 assert.equal(rows.length, 4);
-assert.equal(rows.find(row => row.instrument_id === machine1.id).reagent, '', 'gán máy mới phải giữ hóa chất máy cũ');
-assert.equal(rows.find(row => row.instrument_id === machine2.id).reagent, 'Hóa chất máy 2');
-assert.equal(rows.find(row => row.instrument_id === machine4.id).reagent, 'Hóa chất máy 2', 'máy mới nhận thông số đang hiển thị');
+assert.equal(rows.find(row => row.instrument_id === machine1.id).reagent, '', 'gán máy mới phải giữ hoá chất máy cũ');
+assert.equal(rows.find(row => row.instrument_id === machine2.id).reagent, 'Hoá chất máy 2');
+assert.equal(rows.find(row => row.instrument_id === machine4.id).reagent, 'Hoá chất máy 2', 'máy mới nhận thông số đang hiển thị');
 
 const machine3Row = rows.find(row => row.instrument_id === machine3.id);
 const removedAssignment = config.removeTest({ id: machine3Row.id, ids: [machine3Row.id] }, actor);

@@ -72,6 +72,17 @@ export function targetNumberText(value: number | null | undefined, decimals: num
   return Number(value).toFixed(decimals);
 }
 
+/** Giá trị Mean/SD ĐÃ LƯU hiện trong ô nhập: thêm số 0 cho đủ `decimals` chữ số
+ * thập phân như giới hạn dưới/trên (1.2 → "1.20" cạnh "1.10"), nhưng KHÔNG
+ * làm tròn giá trị có nhiều chữ số hơn — ô này được lưu lại nguyên văn. */
+export function targetInputText(value: number | null | undefined, decimals: number): string {
+  if (value == null || !Number.isFinite(value)) return '';
+  const text = String(value);
+  if (/e/i.test(text)) return text;
+  const places = (text.split('.')[1] || '').length;
+  return places >= decimals ? text : Number(value).toFixed(decimals);
+}
+
 
 export function syncTargetRange(el: HTMLInputElement, source: 'limits' | 'target'): void {
   const row = el.closest('.target-row');

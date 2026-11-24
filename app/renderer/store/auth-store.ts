@@ -4,13 +4,15 @@
 // quyết định quyền (mọi gate thật nằm ở main/ipc/auth-handlers.ts).
 import { create } from 'zustand';
 import type { PublicUser, IpcResult } from '../../shared/qc-api';
+import { onSessionEnded, SESSION_ENDED_MESSAGE } from '../lib/session-events';
 
 type Status = 'checking' | 'needs-bootstrap' | 'logged-out' | 'logged-in';
+export interface AuthFormError { code: string; message: string }
 
 interface AuthState {
   status: Status;
   user: PublicUser | null;
-  error: string | null;
+  error: AuthFormError | null;
   init: () => Promise<void>;
   bootstrapAdmin: (username: string, name: string, password: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
@@ -21,6 +23,9 @@ interface AuthState {
   /** Đọc lại tài khoản đang đăng nhập từ DB — dùng sau khi đổi/xoá ảnh đại
    * diện (main không trả lại toàn bộ `PublicUser`, chỉ trả avatar mới). */
   refreshUser: () => Promise<void>;
+  /** Phiên kết thúc từ phía main: về màn đăng nhập kèm lý do; không còn tài
+   * khoản nào (vd vừa phục hồi bản sao lưu không kèm tài khoản) thì sang khởi tạo quản trị. */
+  endSession: (message: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -39,13 +44,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   bootstrapAdmin: async (username, name, password) => {
     const result = await window.qcApi.bootstrapAdmin({ data: { username, name, password } });
-    if (!result.ok) { set({ error: result.error.message }); return; }
+    if (!result.ok) { set({ error: result.error }); return; }
     set({ error: null, status: 'logged-out' });
   },
 
   login: async (username, password) => {
     const result = await window.qcApi.login({ data: { username, password } });
-    if (!result.ok) { set({ error: result.error.message }); return; }
+    if (!result.ok) { set({ error: result.error }); return; }
     set({ error: null, status: 'logged-in', user: result.data });
   },
 
@@ -73,6 +78,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const user = await window.qcApi.currentUser();
     if (user) set({ user });
   },
+
+  endSession: async (message) => {
+    set({ status: 'logged-out', user: null, error: { code: 'session-ended', message } });
+    if (!(await window.qcApi.hasAnyUsers())) set({ status: 'needs-bootstrap' });
+  },
 }));
+
+// Máy chủ LAN báo phiên kết thúc (401): về màn đăng nhập kèm lý do (GV5).
+onSessionEnded(() => {
+  if (useAuthStore.getState().status !== 'logged-in') return;
+  void useAuthStore.getState().endSession(SESSION_ENDED_MESSAGE);
+});
 
 

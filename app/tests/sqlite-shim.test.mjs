@@ -44,15 +44,15 @@ test('get/all/run khớp ngữ nghĩa node:sqlite', () => {
     '.all() không có dòng nào phải trả mảng rỗng');
 
   const ins = db.prepare('INSERT INTO instruments(id,name,model,serial,section,active) VALUES (?,?,?,?,?,?)');
-  assert.equal(ins.run('i1', 'Máy A', 'M1', 'S1', 'Hóa sinh', 1).changes, 1);
+  assert.equal(ins.run('i1', 'Máy A', 'M1', 'S1', 'Hoá sinh', 1).changes, 1);
   ins.run('i2', 'Máy B', 'M2', 'S2', 'Miễn dịch', 1);
 
   const row = db.prepare('SELECT id,name,section FROM instruments WHERE id=?').get('i1');
   assert.equal(row.name, 'Máy A', 'chuỗi tiếng Việt phải đọc lại nguyên vẹn');
-  assert.equal(row.section, 'Hóa sinh');
+  assert.equal(row.section, 'Hoá sinh');
   assert.equal(db.prepare('SELECT id FROM instruments').all().length, 2);
 
-  // changes phải phản ánh đúng câu lệnh vừa chạy, không phải tổng tích lũy.
+  // changes phải phản ánh đúng câu lệnh vừa chạy, không phải tổng tích luỹ.
   assert.equal(db.prepare('UPDATE instruments SET section=? WHERE id=?').run('Khác', 'i1').changes, 1);
   assert.equal(db.prepare("UPDATE instruments SET section='X' WHERE id='khong-co'").run().changes, 0);
   db.close();
@@ -97,16 +97,16 @@ test('PRAGMA foreign_keys thật sự có tác dụng', () => {
 test('export/mở lại giữ nguyên dữ liệu (nền của persist IndexedDB)', () => {
   const db = freshDb();
   db.prepare('INSERT INTO instruments(id,name,model,serial,section,active) VALUES (?,?,?,?,?,?)')
-    .run('i1', 'Máy Hóa sinh', 'AU680', 'SN-1', 'Hóa sinh', 1);
+    .run('i1', 'Máy Hoá sinh', 'AU680', 'SN-1', 'Hoá sinh', 1);
   const bytes = db.export();
   assert.ok(bytes instanceof Uint8Array && bytes.length > 0);
   db.close();
 
   const reopened = createBrowserDatabase(SQL, applySchema, bytes);
   const row = reopened.prepare('SELECT name,model,section FROM instruments WHERE id=?').get('i1');
-  assert.equal(row.name, 'Máy Hóa sinh', 'dữ liệu phải sống sót qua export/mở lại');
+  assert.equal(row.name, 'Máy Hoá sinh', 'dữ liệu phải sống sót qua export/mở lại');
   assert.equal(row.model, 'AU680');
-  assert.equal(row.section, 'Hóa sinh');
+  assert.equal(row.section, 'Hoá sinh');
   reopened.close();
 });
 

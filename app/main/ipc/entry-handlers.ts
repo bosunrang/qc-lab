@@ -1,45 +1,57 @@
-// IPC handler cho module Entry (nhập/hủy điểm QC). Lô đang vận hành được đánh
+// IPC handler cho module Entry (nhập/huỷ điểm QC). Lô đang vận hành được đánh
 // giá đa mức; lô mới trong chuyển tiếp được đánh giá riêng từng mức và không
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
-import { listOperationalLevels, isTestInActivePanel, countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
-import { evaluateQcSets } from '../db/westgard-evaluation';
-import { createHistoricalWestgard } from '../db/historical-westgard';
-import { listPreviousLotSeriesData } from '../db/lot-lineage';
-// 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
+import { OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
+// Các kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
 // đợt 2026-09-10 đi gỡ.
-import type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
+import type { QcPointView, HistoryQcPointView, VoidedQcPointView, VoidPointAssessment, ParallelEntryColumn, PreviousLotSeries, EntryWindowRequest, EntryWindow, EntryCumulativeStats, ArchivedBlock } from '../../shared/qc-api';
+import type { NceRunSnapshot } from '../domain/nce/types';
 
 export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries };
 import { uid } from '../domain/text-utils';
-import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
+import { validateQcPointInput, validateVoidInput, rejectedRunVoidReasonError, REJECTED_RUN_VOID_REASON_MIN, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
-import { readGlobalRules } from '../db/rule-settings';
-import { parseRuleActions, makeIsOnLayered, makeRuleActionLayered, parseRuleScopes, makeScopeOf } from '../domain/rule-config';
-import { errorClass, WG_RULE_REGISTRY } from '../domain/westgard-rules';
-import { evaluateRangeCandidate, validateRangeReason } from '../domain/range-workflow';
-import { appendMeanSdHistory } from '../domain/manage-validation';
+import { evaluateRangeCandidate, manualRangeDeviation, validateRangeReason } from '../domain/range-workflow';
+import { appendMeanSdHistory, meanSdOnDate } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
 import { isDateInLockedPeriod } from '../db/period-locks';
 import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
-import { isoLocalDateAfter } from '../domain/local-date';
+import { isoLocalDate, validLocalDate, viDate } from '../domain/local-date';
+import { observedStats } from '../domain/observed-stats';
 import { initialsFromName } from '../domain/name-initials';
 import { nextNceId } from '../db/nce-ids';
-import { type Actor, type IpcResult, nowIso } from './shared';
-import { writeCommand } from './write-command';
+import { insertNceRecord, insertNceRun, openRecordOfRun, readNceConfig } from '../db/nce-repository';
+import { nceRunSnapshot } from '../db/nce-evaluation';
+import { nceErrorClass } from '../domain/nce/tier';
+import { WG_RULE_BY_ID } from '../domain/westgard-rules';
+import { testRuleActionOf } from '../db/westgard-evaluation';
+import { emptyChecklist } from '../domain/nce/update';
+import { defaultNceDueDate } from '../domain/nce/config';
+import { type IpcResult, nowIso, requireQcConfig } from './shared';
+import { writeCommand, type WriteTx } from './write-command';
+import { previousLotsOf } from './previous-lot-cache';
+import { listPreviousLotMetadata, previousLotPoints, type LineagePoint } from '../db/lot-lineage';
+import { createHistoricalWestgard } from '../db/historical-westgard';
+import { historicalPointEvaluations } from './historical-evaluation';
+import { activeEvaluationOf, type ActivePoint } from './active-evaluation';
+import { pointEvaluationsOf } from './point-evaluations';
+import { operationalTeaResolver } from '../db/operational-tea';
+import { listParallelColumns as listParallelColumnsOf, pointsForLot as pointsForLotOf } from './parallel-columns';
+import { changedRunConclusions, describeRunChanges, flipsRejection, retroChangeError, runConclusions, type QcRunConclusionChange } from '../domain/run-conclusion-change';
 
-interface QcPointRow {
-  id: string; test_id: string; level: number; date: string; run_id: string; val: number;
-  note: string; operator_name: string; operator_code: string;
-  /** Cột INTEGER trong SQLite nhưng chỉ nhận 0/1 — khai hẹp cho khớp hợp
-   * đồng `shared/qc-api.d.ts`, nơi renderer đọc nó như cờ nhị phân. */
-  voided: 0 | 1;
-  void_reason: string;
+/** Phần ghi trong transaction làm đổi kết luận lần chạy khác mà không qua
+ * được cổng (`retroChangeError()`): ném ra để huỷ phần đã ghi, handler bắt
+ * lại và trả đúng lỗi nghiệp vụ. */
+class RetroChangeBlocked extends Error {
+  readonly error: { code: string; message: string };
+  constructor(error: { code: string; message: string }) {
+    super(error.code);
+    this.error = error;
+  }
 }
-type ActivePoint = QcPointRow & { lot: string; qc_mean: number | null; qc_sd: number | null; runId: string; qcMean: number | null; qcSd: number | null };
-type ActiveLevel = { level: number; mean: number | null; sd: number | null; lot: string; pts: ActivePoint[] };
 
 export interface RangeCandidateView {
   testId: string; level: number; lot: string; source: 'mfg' | 'lab';
@@ -50,8 +62,31 @@ export interface RangeCandidateView {
   eligible: boolean; canRevert: boolean;
 }
 
+function cumulativeStats<T extends { val: number; date: string }>(
+  points: readonly T[], to: string, accepted: (point: T) => boolean,
+): EntryCumulativeStats {
+  const recorded = points.filter(point => point.date <= to);
+  const used = recorded.filter(accepted);
+  const { n, mean, sd, cv } = observedStats(used);
+  return { recorded: recorded.length, excluded: recorded.length - used.length, n, mean, sd, cv };
+}
 
-export function createEntryHandlers(db: Db) {
+function previousPointViews(points: readonly LineagePoint[], block?: ArchivedBlock): QcPointView[] {
+  const flags = new Map(block?.analysis.points.map(point => [point.id, point]));
+  return points.map(point => {
+    const flag = flags.get(point.id);
+    return {
+      ...point, verdict: flag?.verdict || 'none', rules: flag?.rules || [],
+      accepted: flag?.accepted ?? false, runRejectedBy: flag?.runRejectedBy || [],
+    };
+  }) as unknown as QcPointView[];
+}
+
+export function createEntryHandlers(db: Db, options: {
+  /** Tác vụ nội bộ ghi dấu vết nguồn trong chính transaction của điểm QC.
+   * Không nhận callback này qua IPC hoặc dữ liệu từ renderer. */
+  onPointAdded?: (pointId: string, tx: WriteTx) => void;
+} = {}) {
 
 
   /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
@@ -80,124 +115,116 @@ export function createEntryHandlers(db: Db) {
       WHERE ql.id=? AND ${OPERATIONAL_LOT_GROUP_SQL}`).get(qcLotId);
   }
 
-  /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa hủy thuộc đúng lô
+  /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa huỷ thuộc đúng lô
    * đang gán của từng mức, sắp lần chạy theo số tự nhiên, rồi ghép luật
    *
    * Tập mức lấy từ `db/operational-levels.ts` — cùng tập mà trang Phân tích
-   * Westgard dùng, để hai màn hình luôn đánh giá trên cùng một tập dữ liệu. */
+   * Westgard dùng, để hai màn hình luôn đánh giá trên cùng một tập dữ liệu.
+   * Phần tính nằm ở `ipc/active-evaluation.ts`, dùng chung trong một lượt nạp. */
   function activeEvaluation(testId: string) {
-    const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
-    const inActivePanel = isTestInActivePanel(db, testId);
-    const levels: ActiveLevel[] = listOperationalLevels(db, testId).map((config) => {
-      const rows = inActivePanel
-        ? db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=?').all(testId, config.level, config.lot_no) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[]
-        : [];
-      const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd })).sort(compareQcPointOrder);
-      return { level: config.level, mean: config.mean, sd: config.sd, lot: config.lot_no, pts };
-    });
-    // Cấu hình luật CHUNG đọc qua `db/rule-settings.ts` — module dùng chung
-    // được tách ra chính để không nơi nào tự dựng lại phép đọc khoá
-    // `app_meta` này (bản trước có một `globalRules()` riêng ở đây).
-    const overrides = parseRuleActions(test?.rule_actions_json);
-    const global = readGlobalRules(db);
-    const on = makeIsOnLayered(global, overrides);
-    const actionOf = makeRuleActionLayered(global, overrides);
-    const scope = makeScopeOf(parseRuleScopes(test?.rule_scopes_json), levels.length);
-    // Chỉ kênh TỪNG MỨC cần lộ ra ngoài (nhánh dựng lại verdict của điểm lô đã
-    // chuyển tiếp trong `voidPoint()`); kênh liên mức nằm trọn trong
-    const within = (rule: string) => on(rule) && ['within', 'both'].includes(scope(rule));
-    const byPoint = evaluateQcSets(db, testId, levels);
-    return { levels, byPoint, within, actionOf };
+    const { levels, byPoint, rules } = activeEvaluationOf(db, testId);
+    // Hàm luật theo LẦN CHẠY (GV2, không hồi tố): `rulesAt(point)` là cấu hình
+    // có hiệu lực tại lần chạy của điểm, cùng phép phân giải `evaluateQcSets()`
+    // dùng. Lộ ra cho cột "Vi phạm loại bỏ" và nhánh dựng lại verdict của điểm
+    // lô đã chuyển tiếp trong `voidPoint()`.
+    return { levels, byPoint, rulesAt: rules.at };
   }
 
-  function pointsForLot(testId: string, level: number, lot: string): ActivePoint[] {
-    const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=? ORDER BY date,run_id')
-      .all(testId, level, lot) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[];
-    return rows.map((point) => ({ ...point, runId: point.run_id, qcMean: point.qc_mean, qcSd: point.qc_sd })).sort(compareQcPointOrder);
-  }
-
-  /** Cột lô song song chỉ nhận hồ sơ active, đúng Panel chứa xét nghiệm, lô
-   * cũ vẫn đang gán và criteria có Mean/SD hợp lệ. Mỗi mức lấy hồ sơ khớp đầu tiên. */
-  function listParallelColumns(testId: string): ParallelEntryColumn[] {
-    const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
-    if (!test) return [];
-    // Phạm vi within/across phải giống MỌI endpoint khác của xét nghiệm này,
-    // nên đếm mức ĐANG VẬN HÀNH chứ không phải mọi dòng `test_levels`.
-    const levelCount = countOperationalLevels(db, testId);
-    const rows = db.prepare(`SELECT tr.id transition_id,tr.start_date,tr.criteria_json,tl.level,
-        ql.id lot_id,ql.lot_no,ql.exp
-      FROM lot_transitions tr
-      JOIN qc_panel_tests pt ON pt.panel_id=tr.panel_id AND pt.test_id=?
-      JOIN test_levels tl ON tl.test_id=pt.test_id AND tl.qc_lot_id=tr.from_lot_id
-      JOIN qc_lots ql ON ql.id=tr.to_lot_id AND ql.level=tl.level
-      WHERE tr.status='active' ORDER BY tr.rowid`)
-      .all(testId) as { transition_id: string; start_date: string; criteria_json: string; level: number; lot_id: string; lot_no: string; exp: string }[];
-    const seen = new Set<number>();
-    const columns: { row: typeof rows[number]; target: { mean: number; sd: number; low?: number | null; high?: number | null }; pts: ActivePoint[] }[] = [];
-    for (const row of rows) {
-      if (seen.has(row.level)) continue;
-      let criteria: { testId: string; level: number; mean: number; sd: number; low?: number | null; high?: number | null }[] = [];
-      try { const parsed = JSON.parse(row.criteria_json || '[]'); if (Array.isArray(parsed)) criteria = parsed; } catch { /* hồ sơ hỏng không tạo cột nhập */ }
-      const target = criteria.find((item) => item.testId === testId && Number(item.level) === row.level && Number.isFinite(Number(item.mean)) && Number(item.sd) > 0);
-      if (!target) continue;
-      columns.push({ row, target: { ...target, mean: Number(target.mean), sd: Number(target.sd) }, pts: pointsForLot(testId, row.level, row.lot_no) });
-      seen.add(row.level);
-    }
-    if (!columns.length) return [];
-    // Đánh giá CẢ BỘ cột song song qua cùng một đường với chuỗi đang vận hành
-    // và tab lô lịch sử. Bản trước gọi `westgardByPoint()` cho TỪNG cột, tức
-    // chỉ kênh trong-mức: hai mức của lô mới đo cùng một lần chạy mà một mức
-    // +2,5SD còn mức kia −2,5SD thì R4s/2-2s liên mức không bao giờ nổ, và
-    // mốc "đã khắc phục xong" cũng không được áp. Lô đang chạy thẩm định là
-    // lúc CẦN bắt sai số ngẫu nhiên lớn nhất, không phải lúc nới cổng.
-    //
-    // Chỉ gộp các cột song song với NHAU: chúng là các mức của cùng một lô
-    // mới trong cùng lần chạy. Không trộn với lô đang vận hành — đó là hai
-    // dòng dữ liệu khác nhau, kết luận thẩm định lô mới không được lẫn với
-    // kết luận thường quy.
-    const parallelSets = columns.map((column) => ({ level: column.row.level, key: `${column.row.level}:${column.row.lot_no}`, pts: column.pts, mean: column.target.mean, sd: column.target.sd }));
-    const byPoint = evaluateQcSets(db, testId, parallelSets, levelCount);
-    const accepted = acceptedRunPoints(byPoint);
-    const rejectedBy = rejectedLevelsByRun(parallelSets, byPoint);
-    return columns.map(({ row, target, pts }) => ({
-      transitionId: row.transition_id, level: row.level, lotId: row.lot_id, lot: row.lot_no, startDate: row.start_date,
-      mean: target.mean, sd: target.sd, low: target.low ?? null, high: target.high ?? null, exp: row.exp || '',
-      points: pts.map((point) => {
-        const flag = byPoint.get(point);
-        return { ...point, verdict: flag?.level || 'ok', rules: flag?.rules || [], accepted: accepted.has(point), runRejectedBy: rejectedBy.get(qcRunKey(point)) || [] };
-      }),
-    }));
-  }
+  // Phần đọc và đánh giá cột lô song song nằm ở `ipc/parallel-columns.ts`,
+  // dùng chung với cổng chấp nhận lô mới.
+  const pointsForLot = (testId: string, level: number, lot: string) => pointsForLotOf(db, testId, level, lot);
+  const listParallelColumns = (testId: string): ParallelEntryColumn[] => listParallelColumnsOf(db, testId);
 
   /** Các lô cũ nằm trên đúng chuỗi chuyển tiếp đã CHẤP NHẬN dẫn tới lô đang
    * vận hành. Không liệt kê mọi lô cùng nhóm vì chúng có thể chưa từng được
    * dùng cho xét nghiệm này. Mean/SD lấy từ lịch sử cấu hình; snapshot trên
    * điểm là fallback cho dữ liệu đã nhập trước khi lịch sử được hoàn thiện. */
   function listPreviousLotSeries(testId: string): PreviousLotSeries[] {
-    const blocks = createHistoricalWestgard(db).listPreviousLotBlocks(testId);
-    return listPreviousLotSeriesData(db, testId).map((series) => {
+    const { series: previous, blocks } = previousLotsOf(db, testId);
+    return previous.map(({ points, ...series }) => {
       const block = blocks.find(item => item.lotId === series.lotId && item.level === series.level);
-      const flags = new Map(block?.analysis.points.map(point => [point.id, point]));
-      return {
-        level: series.level, lotId: series.lotId, lot: series.lot, mean: series.mean, sd: series.sd,
-        points: series.points.map(point => ({
-          ...point,
-          verdict: flags.get(point.id)?.verdict || 'none',
-          rules: flags.get(point.id)?.rules || [],
-          accepted: flags.get(point.id)?.accepted ?? false,
-          // Lý do bị loại theo lần chạy đi kèm luôn, để cột "Xem lô cũ" nói
-          // được y hệt chuỗi đang vận hành thay vì chỉ bớt điểm khỏi thống kê.
-          runRejectedBy: flags.get(point.id)?.runRejectedBy || [],
-        })) as unknown as PreviousLotSeries['points'],
-      };
+      return { ...series, points: previousPointViews(points, block) };
     });
+  }
+
+  function getEntryWindow(testId: string, request: EntryWindowRequest): EntryWindow {
+    const worksheetFrom = validLocalDate(request?.worksheetFrom);
+    const worksheetTo = validLocalDate(request?.worksheetTo);
+    const chartFrom = request?.chartFrom === '' ? '' : validLocalDate(request?.chartFrom);
+    const chartTo = request?.chartTo === '' ? '\uffff' : validLocalDate(request?.chartTo);
+    if (!worksheetFrom || !worksheetTo || worksheetFrom > worksheetTo || (!chartFrom && request?.chartFrom !== '') || !chartTo) {
+      throw new Error('Khoảng ngày xem nội kiểm không hợp lệ.');
+    }
+    const inWorksheet = (date: string) => date >= worksheetFrom && date <= worksheetTo;
+    const inChart = (date: string) => date >= chartFrom && date <= chartTo;
+    const inView = (point: { date: string }) => inWorksheet(point.date) || inChart(point.date);
+
+    // Westgard vẫn đọc đủ chuỗi và tất cả mức. Cắt theo ngày khi dựng dữ
+    // liệu gửi đi, để mốc đầu khoảng xem vẫn có bằng chứng từ các ngày trước.
+    const active = activeEvaluation(testId);
+    const accepted = acceptedRunPoints(active.byPoint);
+    const rejectedBy = rejectedLevelsByRun(active.levels, active.byPoint);
+    const current: EntryWindow['current'] = {};
+    for (const level of active.levels) {
+      const hasTarget = level.mean != null && level.sd != null;
+      const points = level.pts.filter(inView).map(point => {
+        const row = pointView(point, active, accepted, rejectedBy);
+        const z = active.byPoint.get(point)?.z;
+        return { ...row, chartZ: hasTarget && z !== undefined && Number.isFinite(z) ? z : null, chartVerdict: hasTarget ? row.verdict : 'none' as const };
+      });
+      current[level.level] = { points, cumulative: cumulativeStats(level.pts, chartTo, point => accepted.has(point)) };
+    }
+    const parallelColumns = listParallelColumns(testId).map(column => ({
+      ...column, points: column.points.filter(inView),
+      cumulative: cumulativeStats(column.points, chartTo, point => point.accepted !== false),
+    }));
+
+    // Chỉ đánh giá nhóm lô cũ có điểm trong tháng bảng nhập hoặc lô người
+    // dùng mở trên biểu đồ. Nhãn lô vẫn có sẵn để mở ở bất kỳ khoảng nào.
+    const previous = listPreviousLotMetadata(db, testId).map(lot => {
+      const selected = request.previousLots?.[lot.level] === lot.lotId;
+      const worksheet = previousLotPoints(db, testId, lot.level, lot.lot, worksheetFrom, worksheetTo);
+      if (!selected) return { lot, selected, points: worksheet };
+      const chart = previousLotPoints(db, testId, lot.level, lot.lot, chartFrom, chartTo);
+      const unique = new Map([...worksheet, ...chart].map(point => [point.id, point]));
+      return { lot, selected, points: [...unique.values()].sort(compareQcPointOrder) };
+    });
+    const blocks = createHistoricalWestgard(db).listPreviousLotBlocks(testId,
+      previous.filter(item => item.selected || item.points.length).map(item => item.lot));
+    const blocksByLot = new Map(blocks.map(block => [block.lotId, block]));
+    const countPoints = db.prepare('SELECT COUNT(*) AS n FROM qc_points WHERE test_id=? AND level=? AND lot=? AND voided=0 AND date<=?');
+    const previousLotSeries = previous.map(({ lot, selected, points }) => {
+      const block = blocksByLot.get(lot.lotId);
+      const result: EntryWindow['previousLotSeries'][number] = { ...lot, points: previousPointViews(points, block) };
+      if (selected) {
+        result.cumulative = cumulativeStats(block?.analysis.points ?? [], chartTo, point => point.accepted);
+        if (!block) {
+          const { n } = countPoints.get(testId, lot.level, lot.lot, chartTo) as { n: number };
+          result.cumulative.recorded = n;
+          result.cumulative.excluded = n;
+        }
+      }
+      return result;
+    });
+    return { current, parallelColumns, previousLotSeries, voidedPoints: listVoidedPoints(testId, chartFrom, chartTo) };
   }
 
   /** Tôn trọng cả hai tầng cấu hình bật/tắt luật: chung toàn phòng xét nghiệm và
    * ghi đè riêng xét nghiệm, xem `makeIsOnLayered()`) — CÙNG một hàm isOn mà
    * trang Westgard dùng, để verdict không lệch nhau giữa hai trang. */
   function queryPoints(testId: string, level: number): QcPointView[] {
-    const active = activeEvaluation(testId), selected = active.levels.find((item) => item.level === level);
+    return pointViewsOf(activeEvaluation(testId), level);
+  }
+
+  /** Kết luận theo lần chạy của tập đang vận hành. Gọi trước phần ghi và sau
+   * phần ghi (trong transaction, `activeEvaluationOf()` không giữ kết quả
+   * giữa transaction) để biết lần chạy KHÁC nào đổi kết luận (N26–N28). */
+  function runConclusionsOf(active: ReturnType<typeof activeEvaluation>) {
+    return runConclusions(active.levels, active.byPoint);
+  }
+
+  function pointViewsOf(active: ReturnType<typeof activeEvaluation>, level: number): QcPointView[] {
+    const selected = active.levels.find((item) => item.level === level);
     if (!selected) return [];
     // `accepted`/`runRejectedBy` đi kèm verdict NGAY TỪ ĐÂY. Trước đó chỉ
     // `analyzeLevel()` biết một điểm có vào thống kê hay không, nên thẻ Nhập
@@ -206,57 +233,62 @@ export function createEntryHandlers(db: Db) {
     // n — người dùng thấy 11 chấm mà thống kê nói 9.
     const accepted = acceptedRunPoints(active.byPoint);
     const rejectedBy = rejectedLevelsByRun(active.levels, active.byPoint);
-    return selected.pts.map((point) => {
-      const flag = active.byPoint.get(point) || { level: 'ok' as RuleVerdict, rules: [] };
-      // `rejectRules` tính Ở ĐÂY vì chỉ main mới có bảng hành động đã phân
-      // giải 3 lớp (ghi đè theo xét nghiệm → cấu hình chung → registry).
-      // Renderer dùng nó để không in một luật cảnh báo vào cột "Vi phạm loại
-      // bỏ" chỉ vì nó đứng cùng điểm với một luật loại bỏ khác.
-      return {
-        ...point, verdict: flag.level, rules: flag.rules,
-        rejectRules: rejectingRules(flag.rules, active.actionOf),
-        accepted: accepted.has(point),
-        runRejectedBy: rejectedBy.get(qcRunKey(point)) || [],
-      };
-    });
+    return selected.pts.map(point => pointView(point, active, accepted, rejectedBy));
   }
 
-  /** Toàn bộ điểm chưa hủy của một xét nghiệm, không giới hạn ở lô đang
+  function pointView(point: ActivePoint, active: ReturnType<typeof activeEvaluation>,
+    accepted: ReadonlySet<ActivePoint>, rejectedBy: ReadonlyMap<string, number[]>): QcPointView {
+    const flag = active.byPoint.get(point) || { level: 'ok' as RuleVerdict, rules: [] };
+    // Dùng bảng hành động đã phân giải theo thời điểm chạy để nêu đúng luật
+    // gây loại. Một điểm có thể đồng thời mang luật cảnh báo và luật loại.
+    return {
+      ...point, verdict: flag.level, rules: flag.rules,
+      rejectRules: rejectingRules(flag.rules, active.rulesAt(point).actionOf),
+      accepted: accepted.has(point),
+      runRejectedBy: rejectedBy.get(qcRunKey(point)) || [],
+    };
+  }
+
+  /** Toàn bộ điểm chưa huỷ của một xét nghiệm, không giới hạn ở lô đang
    * vận hành. Trang Lịch sử dữ liệu cần nguồn này để điểm của lô cũ vẫn
    * còn nhìn thấy sau khi chấp nhận chuyển tiếp lô.
    *
-   * KHÔNG kèm kết luận Westgard, và đó là chủ đích — xem `HistoryQcPointView`.
-   * Bản trước trả một trường `verdict` tính bằng ngưỡng z thuần (|z|<=2 →
-   * 'ok', <=3 → 'warn', còn lại 'rej'), trùng tên và trùng kiểu với verdict
-   * THẬT của `queryPoints()` nhưng mang nghĩa khác hẳn. Không nơi nào đọc nó
-   * — `HistoryTab` tự tính lại từ `qc_mean`/`qc_sd` và dán nhãn rõ "Phân loại
-   * theo Z-score, không phải kết luận Westgard" — nên nó chỉ nằm chờ người
-   * sửa sau nhặt nhầm. Đánh giá Westgard thật đòi cả tập mức cùng lần chạy,
-   * không thể suy từ một điểm lẻ, nên endpoint này không dựng nó. */
+   * Kết luận lấy từ cùng nguồn với báo cáo: ghép đủ các mức của lần chạy,
+   * giữ ngữ cảnh lô cũ/song song/lưu trữ trước khi chia bảng theo mức/lô. */
   function listHistoryPoints(testId: string): HistoryQcPointView[] {
-    return db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,qc_mean,qc_sd,note,
+    const rows = db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,qc_mean,qc_sd,note,
         operator_name,operator_username,operator_code,voided,void_reason
-      FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id`).all(testId) as unknown as HistoryQcPointView[];
+      FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id`).all(testId) as unknown as Omit<HistoryQcPointView, 'verdict' | 'rules' | 'accepted' | 'run_rejected_by'>[];
+    const evaluations = pointEvaluationsOf(db, testId, rows);
+    return rows.map((point) => {
+      const result = evaluations.get(point.id);
+      return { ...point, verdict: result?.verdict ?? 'none', rules: result?.rules ?? [],
+        accepted: result?.accepted ?? false, run_rejected_by: result?.run_rejected_by ?? [] };
+    });
   }
 
-  /** Danh sách audit điểm đã hủy dùng riêng cho khối tra cứu. Tách endpoint
+  /** Danh sách audit điểm đã huỷ dùng riêng cho khối tra cứu. Tách endpoint
    * khỏi `queryPoints()` để điểm voided tuyệt đối không lọt lại vào chuỗi
    * Westgard, biểu đồ, thống kê hay quyết định ngày. */
-  function listVoidedPoints(testId: string) {
-    return db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,operator_name,
-        void_reason,void_kind,void_requires_rerun,voided_at,voided_by
-      FROM qc_points WHERE test_id=? AND voided=1 ORDER BY date,run_id`).all(testId);
+  function listVoidedPoints(testId: string, from = '', to = '\uffff'): VoidedQcPointView[] {
+    // Tra tên từ tài khoản để cả điểm đã huỷ trước đây cũng hiện họ tên;
+    // giữ nguyên username gốc phục vụ truy vết khi tài khoản không còn.
+    return db.prepare(`SELECT p.id,p.test_id,p.level,p.date,p.run_id,p.lot,p.val,p.operator_name,
+        p.void_reason,p.void_kind,p.void_requires_rerun,p.voided_at,p.voided_by,
+        COALESCE(NULLIF(TRIM(u.name),''),p.voided_by) AS voided_by_name
+      FROM qc_points p LEFT JOIN users u ON u.username=p.voided_by
+      WHERE p.test_id=? AND p.voided=1 AND p.date BETWEEN ? AND ? ORDER BY p.date,p.run_id`).all(testId, from, to) as unknown as VoidedQcPointView[];
   }
 
   function rangeCandidate(testId: string, level: number): IpcResult<RangeCandidateView> {
-    const test = db.prepare('SELECT id,tea FROM tests WHERE id=?').get(testId) as { id: string; tea: number | null } | undefined;
+    const test = db.prepare('SELECT id FROM tests WHERE id=?').get(testId) as { id: string } | undefined;
     const config = db.prepare(`SELECT mean,sd,mfg_mean,mfg_sd,applied,qc_lot_id FROM test_levels WHERE test_id=? AND level=?`).get(testId, level) as
       { mean: number | null; sd: number | null; mfg_mean: number | null; mfg_sd: number | null; applied: 'mfg' | 'lab'; qc_lot_id: string | null } | undefined;
     if (!test || !config) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy mức QC.' } };
     const lotRow = config.qc_lot_id ? db.prepare('SELECT lot_no FROM qc_lots WHERE id=?').get(config.qc_lot_id) as { lot_no: string } | undefined : undefined;
     const lot = lotRow?.lot_no || '';
     const active = activeEvaluation(testId), rows = active.levels.find((item) => item.level === level)?.pts || [];
-    // Cổng dải PXN đếm theo LẦN CHẠY bị loại, không theo verdict riêng của
+    // Dải PXN bỏ điểm theo LẦN CHẠY bị loại, không theo verdict riêng của
     // mức: một điểm đạt nằm trong lần chạy đã hỏng vì mức khác vi phạm không
     // phải dữ liệu in-control. Dùng `rejectedLevelsByRun()` thay vì
     // `acceptedRunPoints()` để mức CHƯA có Mean/SD (z không hữu hạn nên không
@@ -267,10 +299,19 @@ export function createEntryHandlers(db: Db) {
       verdict: active.byPoint.get(point)?.level || 'ok',
       runRejected: (rejectedRuns.get(qcRunKey(point))?.length ?? 0) > 0,
     })));
-    const systematic = new Set(WG_RULE_REGISTRY.filter((rule) => rule.err === 'SE').map((rule) => rule.id));
-    const nce = (db.prepare("SELECT nce_id,rule FROM actions WHERE test_id=? AND level=? AND record_status<>'cancelled' ORDER BY date DESC,created_at DESC").all(testId, level) as { nce_id: string; rule: string }[])
-      .find((action) => action.rule.split(',').map((rule) => rule.trim()).some((rule) => systematic.has(rule)));
-    const tea = test.tea != null && test.tea > 0 ? test.tea : null;
+    // Cổng an toàn sai số hệ thống (D-12): có hồ sơ NCE sai số hệ thống CHƯA
+    // ĐÓNG của xét nghiệm, hoặc hồ sơ (kể cả đã đóng) có lần chạy hỏng chứa
+    // điểm của đúng mức này trong lô đang dùng. Hồ sơ cũ ở lô khác không còn
+    // bật cổng mãi mãi (sửa R-12).
+    const nce = db.prepare(`SELECT n.nce_id FROM nce_records n
+      WHERE n.test_id=? AND n.error_class='SE' AND n.status<>'cancelled'
+        AND (n.status<>'closed' OR EXISTS (
+          SELECT 1 FROM nce_runs r JOIN qc_points p ON p.test_id=r.test_id AND p.date=r.date AND p.run_id=r.run_id
+          WHERE r.nce_record_id=n.id AND r.role<>'rerun' AND p.level=? AND p.lot=?))
+      ORDER BY n.detected_at DESC, n.created_at DESC LIMIT 1`).get(testId, level, lot) as { nce_id: string } | undefined;
+    // TEa vận hành của đúng mức (hồ sơ TEa PXN trước), quy đổi giới hạn tuyệt
+    // đối tại Mean hiện hành — không đọc `tests.tea`, xem `resolveOperationalTea()`.
+    const tea = operationalTeaResolver(db)(testId, config.mean, level)?.value ?? null;
     return { ok: true, data: {
       testId, level, lot, source: config.applied,
       current: { mean: config.mean, sd: config.sd, cv: config.mean && config.sd != null ? config.sd / Math.abs(config.mean) * 100 : null },
@@ -282,18 +323,10 @@ export function createEntryHandlers(db: Db) {
     } };
   }
 
-  function createRangeAction(testId: string, level: number, lot: string, rule: string, reason: string, actor: Actor, detail: Record<string, unknown>): void {
-    const id = uid(), now = nowIso();
-    const nceId = nextNceId(db, now.slice(0, 10));
-    db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,rule,error_type,nce_id,protocol_version,approval_status,effectiveness_status,record_status,detail_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,3,'pending','pending','active',?)`)
-      // `error_type` chỉ chứa mã SE/RE — hồ sơ quản lý dải KHÔNG phân loại sai số
-      // (loại việc đã nằm ở cột `rule` và cờ `rangeWorkflow` trong `detail_json`).
-      .run(id, now.slice(0, 10), now, now, actor.userId, actor.username, testId, level, lot, rule, '', nceId, JSON.stringify({ correction: reason, rangeWorkflow: true, ...detail }));
-  }
-
-  const applyLabRange = writeCommand(db, 'applyLabRange', 'write', (w, input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): IpcResult<RangeCandidateView> => {
-    const actor = w.actor;
+  /** Lập dải PXN và hoàn dải NSX đặt lại giới hạn kiểm soát, nên cần quyền
+   * `qc.config` (ISO 15189:2022 6.2.3, 7.3.7.2) — trước đây mọi tài khoản ghi
+   * đều làm được, kể cả nhập Mean/SD tay tuỳ ý. */
+  const applyLabRange = writeCommand(db, 'applyLabRange', requireQcConfig(db), (w, input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): IpcResult<RangeCandidateView> => {
     const reason = validateRangeReason(input.data?.reason, 10);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do thiết lập dải tối thiểu 10 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
@@ -312,7 +345,7 @@ export function createEntryHandlers(db: Db) {
     if (fresh.data.safety.needed) {
       const bias = Number(input.data.bias), threshold = fresh.data.safety.biasThreshold;
       if (!input.data.causeConfirmed) return { ok: false, error: { code: 'cause-not-confirmed', message: 'Cần xác nhận đã xử lý nguyên nhân sai số hệ thống trước khi đổi dải.' } };
-      if (threshold == null) return { ok: false, error: { code: 'missing-tea', message: 'Xét nghiệm chưa có TEa để kiểm tra Bias trước khi đổi dải.' } };
+      if (threshold == null) return { ok: false, error: { code: 'missing-tea', message: 'Xét nghiệm chưa có TEa của PXN để kiểm tra Bias trước khi đổi dải (Cấu hình chung → Bảng TEa tham chiếu).' } };
       if (!Number.isFinite(bias) || Math.abs(bias) > threshold) return { ok: false, error: { code: 'bias-out-of-range', message: `Bias phải nằm trong ±${threshold.toFixed(2)}% (TEa/4).` } };
     }
     const row = db.prepare('SELECT id,mean,sd,low,high,mfg_mean,mfg_sd,applied,qc_lot_id,mean_sd_history_json,mean_sd_effective_from FROM test_levels WHERE test_id=? AND level=?').get(fresh.data.testId, fresh.data.level) as
@@ -321,24 +354,37 @@ export function createEntryHandlers(db: Db) {
     const changedAt = nowIso();
     const p = { mean: chosenMean, sd: chosenSd }, history = appendMeanSdHistory(row.mean_sd_history_json, {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
-      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
+      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: isoLocalDate(), source: row.applied,
     }, changedAt);
     const mfgMean = row.mfg_mean ?? row.mean, mfgSd = row.mfg_sd ?? row.sd;
+    // Nhật ký phải đủ để người xem xét dựng lại quyết định: dải đề xuất từ dữ
+    // liệu, mức lệch của Mean/SD tay, và căn cứ của cổng sai số hệ thống.
+    // Bias ở cổng là số đo ngoài app (ngoại kiểm, vật liệu chuẩn sau hiệu
+    // chuẩn) nên vẫn do người dùng nhập; main ghi thêm Bias đối chiếu tự tính
+    // so với Mean nhà sản xuất để người xem xét so được hai con số.
+    const r4 = (value: number) => Number(value.toFixed(4));
+    const proposed = fresh.data.proposed;
+    const deviation = manual ? manualRangeDeviation({ mean: proposed.mean, sd: proposed.sd }, p) : null;
+    const selection = manual
+      ? `chỉnh thủ công (đề xuất Mean ${r4(proposed.mean)}, SD ${r4(proposed.sd)}, n=${proposed.n}${deviation ? `; SD tay gấp ${deviation.sdRatio.toFixed(2)} lần, Mean lệch ${deviation.meanShiftSd.toFixed(2)} SD${deviation.exceeds ? ' — VƯỢT NGƯỠNG CẢNH BÁO' : ''}` : ''})`
+      : `dải đề xuất (n=${proposed.n}, ${proposed.days} ngày)`;
+    const teaUsed = fresh.data.safety.needed ? operationalTeaResolver(db)(fresh.data.testId, fresh.data.current.mean, fresh.data.level) : null;
+    const safety = fresh.data.safety.needed
+      ? ` Cổng sai số hệ thống: hồ sơ ${fresh.data.safety.nceId}, Bias nhập ${Number(input.data.bias)}% (ngưỡng ±${fresh.data.safety.biasThreshold?.toFixed(2)}% = TEa ${fresh.data.safety.tea?.toFixed(2)}% / 4, theo ${teaUsed?.criterion || '—'}), đã xác nhận xử lý nguyên nhân.`
+      : '';
+    const referenceBias = row.mfg_mean != null && row.mfg_mean !== 0
+      ? ` Bias đối chiếu so với Mean NSX ${row.mfg_mean}: ${((p.mean - row.mfg_mean) / Math.abs(row.mfg_mean) * 100).toFixed(2)}%.`
+      : '';
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,mfg_mean=?,mfg_sd=?,applied='lab',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
-        .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, nowIso().slice(0, 10), row.id);
-      const selection = manual ? 'chỉnh thủ công' : 'dải đề xuất';
-      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Thiết lập dải QC mới', reason, actor, {
-        selection, proposed: fresh.data.proposed, applied: p,
-      });
-      tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}. Lý do: ${reason}`, fresh.data.testId);
-      tx.changed(['test_levels', 'actions'], [fresh.data.testId]);
+        .run(p.mean, p.sd, p.mean - 2 * p.sd, p.mean + 2 * p.sd, mfgMean, mfgSd, history, isoLocalDate(), row.id);
+      tx.audit('Thiết lập dải QC mới', `Mức ${fresh.data.level}: Mean ${row.mean ?? '—'} → ${p.mean}; SD ${row.sd ?? '—'} → ${p.sd}. Nguồn: ${selection}.${safety}${referenceBias} Lý do: ${reason}`, fresh.data.testId);
+      tx.changed(['test_levels'], [fresh.data.testId]);
     });
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   });
 
-  const revertManufacturerRange = writeCommand(db, 'revertManufacturerRange', 'write', (w, input: { data: { testId: string; level: number; reason: string } }): IpcResult<RangeCandidateView> => {
-    const actor = w.actor;
+  const revertManufacturerRange = writeCommand(db, 'revertManufacturerRange', requireQcConfig(db), (w, input: { data: { testId: string; level: number; reason: string } }): IpcResult<RangeCandidateView> => {
     const reason = validateRangeReason(input.data?.reason, 5);
     if (!reason) return { ok: false, error: { code: 'reason-too-short', message: 'Cần ghi lý do hoàn dải tối thiểu 5 ký tự.' } };
     const fresh = rangeCandidate(String(input.data?.testId || ''), Number(input.data?.level));
@@ -351,24 +397,23 @@ export function createEntryHandlers(db: Db) {
     const changedAt = nowIso();
     const history = appendMeanSdHistory(row.mean_sd_history_json, {
       mean: row.mean, sd: row.sd, low: row.low, high: row.high, qcLotId: row.qc_lot_id || '', lot: lotRow?.lot_no || '',
-      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: changedAt.slice(0, 10), source: row.applied,
+      effectiveFrom: row.mean_sd_effective_from || lotRow?.opened || '', effectiveTo: isoLocalDate(), source: row.applied,
     }, changedAt);
     w.commit((tx) => {
       db.prepare(`UPDATE test_levels SET mean=?,sd=?,low=?,high=?,range_k=2,applied='mfg',mean_sd_history_json=?,mean_sd_effective_from=? WHERE id=?`)
-        .run(m, sd, m - 2 * sd, m + 2 * sd, history, nowIso().slice(0, 10), row.id);
-      createRangeAction(fresh.data.testId, fresh.data.level, fresh.data.lot, 'Hoàn dải QC', reason, actor, { selection: 'nhà sản xuất', applied: { mean: m, sd } });
-      tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về Mean=${m}; SD=${sd}. Lý do: ${reason}`, fresh.data.testId);
-      tx.changed(['test_levels', 'actions'], [fresh.data.testId]);
+        .run(m, sd, m - 2 * sd, m + 2 * sd, history, isoLocalDate(), row.id);
+      tx.audit('Hoàn dải QC', `Mức ${fresh.data.level}: hoàn về dải nhà sản xuất, Mean ${row.mean ?? '—'} → ${m}; SD ${row.sd ?? '—'} → ${sd}. Lý do: ${reason}`, fresh.data.testId);
+      tx.changed(['test_levels'], [fresh.data.testId]);
     });
     return rangeCandidate(fresh.data.testId, fresh.data.level);
   });
 
-  const addPoint = writeCommand(db, 'addPoint', 'write', (w, input: { data: QcPointInput }): IpcResult<QcPointView> => {
+  const addPoint = writeCommand(db, 'addPoint', 'write', (w, input: { data: QcPointInput }): IpcResult<QcPointView & { retroChanges: QcRunConclusionChange[] }> => {
     const actor = w.actor;
     const knownLevels = (db.prepare('SELECT level FROM test_levels WHERE test_id=?').all(String(input.data.testId || '')) as { level: number }[]).map(r => r.level);
     const result = validateQcPointInput(input.data, knownLevels);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
-    const { testId, level, date, val, runId, lotNo, note, operatorName } = result.data;
+    const { testId, level, date, val, runId, lotNo, note, operatorName, retroReason } = result.data;
     const test = db.prepare('SELECT name, decimal_places FROM tests WHERE id=?').get(testId) as { name: string; decimal_places: number } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể nhập thêm điểm QC.` } };
@@ -376,20 +421,31 @@ export function createEntryHandlers(db: Db) {
     // (qc_mean/qc_sd/lot) — westgard-engine.ts's pointTarget() đã sẵn đọc lại
     // 2 cột này làm ưu tiên trước fallbackMean/fallbackSd, nên điểm cũ không
     // bị đổi verdict âm thầm nếu sau này ai sửa lại Mean/SD của mức.
-    const levelRow = db.prepare('SELECT mean, sd, qc_lot_id FROM test_levels WHERE test_id=? AND level=?').get(testId, level) as
-      { mean: number | null; sd: number | null; qc_lot_id: string | null } | undefined;
+    // Kết quả QC là bản ghi của một lần chạy đã xảy ra (N9).
+    const today = isoLocalDate();
+    if (date > today) return { ok: false, error: { code: 'future-date', message: `Ngày ${viDate(date)} ở tương lai: chỉ nhập kết quả QC đã chạy (hôm nay ${viDate(today)}).` } };
+    const levelRow = db.prepare('SELECT mean, sd, qc_lot_id, mean_sd_effective_from, mean_sd_history_json FROM test_levels WHERE test_id=? AND level=?').get(testId, level) as
+      { mean: number | null; sd: number | null; qc_lot_id: string | null; mean_sd_effective_from: string; mean_sd_history_json: string } | undefined;
     if (!canEnterQcForLevel(testId, levelRow?.qc_lot_id ?? null)) {
       return { ok: false, error: { code: 'level-not-operational', message: 'Mức QC chưa thuộc Panel và nhóm lô đang vận hành, không thể nhập QC.' } };
     }
-    const lotRow = levelRow?.qc_lot_id ? db.prepare('SELECT lot_no FROM qc_lots WHERE id=?').get(levelRow.qc_lot_id) as { lot_no: string } | undefined : undefined;
+    const lotRow = levelRow?.qc_lot_id ? db.prepare('SELECT lot_no, exp FROM qc_lots WHERE id=?').get(levelRow.qc_lot_id) as { lot_no: string; exp: string } | undefined : undefined;
     const currentLot = lotRow?.lot_no || '';
     const parallel = lotNo && lotNo !== currentLot ? listParallelColumns(testId).find((column) => column.level === level && column.lot === lotNo) : undefined;
     if (lotNo && lotNo !== currentLot && !parallel) {
       return { ok: false, error: { code: 'invalid-parallel-lot', message: 'Lô song song không còn ở trạng thái đang chạy hoặc chưa có Mean/SD ứng viên hợp lệ.' } };
     }
     const targetLot = parallel?.lot || currentLot;
-    const targetMean = parallel?.mean ?? levelRow?.mean ?? null;
-    const targetSd = parallel?.sd ?? levelRow?.sd ?? null;
+    // Vật liệu QC quá hạn dùng không còn bảo đảm giá trị đích (N9).
+    const lotExp = parallel ? parallel.exp : lotRow?.exp || '';
+    if (lotExp && date > lotExp) {
+      return { ok: false, error: { code: 'lot-expired', message: `Lô ${targetLot} hết hạn ngày ${viDate(lotExp)}: không nhập kết quả QC chạy sau hạn dùng.` } };
+    }
+    // Điểm nhập lùi ngày mang dải hiệu lực của chính ngày chạy (N9).
+    const datedTarget = parallel ? null : meanSdOnDate(levelRow?.mean_sd_history_json, levelRow?.qc_lot_id || '', date,
+      { mean: levelRow?.mean ?? null, sd: levelRow?.sd ?? null, effectiveFrom: levelRow?.mean_sd_effective_from || '' });
+    const targetMean = parallel?.mean ?? datedTarget?.mean ?? null;
+    const targetSd = parallel?.sd ?? datedTarget?.sd ?? null;
     // Một mức/lô chỉ có MỘT kết quả trong một lần chạy. UI luôn sinh run ID
     // chung đúng quy tắc này, nhưng LIS và mọi lời gọi IPC cũng phải bị chặn
     // tại cổng ghi; nếu không engine liên mức chỉ giữ điểm cuối cùng của mức
@@ -406,7 +462,10 @@ export function createEntryHandlers(db: Db) {
     // ngày, nên điểm MỚI thêm phải mang đúng ghi chú đó thay vì để trống.
     const dayNoteRow = db.prepare('SELECT note FROM qc_points WHERE test_id=? AND date=? AND voided=0 AND note<>\'\' LIMIT 1').get(testId, date) as { note: string } | undefined;
     const id = uid();
-    let view: QcPointView | undefined;
+    // Kết luận theo lần chạy TRƯỚC khi ghi (N27). Lô song song được đánh giá
+    // riêng, không đổi kết luận của tập đang vận hành.
+    const runsBefore = parallel ? null : runConclusionsOf(activeEvaluation(testId));
+    let view: (QcPointView & { retroChanges: QcRunConclusionChange[] }) | undefined;
     try {
       view = w.commit((tx) => {
         const savedInitials = (db.prepare('SELECT initials FROM users WHERE id=?').get(actor.userId) as { initials: string } | undefined)?.initials || '';
@@ -414,15 +473,28 @@ export function createEntryHandlers(db: Db) {
         db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,lot,val,value_decimals,qc_mean,qc_sd,note,operator_id,operator_username,operator_name,operator_code)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(id, testId, level, date, runId, targetLot, val, test.decimal_places ?? 2, targetMean, targetSd, note || dayNoteRow?.note || '', actor.userId, actor.username, operatorName || actor.name, operatorCode);
-        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}`, test.name);
-        tx.changed(['qc_points'], [testId]);
-        const pointView = parallel
-          ? listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id)
-          : queryPoints(testId, level).find((point) => point.id === id);
+        // N27: luật nhiều lần chạy nhìn lại lần chạy trước, nên điểm nhập lùi
+        // ngày đổi được kết luận của lần chạy SAU nó đã có. Lần chạy của chính
+        // điểm này bỏ qua: nhập dần từng mức của một lần chạy là bình thường.
+        const active = parallel ? null : activeEvaluation(testId);
+        const retroChanges = runsBefore && active ? changedRunConclusions(runsBefore, runConclusionsOf(active), new Set([qcRunKey({ date, runId })])) : [];
+        const gate = retroChangeError(retroChanges, isPeriodLocked, retroReason, 'Nhập điểm này', 'retro-reason-required');
+        if (gate) throw new RetroChangeBlocked(gate);
+        const retroNote = retroChanges.length
+          ? ` · Đổi kết luận lần chạy khác: ${describeRunChanges(retroChanges)}${retroReason ? ` · Lý do: ${retroReason}` : ''}`
+          : '';
+        tx.audit('Nhập QC', `Điểm QC mức ${level}${parallel ? ` · lô song song ${targetLot}` : ''}, ngày ${date}, giá trị ${val}${datedTarget?.fromHistory ? ` · Mean/SD hiệu lực ngày chạy ${targetMean}/${targetSd}` : ''}${retroNote}`, test.name);
+        // Điểm mới chỉ vào đúng `targetLot`: bộ nhớ đệm lô cũ giữ nguyên.
+        tx.changed(['qc_points'], [testId], [targetLot]);
+        const pointView = active
+          ? pointViewsOf(active, level).find((point) => point.id === id)
+          : listParallelColumns(testId).find((column) => column.level === level && column.lot === targetLot)?.points.find((point) => point.id === id);
         if (!pointView) throw new Error('point-view-missing');
-        return pointView;
+        options.onPointAdded?.(id, tx);
+        return { ...pointView, retroChanges };
       });
     } catch (error) {
+      if (error instanceof RetroChangeBlocked) return { ok: false, error: error.error };
       if (error instanceof Error && error.message === 'point-view-missing') {
         return { ok: false, error: { code: 'point-view-missing', message: 'Không thể dựng kết quả đánh giá nên điểm chưa được lưu.' } };
       }
@@ -431,9 +503,45 @@ export function createEntryHandlers(db: Db) {
     return { ok: true, data: view };
   });
 
-  /** Hủy điểm QC. "kind" (nguyên nhân hủy) quyết định có tự mở/dùng lại hồ
+  /** Huỷ điểm QC. "kind" (nguyên nhân huỷ) quyết định có tự mở/dùng lại hồ
    * sơ NCE hay không (`voidNceChoice()`). */
-  const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }> => {
+  /** Cùng ảnh chụp trước huỷ cho phần xem trước và hồ sơ NCE. Điểm ngoài
+   * tập đang vận hành lấy đủ kết luận của chuỗi lô lịch sử hoặc song song,
+   * không chỉ bổ sung riêng điểm đang được chọn huỷ. */
+  function snapshotBeforeVoid(point: { id: string; test_id: string; date: string; run_id: string }): NceRunSnapshot {
+    const snapshot = nceRunSnapshot(db, point.test_id, { date: point.date, runId: point.run_id });
+    const selected = snapshot.points.find((p) => p.pointId === point.id)!;
+    const parallelIds = new Set(listParallelColumns(point.test_id).flatMap((column) => column.points.map((p) => p.id)));
+    const groupOf = (p: { lot: string; level: number }) => (db.prepare('SELECT group_id FROM qc_lots WHERE lot_no=? AND level=?').get(p.lot, p.level) as { group_id: string | null } | undefined)?.group_id;
+    const selectedGroup = groupOf(selected);
+    // Lô song song đánh giá riêng với lô chính, dù trùng ngày và mã run.
+    const sameContext = (p: typeof selected) => parallelIds.has(selected.pointId) ? parallelIds.has(p.pointId)
+      : !parallelIds.has(p.pointId) && (selectedGroup ? groupOf(p) === selectedGroup : p.pointId === selected.pointId);
+    const rows = snapshot.points.filter((p) => !p.voided && sameContext(p)).map((p) => ({ id: p.pointId, level: p.level, lot: p.lot }));
+    const evaluated = pointEvaluationsOf(db, point.test_id, rows);
+    const actionOf = testRuleActionOf(db, point.test_id, { date: point.date, runId: point.run_id });
+    return { ...snapshot, points: snapshot.points.map((p) => {
+      const result = p.voided ? undefined : evaluated.get(p.pointId);
+      return result ? { ...p, verdict: result.verdict, rules: [...result.rules], rejectRules: rejectingRules(result.rules, actionOf), mean: result.target_mean, sd: result.target_sd, z: result.z }
+        : { ...p, verdict: 'none', rules: [], rejectRules: [] };
+    }) };
+  }
+
+  function getVoidPointAssessment(pointId: string): IpcResult<VoidPointAssessment> {
+    if (typeof pointId !== 'string' || !pointId.trim()) return { ok: false, error: { code: 'missing-point', message: 'Thiếu mã điểm QC.' } };
+    const point = db.prepare('SELECT id,test_id,date,run_id,voided FROM qc_points WHERE id=?').get(pointId) as { id: string; test_id: string; date: string; run_id: string; voided: number } | undefined;
+    if (!point) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy điểm QC.' } };
+    if (point.voided) return { ok: false, error: { code: 'already-voided', message: 'Điểm QC này đã bị huỷ trước đó.' } };
+    const snapshot = snapshotBeforeVoid(point);
+    const rejected = snapshot.points.filter((p) => !p.voided && p.verdict === 'rej');
+    const errorClass = nceErrorClass([{ role: 'trigger', snapshot }]);
+    const rejectedRules = [...new Set(rejected.flatMap((p) => [...(p.rejectRules ?? p.rules)]))];
+    const rules = errorClass ? rejectedRules.filter((id) => WG_RULE_BY_ID[id]?.err === errorClass) : rejectedRules;
+    return { ok: true, data: { error_class: errorClass, rules, run_rejected: rejected.length > 0,
+      rejected_levels: [...new Set(rejected.map((p) => p.level))].sort((a, b) => a - b) } };
+  }
+
+  const voidPoint = writeCommand(db, 'voidPoint', 'write', (w, input: { data: VoidPointInput }): IpcResult<{ id: string; nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] }> => {
     const actor = w.actor;
     const result = validateVoidInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
@@ -446,52 +554,119 @@ export function createEntryHandlers(db: Db) {
     const test = db.prepare('SELECT name, decimal_places FROM tests WHERE id=?').get(point.test_id) as { name: string; decimal_places: number } | undefined;
     // Luật/loại sai số của CHÍNH điểm này — đọc TRƯỚC khi đánh dấu huỷ, vì
     // queryPoints() chỉ tính verdict cho điểm CHƯA huỷ (voided=0).
-    const currentView = queryPoints(point.test_id, point.level).find(p => p.id === pointId);
+    const activeBefore = activeEvaluation(point.test_id);
+    const runsBefore = runConclusionsOf(activeBefore);
+    const currentView = pointViewsOf(activeBefore, point.level).find(p => p.id === pointId);
     const parallelView = listParallelColumns(point.test_id).flatMap((column) => column.points).find((p) => p.id === pointId);
-    let view = currentView || parallelView;
-    if (!view) {
-      // Hồ sơ chuyển lô có thể vừa kết thúc nhưng người dùng vẫn huỷ điểm lịch
-      // sử. Khi đó đánh giá riêng đúng lô bằng snapshot đã chốt trên điểm.
-      const history = pointsForLot(point.test_id, point.level, point.lot);
-      const active = activeEvaluation(point.test_id);
-      const result = westgardByPoint(history, point.qc_mean, point.qc_sd, active.within, active.actionOf);
-      const index = history.findIndex((item) => item.id === pointId);
-      if (index >= 0) view = { ...history[index], verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
+    let view: { verdict: 'ok' | 'warn' | 'rej'; rules: string[]; runRejectedBy?: number[] } | undefined = currentView || parallelView;
+    {
+      // N31/R05: điểm lô cũ lấy kết luận THEO LẦN CHẠY của đúng chuỗi lô lịch
+      // sử (cùng nguồn với tab lô cũ, báo cáo và biên bản tháng), để thấy cả
+      // luật liên mức như R4s. Đánh giá riêng một mức bỏ sót các luật đó nên
+      // lách được cổng lý do và mất bằng chứng lần chạy bị loại. Cũng kiểm
+      // mức còn gán hiện hành nếu mức khác của lần chạy đã đổi lô.
+      const archived = historicalPointEvaluations(db, point.test_id, [point]).get(pointId);
+      if (archived && archived.verdict !== 'none') view = { verdict: archived.verdict, rules: [...archived.rules], runRejectedBy: archived.runRejectedBy ?? [] };
     }
-    const rules = view ? Array.from(new Set(view.rules)) : [];
-    const rule = rules.length ? rules.join(', ') : 'Không có luật Westgard';
-    const qcVerdict = view && (view.verdict === 'warn' || view.verdict === 'rej') ? view.verdict : 'invalid';
+    if (!view) {
+      // Không thuộc chuỗi lô lịch sử nào (hồ sơ chuyển lô vừa kết thúc): đánh
+      // giá riêng đúng lô bằng snapshot đã chốt trên điểm.
+      const history = pointsForLot(point.test_id, point.level, point.lot);
+      const rules = activeEvaluation(point.test_id).rulesAt({ date: point.date, runId: point.run_id });
+      const result = westgardByPoint(history, point.qc_mean, point.qc_sd, rules.within, rules.actionOf);
+      const index = history.findIndex((item) => item.id === pointId);
+      if (index >= 0) view = { verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] };
+    }
+    // N4: điểm thuộc lần chạy bị loại (chính nó Loại bỏ, hoặc mức khác của lần
+    // chạy vi phạm) cần lý do với MỌI loại huỷ, và điểm đã huỷ giữ lại bằng
+    // chứng đó — huỷ rồi nhập lại không còn xoá được dấu vết lần chạy bị loại.
+    const rejectedLevels = view?.runRejectedBy ?? [];
+    const runRejected = view?.verdict === 'rej' || rejectedLevels.length > 0;
+    if (runRejected) {
+      const reasonError = rejectedRunVoidReasonError(reason);
+      if (reasonError) return { ok: false, error: reasonError };
+    }
+    // Điểm là bằng chứng rerun của hồ sơ NCE đã cho chạy lại nhưng chưa đóng:
+    // huỷ làm bằng chứng mất hiệu lực, hồ sơ chỉ nộp/duyệt được sau khi nhập
+    // lại điểm của đúng lần chạy đó. Bắt ghi lý do như lần chạy bị loại.
+    const rerunOf = db.prepare(`SELECT n.nce_id FROM nce_runs r JOIN nce_records n ON n.id=r.nce_record_id
+      WHERE r.role='rerun' AND r.test_id=? AND r.date=? AND r.run_id=? AND n.status IN ('released','pending_approval') LIMIT 1`)
+      .get(point.test_id, point.date, point.run_id) as { nce_id: string } | undefined;
+    if (rerunOf && reason.trim().length < REJECTED_RUN_VOID_REASON_MIN) {
+      return { ok: false, error: { code: 'reason-required-rerun-evidence', message: `Điểm này là bằng chứng rerun của hồ sơ ${rerunOf.nce_id}: cần ghi lý do huỷ tối thiểu ${REJECTED_RUN_VOID_REASON_MIN} ký tự. Sau khi huỷ phải nhập lại điểm của lần chạy này thì hồ sơ mới nộp/duyệt được.` } };
+    }
+    const rejectionJson = runRejected ? JSON.stringify({ rules: view?.rules ?? [], rejectedLevels }) : '';
     const kindLabel = kind === 'analytical' ? 'Kết quả QC thực tế không hợp lệ' : kind === 'data-entry' ? 'Nhập sai dữ liệu' : '';
     const composedReason = kindLabel ? (reason ? `${kindLabel} — ${reason}` : kindLabel) : reason;
-    const mutation = w.commit((tx) => {
-      db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=? WHERE id=?')
-        .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, pointId);
-      tx.audit('Hủy điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}`, test ? test.name : '');
-      let nceId: string | null = null, reusedAction = false, createdAction = false;
-      if (openNce) {
-        // Dùng lại hồ sơ NCE ĐANG MỞ của CHÍNH điểm này nếu có (chưa huỷ,
-        // chưa duyệt), tránh mở trùng cho cùng một lần vi phạm.
-        const existing = db.prepare("SELECT nce_id FROM actions WHERE point_id=? AND record_status<>'cancelled' AND approval_status<>'approved' ORDER BY created_at DESC LIMIT 1")
-          .get(pointId) as { nce_id: string } | undefined;
-        if (existing) { nceId = existing.nce_id; reusedAction = true; }
-        else {
-          const id = uid();
-          nceId = nextNceId(db, nowIso().slice(0, 10));
-          const dueDate = isoLocalDateAfter(7);
-          const correction = `Hủy điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}. Lý do: ${composedReason}`;
-          const now = nowIso();
-          db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,point_id,rule,error_type,qc_verdict,nce_id,protocol_version,approval_status,effectiveness_status,record_status,due_date,detail_json)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,3,'pending','pending','active',?,?)`)
-      .run(id, point.date, now, now, actor.userId, actor.username, point.test_id, point.level, point.lot, pointId, rule, errorClass(rules), qcVerdict, nceId, dueDate,
-              JSON.stringify({ correction, openedFromVoid: true }));
-          tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ hủy điểm QC`, test ? test.name : '');
+    // Hồ sơ NCE theo LẦN CHẠY (D-01): dùng lại hồ sơ đang xử lý của chính lần
+    // chạy này; không có thì chụp lần chạy TRƯỚC khi đánh dấu huỷ để làm lần
+    // khởi đầu. Điểm ngoài tập đang vận hành (lô song song/lịch sử) lấy kết
+    // luận đã tính ở trên.
+    const existingNce = openNce ? openRecordOfRun(db, point.test_id, point.date, point.run_id) : undefined;
+    let snapshot: NceRunSnapshot | null = null;
+    if (openNce && !existingNce) {
+      const taken = snapshotBeforeVoid(point);
+      snapshot = { ...taken, points: taken.points.map((p) => p.pointId === pointId && p.verdict === 'none' && view
+        ? { ...p, verdict: view.verdict, rules: Array.from(new Set(view.rules)), rejectRules: rejectingRules(view.rules, testRuleActionOf(db, point.test_id, { date: point.date, runId: point.run_id })) } : p) };
+    }
+    let mutation: { nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] };
+    try {
+      mutation = w.commit((tx) => {
+        db.prepare('UPDATE qc_points SET voided=1, void_reason=?, void_kind=?, void_requires_rerun=?, voided_at=?, voided_by=?, void_rejection_json=? WHERE id=?')
+          .run(composedReason, kind, openNce ? 1 : 0, nowIso(), actor.username, rejectionJson, pointId);
+        // N26/N28: điểm bị huỷ có thể là "bằng chứng" của luật nhiều lần chạy ở
+        // lần chạy SAU (hoặc huỷ nó nối ra chuỗi 4-1s/10x mới). Đổi trạng thái
+        // loại bỏ của lần chạy khác cần lý do như N4 và giữ lại bằng chứng; chạm
+        // kỳ đã khoá thì chặn.
+        const retroChanges = changedRunConclusions(runsBefore, runConclusionsOf(activeEvaluation(point.test_id)), new Set([qcRunKey({ date: point.date, runId: point.run_id })]));
+        const gate = retroChangeError(retroChanges, isPeriodLocked, reason, 'Huỷ điểm này', 'reason-required-retro');
+        if (gate) throw new RetroChangeBlocked(gate);
+        const affectedRuns = retroChanges.filter(flipsRejection);
+        if (affectedRuns.length) {
+          // Biên bản tháng đếm điểm huỷ mang bằng chứng loại bỏ qua cột này.
+          db.prepare('UPDATE qc_points SET void_rejection_json=? WHERE id=?')
+            .run(JSON.stringify({ rules: view?.rules ?? [], rejectedLevels, affectedRuns }), pointId);
+        }
+        const rejectionNote = runRejected
+          ? ` · Thuộc lần chạy ${point.run_id || '(không mã)'} bị loại${view?.rules.length ? ` (luật ${view.rules.join(', ')})` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
+          : '';
+        const retroNote = retroChanges.length ? ` · Đổi kết luận lần chạy khác: ${describeRunChanges(retroChanges)}` : '';
+        tx.audit('Huỷ điểm QC', `Điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val} · Lý do: ${composedReason}${rejectionNote}${retroNote}`, test ? test.name : '');
+        let nceId: string | null = null, reusedAction = false, createdAction = false;
+        if (openNce && existingNce) { nceId = existingNce.nce_id; reusedAction = true; }
+        else if (openNce && snapshot) {
+          const id = uid(), now = nowIso(), today = isoLocalDate();
+          nceId = nextNceId(db, today);
+          // "Mô tả sự kiện" ghi điều đã xảy ra, "Xử lý tức thời" ghi việc đã
+          // làm — hai trường không lặp cùng một câu (đánh giá giao diện 10/11/2026).
+          const valueText = point.val.toFixed(test?.decimal_places ?? 2);
+          const runText = `lần chạy ${point.run_id || '(không mã)'} ngày ${viDate(point.date)}`;
+          const ruleText = runRejected
+            ? `; lần chạy bị loại${view?.rules.length ? ` theo luật ${view.rules.join(', ')}` : ''}${rejectedLevels.length ? `, mức vi phạm: ${rejectedLevels.join(', ')}` : ''}`
+            : '';
+          const description = `QC mức ${point.level}, ${runText} cho giá trị ${valueText}${ruleText}. Lý do huỷ: ${composedReason.replace(/[.\s]+$/, '')}.`;
+          const correction = `Đã huỷ điểm QC mức ${point.level} (giá trị ${valueText}) khỏi thống kê và đánh dấu ${runText} phải chạy lại QC.`;
+          // Người huỷ là người phụ trách mặc định, có hạn theo cấu hình — hồ sơ
+          // tự mở không còn lọt khỏi cảnh báo quá hạn (sửa R-11). Có giữ kết quả
+          // hay không thì chưa biết, phải ghi trước khi cho chạy lại.
+          insertNceRecord(db, {
+            id, nceId, source: 'iqc', phase: 'exam', testId: point.test_id, detectedAt: today,
+            description, correction, holdResults: null,
+            ownerUserId: actor.userId, dueDate: defaultNceDueDate(today, '', readNceConfig(db)),
+            errorClass: nceErrorClass([{ role: 'trigger', snapshot }]), checklistJson: JSON.stringify(emptyChecklist('iqc')),
+          }, actor, now);
+          insertNceRun(db, id, 'trigger', snapshot, actor, now);
+          tx.audit('Tạo hồ sơ NCE', `Mở hồ sơ ${nceId} từ huỷ điểm QC`, test ? test.name : '');
           createdAction = true;
         }
-      }
-      tx.changed(createdAction ? ['qc_points', 'actions'] : ['qc_points'], [point.test_id]);
-      return { nceId, reusedAction };
-    });
-    return { ok: true, data: { id: pointId, nceId: mutation.nceId, reusedAction: mutation.reusedAction } };
+        tx.changed(createdAction ? ['qc_points', 'nce_records'] : ['qc_points'], [point.test_id]);
+        return { nceId, reusedAction, retroChanges };
+      });
+    } catch (error) {
+      if (error instanceof RetroChangeBlocked) return { ok: false, error: error.error };
+      throw error;
+    }
+    return { ok: true, data: { id: pointId, ...mutation } };
   });
 
   /** Ghi chú theo ngày (cột "Ghi chú" của bảng nhập QC). Không có bảng riêng;
@@ -503,10 +678,13 @@ export function createEntryHandlers(db: Db) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: { code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' } };
     const test = db.prepare('SELECT name FROM tests WHERE id=?').get(testId) as { name: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
-    if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể sửa ghi chú.` } };
     const note = String(input.data?.note ?? '').slice(0, 1000).trim();
-    const rows = db.prepare('SELECT id FROM qc_points WHERE test_id=? AND date=? AND voided=0').all(testId, date) as { id: string }[];
+    const rows = db.prepare('SELECT id, note FROM qc_points WHERE test_id=? AND date=? AND voided=0').all(testId, date) as { id: string; note: string | null }[];
     if (!rows.length) return { ok: false, error: { code: 'no-points', message: 'Ngày này chưa có điểm QC nào để gắn ghi chú.' } };
+    // Lưu lại đúng ghi chú đang có (vd chỉ bấm vào ô rồi rời đi) thì không ghi
+    // nhật ký, không báo thay đổi.
+    if (rows.every((row) => (row.note || '') === note)) return w.noChange({ note, updated: 0 });
+    if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể sửa ghi chú.` } };
     w.commit((tx) => {
       db.prepare('UPDATE qc_points SET note=? WHERE test_id=? AND date=? AND voided=0').run(note, testId, date);
       tx.audit('Ghi chú QC', `Ngày ${date}${note ? ' · ' + note : ' · xoá ghi chú'}`, test.name);
@@ -515,7 +693,7 @@ export function createEntryHandlers(db: Db) {
     return { ok: true, data: { note, updated: rows.length } };
   });
 
-  return { queryPoints, listHistoryPoints, listVoidedPoints, listParallelColumns, listPreviousLotSeries, rangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote };
+  return { queryPoints, getEntryWindow, listHistoryPoints, listVoidedPoints, getVoidPointAssessment, listParallelColumns, listPreviousLotSeries, rangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote };
 }
 
 export type EntryHandlers = ReturnType<typeof createEntryHandlers>;

@@ -4,6 +4,7 @@
 // config-handlers.test.mjs vì file đó khoá số đếm audit log tuyệt đối.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -150,6 +151,13 @@ assert.match(missingTarget.error.message, /Glucose/);
 
 // Chấp nhận (kèm Mean/SD ứng viên hợp lệ) — chuyển trạng thái, ghi nhận
 // người/ngày duyệt, áp Mean/SD vào test_levels, đánh dấu lô cũ hết dùng.
+// Cổng N12: lô mới phải chạy song song đủ dữ liệu trước khi chấp nhận.
+const shortRun = h.createLotTransition({ id: transition.data.id, data: {
+  panelId: panel.data.id, fromLotId: lot1.data.id, toLotId: lot3.id, startDate: '2026-06-01', status: 'accepted',
+  criteria: [{ testId: test1.id, level: 1, mean: 100, sd: 3 }],
+} }, actor);
+assert.equal(shortRun.error?.code, 'parallel-insufficient', 'chưa chạy song song thì chưa chấp nhận được');
+seedParallelRun(db, { transitionId: transition.data.id, testId: test1.id, level: 1, lotNo: 'L3', mean: 100, sd: 3, start: '2026-06-01' });
 const accept = h.createLotTransition({ id: transition.data.id, data: {
   panelId: panel.data.id, fromLotId: lot1.data.id, toLotId: lot3.id, startDate: '2026-06-01', status: 'accepted',
   criteria: [{ testId: test1.id, level: 1, mean: 100, sd: 3 }],
@@ -173,15 +181,37 @@ const teaMissing = h.saveTeaRef({ data: { name: 'Glucose' } }, actor);
 assert.equal(teaMissing.ok, false);
 assert.equal(teaMissing.error.code, 'invalid-value');
 
-const tea = h.saveTeaRef({
-  data: {
-    name: 'Glucose', labValue: 10, labSource: 'regulation', reference: 'CLIA 2024 final rule',
-    reason: 'Áp dụng theo quy định mới nhất của CLIA', effectiveDate: '2026-01-01',
-    approvedDate: '2025-12-15', nextReviewDate: '2027-01-01', preparedBy: 'KTV A', approvedBy: 'Trưởng khoa B',
-  },
-}, actor);
+const teaData = {
+  analyteId: 'qclab-glucose', name: 'Glucose', labValue: 10,
+  levelValues: [{ level: 1, tea: 8.5 }, { level: 2, tea: 9.5 }],
+  labSource: 'regulation', reference: 'CLIA 2024 final rule',
+  reason: 'Áp dụng theo quy định mới nhất của CLIA', effectiveDate: '2026-01-01',
+  approvedDate: '2025-12-15', nextReviewDate: '2027-01-01', preparedBy: 'KTV A', approvedBy: 'Trưởng khoa B',
+};
+const tea = h.saveTeaRef({ data: teaData }, actor);
 assert.equal(tea.ok, true);
 assert.equal(tea.data.lab, 10);
+assert.deepEqual(tea.data.lab_level_defaults, [{ level: 1, tea: 8.5 }, { level: 2, tea: 9.5 }]);
+assert.equal(h.listTeaRefs().length, 1);
+assert.equal(h.listTeaRefs()[0].lab_level_defaults[0].tea, 8.5, 'listTeaRefs phải trả TEa theo mức độc lập với test–máy');
+
+// Nhật ký phải ghi giá trị từng mức trước → sau, không chỉ đếm số mức.
+const lastAudit = () => db.prepare('SELECT type, detail FROM activity ORDER BY seq DESC LIMIT 1').get();
+const teaAuditCount = () => db.prepare("SELECT COUNT(*) n FROM activity WHERE type LIKE '%TEa chuẩn hoá%'").get().n;
+const teaUpdated = h.saveTeaRef({ id: tea.data.id, data: { ...teaData, levelValues: [{ level: 1, tea: 9 }, { level: 2, tea: 9.5 }] } }, actor);
+assert.equal(teaUpdated.ok, true);
+assert.match(lastAudit().detail, /Theo mức M1 8\.5%, M2 9\.5% → M1 9%, M2 9\.5%/);
+
+// Lưu lại y nguyên: không ghi nhật ký mới.
+const auditsBefore = teaAuditCount();
+const teaSame = h.saveTeaRef({ id: tea.data.id, data: { ...teaData, levelValues: [{ level: 2, tea: 9.5 }, { level: 1, tea: 9 }] } }, actor);
+assert.equal(teaSame.ok, true);
+assert.equal(teaAuditCount(), auditsBefore, 'lưu lại đúng giá trị cũ phải là noChange');
+
+// Thêm hồ sơ mới cho analyte đã có dòng thì cập nhật đúng dòng đó, không nhân đôi.
+const teaByAnalyte = h.saveTeaRef({ data: { ...teaData, labValue: 11 } }, actor);
+assert.equal(teaByAnalyte.ok, true);
+assert.equal(teaByAnalyte.data.id, tea.data.id);
 assert.equal(h.listTeaRefs().length, 1);
 
 const teaRemoved = h.removeTeaRef({ id: tea.data.id }, actor);
@@ -191,10 +221,13 @@ assert.equal(h.listTeaRefs().length, 0);
 // ---- Phạm vi luật Westgard theo xét nghiệm ----
 const scopes1 = h.listRuleScopes(test1.id, 1);
 assert.ok(scopes1.some(s => s.id === '1-3s'));
-const saveScope = h.saveRuleScope(test1.id, '2-2s', 'across', actor);
+// N7: xét nghiệm này chưa đủ 2 mức đang vận hành, nên kênh liên mức không
+// chạy được và không lưu được; kênh trong-mức thì được.
+assert.equal(h.saveRuleScope(test1.id, '2-2s', 'across', actor).error?.code, 'scope-needs-levels');
+const saveScope = h.saveRuleScope(test1.id, '2-2s', 'within', actor);
 assert.equal(saveScope.ok, true);
 const scopesAfter = h.listRuleScopes(test1.id, 1);
-assert.equal(scopesAfter.find(s => s.id === '2-2s').scope, 'across');
+assert.equal(scopesAfter.find(s => s.id === '2-2s').scope, 'within');
 const clearScope = h.saveRuleScope(test1.id, '2-2s', '', actor);
 assert.equal(clearScope.ok, true);
 const storedScopes = JSON.parse(db.prepare('SELECT rule_scopes_json FROM tests WHERE id=?').get(test1.id).rule_scopes_json);
@@ -232,7 +265,8 @@ const hint6x = hints.find(r => r.id === '6x');
 assert.equal(hint6x.scope, 'within', 'scope hieu luc phai theo ghi de rieng');
 assert.equal(hint6x.defaultScope, 'both', 'defaultScope la chuan cua ho dem chuoi, khong phai ghi de');
 assert.equal(hint6x.action, 'alert', 'action hieu luc phai theo ghi de rieng');
-assert.equal(hint6x.defaultAction, 'reject', 'defaultAction la muc do chuan, khong phai ghi de');
+// WG-26: 6x không bật sẵn, nên mức chuẩn khi không ghi đè là "không dùng".
+assert.equal(hint6x.defaultAction, 'inactive', 'defaultAction la muc do chuan, khong phai ghi de');
 
 // Không truyền số mức: main tự đếm mức đang vận hành, không nhận từ renderer.
 const selfCounted = h.listRuleScopes(test1.id);

@@ -81,7 +81,7 @@ export function addQuickValue(list: readonly string[], value: unknown): { items:
 export type ReagentRow = [string, string];
 
 /** Tên của phép so sánh mới tạo, khi người dùng chưa đặt tên. */
-export const DEFAULT_REAGENT_NAME = 'Hóa chất mới';
+export const DEFAULT_REAGENT_NAME = 'Hoá chất mới';
 
 export function prepareReagentRows(rows: unknown): ReagentRow[] {
   if (!Array.isArray(rows) || !rows.length) return [['', ''], ['', ''], ['', ''], ['', ''], ['', '']];

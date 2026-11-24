@@ -4,7 +4,7 @@
 // do huỷ điểm là vẽ lại cả bảng 31 ngày và mọi biểu đồ. Nay hộp thoại tự giữ
 // form của mình, còn bảng nhập và biểu đồ bọc `memo` và chỉ nhận props ổn
 // định (cột dựng bằng `useMemo`, callback bằng `useCallback`).
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalog } from '../lib/useCatalog';
@@ -16,26 +16,32 @@ import { canWrite, isAdmin } from '../lib/permissions';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import { confirmDialog } from '../state/dialog-store';
+import { LoadNotice } from '../components/LoadNotice';
+import { confirmDialog, errorDialog, reasonDialog } from '../state/dialog-store';
+import { showToast } from '../state/toast-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
+import { isoLocalDate, isoLocalDateAfter } from '../../main/domain/local-date';
+import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
 import type { QcChartPoint } from '../components/QcChart';
-import type { QcPointView, TestLevel } from '../../shared/qc-api';
+import type { EntryWindow, EntryWindowRequest, QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
 import { createOperationalCatalog } from './entry/operational';
 import { EntryTree, TreeToggleIcon } from './entry/EntryTree';
-import { EntrySheet, type SheetMessages } from './entry/EntrySheet';
+import { EntrySheet } from './entry/EntrySheet';
 import { EntryLjPanel } from './entry/EntryLjPanel';
 import { EntryPointsPanel } from './entry/EntryPointsPanel';
 import { EntryRangePanel } from './entry/EntryRangePanel';
 import { VoidPointModal } from './entry/VoidPointModal';
 import { RangeWorkflowModal, type RangeMode } from './entry/RangeWorkflowModal';
-import { formatQcValue, pad2, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
+import { formatQcValue, parseQcValueText, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
 import { lotNoOfLevel } from '../lib/lot-label';
 
 const EMPTY_LEVELS: TestLevel[] = [];
+const EMPTY_LOT_SELECTION: Record<number, string> = {};
+const EMPTY_WINDOW: EntryWindow = { current: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [] };
 const ENTRY_TREE_COLLAPSE_KEY = 'qclab-entry-tree-collapsed';
 
-function isoDay(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+function visibleContentTop(viewport: HTMLElement): number {
+  return viewport.querySelector('.head')?.getBoundingClientRect().bottom ?? viewport.getBoundingClientRect().top;
 }
 
 export function EntryPage() {
@@ -43,11 +49,13 @@ export function EntryPage() {
     instruments: s.instruments, lots: s.lots, lotGroups: s.lotGroups, tests: s.tests, panels: s.panels, levelsByTestId: s.levelsByTestId,
     loadLevels: s.loadLevels, })));
   const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
-  const { pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, addPoint, setDayNote } = useEntryStore(useShallow((s) => ({
-    pointsByLevel: s.pointsByLevel, analysisByLevel: s.analysisByLevel, parallelColumns: s.parallelColumns, previousLotSeries: s.previousLotSeries,
-    voidedPoints: s.voidedPoints, rangeCandidate: s.rangeCandidate, rangeError: s.rangeError,
+  const { activeTestId, entryWindow, loadedRequest, windowError, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, addPoint, setDayNote } = useEntryStore(useShallow((s) => ({
+    activeTestId: s.activeTestId, entryWindow: s.entryWindow, loadedRequest: s.loadedRequest, windowError: s.windowError,
+    rangeCandidate: s.rangeCandidate, rangeError: s.rangeError,
     loadTestData: s.loadTestData, resetTestData: s.resetTestData, loadRangeCandidate: s.loadRangeCandidate, addPoint: s.addPoint, setDayNote: s.setDayNote,
   })));
+  const selectedTestId = useEntryStore((s) => s.selectedTestId);
+  const selectTreeTest = useEntryStore((s) => s.selectTreeTest);
   // Vai trò "chỉ xem" vẫn mở được trang này nhưng không
   // thấy ô nhập/nút huỷ — main process cũng chặn (requireWrite), đây chỉ để
   // không hiện nút rồi mới báo lỗi.
@@ -62,20 +70,18 @@ export function EntryPage() {
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     try { return localStorage.getItem(ENTRY_TREE_COLLAPSE_KEY) === '1'; } catch { return false; }
   });
-  const [testId, setTestId] = useState('');
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
+  const [todayJumpTestId, setTodayJumpTestId] = useState('');
+  const [panelAnchor, setPanelAnchor] = useState<{ testId: string; section: string; offset: number } | null>(null);
+  const entryMainRef = useRef<HTMLDivElement>(null);
   const [voiding, setVoiding] = useState<QcPointView | null>(null);
-  const [voidMsg, setVoidMsg] = useState<string | null>(null);
   // Mỗi mức chỉ mở một chuỗi lô cũ trên biểu đồ/bảng chi tiết. Worksheet vẫn
   // hiện mọi điểm lô cũ theo ngày ở dạng chỉ đọc để lịch sử tháng liền mạch.
-  const [previousLotOpen, setPreviousLotOpen] = useState<Record<number, string>>({});
+  const [lotSelection, setLotSelection] = useState({ testId: '', lots: EMPTY_LOT_SELECTION });
   const [ljDays, setLjDays] = useState(30);
-  const [ljFrom, setLjFrom] = useState('');
-  const [ljTo, setLjTo] = useState('');
-  const [noteErr, setNoteErr] = useState<string | null>(null);
-  const [pointErr, setPointErr] = useState<string | null>(null);
-  const [pointFeedback, setPointFeedback] = useState<{ kind: 'ok' | 'warn' | 'rej'; message: string } | null>(null);
+  const [ljFrom, setLjFrom] = useState(() => isoLocalDateAfter(-29));
+  const [ljTo, setLjTo] = useState(() => isoLocalDate());
 
   function setTreeVisibility(collapsed: boolean) {
     setTreeCollapsed(collapsed);
@@ -86,7 +92,25 @@ export function EntryPage() {
   // Danh mục tự nạp lại khi quản trị viên đổi máy, xét nghiệm, lô, nhóm lô
   // hay Panel ở máy khác. Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`
   // của MỌI xét nghiệm, nên không lọc theo testId.
-  useCatalog(['instruments', 'lots', 'lotGroups', 'summaries', 'tests', 'panels']);
+  const catalogStatus = useCatalog(['instruments', 'lots', 'lotGroups', 'summaries', 'tests', 'panels']);
+  const catalog = useMemo(() => createOperationalCatalog(tests, panels, lots, lotGroups), [tests, panels, lots, lotGroups]);
+  const operationalSummaries = useMemo(() => summaries.filter(catalog.isOperationalTest), [summaries, catalog]);
+  const currentSummary = operationalSummaries.find((s) => s.testId === selectedTestId);
+  const testId = currentSummary?.testId || '';
+  const testName = currentSummary?.testName || '';
+  const decimals = currentSummary?.decimalPlaces ?? 2;
+  const previousLotOpen = lotSelection.testId === testId ? lotSelection.lots : EMPTY_LOT_SELECTION;
+  const windowRequest = useMemo<EntryWindowRequest>(() => ({
+    worksheetFrom: isoLocalDate(new Date(viewYear, viewMonth - 1, 1)),
+    worksheetTo: isoLocalDate(new Date(viewYear, viewMonth, 0)),
+    chartFrom: ljFrom, chartTo: ljTo, previousLots: previousLotOpen,
+  }), [viewYear, viewMonth, ljFrom, ljTo, previousLotOpen]);
+  const sameTest = activeTestId === testId;
+  const windowReady = sameTest && loadedRequest === windowRequest;
+  const worksheetReady = sameTest && loadedRequest?.worksheetFrom === windowRequest.worksheetFrom
+    && loadedRequest.worksheetTo === windowRequest.worksheetTo;
+  const { current, parallelColumns, previousLotSeries, voidedPoints } = sameTest && entryWindow ? entryWindow : EMPTY_WINDOW;
+  const pointsByLevel = useMemo(() => Object.fromEntries(Object.entries(current).map(([level, value]) => [level, value.points])), [current]);
   // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
   // Mean/SD và Lịch sử dữ liệu cần thấy cả mức đã dừng). Thẻ Nhập QC thì chỉ
   // được dựng cột cho mức ĐANG VẬN HÀNH — cùng tập mà `listOperationalLevels()`
@@ -100,67 +124,125 @@ export function EntryPage() {
   // lần render sẽ thành vòng lặp nạp vô hạn.
   const allLevels = levelsByTestId[testId] || EMPTY_LEVELS;
   const levels = useMemo(() => allLevels.filter((l) => l.operational !== 0), [allLevels]);
-  const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
+  // Giữ theo GIÁ TRỊ: sau mỗi lần ghi, `loadLevels` trả mảng mới dù tập mức
+  // không đổi; nếu `levelNums` đổi theo thì effect dưới nạp lại dữ liệu thêm
+  // một lượt ngoài lượt của `useStoreInvalidation` (e2e `reload-count`).
+  const levelKey = levels.map((l) => l.level).join(',');
+  const levelNums = useMemo(() => (levelKey ? levelKey.split(',').map(Number) : []), [levelKey]);
+  const testDataReady = !!levelKey && windowReady && (todayJumpTestId === testId || panelAnchor?.testId === testId);
+  const jumpToToday = testDataReady && todayJumpTestId === testId;
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
-  // Đổi xét nghiệm thì dải QC đang xem rơi về mức đầu tiên còn vận hành.
+  // Giữ mức đang xem nếu xét nghiệm mới có mức đó, chờ nạp danh mục mức trước khi chọn lại.
   useEffect(() => {
+    if (testId && allLevels === EMPTY_LEVELS) return;
     if (!levelNums.length) { setRangeLevel(null); return; }
     setRangeLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
-  }, [testId, levelNums]);
-  useEffect(() => { setPreviousLotOpen({}); }, [testId]);
+  }, [testId, allLevels, levelNums]);
   useEffect(() => {
-    if (testId) loadTestData(testId, levelNums);
+    if (testId) void loadTestData(testId, windowRequest);
     else resetTestData();
-  }, [testId, levelNums, loadTestData, resetTestData]);
+  }, [testId, windowRequest, loadTestData, resetTestData]);
   useEffect(() => { if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel); }, [testId, rangeLevel, loadRangeCandidate]);
-  useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions'], testId || undefined, () => {
-    if (testId && levelNums.length) loadTestData(testId, levelNums);
+  useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions', 'qc_lots', 'lot_groups', 'tests', 'app_meta', 'nce_cuts', 'qc_panels', 'qc_panel_tests'], testId || undefined, () => {
+    // Khung dữ liệu lấy tập mức từ main; danh mục mức dùng để dựng nhãn cột.
+    if (testId) loadLevels(testId);
+    if (testId) void loadTestData(testId, windowRequest);
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
 
-  const catalog = useMemo(() => createOperationalCatalog(tests, panels, lots, lotGroups), [tests, panels, lots, lotGroups]);
-  const currentSummary = summaries.find((s) => s.testId === testId);
-  const testName = currentSummary?.testName || '';
-  const decimals = currentSummary?.decimalPlaces ?? 2;
+  const selectLeaf = useCallback((summary: TestSummary, resetMonth = true) => {
+    setTodayJumpTestId('');
+    setPanelAnchor(null);
+    setLotSelection((selection) => selection.testId === summary.testId ? selection : { testId: summary.testId, lots: EMPTY_LOT_SELECTION });
+    selectTreeTest(summary.testId, catalog.machineKeyOf(summary), catalog.lotGroupOf(summary).key);
+    if (resetMonth) {
+      const now = new Date();
+      setViewYear(now.getFullYear()); setViewMonth(now.getMonth() + 1);
+    }
+  }, [selectTreeTest, catalog]);
+  const selectFromTree = useCallback((summary: TestSummary) => {
+    const content = entryMainRef.current;
+    const viewport = content?.closest('main');
+    const top = viewport ? visibleContentTop(viewport) : 0;
+    const sections = Array.from(content?.querySelectorAll<HTMLElement>(':scope > [data-entry-section]') ?? []);
+    const atBottom = viewport && viewport.scrollTop > 0 && viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop < 2;
+    const panel = atBottom ? sections.at(-1) : sections.find((section) => section.getBoundingClientRect().bottom > top);
+    const section = panel?.dataset.entrySection;
+    const inWorksheet = !section || section === 'worksheet';
+    const anchor = panel && section && !inWorksheet && summary.testId !== testId
+      ? { testId: summary.testId, section, offset: top - panel.getBoundingClientRect().top }
+      : null;
+    selectLeaf(summary, inWorksheet);
+    if (inWorksheet) setTodayJumpTestId(summary.testId);
+    else if (anchor) setPanelAnchor(anchor);
+  }, [selectLeaf, testId]);
+  const clearTodayJump = useCallback(() => setTodayJumpTestId(''), []);
 
-  const selectLeaf = useCallback((id: string) => {
-    // Nhóm lô chứa xét nghiệm được mở một lần trong `EntryTree` khi `testId`
-    // đổi; ở đây chỉ chọn xét nghiệm và đưa bảng về tháng hiện tại.
-    const now = new Date();
-    setTestId(id);
-    setViewYear(now.getFullYear()); setViewMonth(now.getMonth() + 1);
-  }, []);
+  useLayoutEffect(() => {
+    if (!panelAnchor || panelAnchor.testId !== testId) return;
+    const content = entryMainRef.current;
+    const viewport = content?.closest('main');
+    const panel = content?.querySelector<HTMLElement>(`[data-entry-section="${panelAnchor.section}"]`);
+    if (!viewport || !panel) return;
+
+    const restorePanel = () => {
+      const bounds = panel.getBoundingClientRect();
+      const offset = panelAnchor.offset < bounds.height ? panelAnchor.offset : 0;
+      viewport.scrollTop += bounds.top - visibleContentTop(viewport) + offset;
+    };
+
+    // Các khung phía trên có thể đổi chiều cao khi nạp mức và vẽ biểu đồ mới.
+    restorePanel();
+    if (!testDataReady) return;
+    const frame = requestAnimationFrame(() => {
+      restorePanel();
+      setPanelAnchor((current) => current === panelAnchor ? null : current);
+    });
+    return () => cancelAnimationFrame(frame);
+  });
 
   // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ để mở trang
   // là có ngay bảng nhập. `location.state.testId` cho phép điều hướng chéo từ
   // Tổng quan đến đúng xét nghiệm.
-  const navState = useLocation().state as { testId?: string; level?: number } | null;
+  // Chỉ áp `location.state` MỘT lần cho mỗi lần điều hướng (theo
+  // `location.key`): `summaries` nạp lại sau mỗi lần lưu, nếu áp lại thì
+  // trang kéo người dùng về xét nghiệm lúc mới vào dù họ đã chọn cái khác.
+  const location = useLocation();
+  const navState = location.state as { testId?: string; level?: number } | null;
+  const handledNavKey = useRef<string | null>(null);
+  const handledNavLevelKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!summaries.length) return;
-    const wanted = navState?.testId;
-    if (wanted && wanted !== testId && summaries.some((s) => s.testId === wanted)) { selectLeaf(wanted); return; }
-    if (testId && summaries.some((s) => s.testId === testId)) return;
-    // Chỉ tự chọn xét nghiệm đã sẵn sàng nhập — không rơi vào một xét nghiệm
-    // chưa có nhóm lô hoạt động, thứ
-    // vốn còn không hiện trong cây để mà chọn.
-    const first = summaries.find((s) => catalog.isOperationalTest(s));
-    if (first) selectLeaf(first.testId);
-  }, [summaries, navState?.testId, catalog]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (catalogStatus.state !== 'ready') return;
+    const wanted = handledNavKey.current !== location.key
+      ? operationalSummaries.find((s) => s.testId === navState?.testId)
+      : undefined;
+    if (wanted) {
+      handledNavKey.current = location.key;
+      selectLeaf(wanted);
+      return;
+    }
+    // Quay lại bằng menu thì giữ nhánh người dùng đã đóng, kể cả khi nhánh
+    // đó chứa xét nghiệm đang xem. Chỉ mở nhánh khi có lựa chọn mới.
+    const first = operationalSummaries[0];
+    if (!testId && first) selectLeaf(first);
+  }, [catalogStatus.state, operationalSummaries, navState?.testId, location.key, selectLeaf, testId]);
+  // Mức được yêu cầu cũng chỉ áp một lần; `levelNums` đổi sau khi đặt dải PXN
+  // thì không kéo dải QC đang xem về lại mức đó.
   useEffect(() => {
     const wantedLevel = Number(navState?.level);
-    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) setRangeLevel(wantedLevel);
-  }, [testId, levelNums, navState?.testId, navState?.level]);
+    if (handledNavLevelKey.current === location.key) return;
+    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) {
+      handledNavLevelKey.current = location.key;
+      setRangeLevel(wantedLevel);
+    }
+  }, [testId, levelNums, navState?.testId, navState?.level, location.key]);
 
   /** Preset "N ngày": đặt Đến = hôm nay, Từ = hôm nay − (N−1) ngày. */
   const applyDayPreset = useCallback((days: number) => {
     setLjDays(days);
     const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const start = new Date(end.getTime() - (days - 1) * 86400000);
-    setLjFrom(isoDay(start)); setLjTo(isoDay(end));
+    setLjFrom(isoLocalDateAfter(1 - days, now)); setLjTo(isoLocalDate(now));
   }, []);
-  // Cửa sổ mặc định 30 ngày để khoảng xem luôn có hai mốc ngày.
-  useEffect(() => { if (!ljFrom && !ljTo) applyDayPreset(30); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Cột nhập được xếp theo mức: lô đang vận hành trước, lô chuyển tiếp ngay
    * sau nó. Lô song song dùng Mean/SD của hồ sơ chuyển lô và chuỗi Westgard
@@ -168,17 +250,17 @@ export function EntryPage() {
   const entryColumns: EntryColumn[] = useMemo(() => {
     const lotLabelFor = (level: number) => lotNoOfLevel(levels, lots, level);
     return levels.flatMap((level) => {
-      const analysis = analysisByLevel[level.level];
-      const rows = pointsByLevel[level.level] || [];
-      // `analyzeLevel` mang z + `accepted`; `queryPoints` mang LÝ DO lần chạy bị
-      // loại. Ghép theo id để biểu đồ nói được vì sao một chấm xanh không vào
-      // thống kê, thay vì chỉ âm thầm bớt nó khỏi n.
-      const runRejectedById = new Map(rows.map((point) => [point.id, point.runRejectedBy || []]));
+      const levelData = current[level.level];
+      const rows = levelData?.points || [];
       const main: EntryColumn = {
         key: `main:${level.level}:${lotLabelFor(level.level)}`,
         level: level.level, lot: lotLabelFor(level.level), mean: level.mean, sd: level.sd, exp: '',
-        parallel: false, applied: level.applied, points: rows,
-        chartPoints: (analysis?.points || []).map((point) => ({ ...point, runRejectedBy: runRejectedById.get(point.id) || [] })),
+        parallel: false, applied: level.applied, points: rows, cumulative: levelData?.cumulative,
+        chartPoints: rows.map(point => ({
+          date: point.date, runId: point.run_id, val: point.val, z: point.chartZ ?? NaN, verdict: point.chartVerdict,
+          rules: point.chartVerdict === 'none' ? [] : point.rules, accepted: point.chartVerdict !== 'none' && point.accepted,
+          runRejectedBy: point.runRejectedBy || [],
+        })),
       };
       const candidate = parallelColumns.find((item) => item.level === level.level);
       if (!candidate) return [main];
@@ -194,19 +276,19 @@ export function EntryPage() {
         key: `parallel:${candidate.transitionId}:${candidate.level}:${candidate.lot}`,
         level: candidate.level, lot: candidate.lot, mean: candidate.mean, sd: candidate.sd,
         exp: candidate.exp, parallel: true, applied: 'mfg' as const,
-        points: candidate.points, chartPoints,
+        points: candidate.points, chartPoints, cumulative: candidate.cumulative,
       }];
     });
-  }, [levels, lots, analysisByLevel, pointsByLevel, parallelColumns]);
+  }, [levels, lots, current, parallelColumns]);
 
   const displayColumns: DisplayColumn[] = useMemo(() => entryColumns.map((column) => {
     if (column.parallel) return { ...column, previous: false };
-    const previous = previousLotSeries.find((series) => series.level === column.level && series.lot === previousLotOpen[column.level]);
+    const previous = previousLotSeries.find((series) => series.level === column.level && series.lotId === previousLotOpen[column.level]);
     if (!previous) return { ...column, previous: false };
     return {
       ...column,
       key: `previous:${column.level}:${previous.lot}`,
-      lot: previous.lot, mean: previous.mean, sd: previous.sd, points: previous.points, previous: true,
+      lot: previous.lot, mean: previous.mean, sd: previous.sd, points: previous.points, previous: true, cumulative: previous.cumulative,
       chartPoints: previous.points.map((point) => ({
         date: point.date, runId: point.run_id, val: point.val,
         z: point.qc_mean != null && point.qc_sd != null && point.qc_sd > 0
@@ -218,72 +300,92 @@ export function EntryPage() {
   }), [entryColumns, previousLotSeries, previousLotOpen]);
 
   const togglePreviousLot = useCallback((level: number) => {
-    setPreviousLotOpen((current) => {
-      if (current[level]) { const next = { ...current }; delete next[level]; return next; }
+    setLotSelection((selection) => {
+      const lots = selection.testId === testId ? selection.lots : EMPTY_LOT_SELECTION;
+      if (lots[level]) { const next = { ...lots }; delete next[level]; return { testId, lots: next }; }
       const previous = previousLotSeries.find((series) => series.level === level);
-      return previous ? { ...current, [level]: previous.lot } : current;
+      return previous ? { testId, lots: { ...lots, [level]: previous.lotId } } : selection;
     });
-  }, [previousLotSeries]);
+  }, [previousLotSeries, testId]);
 
   // Chỉ xoá ô nhập khi lưu thành công; nếu thất bại thì hiển thị lỗi trả về.
-  const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, val: number): Promise<boolean> => {
+  const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, raw: string): Promise<{ saved: boolean; fieldError?: string }> => {
+    const val = parseQcValueText(raw);
+    if (val == null) return { saved: false };
+    if (Number.isNaN(val)) {
+      return { saved: false, fieldError: `"${raw.trim()}" không phải một giá trị số. Dùng dấu chấm hoặc dấu phẩy cho phần thập phân, ví dụ 5.25 hoặc 5,25.` };
+    }
     const deviation = extremeQcPointDeviation(val, column.mean, column.sd);
     if (deviation != null) {
       const confirmed = await confirmDialog(
         `Giá trị ${formatQcValue(val, decimals)} lệch ${deviation >= 0 ? '+' : ''}${deviation.toFixed(2)}SD, vượt ngưỡng ±5SD so với Mean/SD hiện tại. Hãy kiểm tra đơn vị, dấu thập phân và mức QC trước khi lưu.`,
-        { title: 'Giá trị QC bất thường', confirmLabel: 'Vẫn lưu', cancelLabel: 'Kiểm tra lại' },
+        { title: 'Giá trị QC bất thường', confirmLabel: 'Vẫn lưu', cancelLabel: 'Kiểm tra lại', danger: false },
       );
-      if (!confirmed) return false;
+      if (!confirmed) return { saved: false };
     }
-    const result = await addPoint({ testId, level: column.level, date, val, runId, lotNo: column.parallel ? column.lot : undefined });
+    const input = { testId, level: column.level, date, val, runId, lotNo: column.parallel ? column.lot : undefined };
+    let result = await addPoint(input);
+    // N27: điểm nhập lùi ngày làm đổi trạng thái loại bỏ của lần chạy đã có —
+    // main đã huỷ phần ghi và nói rõ lần chạy nào; hỏi lý do rồi gửi lại.
+    if (!result.ok && result.error.code === 'retro-reason-required') {
+      const retroReason = await reasonDialog({
+        title: 'Điểm này đổi kết luận lần chạy đã có',
+        message: result.error.message,
+        label: 'Lý do nhập điểm',
+        minLength: RETRO_REASON_MIN,
+        confirmLabel: 'Lưu điểm',
+        placeholder: 'VD: Bổ sung kết quả chạy ngày 05/10 bị sót, đối chiếu sổ máy…',
+      });
+      if (retroReason == null) return { saved: false };
+      result = await addPoint({ ...input, retroReason });
+    }
     if (!result.ok) {
-      setPointErr(result.error.message);
-      setPointFeedback(null);
-      return false;
+      await errorDialog(result.error.message, { title: 'Chưa lưu được kết quả QC' });
+      return { saved: false };
     }
-    setPointErr(null);
-    setVoidMsg(null);
     const rules = result.data.rules.join(', ');
     const lotSuffix = column.parallel ? ` · lô song song ${column.lot}` : '';
-    setPointFeedback(result.data.verdict === 'rej'
-      ? { kind: 'rej', message: `⚠ Mức ${column.level}${lotSuffix} vi phạm${rules ? ` — ${rules}` : ''}` }
-      : result.data.verdict === 'warn'
-        ? { kind: 'warn', message: `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}` }
-        : { kind: 'ok', message: `✓ Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.` });
-    return true;
+    // Lần chạy khác đổi kết luận (kể cả chỉ Đạt ↔ Cảnh báo) phải hiện ra, không
+    // chỉ nằm trong nhật ký.
+    const retro = result.data.retroChanges.length ? ` Đổi kết luận lần chạy khác: ${describeRunChanges(result.data.retroChanges)}.` : '';
+    const retroRejects = result.data.retroChanges.some(flipsRejection);
+    if (result.data.verdict === 'rej') showToast(`Mức ${column.level}${lotSuffix} vi phạm${rules ? ` — ${rules}` : ''}${retro}`, 'rej');
+    else if (result.data.verdict === 'warn' || retroRejects) showToast(`${result.data.verdict === 'warn' ? `Mức ${column.level}${lotSuffix} cảnh báo${rules ? ` — ${rules}` : ''}.` : `Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.`}${retro}`, 'warn');
+    else showToast(`Đã lưu Mức ${column.level}${lotSuffix} ngày ${vnDate(date)}.${retro}`);
+    return { saved: true };
   }, [testId, decimals, addPoint]);
 
   const saveDayNote = useCallback(async (date: string, note: string) => {
     const result = await setDayNote(testId, date, note);
-    setNoteErr(result.ok ? null : result.error.message);
+    if (!result.ok) await errorDialog(result.error.message, { title: 'Chưa lưu được ghi chú' });
   }, [testId, setDayNote]);
 
-  const messages: SheetMessages = useMemo(() => ({ noteErr, pointErr, pointFeedback, voidMsg }), [noteErr, pointErr, pointFeedback, voidMsg]);
   const openVoid = useCallback((point: QcPointView) => setVoiding(point), []);
   const closeVoid = useCallback(() => setVoiding(null), []);
   const onVoided = useCallback((message: string) => {
-    setVoidMsg(message);
-    setPointFeedback(null);
+    showToast(message, 'warn');
     setVoiding(null);
   }, []);
   const closeRange = useCallback(() => setRangeMode(null), []);
   const onRangeApplied = useCallback(async () => {
-    await Promise.all([loadLevels(testId), loadTestData(testId, levelNums), loadSummaries()]);
-  }, [testId, levelNums, loadLevels, loadTestData, loadSummaries]);
+    await Promise.all([loadLevels(testId), loadTestData(testId, windowRequest), loadSummaries()]);
+  }, [testId, windowRequest, loadLevels, loadTestData, loadSummaries]);
 
   // Hai trạng thái rỗng thay toàn bộ thân trang: chưa khai báo xét nghiệm và
   // đã có xét nghiệm nhưng chưa sẵn sàng nhập (thiếu Panel QC, nhóm lô đang
   // hoạt động hoặc Mean/SD). Mỗi trạng thái có hướng dẫn riêng.
   const emptyState = !tests.length
     ? { title: 'Chưa có xét nghiệm', message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.', linkLabel: 'Thêm xét nghiệm', tab: 'tests' }
-    : !summaries.some((s) => catalog.isOperationalTest(s))
+    : !operationalSummaries.length
       ? { title: 'Chưa có xét nghiệm sẵn sàng nhập', message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.', linkLabel: 'Cấu hình Mean/SD', tab: 'targets' }
       : null;
 
   return (
     <div>
-      <PageHeader title="Nhập QC" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
-      {emptyState ? (
+      <PageHeader title="Nhập QC & Biểu đồ" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
+      {catalogStatus.state !== 'ready' ? (
+        <LoadNotice state={catalogStatus.state} error={catalogStatus.error} what="danh mục nội kiểm" onRetry={catalogStatus.retry} />
+      ) : emptyState ? (
         <div className="panel">
           <EmptyState
             title={emptyState.title}
@@ -295,23 +397,25 @@ export function EntryPage() {
         <button type="button" className="btn teal entry-tree-expand" onClick={() => setTreeVisibility(false)}
           title="Hiện danh mục nội kiểm" aria-label="Hiện danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
 
-        <EntryTree summaries={summaries} instruments={instruments} catalog={catalog} testId={testId}
-          treeCollapsed={treeCollapsed} onSelect={selectLeaf} onCollapse={collapseTree} />
+        <EntryTree summaries={operationalSummaries} instruments={instruments} catalog={catalog} testId={testId}
+          treeCollapsed={treeCollapsed} onSelect={selectFromTree} onCollapse={collapseTree} />
 
-        <div className="entry-main" key={testId}>
+        <div className="entry-main" ref={entryMainRef} aria-busy={!!testId && !windowReady && !windowError}>
           {!testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở danh mục bên trái.</EmptyState></div>}
           {testId && (
             <>
-              <EntrySheet testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
-                pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable}
+              {sameTest && windowError && <LoadNotice state="error" error={windowError} what="dữ liệu QC" onRetry={() => void loadTestData(testId, windowRequest)} />}
+              <EntrySheet key={testId} testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
+                pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable && worksheetReady}
+                jumpToToday={jumpToToday} onTodayJumpHandled={clearTodayJump}
                 viewYear={viewYear} viewMonth={viewMonth} onViewYear={setViewYear} onViewMonth={setViewMonth}
-                messages={messages} onCommitRun={commitRun} onSaveNote={saveDayNote} />
-              <EntryLjPanel displayColumns={displayColumns} levelCount={levels.length} pointsByLevel={pointsByLevel}
-                analysisByLevel={analysisByLevel} previousLotSeries={previousLotSeries} decimals={decimals}
+                onCommitRun={commitRun} onSaveNote={saveDayNote} />
+              <EntryLjPanel key={`charts:${testId}`} displayColumns={displayColumns} levelCount={levels.length}
+                previousLotSeries={previousLotSeries} decimals={decimals}
                 ljFrom={ljFrom} ljTo={ljTo} ljDays={ljDays} onFrom={setLjFrom} onTo={setLjTo} onPreset={applyDayPreset}
                 onTogglePreviousLot={togglePreviousLot} />
               <EntryPointsPanel displayColumns={displayColumns} voidedPoints={voidedPoints} decimals={decimals}
-                writable={writable} ljFrom={ljFrom} ljTo={ljTo} onVoid={openVoid} />
+                writable={writable && windowReady} cumulativeReady={windowReady} ljFrom={ljFrom} ljTo={ljTo} onVoid={openVoid} />
               <EntryRangePanel rangeCandidate={rangeCandidate} rangeError={rangeError} levelNums={levelNums} rangeLevel={rangeLevel}
                 decimals={decimals} writable={writable} onRangeLevel={setRangeLevel} onOpen={setRangeMode} />
             </>

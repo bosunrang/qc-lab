@@ -1,4 +1,4 @@
-// Zustand store cho trang So sánh hóa chất — chỉ ReagentPage.tsx dùng. Mọi
+// Zustand store cho trang So sánh hoá chất — chỉ ReagentPage.tsx dùng. Mọi
 // hàm ghi trả `IpcResult` để form hiển thị đúng lỗi của chính nó.
 import { create } from 'zustand';
 import type { ReagentComparisonView, IpcResult } from '../../shared/qc-api';

@@ -7,14 +7,14 @@
 //
 // State vẫn ở `manage-store`/`westgard-store`; hook này chỉ gom việc nạp và
 // danh sách bảng về MỘT nơi.
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
 
 /** Các bảng mà `listTestSummaries` đọc hoặc dùng để đánh giá Westgard: điểm,
  * xét nghiệm, Mean/SD, máy (tên hiển thị), lô, nhóm lô, Panel, chuyển lô,
  * luật chung (`app_meta`) và mốc khắc phục (`actions`). */
-export const SUMMARY_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'actions', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
+export const SUMMARY_TABLES = ['qc_points', 'tests', 'test_levels', 'instruments', 'nce_cuts', 'qc_lots', 'lot_groups', 'qc_panels', 'qc_panel_tests', 'lot_transitions', 'app_meta'];
 
 const CATALOG = {
   instruments: { tables: ['instruments'], load: () => useManageStore.getState().loadInstruments() },
@@ -34,12 +34,40 @@ export function catalogTables(key: CatalogKey): readonly string[] {
   return CATALOG[key].tables;
 }
 
-export function useCatalog(keys: readonly CatalogKey[]): void {
+/** Danh mục đã nạp thành công ít nhất một lần trong phiên: quay lại trang thì
+ * dữ liệu trong store đã có, không hiện "Đang tải…" lần nữa. */
+const loadedOnce = new Set<CatalogKey>();
+
+/** Trạng thái lần nạp đầu (và lần "Thử lại"). Trang dùng nó để không báo
+ * "Chưa có xét nghiệm" khi dữ liệu còn đang về hoặc nạp lỗi (U30, đánh giá
+ * 2026-11-09): store khởi tạo mảng rỗng nên không phân biệt được "rỗng thật"
+ * với "chưa nạp". Lần nạp lại do thay đổi dữ liệu không đổi trạng thái này. */
+export interface CatalogStatus {
+  state: 'loading' | 'ready' | 'error';
+  error: string;
+  retry: () => void;
+}
+
+export function useCatalog(keys: readonly CatalogKey[]): CatalogStatus {
   const keysKey = keys.join(',');
   const keysRef = useRef(keys);
   keysRef.current = keys;
+  const [status, setStatus] = useState<{ state: CatalogStatus['state']; error: string }>(
+    () => ({ state: keys.every((key) => loadedOnce.has(key)) ? 'ready' : 'loading', error: '' }));
+  const attempt = useRef(0);
+  const loadAll = useCallback(async () => {
+    const mine = ++attempt.current;
+    const current = keysRef.current;
+    if (!current.every((key) => loadedOnce.has(key))) setStatus({ state: 'loading', error: '' });
+    const results = await Promise.allSettled(current.map(async (key) => { await CATALOG[key].load(); loadedOnce.add(key); }));
+    if (mine !== attempt.current) return;
+    const failed = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    setStatus(failed
+      ? { state: 'error', error: failed.reason instanceof Error ? failed.reason.message : String(failed.reason) }
+      : { state: 'ready', error: '' });
+  }, []);
   useEffect(() => {
-    for (const key of keysRef.current) void CATALOG[key].load();
+    void loadAll();
     return window.qcApi.onStoreChanged((payload) => {
       // Mỗi danh mục nạp lại đúng một lần cho một thông báo, và chỉ khi bảng
       // nó phụ thuộc có trong thông báo đó.
@@ -47,5 +75,8 @@ export function useCatalog(keys: readonly CatalogKey[]): void {
         if (CATALOG[key].tables.some((table) => payload.tables.includes(table))) void CATALOG[key].load();
       }
     });
-  }, [keysKey]);
+  }, [keysKey, loadAll]);
+  // Unmount giữa chừng: kết quả của lần nạp cũ không ghi vào state nữa.
+  useEffect(() => () => { attempt.current++; }, []);
+  return { ...status, retry: () => { void loadAll(); } };
 }

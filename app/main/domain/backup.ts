@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
  * từ tệp .json đã xuất trước 2026-09-25. */
 export const BACKUP_FORMAT = 'qclab-backup';
 export const BACKUP_FORMAT_VERSION = 1;
-/** Định dạng tệp backup hiện tại: một tệp SQLite (tạo bằng `VACUUM INTO`) có
+/** Định dạng tệp sao lưu hiện tại: một tệp SQLite (tạo bằng `VACUUM INTO`) có
  * thêm bảng `backup_info` ghi dấu định dạng, phiên bản schema và thời điểm. */
 export const BACKUP_FILE_FORMAT = 'qclab-sqlite-backup';
 export const BACKUP_FILE_FORMAT_VERSION = 1;
@@ -42,21 +42,21 @@ export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: str
  * nhận cấu trúc từng bảng ở đây (đó là việc của handler, đọc theo đúng cột
  * SQLite hiện có qua PRAGMA table_info, không hard-code danh sách cột). */
 export function validateBackupEnvelope(raw: unknown, currentSchemaVersion: number): ValidationResult<BackupEnvelope> {
-  if (!raw || typeof raw !== 'object') return { ok: false, code: 'invalid-json', message: 'File backup không đúng định dạng JSON.' };
+  if (!raw || typeof raw !== 'object') return { ok: false, code: 'invalid-json', message: 'Tệp sao lưu không đúng định dạng JSON.' };
   const env = raw as Partial<BackupEnvelope>;
   if (env.format !== BACKUP_FORMAT) {
-    return { ok: false, code: 'wrong-format', message: `File này không đúng định dạng backup được hỗ trợ (format="${String(env.format)}").` };
+    return { ok: false, code: 'wrong-format', message: `File này không đúng định dạng sao lưu được hỗ trợ (format="${String(env.format)}").` };
   }
   if (typeof env.schemaVersion !== 'number' || env.schemaVersion > currentSchemaVersion) {
-    return { ok: false, code: 'unsupported-schema', message: 'Backup được tạo từ phiên bản mới hơn app hiện tại, không thể phục hồi.' };
+    return { ok: false, code: 'unsupported-schema', message: 'Bản sao lưu được tạo từ phiên bản mới hơn phần mềm hiện tại, không thể phục hồi.' };
   }
   if (!env.data || typeof env.data !== 'object' || Array.isArray(env.data)) {
-    return { ok: false, code: 'missing-data', message: 'Backup thiếu dữ liệu.' };
+    return { ok: false, code: 'missing-data', message: 'Bản sao lưu thiếu dữ liệu.' };
   }
   const dataJson = JSON.stringify(env.data);
   const checksum = computeChecksum(dataJson);
   if (checksum !== env.checksum) {
-    return { ok: false, code: 'checksum-mismatch', message: 'Checksum SHA-256 không khớp — file backup có thể đã bị sửa hoặc hỏng.' };
+    return { ok: false, code: 'checksum-mismatch', message: 'Checksum SHA-256 không khớp — tệp sao lưu có thể đã bị sửa hoặc hỏng.' };
   }
   return { ok: true, data: env as BackupEnvelope };
 }

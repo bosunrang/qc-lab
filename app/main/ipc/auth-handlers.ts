@@ -6,19 +6,33 @@
 // module này chỉ lo xác thực + CRUD tài khoản.
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
-import { hashPasswordAsync, verifyPasswordAsync } from '../domain/password-hash';
+import { PASSWORD_HASH_ITERATIONS, hashPasswordAsync, verifyPasswordAsync } from '../domain/password-hash';
 import {
   validateUserCreate, validateUserUpdate, validateNewPassword, validateLoginInput, validateSetAvatar,
   type UserCreateInput, type UserUpdateInput, type LoginInput,
 } from '../domain/auth-validation';
-import { roleLabel, roleOf } from '../domain/page-roles';
+import { canWriteRole, roleLabel, roleOf } from '../domain/page-roles';
+import { parseUserCapabilities } from '../domain/capabilities';
 import { type Actor, type IpcResult, type PermissionDenied, writeAudit, withTransaction } from './shared';
 import { writeCommand, writeCommandAsync } from './write-command';
+import { LoginThrottle } from '../lan/login-throttle';
+
+/** Hash giả cùng số vòng với hash thật, dùng khi tên đăng nhập không tồn tại
+ * (A10). Trước đây trường hợp này bỏ qua bước băm nên trả lời nhanh hơn hẳn
+ * vài trăm ms, đo thời gian là biết tài khoản có tồn tại. Không mật khẩu nào
+ * khớp được dãy 0 này. */
+const MISSING_USER_HASH = `pbkdf2$${PASSWORD_HASH_ITERATIONS}$${'0'.repeat(32)}$${'0'.repeat(64)}`;
+
+/** Giới hạn nhập sai khi xác thực lại hoặc tự đổi mật khẩu (A10): 5 lần sai
+ * trong 15 phút thì khoá 15 phút, tính theo tài khoản. Cùng ngưỡng với đăng
+ * nhập qua LAN. Không có ngưỡng này, ai ngồi vào máy đang đăng nhập dở là dò
+ * mật khẩu của chủ phiên được không giới hạn. */
+const REAUTH_THROTTLE = { maxPerPair: 5, maxPerIp: Number.MAX_SAFE_INTEGER, windowMs: 15 * 60 * 1000, lockMs: 15 * 60 * 1000 };
 
 interface UserRow {
   id: string; username: string; name: string; initials: string; external_code: string;
   role: string; page_perms_json: string | null; pass_hash: string; active: number;
-  must_change_password: number; avatar: string;
+  must_change_password: number; avatar: string; capabilities_json: string;
 }
 
 // `PublicUser` (và các kiểu dữ liệu dùng chung khác) có NGUỒN DUY NHẤT là
@@ -32,6 +46,12 @@ interface UserRow {
 import type { PublicUser } from '../../shared/qc-api';
 
 export type { PublicUser };
+
+/** Nơi đăng nhập cho dòng nhật ký: cột `client_id` không hiện ở trang Nhật
+ * ký hay CSV, nên ghi kèm vào phần chi tiết. */
+function clientLabel(clientId: string): string {
+  return clientId.startsWith('lan:') ? `máy trạm LAN ${clientId.slice(4) || '?'}` : 'máy chính';
+}
 
 function parsePagePerms(value: string | null): string[] | null {
   if (!value) return null;
@@ -50,6 +70,7 @@ function toPublicUser(row: UserRow): PublicUser {
     role: roleOf(row.role),
     pagePerms: parsePagePerms(row.page_perms_json), active: !!row.active, mustChangePassword: !!row.must_change_password,
     avatar: row.avatar || '',
+    capabilities: parseUserCapabilities(row.capabilities_json),
   };
 }
 
@@ -57,7 +78,20 @@ function forbidden(message = 'Chỉ quản trị viên mới được thực hi�
   return { ok: false, error: { code: 'forbidden', message } };
 }
 
-export function createAuthHandlers(db: Db) {
+export function createAuthHandlers(db: Db, now: () => number = () => Date.now()) {
+  const reauthThrottle = new LoginThrottle(REAUTH_THROTTLE, now);
+  /** Kiểm mật khẩu của chính tài khoản đang đăng nhập, có đếm lần sai. */
+  async function checkOwnPassword(row: UserRow, password: string): Promise<'ok' | 'wrong' | { retryAfterMs: number }> {
+    const gate = reauthThrottle.begin(`reauth:${row.id}`, row.id);
+    if ('retryAfterMs' in gate) return gate;
+    if (!await verifyPasswordAsync(password, row.pass_hash)) return 'wrong';
+    gate.attempt.succeed();
+    return 'ok';
+  }
+  const tooManyAttempts = ({ retryAfterMs }: { retryAfterMs: number }): IpcResult<never> => ({
+    ok: false, error: { code: 'too-many-attempts', message: `Nhập sai mật khẩu quá nhiều lần. Thử lại sau ${Math.ceil(retryAfterMs / 60000)} phút.` },
+  });
+
   function hasAnyUsers(): boolean {
     return (db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c > 0;
   }
@@ -114,23 +148,41 @@ export function createAuthHandlers(db: Db) {
 
   /** Bất đồng bộ vì đây là cổng KHÔNG cần đăng nhập, mở cả qua LAN: mỗi lần
    * thử phải băm 600.000 vòng, chạy đồng bộ thì vài yêu cầu dồn dập đủ làm đơ
-   * main process. Chỉ phần băm là chờ; đọc và ghi SQLite vẫn đồng bộ. */
-  async function login(input: { data: LoginInput }): Promise<IpcResult<PublicUser>> {
+   * main process. Chỉ phần băm là chờ; đọc và ghi SQLite vẫn đồng bộ.
+   *
+   * `clientId` là nơi đăng nhập: `app-desktop` cho máy chính, `lan:<ip>` cho
+   * máy trạm (`lan/http-server.ts`). Lần đăng nhập sai cũng ghi nhật ký kèm
+   * nơi thử (GV3); máy trạm LAN đã có bộ đếm chặn thử dồn dập trước bước này. */
+  async function login(input: { data: LoginInput }, clientId = 'app-desktop'): Promise<IpcResult<PublicUser>> {
     const result = validateLoginInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { username, password } = result.data;
     const stored = db.prepare('SELECT pass_hash FROM users WHERE username=?').get(username) as { pass_hash: string } | undefined;
-    const passwordOk = !!stored && await verifyPasswordAsync(password, stored.pass_hash);
+    // Tên không tồn tại vẫn băm đủ vòng để thời gian trả lời như sai mật khẩu.
+    const passwordOk = await verifyPasswordAsync(password, stored?.pass_hash ?? MISSING_USER_HASH) && !!stored;
     // Đọc lại SAU khi chờ băm: trong lúc đó admin có thể vừa khoá tài khoản
     // hoặc đổi mật khẩu, nên kết luận phải dựa trên hàng hiện tại.
     const row = db.prepare('SELECT * FROM users WHERE username=?').get(username) as UserRow | undefined;
+    const failed = (reason: string) => {
+      // Không có phiên: người thực hiện là tài khoản bị thử (hoặc chỉ tên đã
+      // gõ khi tài khoản không tồn tại). Không bao giờ ghi mật khẩu.
+      const actor: Actor = row
+        ? { userId: row.id, username: row.username, name: row.name, role: row.role, clientId }
+        : { userId: '', username, name: username, role: '', clientId };
+      // eslint-disable-next-line no-restricted-syntax -- thao tác trước đăng nhập
+      writeAudit(db, actor, 'Đăng nhập thất bại', `${reason} · ${clientLabel(clientId)}`, username);
+    };
     if (!row || !passwordOk || row.pass_hash !== stored?.pass_hash) {
+      failed(row ? 'Sai mật khẩu' : 'Tài khoản không tồn tại');
       return { ok: false, error: { code: 'invalid-credentials', message: 'Sai tên đăng nhập hoặc mật khẩu.' } };
     }
-    if (!row.active) return { ok: false, error: { code: 'inactive', message: 'Tài khoản đã bị khoá.' } };
+    if (!row.active) {
+      failed('Tài khoản đã bị khoá');
+      return { ok: false, error: { code: 'inactive', message: 'Tài khoản đã bị khoá.' } };
+    }
     // Đăng nhập chưa có phiên nên không qua writeCommand(); chỉ ghi nhật ký.
     // eslint-disable-next-line no-restricted-syntax -- thao tác trước đăng nhập
-    writeAudit(db, { userId: row.id, username: row.username, name: row.name, role: row.role, clientId: 'app-desktop' }, 'Đăng nhập', `Đăng nhập thành công`, row.username);
+    writeAudit(db, { userId: row.id, username: row.username, name: row.name, role: row.role, clientId }, 'Đăng nhập', `Đăng nhập thành công · ${clientLabel(clientId)}`, row.username);
     return { ok: true, data: toPublicUser(row) };
   }
 
@@ -191,6 +243,31 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
   });
 
+  /** Cấp/thu quyền nghiệp vụ (`nce.release`, `nce.approve`, `qc.config` — xem
+   * `domain/capabilities.ts`) cho một tài khoản. Tên IPC giữ từ lúc chỉ có
+   * quyền NCE. Người chỉ xem không được cấp: mọi capability đều là quyền ghi.
+   * Quản trị viên mặc nhiên có tất cả, nên lưu cho tài khoản quản trị không đổi
+   * gì thực tế nhưng vẫn được ghi để giữ lựa chọn khi vai trò đổi. */
+  const setNceCapabilities = writeCommand(db, 'setNceCapabilities', adminOnly, (w, input: { id: unknown; capabilities: unknown }): IpcResult<PublicUser> => {
+    const id = String(input?.id || '');
+    const existing = db.prepare('SELECT * FROM users WHERE id=?').get(id) as UserRow | undefined;
+    if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy người dùng.' } };
+    const requested = Array.isArray(input?.capabilities) ? input.capabilities : null;
+    if (!requested) return { ok: false, error: { code: 'invalid-capabilities', message: 'Danh sách quyền nghiệp vụ không hợp lệ.' } };
+    const capabilities = parseUserCapabilities(requested).sort();
+    if (capabilities.length !== new Set(requested).size) return { ok: false, error: { code: 'invalid-capabilities', message: 'Có mã quyền nghiệp vụ không hợp lệ.' } };
+    if (capabilities.length && !canWriteRole(existing.role)) return { ok: false, error: { code: 'viewer-capabilities', message: 'Tài khoản chỉ xem không được cấp quyền nghiệp vụ.' } };
+    const before = parseUserCapabilities(existing.capabilities_json).sort();
+    if (JSON.stringify(before) === JSON.stringify(capabilities)) return w.noChange(toPublicUser(existing));
+    w.commit((tx) => {
+      db.prepare('UPDATE users SET capabilities_json=? WHERE id=?').run(JSON.stringify(capabilities), id);
+      const list = (items: string[]) => (items.length ? items.join(', ') : 'không có quyền riêng');
+      tx.audit('Phân quyền nghiệp vụ', `"${existing.username}": ${list(before)} → ${list(capabilities)}`, existing.username);
+      tx.changed(['users']);
+    });
+    return { ok: true, data: toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as UserRow) };
+  });
+
   /** Admin đặt lại mật khẩu cho người khác — luôn bật must_change_password
    * để buộc đổi lại ở lần đăng nhập kế tiếp, không âm thầm giữ mật khẩu admin
    * vừa gõ làm mật khẩu lâu dài của người dùng. */
@@ -215,9 +292,11 @@ export function createAuthHandlers(db: Db) {
 
   async function verifyOwnPassword(input: { data: { password?: unknown } }, actor: Actor): Promise<IpcResult<{ ok: true }>> {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
-    if (!row || !await verifyPasswordAsync(String(input.data?.password || ''), row.pass_hash)) {
-      return { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu không đúng.' } };
-    }
+    const wrong: IpcResult<never> = { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu không đúng.' } };
+    if (!row) return wrong;
+    const checked = await checkOwnPassword(row, String(input.data?.password || ''));
+    if (checked === 'wrong') return wrong;
+    if (checked !== 'ok') return tooManyAttempts(checked);
     return { ok: true, data: { ok: true } };
   }
 
@@ -226,7 +305,9 @@ export function createAuthHandlers(db: Db) {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(actor.userId) as UserRow | undefined;
     if (!row) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy tài khoản.' } };
     const wrong: IpcResult<never> = { ok: false, error: { code: 'wrong-password', message: 'Mật khẩu hiện tại không đúng.' } };
-    if (!await verifyPasswordAsync(String(input.data?.oldPassword || ''), row.pass_hash)) return wrong;
+    const checked = await checkOwnPassword(row, String(input.data?.oldPassword || ''));
+    if (checked === 'wrong') return wrong;
+    if (checked !== 'ok') return tooManyAttempts(checked);
     const result = validateNewPassword(input.data?.newPassword);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const passHash = await hashPasswordAsync(result.data);
@@ -291,7 +372,7 @@ export function createAuthHandlers(db: Db) {
     return { ok: true, data: { id } };
   });
 
-  return { hasAnyUsers, getUser, listUsers, bootstrapAdmin, login, createUser, updateUser, deleteUser, resetPassword, changeOwnPassword, verifyOwnPassword, setAvatar, clearAvatar };
+  return { hasAnyUsers, getUser, listUsers, bootstrapAdmin, login, createUser, updateUser, deleteUser, resetPassword, setNceCapabilities, changeOwnPassword, verifyOwnPassword, setAvatar, clearAvatar };
 }
 
 export type AuthHandlers = ReturnType<typeof createAuthHandlers>;

@@ -1,4 +1,5 @@
-import type { NceDetail, NceRecord, QcLot, QcPanel, Test, TestSummary } from '../../shared/qc-api';
+import type { NceRecordRow, QcLot, QcPanel, Test, TestSummary } from '../../shared/qc-api';
+import { compareIsoDate, compareRunId } from '../../main/domain/sort-order';
 
 const RANK = { ok: 0, warn: 1, rej: 2 } as const;
 
@@ -49,11 +50,10 @@ export function operationalDashboardSummaries(summaries: TestSummary[], tests: T
 
 
 /** Thông tin hiển thị cho hồ sơ quá hạn. Số ngày do main tính
- * (`NceRecord.overdue_days`); ở đây chỉ dựng nhãn và người phụ trách. */
-export function dashboardNceOverdue(record: NceRecord | null | undefined): DashboardOverdueInfo {
+ * (`NceRecordRow.overdue_days`); ở đây chỉ dựng nhãn và người phụ trách. */
+export function dashboardNceOverdue(record: Pick<NceRecordRow, 'overdue_days' | 'owner_name'> | null | undefined): DashboardOverdueInfo {
   const days = Number(record?.overdue_days) || 0;
-  let owner = '';
-  try { owner = String((JSON.parse(record?.detail_json || '{}') as NceDetail).owner || '').trim(); } catch { /* JSON hỏng: chưa ghi người phụ trách */ }
+  const owner = String(record?.owner_name || '').trim();
   return days > 0 ? { overdue: true, days, label: `Quá hạn ${days} ngày`, owner } : { overdue: false, days: 0, label: '', owner };
 }
 
@@ -73,7 +73,10 @@ export function daysToExpiry(value: string, now: Date = new Date()): number | nu
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
   const target = match ? new Date(+match[1], +match[2] - 1, +match[3]) : new Date(value);
   const time = target.getTime();
-  return Number.isFinite(time) ? Math.round((time - now.getTime()) / 86400000) : null;
+  // So với 0 giờ hôm nay, không với giờ hiện tại: nếu không, đúng ngày hết
+  // hạn mà quá 12 giờ trưa thì làm tròn thành "Hết hạn 1 ngày".
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Number.isFinite(time) ? Math.round((time - today) / 86400000) : null;
 }
 
 
@@ -86,19 +89,19 @@ export function dashboardShiftStatus(input: { rejected: number; overdueActions: 
 }
 
 export function levelTargetOk(level: LevelSummary): boolean {
-  return Number.isFinite(Number(level.mean)) && Number.isFinite(Number(level.sd)) && Number(level.sd) > 0;
+  return level.mean != null && level.sd != null && Number.isFinite(level.mean) && Number.isFinite(level.sd) && level.sd > 0;
 }
 
-// Generic theo hồ sơ NCE: store bơm vào `OverdueAction` (NceRecord + tên
+// Generic theo hồ sơ NCE: store bơm vào `OverdueAction` (NceRecordRow + tên
 // xét nghiệm đã join sẵn) — giữ nguyên kiểu đó ở đầu ra để trang đọc được
 // `testName` mà không cần cast.
-export function buildDashboardViewModel<TOverdue extends NceRecord>(
-  testSummaries: TestSummary[], lots: QcLot[], overdueActions: TOverdue[], today: string, now: Date = new Date(),
+export function buildDashboardViewModel<TOverdue extends NceRecordRow>(
+  testSummaries: TestSummary[], lots: QcLot[], overdueActions: TOverdue[], now: Date = new Date(),
 ) {
   const tests: DashboardTestItem[] = testSummaries.map(test => {
     const status = test.levels.reduce<DashboardStatus>((worst, level) => RANK[level.latestVerdict] > RANK[worst] ? level.latestVerdict : worst, 'ok');
     const latestCandidates = test.levels.flatMap(level => level.latest ? [{ ...level.latest, level: level.level }] : []);
-    latestCandidates.sort((a, b) => a.date.localeCompare(b.date) || a.runId.localeCompare(b.runId));
+    latestCandidates.sort((a, b) => compareIsoDate(a.date, b.date) || compareRunId(a.runId, b.runId));
     const todayCount = test.levels.filter(level => level.todayPointCount > 0).length;
     return {
       ...test, status, totalPoints: test.levels.reduce((sum, level) => sum + level.pointCount, 0), todayCount,

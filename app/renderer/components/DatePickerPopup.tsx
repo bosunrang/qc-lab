@@ -5,6 +5,7 @@ import {
   datePickerStore, closeDatePicker, movePickerMonth, setPickerMode, setPickerYear,
   setPickerMonth, pickDate, validIsoDate, parseFlexibleDate, todayIso,
 } from '../state/date-picker-store';
+import { registerLayer } from '../lib/layer-stack';
 
 const MONTHS = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
   'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
@@ -50,12 +51,13 @@ export function DatePickerPopup() {
         && (node.id === 'vnDatePicker' || node.classList.contains('datebox')))) return;
       closeDatePicker();
     };
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') closeDatePicker(); };
+    // Lịch là một lớp trong ngăn xếp: Esc chỉ đóng lịch, không đóng luôn modal
+    // chứa ô ngày (U3), và modal bỏ qua cú bấm ra nền khi lịch đang ở trên.
+    const layer = registerLayer(closeDatePicker);
     document.addEventListener('mousedown', onDocMouseDown);
-    document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('mousedown', onDocMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
+      layer.release();
     };
   }, [state.open]);
 

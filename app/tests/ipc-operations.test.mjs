@@ -28,6 +28,9 @@ const {
   createBusinessOperations, createLanInvoker, registerIpcOperations, sessionContext, bindOperations,
 } = require('../../app-dist/main/ipc/operations.js');
 const { createDesktopOperations } = require('../../app-dist/main/ipc/desktop-operations.js');
+const { createSoftwareOperations } = require('../../app-dist/main/ipc/software-operations.js');
+const { createLicenseService } = require('../../app-dist/main/licensing/license-service.js');
+const { createUpdateService } = require('../../app-dist/main/updates/update-service.js');
 
 const admin = { userId: 'u-admin', username: 'admin', name: 'Quan tri', role: 'admin', clientId: 'test' };
 const tech = { userId: 'u-tech', username: 'ktv', name: 'Ky thuat vien', role: 'technician', clientId: 'test' };
@@ -60,12 +63,20 @@ function setup({ backup, pickOpen = async () => null } = {}) {
     logDir: 'C:/qclab/logs',
     openFolder: async () => '',
   });
-  const tables = [business, desktop];
+  const software = createSoftwareOperations(db,
+    createLicenseService(db, { required: false, machineCode: '', publicKey: '' }),
+    createUpdateService(null, { currentVersion: '1.0.9', changed() {}, async prepareInstall() {}, beforeInstall() {} }), session);
+  const tables = [business, desktop, software];
   return { db, auth, business, desktop, tables, session, printed, lan: createLanInvoker(tables) };
 }
 
-/** KTV được tạo NCE; vai trò chỉ xem thì không. */
-const NCE_INPUT = { data: { date: '2026-09-25', correction: 'Chạy lại mẫu QC' } };
+/** KTV được tạo NCE; vai trò chỉ xem thì không. Người phụ trách phải là tài
+ * khoản có thật: test nào tạo NCE thành công gọi `addTech(db)` trước. */
+const NCE_INPUT = { data: { source: 'other', description: 'Hồ sơ đào tạo thiếu chữ ký', correction: 'Bổ sung hồ sơ đào tạo', holdResults: false, detectedAt: '2026-09-25', ownerUserId: 'u-tech' } };
+
+function addTech(db) {
+  db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-tech','ktv','Ky thuat vien','technician',1)").run();
+}
 
 function lastAudit(db) {
   return db.prepare('SELECT username, type FROM activity ORDER BY seq DESC LIMIT 1').get();
@@ -82,11 +93,27 @@ test('preload khớp đúng bảng thao tác: cùng tên hàm, cùng kênh, khô
   assert.deepEqual(fromPreload, fromTables);
 });
 
+test('NCE: đọc tóm tắt cần đăng nhập; người chỉ xem không đọc hồ sơ chi tiết hay xem trước', async () => {
+  const { business, lan } = setup();
+  assert.throws(() => business.listNce.run(sessionContext(() => null)), /Chưa đăng nhập/);
+  assert.deepEqual(business.listNce.run(sessionContext(() => viewer)), [], 'giữ quyền xem tóm tắt của Tổng quan và Báo cáo');
+  for (const name of ['getNce', 'listNceQueue', 'listNceUsers', 'getNceConfig', 'previewNceRelease']) {
+    assert.throws(() => business[name].run(sessionContext(() => viewer), 'không-tồn-tại'), /không có quyền xem hồ sơ chi tiết/, name);
+    // Qua LAN, lỗi của thao tác đọc gói kèm `readFailed` để client ném lại (GV5).
+    if (name !== 'previewNceRelease') {
+      const result = await lan(name, ['không-tồn-tại'], viewer);
+      assert.equal(result.readFailed, true, name);
+      assert.match(result.error.message, /không có quyền xem hồ sơ chi tiết/, name);
+    }
+  }
+});
+
 test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng phiên máy chính', async () => {
   const { tables, session, db } = setup();
+  addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 127);
+  assert.equal(handlers.size, 170);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -105,21 +132,24 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
   // 2026-09-25: máy trạm chỉ nhập liệu, quản trị làm trên máy chính). Sửa có
   // chủ đích, kèm lý do ghi tại dòng tương ứng trong bảng.
   assert.deepEqual(open, [
-    'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce', 'backupStatus',
-    'cancelNce', 'changeOwnPassword', 'clearAvatar', 'createNce', 'createReagentComparison',
-    'getFirebaseSettings', 'getLabProfile', 'getLisSettings', 'getLoginBrand', 'getRangeCandidate',
-    'getReportTemplateSettings', 'getStorageInfo', 'hasAnyUsers', 'importLisResult',
-    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listInstruments',
-    'listLotGroups', 'listLotTransitions', 'listLots', 'listNceRecords', 'listPanels',
-    'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets', 'listPreviousEntryLotSeries',
-    'listPreviousLotBlocks', 'listReagentComparisons', 'listReagentQuickValues', 'listRuleScopes',
-    'listRuleSettings', 'listSigmaCohorts', 'listSigmaPeriods', 'listTeaRefs', 'listTestLevels',
-    'listTestSummaries', 'listTests', 'listVoidedEntryPoints', 'markNceEffectiveness',
-    'previewLotRename', 'pullLisQueue', 'queryPoints', 'queryReport', 'rejectLisResult',
-    'removeReagentQuickValue', 'renameSigmaPeriod', 'reopenNce', 'returnNce', 'revertManufacturerRange',
-    'saveNceProtocol', 'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig',
-    'setAvatar', 'setDayNote', 'setNceCompletedDate', 'setNceReleaseDecision', 'setNceRerunEvidence',
-    'verifyOwnPassword', 'voidPoint',
+    'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
+    'attachNceRun', 'backupStatus', 'cancelEqaRound', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
+    'completeNceAction', 'createNce', 'createReagentComparison', 'getEntryWindow', 'getEqaCorrectiveEvidence', 'getEqaInstrumentGrid', 'getEqaReport', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
+    'getLicenseStatus', 'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
+    // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
+    'getReportTemplateSettings', 'getSigmaEqaBias', 'getSoftwareUpdateStatus', 'getStorageInfo', 'getVoidPointAssessment', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
+    'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAssignees', 'listEqaAttention', 'listEqaCorrective', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
+    'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
+    'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
+    'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listPreviousLotLevels', 'listReagentComparisons',
+    'listReagentQuickValues', 'listRuleScopes', 'listRuleSettings', 'listSigmaCohorts',
+    'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
+    'listVoidedEntryPoints', 'markEqaSubmitted', 'previewEqaImport', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',
+    'queryReport', 'recordNcePatientImpact', 'recordNceTechnicalAssessment', 'rejectLisResult', 'releaseNce', 'removeEqaSchedule', 'removeReagentQuickValue',
+    // Xem xét ngoại kiểm là nghiệp vụ ký có cổng nce.approve ở main, dùng được tại máy trạm.
+    'renameSigmaPeriod', 'returnNce', 'revertManufacturerRange', 'reviewEqaReport', 'reviewNceEffectiveness',
+    'saveEqaSchedule', 'saveReagentMetadata', 'saveReagentRows', 'saveSigmaPeriod', 'saveSigmaTeaConfig', 'setAvatar',
+    'setDayNote', 'submitNce', 'updateNce', 'updateNceAction', 'verifyOwnPassword', 'voidPoint',
   ]);
 });
 
@@ -146,6 +176,7 @@ test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và t�
     'htmlToPdf', 'printHtmlToPdf', 'print:htmlToPdf', 'export', 'exportBackup', 'backup:export',
     'chooseFile', 'import', 'listActivity', 'resetOperationalData', 'backup:resetAll', 'config:listTests', 'constructor', '__proto__', 'toString', '',
     'reportClientError', 'openLogFolder', 'log:clientError', 'log:openFolder', 'exportLogBundle', 'log:exportBundle',
+    'activateSoftware', 'checkSoftwareUpdate', 'downloadSoftwareUpdate', 'installSoftwareUpdate',
   ]) {
     const result = await lan(method, [{ data: { username: 'admin', password: 'admin12345' } }], viewer);
     assert.equal(result?.error?.code, 'unknown-operation', `LAN phải chặn "${method}"`);
@@ -156,6 +187,7 @@ test('LAN từ chối kênh đóng, tên kênh có namespace, đuôi tên và t�
 
 test('LAN chạy bằng actor của phiên HTTP, cổng quyền vẫn áp dụng', async () => {
   const { lan, session, db } = setup();
+  addTech(db);
   session.set(admin);
   const saved = await lan('createNce', [NCE_INPUT], tech);
   assert.equal(saved.ok, true);
@@ -210,9 +242,11 @@ test('phục hồi backup chỉ dùng tệp main vừa kiểm tra, không nhận
   const imported = [];
   const backup = {
     verifyBackupFile: (filePath) => ({ ok: true, data: { points: 3, checked: filePath } }),
-    importBackupFrom: (filePath, actor) => { imported.push([filePath, actor.username]); return { ok: true, data: { preRestoreSnapshotPath: 'snap' } }; },
+    importBackupFrom: (filePath, options, actor) => { imported.push([filePath, actor.username, options.keepAccounts]); return { ok: true, data: { preRestoreSnapshotPath: 'snap' } }; },
   };
-  const { desktop, session } = setup({ backup, pickOpen: async () => 'C:\\backup\\qclab.sqlite' });
+  const { desktop, session, db } = setup({ backup, pickOpen: async () => 'C:\\backup\\qclab.sqlite' });
+  // Tài khoản admin có trong CSDL: phục hồi giả không xoá nó nên phiên được giữ.
+  db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-admin','admin','Quan tri','admin',1)").run();
   const ctx = sessionContext(() => session.get());
 
   session.set(tech);
@@ -226,12 +260,16 @@ test('phục hồi backup chỉ dùng tệp main vừa kiểm tra, không nhận
   const chosen = await desktop.chooseBackupFile.run(ctx);
   assert.equal(chosen.data.fileName, 'qclab.sqlite');
   desktop.importBackup.run(ctx, 'C:\\evil.sqlite');
-  assert.deepEqual(imported, [['C:\\backup\\qclab.sqlite', 'admin']]);
+  assert.deepEqual(imported, [['C:\\backup\\qclab.sqlite', 'admin', false]], 'tham số lạ từ renderer không thành đường dẫn hay tuỳ chọn');
   assert.equal(desktop.importBackup.run(ctx).error.code, 'no-file', 'mỗi lần chọn chỉ phục hồi được một lần');
+  await desktop.chooseBackupFile.run(ctx);
+  desktop.importBackup.run(ctx, { keepAccounts: true });
+  assert.deepEqual(imported.at(-1), ['C:\\backup\\qclab.sqlite', 'admin', true], 'chỉ nhận cờ giữ tài khoản');
 });
 
 test('bản xem trước gắn cùng bảng nghiệp vụ, đọc phiên tại thời điểm gọi', async () => {
-  const { business, session } = setup();
+  const { business, session, db } = setup();
+  addTech(db);
   const api = bindOperations(business, sessionContext(() => session.get()));
   assert.equal((await api.listUsers()).error.code, 'unauthenticated');
   await assert.rejects(api.getLisSettings(), /Chưa đăng nhập/, 'hàm đọc vẫn ném lỗi như trước');
@@ -258,9 +296,37 @@ test('exception của thao tác trả IpcResult thành { ok: false }; thao tác 
     assert.deepEqual(await lan('createNce', [NCE_INPUT], tech), expected, 'LAN');
     assert.deepEqual(await api.createNce(NCE_INPUT), expected, 'bản xem trước');
     await assert.rejects(handlers.get('config:listTests')({}), /SQLITE_BUSY/);
-    await assert.rejects(lan('listTests', [], tech), /SQLITE_BUSY/);
+    const lanRead = await lan('listTests', [], tech);
+    assert.equal(lanRead.readFailed, true, 'LAN gói lỗi đọc kèm readFailed để client ném lại');
+    assert.match(lanRead.error.message, /SQLITE_BUSY/);
     await assert.rejects(api.listTests(), /SQLITE_BUSY/);
   } finally {
     console.error = quiet;
+  }
+});
+
+// Phục hồi thay cả bảng users: tài khoản đang đăng nhập không còn thì main kết
+// thúc phiên và báo `signedOut` để renderer về màn đăng nhập/khởi tạo quản trị.
+test('phục hồi làm mất tài khoản đang đăng nhập: kết thúc phiên, báo signedOut', async () => {
+  for (const keepUser of [false, true]) {
+    let ref;
+    const backup = {
+      backupStatus: () => ({ lastBackupAt: null, lastBackupBytes: 0 }),
+      verifyBackupFile: () => ({ ok: true, data: { tables: 1, rows: 1, points: 0, schemaVersion: 1, createdAt: '', bytes: 1, legacy: true } }),
+      importBackupFrom: () => {
+        if (!keepUser) ref.db.prepare("DELETE FROM users WHERE id='u-admin'").run();
+        return { ok: true, data: { preRestoreSnapshotPath: 'C:/qclab/pre-restore.sqlite' } };
+      },
+    };
+    ref = setup({ backup, pickOpen: async () => 'C:/backup.json' });
+    const { db, desktop, session } = ref;
+    db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-admin','admin','Quan tri','admin',1)").run();
+    session.set(admin);
+    const ctx = sessionContext(() => session.get());
+    assert.equal((await desktop.chooseBackupFile.run(ctx)).ok, true);
+    const result = await desktop.importBackup.run(ctx);
+    assert.equal(result.ok, true);
+    assert.equal(result.data.signedOut ?? false, !keepUser);
+    assert.equal(session.get() === null, !keepUser, keepUser ? 'tài khoản còn thì giữ phiên' : 'tài khoản mất thì kết thúc phiên');
   }
 });

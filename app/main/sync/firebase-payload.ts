@@ -6,6 +6,7 @@ import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
 import { dumpAllTables } from '../db/table-io';
 import { buildBackupEnvelope, type BackupEnvelope } from '../domain/backup';
+import { cloudBackupData } from '../domain/cloud-backup';
 
 export interface FirebasePayload { _format: 'qclab-firebase'; _ts: number; _client: string; backup: BackupEnvelope; }
 
@@ -17,7 +18,8 @@ export const FIREBASE_WARN_RATIO = 0.8;
 export function buildFirebasePayload(db: Db, now: Date = new Date()): FirebasePayload {
   return {
     _format: 'qclab-firebase', _ts: now.getTime(), _client: 'qclab-desktop',
-    backup: buildBackupEnvelope(dumpAllTables(db), SCHEMA_VERSION, 'app', now.toISOString()),
+    // Bỏ khoá riêng của máy (token LIS, kết nối Firebase) trước khi rời máy (GV6).
+    backup: buildBackupEnvelope(cloudBackupData(dumpAllTables(db)), SCHEMA_VERSION, 'app', now.toISOString()),
   };
 }
 

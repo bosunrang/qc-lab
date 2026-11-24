@@ -33,10 +33,10 @@ export function watchErrors(page) {
   return errors;
 }
 
-export async function launchApp() {
+export async function launchApp(options = {}) {
   const userDataDir = mkdtempSync(path.join(os.tmpdir(), 'qclab-e2e-'));
   const port = await freePort();
-  const env = { ...process.env, QCLAB_USER_DATA_DIR: userDataDir, QCLAB_LAN_PORT: String(port) };
+  const env = { ...process.env, ...options.env, QCLAB_USER_DATA_DIR: userDataDir, QCLAB_LAN_PORT: String(port) };
   // Bản build phải nạp tệp trong `app-dist/renderer`, không trỏ sang Vite.
   delete env.QCLAB_DEV_SERVER_URL;
   const app = await _electron.launch({ args: ['.'], cwd: REPO_ROOT, env });
@@ -55,11 +55,25 @@ export async function bootstrapAndLogin(page, user = ADMIN) {
   await login(page, user);
 }
 
+/** Đăng nhập. Tài khoản do admin tạo phải đổi mật khẩu ở lần đầu (GV5): gặp
+ * màn đổi mật khẩu thì đổi sang mật khẩu mới và ghi lại vào `user.password`
+ * cho các lần đăng nhập sau. Trả `true` khi đã phải đổi mật khẩu. */
 export async function login(page, user) {
   await page.fill('#login-username', user.username);
   await page.fill('#login-password', user.password);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
-  await page.getByRole('navigation', { name: 'Điều hướng chính' }).waitFor();
+  const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+  const forced = page.locator('#cpw-old');
+  await nav.or(forced).first().waitFor();
+  if (!(await forced.isVisible())) return false;
+  const next = `${user.password}-doi`;
+  await forced.fill(user.password);
+  await page.fill('#cpw-new', next);
+  await page.fill('#cpw-confirm', next);
+  await page.getByRole('button', { name: 'Đổi mật khẩu và tiếp tục' }).click();
+  await nav.waitFor();
+  user.password = next;
+  return true;
 }
 
 /** Ngày hôm nay theo giờ địa phương của cửa sổ, dạng YYYY-MM-DD. */
@@ -97,6 +111,15 @@ export async function seedOperationalTest(page) {
 /** Chuyển trang bằng thanh điều hướng như người dùng. */
 export async function openPage(page, label) {
   await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: label }).click();
+}
+
+/** Mở tháng bằng hai ô chọn trên lịch ngoại kiểm như người dùng. */
+export async function showEqaCalendarMonth(page, date) {
+  const main = page.getByRole('region', { name: 'Lịch và danh sách đợt', exact: true });
+  await main.getByRole('button', { name: 'Lịch tháng', exact: true }).click();
+  await main.getByRole('combobox', { name: 'Năm trong lịch', exact: true }).selectOption(date.slice(0, 4));
+  await main.getByRole('combobox', { name: 'Tháng trong lịch', exact: true }).selectOption(date.slice(5, 7));
+  await main.getByRole('grid', { name: `Lịch tháng ${date.slice(5, 7)}/${Number(date.slice(0, 4))}`, exact: true }).waitFor();
 }
 
 /** Ô nhập của một mức trong ngày trên bảng Nhập QC. */

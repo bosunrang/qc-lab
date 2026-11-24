@@ -60,7 +60,7 @@ test('gói log là ZIP hợp lệ gồm log, tệp crash và thông tin môi tr�
   assert.equal(entries['logs/qclab.log'].toString('utf8'), '{"level":"error","message":"Lỗi thử nghiệm"}\n', 'nội dung giữ nguyên, tiếng Việt đúng');
   assert.deepEqual([...entries['logs/crashes/abc.dmp']], [0, 1, 2, 3, 255], 'tệp nhị phân giữ nguyên');
   const info = entries['thong-tin.txt'].toString('utf8');
-  assert.match(info, /Phiên bản app: 1\.0\.5/);
+  assert.match(info, /Phiên bản phần mềm: 1\.0\.5/);
   assert.match(info, /Người xuất: Quản trị/);
   assert.doesNotMatch(Object.keys(entries).join(','), /sqlite/, 'không kèm CSDL');
 });

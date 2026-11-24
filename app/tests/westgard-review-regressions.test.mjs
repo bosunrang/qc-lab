@@ -8,6 +8,8 @@ const { createWestgardHandlers } = require('../../app-dist/main/ipc/westgard-han
 const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
 const { combinedWestgardByPoint, westgardByPoint, westgardMultiByPoint, acceptedRunPoints } = require('../../app-dist/main/domain/westgard-engine.js');
 const { qcRunKey, compareQcRunKey } = require('../../app-dist/main/domain/sort-order.js');
+const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
+import { createIqcNce, ensureUser, releaseWith } from './helpers/nce-flow.mjs';
 const actor = { userId: 'u1', username: 'admin', name: 'Admin', role: 'admin', clientId: 'review' };
 
 function fixture() {
@@ -80,19 +82,35 @@ test('WG05/06: no rejected point or sibling level in a failed run enters statist
   db.close();
 });
 
-test('WG07: only approved effective corrections reset rules, from the next day, in both entry and Westgard', () => {
+test('WG07: release with an accepted rerun restarts sequence rules from that run, without changing earlier verdicts', () => {
   const { db, item, point, wg, entry } = fixture();
+  const nce = createNceHandlers(db);
+  ensureUser(db, actor);
   for (let day = 1; day <= 5; day++) point(`p${day}`, 1, `2026-09-0${day}`, 'morning', day === 5 ? 1.1 : 1.5);
-  assert.equal(wg.analyzeLevel(item.id, 1).points[4].verdict, 'rej');
-  db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,test_id,level,nce_id,approval_status,effectiveness_status,record_status,action_completed_date)
-    VALUES ('fix','2026-09-04','','',?,1,'NCE','pending','effective','active','2026-09-04')`).run(item.id);
-  assert.equal(wg.analyzeLevel(item.id, 1).points[4].verdict, 'rej');
-  db.exec("UPDATE actions SET approval_status='approved' WHERE id='fix'");
+  assert.equal(wg.analyzeLevel(item.id, 1).points[3].verdict, 'rej', '4-1s loại ngày 4');
+  assert.equal(wg.analyzeLevel(item.id, 1).points[4].verdict, 'rej', 'chưa khắc phục thì ngày 5 vẫn nối chuỗi cũ');
+  const opened = createIqcNce(nce, actor, item.id, { date: '2026-09-04', runId: 'morning' });
+  assert.equal(wg.analyzeLevel(item.id, 1).points[4].verdict, 'rej', 'mở hồ sơ chưa đổi gì');
+  // Lần rerun được đánh giá trong giai đoạn mới nên đạt; đánh giá trong giai
+  // đoạn cũ thì 4-1s sẽ loại oan nó.
+  const preview = nce.previewNceRelease({ data: { id: opened.record.id, rerun: { date: '2026-09-05', runId: 'morning' } } });
+  assert.equal(preview.data.ok, true, JSON.stringify(preview.data.problems));
+  releaseWith(nce, actor, opened, { date: '2026-09-05', runId: 'morning' });
   const points = wg.analyzeLevel(item.id, 1).points;
-  assert.equal(points[3].verdict, 'rej'); assert.equal(points[4].verdict, 'ok'); assert.equal(points[4].accepted, true);
-  assert.equal(entry.queryPoints(item.id, 1)[4].verdict, 'ok');
-  db.exec("UPDATE actions SET record_status='cancelled' WHERE id='fix'");
-  assert.equal(wg.analyzeLevel(item.id, 1).points[4].verdict, 'rej');
+  assert.equal(points[3].verdict, 'rej', 'kết luận trước mốc cắt không đổi');
+  assert.equal(points[4].verdict, 'ok'); assert.equal(points[4].accepted, true);
+  assert.equal(entry.queryPoints(item.id, 1)[4].verdict, 'ok', 'Nhập QC và Phân tích Westgard dùng cùng mốc cắt');
+  assert.deepEqual(db.prepare('SELECT date, run_id FROM nce_cuts').all().map((r) => ({ ...r })), [{ date: '2026-09-05', run_id: 'morning' }]);
+  db.close();
+});
+
+test('WG07b: legacy day cut (approved effective protocol-3 record) restarts from the next day', () => {
+  const { db, item, point, wg } = fixture();
+  for (let day = 1; day <= 5; day++) point(`p${day}`, 1, `2026-09-0${day}`, 'morning', day === 5 ? 1.1 : 1.5);
+  db.prepare("INSERT INTO nce_records(id,nce_id,source,test_id,detected_at,status,protocol_version) VALUES ('fix','NCE','iqc',?,'2026-09-04','closed',3)").run(item.id);
+  db.prepare("INSERT INTO nce_cuts(id,nce_record_id,test_id,date,run_id) VALUES ('c','fix',?,'2026-09-04',NULL)").run(item.id);
+  const points = wg.analyzeLevel(item.id, 1).points;
+  assert.equal(points[3].verdict, 'rej'); assert.equal(points[4].verdict, 'ok');
   db.close();
 });
 
@@ -115,8 +133,13 @@ test('WG13: a failed audit rolls back global, reset, and per-test rule writes', 
   assert.deepEqual(wg.listRuleSettings(), before);
   assert.throws(() => wg.saveRuleAction(item.id, '1-3s', 'inactive', actor), /injected/);
   assert.equal(db.prepare('SELECT rule_actions_json FROM tests WHERE id=?').get(item.id).rule_actions_json, '{}');
+  // Khôi phục khi đã là mặc định không ghi gì (GV2), nên đặt sẵn một cấu
+  // hình khác mặc định để lần khôi phục phải ghi rồi bị huỷ.
+  db.prepare("INSERT INTO app_meta(key,value) VALUES('westgardRules',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify({ '1-3s': false }));
+  const customized = wg.listRuleSettings();
   assert.throws(() => wg.resetRuleSettings(actor), /injected/);
-  assert.deepEqual(wg.listRuleSettings(), before);
+  assert.deepEqual(wg.listRuleSettings(), customized);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM rule_config_history').get().n, 0, 'lịch sử cấu hình cũng được huỷ cùng lần ghi');
   assert.equal(wg.saveRuleSetting('1-3s', 'false', actor).ok, false);
   db.close();
 });

@@ -7,6 +7,7 @@ import { qcRunKey, compareQcRunKey } from '../main/domain/sort-order.ts';
 import { createRequire } from 'node:module';
 import { displayedWestgardBlocks, statText, westgardExportRows, escapeHtml } from '../renderer/lib/westgard-view.ts';
 import { readWestgardPageSources } from './helpers/page-source.mjs';
+import * as qcMarker from '../renderer/lib/qc-marker.ts';
 // Công thức thống kê nằm ở main (observed-stats); trang Westgard lọc điểm `accepted` trước khi gọi.
 const { observedStats: statsOf } = createRequire(import.meta.url)('../../app-dist/main/domain/observed-stats.js');
 const observedStats = (points) => statsOf(points.filter((point) => point.accepted));
@@ -77,7 +78,7 @@ test('WG11/12: chart and invalidation wiring use the shared run key and all eval
   const page = readWestgardPageSources();
   const subscriptions = [...page.matchAll(/useStoreInvalidation\(\[([^\]]+)\]/g)];
   assert.equal(subscriptions.length, 2);
-  for (const subscription of subscriptions) for (const table of ['actions', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions']) assert.ok(subscription[1].includes(`'${table}'`));
+  for (const subscription of subscriptions) for (const table of ['nce_cuts', 'app_meta', 'qc_panels', 'qc_panel_tests', 'lot_transitions']) assert.ok(subscription[1].includes(`'${table}'`));
 });
 
 test('WG11: actual canvas drawing places same-day runs at distinct increasing X coordinates', () => {
@@ -91,7 +92,7 @@ test('WG11: actual canvas drawing places same-day runs at distinct increasing X 
     source.slice(source.indexOf('function drawMultiCusum(')),
   ].join('\n');
   const context = vm.createContext({ qcRunKey, compareQcRunKey, vnDayMonth: date => date,
-    LJ: {}, BANDS: [], MULTI_COLORS: ['teal'], MULTI_CUSUM_COLORS: [['teal', 'blue']], CUSUM_COLORS: {} });
+    LJ: {}, BANDS: [], MULTI_COLORS: ['teal'], MULTI_CUSUM_COLORS: [['teal', 'blue']], CUSUM_COLORS: {}, ...qcMarker });
   vm.runInContext(stripTypeScriptTypes(sections), context);
   const circles = [];
   const canvas = new Proxy({}, { get: (_, key) => key === 'arc' ? (x, y) => circles.push({ x, y }) : key === 'measureText' ? () => ({ width: 20 }) : () => {}, set: () => true });

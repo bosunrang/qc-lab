@@ -1,0 +1,57 @@
+{
+  "fileName": "ĐGĐ M2 THÁNG 7.pdf",
+  "creationDate": "2026-08-04",
+  "pages": [
+    [
+      { "str": "LABORATORY REF. NO. 231210.11", "x": 25, "y": 829 },
+      { "str": "MC - 231210.11 - Reg (G) - TNH201 - Medica Easylyte Plus", "x": 25, "y": 812 },
+      { "str": "MONTHLY CLINICAL CHEMISTRY", "x": 188, "y": 569 },
+      { "str": "CYCLE 23 SAMPLE 7", "x": 232, "y": 529 },
+      { "str": "Authorised by: Sarah Fleck, RIQAS Manager Issue No: 1 Issue Date: 29/07/2026", "x": 25, "y": 330 }
+    ],
+    [
+      { "str": "MONTHLY CLINICAL CHEMISTRY LABORATORY REF. NO. 231210.11 CYCLE 23 SAMPLE 7 28/07/2026", "x": 25, "y": 823 },
+      { "str": "Chloride, mmol/l", "x": 25, "y": 781 },
+      { "str": "N Mean CV% U m SDPA Exc.", "x": 173, "y": 756 },
+      { "str": "All Method 5361 110.262 2.8 0.05 2.88 24", "x": 25, "y": 741 },
+      { "str": "Ion Selective Electrode 4949 110.125 2.7 0.05 2.88 24", "x": 25, "y": 723 },
+      { "str": "Medica 158 112.932 2.9 0.33 2.95 0", "x": 25, "y": 707 },
+      { "str": "Medica Corporation Medica Easylyte instrumen 130 113.237 2.9 0.37 2.96 0", "x": 25, "y": 690 },
+      { "str": "Medica Corporation Medica Easylyte instrumen 66 112.325 3.0 0.52 2.94 0", "x": 25, "y": 673 },
+      { "str": "Your Result 111.200 SDI -0.38", "x": 44, "y": 624 },
+      { "str": "Mean for Comparison 112.325 TS 113", "x": 44, "y": 598 },
+      { "str": "Issue No: 1 Issue Date: 29/07/2026", "x": 25, "y": 10 }
+    ],
+    [
+      { "str": "MONTHLY CLINICAL CHEMISTRY LABORATORY REF. NO. 231210.11 CYCLE 23 SAMPLE 7 28/07/2026", "x": 25, "y": 823 },
+      { "str": "Potassium, mmol/l", "x": 25, "y": 780 },
+      { "str": "N Mean CV% U m SDPA Exc.", "x": 173, "y": 756 },
+      { "str": "All Method 5783 6.094 2.5 0.00 0.19 28", "x": 25, "y": 741 },
+      { "str": "Ion Selective Electrode 5272 6.095 2.5 0.00 0.19 26", "x": 25, "y": 726 },
+      { "str": "Medica 189 5.918 3.2 0.02 0.18 2", "x": 25, "y": 706 },
+      { "str": "Medica Corporation Medica Easylyte instrumen 147 5.908 3.3 0.02 0.18 2", "x": 25, "y": 690 },
+      { "str": "Medica Corporation Medica Easylyte instrumen 67 5.890 2.5 0.02 0.18 1", "x": 25, "y": 673 },
+      { "str": "Your Result 5.890 SDI 0.00", "x": 44, "y": 624 },
+      { "str": "Mean for Comparison 5.890 TS 120", "x": 44, "y": 598 }
+    ],
+    [
+      { "str": "MONTHLY CLINICAL CHEMISTRY LABORATORY REF. NO. 231210.11 CYCLE 23 SAMPLE 7 28/07/2026", "x": 25, "y": 823 },
+      { "str": "Sodium, mmol/l", "x": 25, "y": 781 },
+      { "str": "N Mean CV% U m SDPA Exc.", "x": 173, "y": 756 },
+      { "str": "All Method 5757 157.284 2.2 0.06 3.35 25", "x": 25, "y": 741 },
+      { "str": "Ion Selective Electrode 5260 157.435 2.2 0.06 3.35 24", "x": 25, "y": 723 },
+      { "str": "Medica 183 154.324 2.1 0.30 3.28 1", "x": 25, "y": 707 },
+      { "str": "Medica Corporation Medica Easylyte instrumen 146 154.151 2.0 0.32 3.28 1", "x": 25, "y": 690 },
+      { "str": "Medica Corporation Medica Easylyte instrumen 67 153.906 1.8 0.44 3.27 1", "x": 25, "y": 673 },
+      { "str": "Your Result 152.900 SDI -0.31", "x": 44, "y": 624 },
+      { "str": "Mean for Comparison 153.906 TS 120", "x": 44, "y": 598 }
+    ],
+    [
+      { "str": "MONTHLY CLINICAL CHEMISTRY LABORATORY REF. NO. 231210.11 CYCLE 23 SAMPLE 7 28/07/2026", "x": 25, "y": 822 },
+      { "str": "Analyte Comparison Result SDI RMSDI %DEV RM%DEV TS RMTS Performance", "x": 11, "y": 782 },
+      { "str": "Chloride 112.325 111.200 -0.38 1.03 -1.0 2.7 113 77", "x": 11, "y": 762 },
+      { "str": "Potassium 5.890 5.890 0.00 -0.66 0.0 -2.1 120 92", "x": 11, "y": 751 },
+      { "str": "Sodium 153.906 152.900 -0.31 -5.89 -0.7 -12.5 120 60", "x": 11, "y": 740 }
+    ]
+  ]
+}

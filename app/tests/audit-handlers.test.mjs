@@ -5,7 +5,8 @@ const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createAuditHandlers } = require('../../app-dist/main/ipc/audit-handlers.js');
-const { writeAudit, AUDIT_HARD_CAP, AUDIT_ROTATE_TO } = require('../../app-dist/main/ipc/shared.js');
+const { writeAudit } = require('../../app-dist/main/ipc/shared.js');
+const { AUDIT_SIZE_WARNING_ROWS, auditSizeWarning } = require('../../app-dist/main/domain/audit-filter.js');
 
 const db = openDatabase(':memory:');
 const config = createConfigHandlers(db);
@@ -109,31 +110,32 @@ assert.equal(allOldArchived.ok, true);
 assert.equal(allOldArchived.data.retainedCount, 0);
 assert.equal(verifyChainNow().ok, true, 'cat het log phai khoi dau chuoi hash moi hop le');
 
-// 10) Phòng khi người dùng quên lưu trữ thủ công: giới hạn cứng AUDIT_HARD_CAP,
-// vượt 50.000 dòng tự giữ 40.000 dòng mới nhất + 1 dòng giải thích; anchor
-// phải nối đúng vào dòng đầu còn lại để verifier không báo sai.
+// 10) GV3 (ISO 15189:2022 8.4.3): vượt ngưỡng KHÔNG tự xoá dòng nào. Trước
+// 2026-11-02 vượt 50.000 dòng thì tự cắt còn 40.000 mà không xuất CSV; nay
+// ngưỡng chỉ để nhắc quản trị viên dùng "Lưu trữ nhật ký cũ".
 db.exec("DELETE FROM activity; DELETE FROM app_meta WHERE key='activityAnchor'");
 const seedInsert = db.prepare(`INSERT INTO activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash)
   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-const rotationSeed = [];
 let previousHash = '';
-for (let seq = 1; seq <= AUDIT_HARD_CAP; seq++) {
+for (let seq = 1; seq <= AUDIT_SIZE_WARNING_ROWS; seq++) {
   const entry = {
-    id: `rotation-${seq}`, seq, ts: '2020-01-01T00:00:00.000Z', user: 'Quan tri vien', username: 'admin', userId: 'u1',
+    id: `seed-${seq}`, seq, ts: '2020-01-01T00:00:00.000Z', user: 'Quan tri vien', username: 'admin', userId: 'u1',
     role: 'admin', type: 'Thao tác cũ', detail: `Dòng ${seq}`, target: '', clientId: 'test-client', prevHash: previousHash, hash: '',
   };
   entry.hash = auditEntryHash(entry);
   previousHash = entry.hash;
-  rotationSeed.push(entry);
   seedInsert.run(entry.id, entry.seq, entry.ts, entry.user, entry.username, entry.userId, entry.role, entry.type, entry.detail, entry.target, entry.clientId, entry.prevHash, entry.hash);
 }
-writeAudit(db, actor, 'Thao tác làm vượt ngưỡng', 'Kiểm tra tự xoay vòng', 'Nhật ký');
-const rotatedRows = db.prepare('SELECT * FROM activity ORDER BY seq ASC').all();
-assert.equal(rotatedRows.length, AUDIT_ROTATE_TO + 1, 'giữ 40.000 dòng mới nhất và thêm 1 dòng báo xoay vòng');
-// Dòng thao tác vừa ghi là dòng 50.001, nên phải cắt 10.001 dòng (index 0…10000).
-assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='activityAnchor'").get().value, rotationSeed[AUDIT_HARD_CAP - AUDIT_ROTATE_TO].hash);
-assert.equal(rotatedRows.at(-1).type, 'Xoay vòng nhật ký hoạt động');
-assert.equal(verifyChainNow().ok, true, 'chuỗi phải hợp lệ sau xoay vòng tự động');
+assert.equal(auditSizeWarning(AUDIT_SIZE_WARNING_ROWS), null, 'đúng ngưỡng thì chưa nhắc');
+writeAudit(db, actor, 'Thao tác làm vượt ngưỡng', 'Kiểm tra không tự xoá', 'Nhật ký');
+writeAudit(db, actor, 'Thao tác tiếp theo', 'Vẫn ghi nối chuỗi', 'Nhật ký');
+const keptRows = db.prepare('SELECT * FROM activity ORDER BY seq ASC').all();
+assert.equal(keptRows.length, AUDIT_SIZE_WARNING_ROWS + 2, 'không dòng nào bị xoá khi vượt ngưỡng');
+assert.equal(keptRows[0].id, 'seed-1', 'dòng cũ nhất vẫn còn');
+assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='activityAnchor'").get(), undefined, 'không tự dời anchor');
+assert.equal(verifyChainNow().ok, true, 'chuỗi vẫn hợp lệ khi bảng lớn');
+assert.equal(query({}).total, AUDIT_SIZE_WARNING_ROWS + 2);
+assert.match(auditSizeWarning(AUDIT_SIZE_WARNING_ROWS + 2), /Lưu trữ nhật ký cũ/, 'vượt ngưỡng thì nhắc lưu trữ');
 
 console.log('app audit-handlers end-to-end tests passed');
 

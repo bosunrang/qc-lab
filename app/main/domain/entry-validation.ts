@@ -1,4 +1,4 @@
-// Xác thực dữ liệu thêm và hủy điểm QC tại cổng ghi của module Nhập QC.
+// Xác thực dữ liệu thêm và huỷ điểm QC tại cổng ghi của module Nhập QC.
 import { cleanId, cleanText, finiteNumber } from './text-utils';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,6 +20,9 @@ export interface QcPointInput {
   lotNo?: unknown;
   note?: unknown;
   operatorName?: unknown;
+  /** Lý do khi điểm làm đổi trạng thái loại bỏ của lần chạy đã có (nhập lùi
+   * ngày, N27). Chỉ main biết có cần hay không — sau khi đánh giá lại chuỗi. */
+  retroReason?: unknown;
 }
 
 export interface PreparedQcPoint {
@@ -31,6 +34,7 @@ export interface PreparedQcPoint {
   lotNo: string;
   note: string;
   operatorName: string;
+  retroReason: string;
 }
 
 export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
@@ -79,7 +83,7 @@ export function validateQcPointInput(input: QcPointInput, knownLevels: readonly 
   const runId = cleanText(input.runId, 120).trim() || `${date}-1`;
   return {
     ok: true,
-    data: { testId, level, date, val, runId, lotNo: cleanText(input.lotNo, 80).trim(), note: cleanText(input.note, 1000).trim(), operatorName: cleanText(input.operatorName, 120).trim() },
+    data: { testId, level, date, val, runId, lotNo: cleanText(input.lotNo, 80).trim(), note: cleanText(input.note, 1000).trim(), operatorName: cleanText(input.operatorName, 120).trim(), retroReason: cleanText(input.retroReason, 1000).trim() },
   };
 }
 
@@ -100,6 +104,23 @@ export function voidNceChoice(kind: VoidKind): { openNce: boolean; forced: boole
   if (kind === 'analytical') return { openNce: true, forced: true, reasonRequired: false };
   if (kind === 'data-entry') return { openNce: false, forced: true, reasonRequired: false };
   return { openNce: false, forced: false, reasonRequired: true };
+}
+
+/** Huỷ một điểm thuộc lần chạy bị loại (điểm Loại bỏ, hoặc mức khác của lần
+ * chạy đó vi phạm) cần lý do ≥ 10 ký tự với MỌI loại huỷ, kể cả "nhập sai dữ
+ * liệu" (ISO 15189:2022 7.3.7.2, 8.4; N4). Không có cổng này thì huỷ rồi nhập
+ * lại là lần chạy "Đạt", hàng chờ NCE trống, chỉ còn một dòng nhật ký. Loại
+ * "nhập sai dữ liệu" vẫn không mở NCE — đó là thiết kế, không phải lỗ hổng. */
+export const REJECTED_RUN_VOID_REASON_MIN = 10;
+
+export function voidReasonMinimum(kind: VoidKind, runRejected: boolean): number {
+  if (runRejected) return REJECTED_RUN_VOID_REASON_MIN;
+  return voidNceChoice(kind).reasonRequired ? 5 : 0;
+}
+
+export function rejectedRunVoidReasonError(reason: string): { code: string; message: string } | null {
+  if (reason.trim().length >= REJECTED_RUN_VOID_REASON_MIN) return null;
+  return { code: 'reason-required-rejected-run', message: `Điểm này thuộc lần chạy bị loại: cần ghi lý do huỷ tối thiểu ${REJECTED_RUN_VOID_REASON_MIN} ký tự (vd. bằng chứng nhập sai).` };
 }
 
 export function validateVoidInput(input: VoidPointInput): ValidationResult<PreparedVoid> {

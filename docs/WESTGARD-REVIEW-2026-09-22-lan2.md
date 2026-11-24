@@ -1,5 +1,74 @@
 # Rà soát chuyên sâu thẻ Westgard — lần 2 — 22/09/2026
 
+## Quyết định WG-26 (18/11/2026) — luật bật sẵn theo số mức QC
+
+Chốt mục "Điểm cần chốt theo SOP" ở cuối tài liệu này theo chuẩn, không để
+chờ SOP. Rà soát 18/11/2026 mô phỏng quá trình ổn định trên chính engine của
+app: bộ mặc định cũ (1-2s, 1-3s, 2-2s, R4s, 4-1s, **6x**, 10x) làm **11%** lần
+chạy bị loại giả ở xét nghiệm 2 mức và **16%** ở 3 mức, gần hết do 6x; mỗi
+lần chạy bị loại lại phải lập hồ sơ NCE. Bộ Westgard 2 mức chỉ còn 1,95%.
+
+| Số mức đang vận hành | Bật sẵn |
+| --- | --- |
+| 1–2 mức | 1-2s (cảnh báo), 1-3s, 2-2s, R4s, 4-1s, 10x |
+| Từ 3 mức | 1-2s (cảnh báo), 1-3s, 2of3-2s, R4s, 3-1s, 12x |
+
+- 6x, 8x, 9x, 7T không bật sẵn; xét nghiệm tự bật khi cần (6x cho Sigma dưới
+  4 theo Westgard Sigma Rules, đúng gợi ý của trang Six Sigma).
+- Căn cứ: Westgard, "Westgard Rules" và "Multirule QC" — bảng đa quy tắc cho
+  N=2 (1-3s/2-2s/R4s/4-1s/10x) và N=3 (1-3s/2of3-2s/R4s/3-1s/12x).
+- `WG_RULE_REGISTRY.defaultOn` khai theo số mức (`always`/`upTo2`/`from3`/
+  `never`); `makeRuleActionLayered()` nhận số mức đang vận hành của xét
+  nghiệm, kể cả `testRuleActionOf()` của NCE và huỷ điểm.
+- Panel "Cấu hình chung của luật" hiện mặc định theo số mức của xét nghiệm
+  đang xem; luật đã đặt riêng ở cấu hình chung áp cho mọi xét nghiệm. Khôi
+  phục mặc định xoá mọi mục đặt riêng thay vì ghi bảng bật/tắt cố định.
+- Không hồi tố (GV2): migration schema 17 ghi đầy đủ mặc định cũ vào mọi phiên
+  bản cấu hình chung đã có và thêm phiên bản mới cho lần chạy nhập sau nâng
+  cấp. Mục cấu hình chung chỉ trùng mặc định cũ (ví dụ sau "Khôi phục") được
+  bỏ để dùng mặc định mới; mục đã đặt khác mặc định cũ được giữ.
+
+Hồi quy: `westgard-default-rules-migration.test.mjs`, `westgard-rules.test.mjs`;
+ca thẩm định WG-10/WG-11 (tự bật 6x), WG-29 (3 mức không còn 2-2s), WG-33
+(2 mức, 6x không nổ), WG-34 (3 mức, 3-1s bật sẵn).
+
+## Cập nhật 11/11/2026 — kết luận QC trong Lịch sử dữ liệu
+
+Theo yêu cầu người dùng, thay cột phân loại khoảng Z bằng Kết luận QC;
+giữ nguyên cột Z và snapshot Mean/SD lúc nhập. `pointEvaluationsOf()` được
+tách nguyên từ nguồn đánh giá báo cáo để dùng chung với lịch sử: giữ đủ chuỗi,
+luật liên mức, cấu hình theo lần chạy, mốc NCE, lô đang chạy/song song/lô cũ
+và nhóm dừng. Không thay công thức hoặc ngưỡng luật Westgard.
+
+Kết luận hiển thị theo cả lần chạy: điểm không tự vi phạm nhưng có
+`run_rejected_by` vẫn hiện Bị loại và nêu mức gây loại khi rê chuột. Điểm
+không có ngữ cảnh đánh giá hiện Chưa đánh giá, không suy Đạt từ Z. Nguồn
+lịch sử tiếp tục chỉ liệt kê điểm chưa huỷ; điểm đã huỷ không vào chuỗi.
+
+Hồi quy: `app/tests/history-qc-conclusion.test.mjs` kiểm chuỗi 4-1s với Z
+trong ±2s, mức đi kèm lần chạy bị loại, cảnh báo/chưa đánh giá, đổi riêng
+một mức, nhóm đã dừng và R4s trên lô song song; đối chiếu kết quả với báo cáo
+và Westgard. `app/e2e/history-pagination.e2e.mjs` kiểm cột Z, kết luận và
+tự cập nhật khi nhập điểm trong lúc mở chi tiết. EN12 được cập nhật từ
+hợp đồng cũ không trả verdict sang hợp đồng mới trả đánh giá thật từ main.
+
+## Cập nhật 10/11/2026 — giữ ngữ cảnh khi đổi lô từng mức
+
+Khắc phục RC02 trong `APP-REVIEW-2026-11-10-RECHECK.md`, không đổi công thức,
+hành động luật hoặc cách xác định mốc cắt. `historicalPointEvaluations()` đọc
+cả nhóm còn vận hành khi đã có lô của xét nghiệm được thay và có điểm lịch
+sử. Kết luận của lần chạy đó được tính với đầy đủ các mức của nhóm cũ.
+
+Biên bản tháng và báo cáo chi tiết áp dụng kết luận này cho cả điểm ở mức đã
+đổi lô lẫn mức còn gán hiện hành; cổng huỷ kiểm cùng ngữ cảnh cho cả hai mức.
+Lần chạy mới không có điểm của lô đã thay vẫn dùng kết luận vận hành hiện tại,
+không ghép lô cũ vào lần chạy mới. Nhóm đang chạy nhưng không có bằng chứng
+đổi lô không tự biến dữ liệu chưa cấu hình thành dữ liệu đã đánh giá.
+
+Hồi quy ở `app/tests/review-2026-11-10.test.mjs`: giữ số liệu/chữ ký của kỳ
+khoá khi chỉ đổi một mức; lần chạy mới vẫn đạt; huỷ từng mức của lần chạy
+R4s hoặc 1-3s đều cần lý do và giữ bằng chứng.
+
 ## Cập nhật khắc phục
 
 **Đã sửa toàn bộ WG-15 → WG-25.** Phần mô tả bên dưới là ghi nhận **trước

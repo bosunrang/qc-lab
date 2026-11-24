@@ -2,6 +2,7 @@
 // chuyển lô active, dùng Mean/SD riêng và không làm bẩn Westgard lô chính.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 const require = createRequire(import.meta.url);
 
@@ -61,6 +62,9 @@ const forged = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-0
 assert.equal(forged.ok, false);
 assert.equal(forged.error.code, 'invalid-parallel-lot');
 
+// Cổng N12: lô mới phải chạy song song đủ dữ liệu trước khi chấp nhận.
+seedParallelRun(db, { transitionId: planned.data.id, testId: test.id, level: 1, lotNo: 'NEW-202', mean: 20, sd: 2, start: '2026-08-01' });
+
 // Chấp nhận chuyển lô: cột song song biến mất và các điểm NEW-202 trở thành
 // tập đang vận hành mà không cần chép/chuyển hàng dữ liệu.
 const accepted = config.createLotTransition({ id: planned.data.id, data: {
@@ -70,9 +74,8 @@ const accepted = config.createLotTransition({ id: planned.data.id, data: {
 assert.equal(accepted.ok, true, JSON.stringify(accepted));
 assert.equal(entry.listParallelColumns(test.id).length, 0);
 const afterAccept = entry.queryPoints(test.id, 1);
-assert.equal(afterAccept.length, 1);
-assert.equal(afterAccept[0].id, parallelPoint.data.id);
-assert.equal(afterAccept[0].verdict, 'rej');
+assert.equal(afterAccept.length, 11, '10 điểm chạy song song + điểm vừa nhập');
+assert.equal(afterAccept.find((point) => point.id === parallelPoint.data.id).verdict, 'rej');
 
 // Lô vừa được thay thế vẫn xem lại được trong Nhập QC bằng đúng dải lịch sử;
 // điểm lô cũ không bị trộn trở lại chuỗi Westgard đang vận hành.

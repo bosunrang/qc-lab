@@ -9,6 +9,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { readEntryPageSources } from './helpers/page-source.mjs';
+import * as qcMarker from '../renderer/lib/qc-marker.ts';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -116,15 +117,15 @@ function drawLjCircles(points, mean, sd) {
     source.slice(source.indexOf('function geometry('), source.indexOf('const MULTI_COLORS')),
   ].join('\n');
   const LJ = { okBand: 'band', okMid: 'band', warnBand: 'band', rejectBand: 'band', grid: 'grid', mean: 'mean', line: 'line', okPoint: 'OK', warnPoint: 'WARN', rejectPoint: 'REJ' };
-  const context = vm.createContext({ vnDayMonth: (date) => date, LJ, BANDS: [] });
-  vm.runInContext(stripTypeScriptTypes(section), context);
   const circles = [];
+  // Mỗi điểm vẽ qua `traceMarker` (U6): ghi tâm và hình tại đó, còn ruột/viền
+  // ghi đúng lúc `fill()`/`stroke()` vì `drawPoint` đặt màu ngay trước mỗi lệnh.
+  const traceMarker = (ctx, shape, x, y) => circles.push({ x, y, shape, fill: null, stroke: null });
+  const context = vm.createContext({ vnDayMonth: (date) => date, LJ, BANDS: [], ...qcMarker, traceMarker });
+  vm.runInContext(stripTypeScriptTypes(section), context);
   const pen = { fillStyle: null, strokeStyle: null };
-  // `drawLJ` đặt `fillStyle` TRƯỚC `arc()` rồi mới đặt `strokeStyle` và gọi
-  // `stroke()`, nên viền phải ghi lại ở đúng lúc vẽ viền — đọc `strokeStyle`
-  // ngay tại `arc()` chỉ bắt được màu của đường kẻ lưới vẽ trước đó.
   const canvas = new Proxy({}, {
-    get: (_, key) => key === 'arc' ? (x, y) => circles.push({ x, y, fill: pen.fillStyle, stroke: null })
+    get: (_, key) => key === 'fill' ? () => { const last = circles.at(-1); if (last && last.fill === null) last.fill = pen.fillStyle; }
       : key === 'stroke' ? () => { const last = circles.at(-1); if (last && last.stroke === null) last.stroke = pen.strokeStyle; }
       : key === 'measureText' ? () => ({ width: 20 }) : () => {},
     set: (_, key, value) => { if (key in pen) pen[key] = value; return true; },
@@ -180,6 +181,14 @@ test('EN07: điểm đạt nhưng cả lần chạy bị loại được vẽ V�
   const rejected = drawLjCircles([{ ...base, verdict: 'rej', rules: ['1-3s'], accepted: false, runRejectedBy: [1] }], 100, 2).circles[0];
   assert.equal(rejected.fill, 'REJ');
   assert.equal(rejected.stroke, '#fff');
+  // U6: hình theo kết luận, kể cả điểm rỗng giữ hình của chính nó.
+  assert.equal(counted.shape, 'circle');
+  assert.equal(collateral.shape, 'circle');
+  assert.equal(rejected.shape, 'square');
+  const warnCollateral = drawLjCircles([{ ...base, verdict: 'warn', z: 2.5, rules: ['1-2s'], accepted: false, runRejectedBy: [2] }], 100, 2).circles[0];
+  assert.equal(warnCollateral.shape, 'triangle');
+  assert.equal(warnCollateral.fill, '#fff');
+  assert.equal(warnCollateral.stroke, 'WARN');
 });
 
 test('EN08: queryPoints trả kèm accepted + mức nào làm hỏng lần chạy', () => {
@@ -281,7 +290,7 @@ test('EN10: ô nhắc chạy lại mở cho MỌI mức của lần chạy bị 
   assert.match(css, /\.qc-value-cell\.warn\.run-excluded\{border-color:var\(--warning-border\);\}/);
 });
 
-test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại và nói rõ đã bỏ bao nhiêu', () => {
+test('EN11: thống kê tích luỹ bỏ điểm thuộc lần chạy bị loại và nói rõ đã bỏ bao nhiêu', () => {
   const { db, test: subject, entry } = twoOperationalLevels();
   const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
   const days = ['2026-09-01', '2026-09-02', '2026-09-03'];
@@ -289,17 +298,36 @@ test('EN11: thống kê tích lũy bỏ điểm thuộc lần chạy bị loại
     ins.run('a' + i, subject.id, 1, date, date + '-1', i === 1 ? 107 : (i % 2 ? 99.5 : 100.5), 'A1', 100, 2);
     ins.run('b' + i, subject.id, 2, date, date + '-1', i % 2 ? 199.5 : 200.5, 'A2', 200, 4);
   });
-  const rows = entry.queryPoints(subject.id, 2);
-  // Đúng phép lọc của khối "Thống kê tích lũy" trong EntryPage.
-  const recorded = rows.filter((p) => !p.voided);
-  const cumulative = recorded.filter((p) => p.accepted !== false);
-  assert.equal(recorded.length, 3, 'tổng ghi nhận giữ nguyên cho truy vết');
-  assert.equal(cumulative.length, 2, 'điểm thuộc lần chạy bị loại không vào thống kê');
-  assert.equal(recorded.length - cumulative.length, 1);
+  const { current } = entry.getEntryWindow(subject.id, {
+    worksheetFrom: '2026-09-03', worksheetTo: '2026-09-03',
+    chartFrom: '2026-09-03', chartTo: '2026-09-03', previousLots: {},
+  });
+  assert.deepEqual(current[2].points.map(p => p.id), ['b2'], 'chỉ gửi điểm trong khoảng đang xem');
+  assert.equal(current[2].cumulative.recorded, 3, 'tổng ghi nhận giữ nguyên cho truy vết');
+  assert.equal(current[2].cumulative.n, 2, 'điểm thuộc lần chạy bị loại không vào thống kê');
+  assert.equal(current[2].cumulative.recorded - current[2].cumulative.n, 1);
 
   const page = readEntryPageSources();
-  assert.match(page, /const cumulative = recorded\.filter\(\(p\) => p\.accepted !== false\);/);
-  assert.match(page, /Tổng ghi nhận \{recorded\.length\}/);
+  assert.match(page, /Tổng ghi nhận \{cumulative\?\.recorded/);
+});
+
+test('khoảng Nhập QC giữ bằng chứng Westgard từ trước ngày bắt đầu và tách các khoảng rời nhau', () => {
+  const { db, test: subject, entry } = twoOperationalLevels();
+  const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
+  for (const [index, date] of ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-10-01'].entries()) {
+    ins.run('window-' + index, subject.id, 1, date, date + '-1', index < 4 ? 102.5 : 100, 'A1', 100, 2);
+  }
+  const { current } = entry.getEntryWindow(subject.id, {
+    worksheetFrom: '2026-10-01', worksheetTo: '2026-10-31',
+    chartFrom: '2026-09-04', chartTo: '2026-09-04', previousLots: {},
+  });
+  assert.deepEqual(current[1].points.map(p => p.id), ['window-3', 'window-5']);
+  const [first] = current[1].points;
+  assert.equal(first.chartZ, 1.25);
+  assert.equal(first.chartVerdict, 'rej');
+  assert.ok(first.rules.includes('4-1s'), 'ba điểm ngoài khoảng vẫn tham gia luật');
+  assert.equal(current[1].cumulative.recorded, 4);
+  assert.equal(current[1].cumulative.n, 3);
 });
 
 test('EN13: thẻ biểu đồ là vùng thông tin, không lồng tương tác giả; số điểm nói rõ phần dùng thống kê', () => {
@@ -313,16 +341,18 @@ test('EN13: thẻ biểu đồ là vùng thông tin, không lồng tương tác 
     'canvas có mô tả thay thế cho công cụ hỗ trợ');
 });
 
-test('EN12: listHistoryPoints không còn trả verdict giả danh kết luận Westgard', () => {
+test('EN12: listHistoryPoints trả kết luận Westgard thật và giữ snapshot Mean/SD', () => {
   const { db, test: subject, entry } = twoOperationalLevels();
   const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
   // Điểm vượt +3,5SD phải nhận verdict từ engine Westgard, không từ một ngưỡng
   // z-score hiển thị độc lập.
   ins.run('a0', subject.id, 1, '2026-09-01', '2026-09-01-1', 107, 'A1', 100, 2);
   const [point] = entry.listHistoryPoints(subject.id);
-  assert.equal('verdict' in point, false, 'không còn trường verdict');
-  assert.equal('rules' in point, false, 'không còn trường rules');
-  // Vẫn đủ dữ liệu để tab Lịch sử tự xếp theo dải Z như nó vẫn làm.
+  assert.equal(point.verdict, 'rej');
+  assert.ok(point.rules.includes('1-3s'));
+  assert.equal(point.accepted, false);
+  assert.deepEqual(point.run_rejected_by, [1]);
+  // Vẫn giữ đủ dữ liệu gốc để cột Z không đổi cách hiển thị.
   for (const field of ['id', 'level', 'date', 'run_id', 'lot', 'val', 'qc_mean', 'qc_sd', 'operator_username']) {
     assert.ok(field in point, `thiếu trường ${field}`);
   }

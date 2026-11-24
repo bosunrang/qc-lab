@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -17,6 +18,9 @@ const { nextNceId } = require('../../app-dist/main/db/nce-ids.js');
 const { createConfigHandlers } = require('../../app-dist/main/ipc/config-handlers.js');
 const { createAuthHandlers } = require('../../app-dist/main/ipc/auth-handlers.js');
 const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
+const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
+import { ensureUser, must, validTechnicalAssessment } from './helpers/nce-flow.mjs';
+import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 const { createReagentHandlers } = require('../../app-dist/main/ipc/reagent-handlers.js');
 const { createReportHandlers } = require('../../app-dist/main/ipc/report-handlers.js');
 const { createSettingsHandlers } = require('../../app-dist/main/ipc/settings-handlers.js');
@@ -85,24 +89,51 @@ test('tài khoản: tạo, sửa, đặt lại mật khẩu, xoá đều nguyên
   assertAtomic(db, ['users'], 'deleteUser', () => auth.deleteUser({ id: user.id }, actor));
 });
 
-test('NCE: tạo, huỷ, mở vòng tiếp theo đều nguyên tử; mã không trùng khi có khoảng trống', () => {
+test('NCE: tạo, sửa, hành động, quyết định, cho chạy lại, huỷ đều nguyên tử; mã không trùng khi có khoảng trống', () => {
   const db = openDatabase(':memory:');
   const config = createConfigHandlers(db);
+  const entry = createEntryHandlers(db);
   const nce = createNceHandlers(db);
+  ensureUser(db, admin);
   const instrument = config.saveInstrument({ data: { name: 'Máy A' } }, admin).data;
   const assay = config.saveTest({ data: { name: 'Glucose', instrumentId: instrument.id } }, admin).data;
-  const input = { data: { testId: assay.id, level: 1, lot: 'L1', date: '2026-09-03', rule: '2-2s', errorType: 'SE', correction: 'Hiệu chuẩn lại và chạy lại QC', dueDate: '2026-09-10' } };
-  const first = nce.create(input, admin).data;
-  assertAtomic(db, ['actions'], 'nce.create', () => nce.create(input, admin));
-  assertAtomic(db, ['actions'], 'nce.cancel', () => nce.cancel({ data: { id: first.id, note: 'Tạo nhầm hồ sơ' } }, admin));
-  db.prepare("UPDATE actions SET effectiveness_status='ineffective' WHERE id=?").run(first.id);
-  assertAtomic(db, ['actions'], 'nce.reopen', () => nce.reopenNce({ data: { id: first.id, note: 'Tái diễn' } }, admin));
+  config.saveTestLevel({ testId: assay.id, data: { level: 1, mean: 100, sd: 2 } }, admin);
+  makeOperationalQc(db, { testId: assay.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
+  entry.addPoint({ data: { testId: assay.id, level: 1, date: '2026-09-03', runId: '2026-09-03-1', val: 100 } }, admin);
+  const TABLES = ['nce_records', 'nce_runs', 'nce_actions', 'nce_decisions', 'nce_revisions', 'nce_cuts'];
+  entry.addPoint({ data: { testId: assay.id, level: 1, date: '2026-09-04', runId: '2026-09-04-bad', val: 107 } }, admin);
+  const iqc = must(nce.createNce({ data: {
+    source: 'iqc', testId: assay.id, trigger: { date: '2026-09-04', runId: '2026-09-04-bad' },
+    description: 'QC vượt giới hạn cần xác minh kỹ thuật', correction: 'Dừng trả kết quả và kiểm tra máy',
+    holdResults: true, detectedAt: '2026-09-04', ownerUserId: admin.userId,
+  } }, admin), 'tạo hồ sơ IQC');
+  assertAtomic(db, TABLES, 'nce.recordTechnicalAssessment', () => nce.recordNceTechnicalAssessment({ data: {
+    id: iqc.record.id, expectedVersion: iqc.record.row_version, assessment: validTechnicalAssessment,
+  } }, admin));
+  const input = { data: { source: 'calibration', testId: assay.id, description: 'Lệch hiệu chuẩn sau bảo trì', correction: 'Hiệu chuẩn lại', holdResults: true, detectedAt: '2026-09-03', ownerUserId: admin.userId } };
+  const first = nce.createNce(input, admin).data;
+  assertAtomic(db, TABLES, 'nce.create', () => nce.createNce(input, admin));
+  const base = () => ({ id: first.record.id, expectedVersion: nce.getNce(first.record.id, admin).record.row_version });
+  assertAtomic(db, TABLES, 'nce.update', () => nce.updateNce({ data: { ...base(), patch: { riskSeverity: 2 } } }, admin));
+  assertAtomic(db, TABLES, 'nce.addAction', () => nce.addNceAction({ data: { ...base(), action: { kind: 'corrective', description: 'Đưa lịch hiệu chuẩn vào nhắc việc', ownerUserId: admin.userId, dueDate: '2026-09-10' } } }, admin));
+  const impact = { outcome: 'not_reported', description: 'Đã giữ kết quả' };
+  assertAtomic(db, TABLES, 'nce.recordPatientImpact', () => nce.recordNcePatientImpact({ data: { ...base(), impact } }, admin));
+  nce.recordNcePatientImpact({ data: { ...base(), impact } }, admin);
+  must(nce.updateNce({ data: { ...base(), patch: { checklist: Object.fromEntries(['calibrator', 'calibration', 'iqcHistory'].map((key) => [key, { status: 'ok', note: '' }])) } } }, admin), 'kiểm tra nhanh trước release');
+  // Cho chạy lại ghi bản ghi, lần chạy rerun, quyết định VÀ mốc cắt trong cùng một transaction.
+  assertAtomic(db, TABLES, 'nce.release', () => nce.releaseNce({ data: { ...base(), release: { reason: 'QC xác minh đạt sau hiệu chuẩn', rerun: { date: '2026-09-03', runId: '2026-09-03-1' } } } }, admin));
+  const second = nce.createNce(input, admin).data;
+  assertAtomic(db, TABLES, 'nce.cancel', () => nce.cancelNce({ data: { id: second.record.id, expectedVersion: second.record.row_version, reason: 'Tạo trùng với hồ sơ khác' } }, admin));
 
-  // Mã NCE: còn -01 và -03 (mất -02) thì mã kế tiếp phải là -04, không phải -03.
-  const prefix = `NCE-${first.nce_id.slice(4, 12)}-`;
-  db.prepare("UPDATE actions SET nce_id=? WHERE id=?").run(`${prefix}03`, first.id);
-  db.prepare("INSERT INTO actions(id,date,created_at,updated_at,nce_id) VALUES ('khac','2026-09-03','x','x',?)").run(`${prefix}01`);
-  assert.equal(nextNceId(db, `${first.nce_id.slice(4, 8)}-${first.nce_id.slice(8, 10)}-${first.nce_id.slice(10, 12)}`), `${prefix}04`);
+  // Mã NCE: còn -01 và -03 (mất -02) thì mã kế tiếp phải là -04, không phải
+  // -03. Mã của hồ sơ đổi dải cũ còn nằm trong `actions` cũng không dùng lại.
+  const prefix = first.record.nce_id.slice(0, 13);
+  const day = `${prefix.slice(4, 8)}-${prefix.slice(8, 10)}-${prefix.slice(10, 12)}`;
+  db.prepare('UPDATE nce_records SET nce_id=? WHERE id=?').run(`${prefix}03`, first.record.id);
+  db.prepare('UPDATE nce_records SET nce_id=? WHERE id=?').run(`${prefix}01`, second.record.id);
+  assert.equal(nextNceId(db, day), `${prefix}04`);
+  db.prepare("INSERT INTO actions(id,date,created_at,updated_at,nce_id) VALUES ('cu','2026-09-03','x','x',?)").run(`${prefix}07`);
+  assert.equal(nextNceId(db, day), `${prefix}08`);
 });
 
 test('so sánh hoá chất, khoá kỳ, hồ sơ đơn vị, LIS đều nguyên tử', () => {
@@ -118,8 +149,8 @@ test('so sánh hoá chất, khoá kỳ, hồ sơ đơn vị, LIS đều nguyên 
   assertAtomic(db, ['reagent_tests'], 'reagent.remove', () => reagent.removeComparison({ id: comparison.id }, admin));
   assertAtomic(db, ['app_meta'], 'reagent.addQuickValue', () => reagent.addQuickListValue({ type: 'operator', value: 'KTV A' }, admin));
 
-  assertAtomic(db, ['period_locks'], 'report.lockPeriod', () => report.lockPeriod({ data: { ym: '2026-03', note: 'chốt kỳ' } }, admin));
-  report.lockPeriod({ data: { ym: '2026-04', note: 'chốt kỳ' } }, admin);
+  assertAtomic(db, ['period_locks'], 'report.lockPeriod', () => report.lockPeriod({ data: { ym: '2026-03', note: 'chốt kỳ', acknowledge: true } }, admin));
+  report.lockPeriod({ data: { ym: '2026-04', note: 'chốt kỳ', acknowledge: true } }, admin);
   assertAtomic(db, ['period_locks'], 'report.unlockPeriod', () => report.unlockPeriod({ data: { ym: '2026-04', note: 'mở lại để sửa' } }, admin));
 
   assertAtomic(db, ['lab'], 'settings.saveLabProfile', () => settings.saveLabProfile({ data: { name: 'Khoa Xét nghiệm', dept: '', address: '', brandTitle: 'QC Lab', brandSub: '' } }, admin));
@@ -154,6 +185,7 @@ test('chuyển lô: hồ sơ, cascade và nhật ký là một đơn vị', () =
   const tables = ['lot_transitions', 'qc_lots', 'lot_groups', 'test_levels', 'tests'];
   assertAtomic(db, tables, 'createLotTransition (dự kiến)', () => config.createLotTransition({ data }, admin));
   const created = config.createLotTransition({ data }, admin).data;
+  seedParallelRun(db, { transitionId: created.id, testId: assay.id, level: 1, lotNo: 'CAND-1', mean: 212, sd: 4.2, start: '2026-04-05' });
   assertAtomic(db, tables, 'createLotTransition (chấp nhận, có cascade)', () => config.createLotTransition({ id: created.id, data: { ...data, status: 'accepted' } }, admin));
   // Không lỗi thì chấp nhận vẫn áp đúng như trước.
   const accepted = config.createLotTransition({ id: created.id, data: { ...data, status: 'accepted' } }, admin);

@@ -53,9 +53,11 @@ assert.equal(afterApply.mfg_sd, 1);
 assert.equal(afterApply.mean, applied.data.current.mean);
 assert.equal(JSON.parse(afterApply.mean_sd_history_json).length, 1);
 
-const rangeAction = db.prepare("SELECT * FROM actions WHERE rule='Thiết lập dải QC mới'").get();
-assert.ok(rangeAction, 'áp dụng dải phải tạo hồ sơ quản lý dải chờ duyệt');
-assert.equal(rangeAction.approval_status, 'pending');
+// Đổi dải QC là kiểm soát thay đổi, không phải sự không phù hợp (D-12): không
+// tạo hồ sơ NCE; lịch sử nằm ở `mean_sd_history_json` và nhật ký.
+assert.equal(db.prepare('SELECT COUNT(*) AS n FROM nce_records').get().n, 0, 'đổi dải không tạo hồ sơ NCE');
+assert.equal(db.prepare('SELECT COUNT(*) AS n FROM actions').get().n, 0, 'không còn ghi vào bảng actions cũ');
+assert.ok(db.prepare("SELECT 1 FROM activity WHERE type='Thiết lập dải QC mới'").get(), 'đổi dải vẫn có dấu vết trong nhật ký');
 
 assert.equal(entry.revertManufacturerRange({ data: { testId: test.id, level: 1, reason: 'Hoàn lại dải NSX' } }, actor).ok, true);
 const reverted = config.listTestLevels(test.id)[0];
@@ -69,16 +71,19 @@ assert.equal(manualApplied.ok, true, JSON.stringify(manualApplied));
 const afterManual = config.listTestLevels(test.id)[0];
 assert.equal(afterManual.mean, 10.05);
 assert.equal(afterManual.sd, 0.25);
-const manualAction = db.prepare("SELECT detail_json FROM actions WHERE rule='Thiết lập dải QC mới' ORDER BY created_at DESC LIMIT 1").get();
-assert.equal(JSON.parse(manualAction.detail_json).selection, 'chỉnh thủ công');
-assert.deepEqual(JSON.parse(manualAction.detail_json).applied, { mean: 10.05, sd: 0.25 });
+assert.match(db.prepare("SELECT detail FROM activity WHERE type='Thiết lập dải QC mới' ORDER BY seq DESC LIMIT 1").get().detail, /chỉnh thủ công/);
 
-// Nếu có NCE sai số hệ thống, hệ thống yêu cầu xác nhận nguyên nhân và Bias
-// nằm trong TEa/4 trước khi cho đổi dải.
-db.prepare("INSERT INTO actions(id,date,created_at,test_id,level,rule,nce_id) VALUES ('se-gate','2026-07-20','2026-07-20',?,?, '2-2s','NCE-SE-01')").run(test.id, 1);
+// Nếu có NCE sai số hệ thống CHƯA ĐÓNG, hệ thống yêu cầu xác nhận nguyên
+// nhân và Bias nằm trong TEa/4 trước khi cho đổi dải (D-12).
+db.prepare("INSERT INTO nce_records(id,nce_id,source,test_id,detected_at,status,error_class) VALUES ('se-gate','NCE-SE-01','iqc',?,'2026-07-20','open','SE')").run(test.id);
+assert.equal(entry.rangeCandidate(test.id, 1).data.safety.nceId, 'NCE-SE-01');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống' } }, actor).error.code, 'cause-not-confirmed');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 0 } }, actor).error.code, 'missing-tea');
-db.prepare('UPDATE tests SET tea=8 WHERE id=?').run(test.id);
+// `tests.tea` không còn là căn cứ (chỉ là số chép từ gợi ý cũ): cổng đọc TEa
+// vận hành, tức hồ sơ TEa của PXN khớp tên xét nghiệm.
+db.prepare('UPDATE tests SET tea=50 WHERE id=?').run(test.id);
+assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 0 } }, actor).error.code, 'missing-tea');
+db.prepare("INSERT INTO tea_refs(id,name,lab,lab_source) VALUES ('ref-range','Range test',8,'Hồ sơ PXN')").run();
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 2.1 } }, actor).error.code, 'bias-out-of-range');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 2 } }, actor).ok, true);
 
@@ -104,10 +109,11 @@ assert.equal(warned.data.eligible, true, 'một cảnh báo 1-2s lẻ không đ�
 // Và nó VẪN nằm trong phép tính, không bị lọc lén để SD đẹp hơn.
 assert.ok(warned.data.proposed.sd > 0.5, 'điểm cảnh báo vẫn tham gia tính SD');
 
-// Ngược lại: một LẦN CHẠY bị loại thì chặn, kể cả khi chính mức này đạt.
-// Mức 3 vượt +4SD ngày 10/08 nên cả lần chạy `2026-08-10-1` mất hiệu lực —
-// điểm Mức 2 cùng lần chạy đó không còn là dữ liệu in-control dù verdict
-// riêng của nó vẫn là 'ok'.
+// Một LẦN CHẠY bị loại thì bị bỏ khỏi phép tính, kể cả khi chính mức này
+// đạt — nhưng KHÔNG chặn lập dải (N10, CLSI C24-Ed4; sửa 02/11/2026: trước đây
+// chặn vĩnh viễn, đẩy người dùng sang huỷ điểm). Mức 3 vượt +4SD ngày 10/08
+// nên cả lần chạy `2026-08-10-1` mất hiệu lực — điểm Mức 2 cùng lần chạy đó
+// không còn là dữ liệu in-control dù verdict riêng của nó vẫn là 'ok'.
 const lot3 = config.saveLot({ data: { lotNo: 'LOT-RUN', level: 3 } }, actor).data;
 config.saveTestLevel({ testId: test.id, data: { level: 3, mean: 30, sd: 1, qcLotId: lot3.id } }, actor);
 makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 3, lotId: lot3.id }] });
@@ -116,10 +122,21 @@ assert.equal(entry.addPoint({ data: { testId: test.id, level: 3, date: '2026-08-
 const collateral = entry.queryPoints(test.id, 2).find((point) => point.date === '2026-08-10');
 assert.equal(collateral.verdict, 'ok', 'điểm Mức 2 tự nó không vi phạm gì');
 assert.deepEqual(collateral.runRejectedBy, [3], 'nhưng lần chạy của nó bị Mức 3 làm hỏng');
-const blocked = entry.rangeCandidate(test.id, 2);
-assert.equal(blocked.data.proposed.n, 20, 'không lọc lén điểm ra khỏi phép tính');
-assert.equal(blocked.data.proposed.rejected, 1, 'đếm điểm thuộc lần chạy bị loại');
-assert.equal(blocked.data.eligible, false, 'lần chạy bị loại thì chưa được lập dải');
+const excluded = entry.rangeCandidate(test.id, 2);
+assert.equal(excluded.data.proposed.n, 19, 'điểm thuộc lần chạy bị loại ra khỏi phép tính');
+assert.equal(excluded.data.proposed.days, 19, 'ngày độc lập đếm trên điểm được tính');
+assert.equal(excluded.data.proposed.rejected, 1, 'đếm điểm thuộc lần chạy bị loại');
+assert.equal(excluded.data.eligible, false, 'còn 19 kết quả: chưa đủ 20');
+// Thêm một ngày đạt: đủ 20 kết quả được tính trên 20 ngày → lập được dải,
+// không cần huỷ điểm của lần chạy bị loại.
+assert.equal(entry.addPoint({ data: { testId: test.id, level: 2, date: '2026-08-21', val: 20.2 } }, actor).ok, true);
+const enough = entry.rangeCandidate(test.id, 2);
+assert.equal(enough.data.proposed.n, 20);
+assert.equal(enough.data.proposed.rejected, 1);
+assert.equal(enough.data.eligible, true, 'lần chạy bị loại không còn chặn lập dải');
+const expectedValues = [...Array.from({ length: 19 }, (_, i) => i + 1).filter((day) => day !== 10).map((day) => (day % 2 ? 19.8 : 20.2)), 22.5, 20.2];
+const expectedMean = expectedValues.reduce((sum, value) => sum + value, 0) / expectedValues.length;
+assert.ok(Math.abs(enough.data.proposed.mean - expectedMean) < 1e-9, 'Mean tính đúng trên các điểm được giữ');
 
 console.log('app range workflow end-to-end tests passed');
 

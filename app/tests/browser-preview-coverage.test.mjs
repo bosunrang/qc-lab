@@ -32,7 +32,10 @@ const preload = readFileSync(join(ROOT, 'main/preload.ts'), 'utf8');
  * SIẾT xuống khi một hàm được nối vào handler thật; chỉ NÂNG khi có lý do
  * kỹ thuật thật (cần file system / BrowserWindow / HTTP ra ngoài) và ghi lý
  * do ngay tại chỗ trong real-api.ts. */
-const NOT_AVAILABLE_BUDGET = 12;
+// Bổ sung 10/11/2026: kích hoạt cần định danh Windows; kiểm tra/tải/cài cập
+// nhật cần electron-updater và bộ cài NSIS. Hai hàm đọc trạng thái vẫn có
+// đường riêng rõ ràng cho bản xem trước, không giả lập giấy phép đã cấp.
+const NOT_AVAILABLE_BUDGET = 16;
 
 test('real-api nối handler thật, không tự cài đặt lại nghiệp vụ', () => {
   // Phải dựng handler thật từ main/ipc — đây là điều làm nên cả đợt này.

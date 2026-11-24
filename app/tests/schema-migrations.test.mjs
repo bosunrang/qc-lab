@@ -19,6 +19,8 @@ test('CSDL mới: chạy đủ mọi bước, ghi đúng phiên bản, có dòng
   assert.ok(SCHEMA_VERSION >= 2);
   assert.equal(readSchemaVersion(db), SCHEMA_VERSION);
   assert.ok(columns(db, 'tests').includes('eflm_tea'), 'cột chỉ thêm bằng migration cũng có ở CSDL mới');
+  assert.ok(columns(db, 'tea_ref_level_defaults').includes('tea'), 'phải có TEa theo số mức QC của analyte');
+  assert.deepEqual(columns(db, 'tea_ref_levels'), [], 'bảng TEa theo xét nghiệm–máy của bản phát triển đã bỏ');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM lab WHERE id=1').get().n, 1);
 });
 
@@ -37,6 +39,22 @@ test('CSDL từ phiên bản mới hơn app: từ chối mở', () => {
   const db = openDatabase(':memory:');
   db.prepare("UPDATE app_meta SET value=? WHERE key='schemaVersion'").run(String(SCHEMA_VERSION + 1));
   assert.throws(() => applySchema(db), /phiên bản QC Lab mới hơn/);
+});
+
+test('schema 11 thêm nguồn TEa vận hành riêng và giữ nguyên lựa chọn/giá trị cũ', () => {
+  const db = openDatabase(':memory:');
+  try {
+    db.prepare("INSERT INTO instruments(id,name) VALUES ('tea-machine','Máy')").run();
+    db.prepare("INSERT INTO tests(id,name,instrument_id,tea_source,tea) VALUES ('tea-test','Sodium','tea-machine','ricos',0.73)").run();
+    db.exec('ALTER TABLE tests DROP COLUMN operational_tea_source');
+    db.prepare("UPDATE app_meta SET value='11' WHERE key='schemaVersion'").run();
+    applySchema(db);
+    const read = () => db.prepare("SELECT tea_source,tea,operational_tea_source FROM tests WHERE id='tea-test'").get();
+    assert.deepEqual({ ...read() }, { tea_source: 'ricos', tea: 0.73, operational_tea_source: '' });
+    db.prepare("UPDATE tests SET operational_tea_source='clia' WHERE id='tea-test'").run();
+    applySchema(db);
+    assert.equal(read().operational_tea_source, 'clia');
+  } finally { db.close(); }
 });
 
 test('phục hồi dữ liệu cũ: cột thiếu nhận mặc định, dữ liệu được chuẩn hoá ngay', () => {
@@ -67,7 +85,7 @@ test('phục hồi dữ liệu từ phiên bản mới hơn: huỷ cả lần ph
   assert.equal(readSchemaVersion(target), SCHEMA_VERSION);
 });
 
-test('phục hồi từ tệp backup SQLite cũ: dữ liệu được nâng cấp ngay', async () => {
+test('phục hồi từ tệp sao lưu SQLite cũ: dữ liệu được nâng cấp ngay', async () => {
   const { mkdtempSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { tmpdir } = await import('node:os');

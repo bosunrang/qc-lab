@@ -75,7 +75,7 @@ export function ManagePage() {
         </nav>
         <section className="config-shell-main">
           {tab === 'instruments' && <InstrumentsTab createRequest={instrumentCreateRequest} onCreateRequestHandled={() => setInstrumentCreateRequest(0)} />}
-          {tab === 'tests' && <TestsTab openTestId={navState?.editTestId} onNeedInstrument={() => {
+          {tab === 'tests' && <TestsTab openTestId={navState?.editTestId} onGoTeaRefs={() => setTab('tearefs')} onNeedInstrument={() => {
             setInstrumentCreateRequest((value) => value + 1); setTab('instruments');
           }} />}
           {tab === 'panels' && <PanelsTab onGoTests={() => setTab('tests')} onGoInstruments={() => setTab('instruments')} />}

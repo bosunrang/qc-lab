@@ -2,11 +2,11 @@
 // song nếu có). Khối nặng nhất trang (31 hàng × mọi mức), nên bọc `memo` và
 // chỉ nhận props ổn định: gõ vào hộp thoại huỷ điểm hay dải QC không làm vẽ
 // lại bảng này.
-import { memo, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { initialsFromName } from '../../../main/domain/name-initials';
 import { handleSheetKeyDown } from '../../lib/entry-sheet-navigation';
 import { nextSharedRunId } from '../../lib/entry-run-id';
-import { VERDICT_LABEL, formatQcValue, pad2, runExcludedNote, zText, type EntryColumn } from './shared';
+import { VERDICT_LABEL, formatQcValue, pad2, runExcludedNote, vnDate, zText, type EntryColumn } from './shared';
 import type { PreviousLotSeries, QcPointView, TestLevel } from '../../../shared/qc-api';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -26,16 +26,10 @@ function pointsForColumnDay(column: EntryColumn, date: string): QcPointView[] {
   return column.points.filter((point) => point.date === date && !point.voided);
 }
 
-export interface SheetMessages {
-  noteErr: string | null;
-  pointErr: string | null;
-  pointFeedback: { kind: 'ok' | 'warn' | 'rej'; message: string } | null;
-  voidMsg: string | null;
-}
-
 export const EntrySheet = memo(function EntrySheet({
   testId, testName, entryColumns, levels, pointsByLevel, previousLotSeries, decimals, writable,
-  viewYear, viewMonth, onViewYear, onViewMonth, messages, onCommitRun, onSaveNote,
+  jumpToToday, onTodayJumpHandled,
+  viewYear, viewMonth, onViewYear, onViewMonth, onCommitRun, onSaveNote,
 }: {
   testId: string;
   testName: string;
@@ -45,30 +39,49 @@ export const EntrySheet = memo(function EntrySheet({
   previousLotSeries: PreviousLotSeries[];
   decimals: number;
   writable: boolean;
+  jumpToToday: boolean;
+  onTodayJumpHandled: () => void;
   viewYear: number;
   viewMonth: number;
   onViewYear: (year: number) => void;
   onViewMonth: (month: number) => void;
-  messages: SheetMessages;
-  onCommitRun: (column: EntryColumn, date: string, runId: string, val: number) => Promise<boolean>;
+  /** `raw` là chuỗi người dùng gõ; trang tự đọc số và báo lỗi nếu không hợp lệ. */
+  onCommitRun: (column: EntryColumn, date: string, runId: string, raw: string) => Promise<{ saved: boolean; fieldError?: string }>;
   onSaveNote: (date: string, note: string) => void;
 }) {
   // Ngày đã có điểm chỉ mở lần chạy bổ sung khi người dùng bấm "＋ Thêm".
   // Trạng thái mở này thuần UI,
   // khoá theo `mức|ngày`, không lưu xuống DB.
   const [extraRuns, setExtraRuns] = useState<Set<string>>(new Set());
+  const sheetRef = useRef<HTMLDivElement>(null);
   const valText = (val: number) => formatQcValue(val, decimals);
   const today = new Date();
   // Hiển thị 11 năm, từ năm hiện tại trừ 5 năm.
   const YEARS = Array.from({ length: 11 }, (_, i) => today.getFullYear() - 5 + i);
-  const days = Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) => i + 1)
-    .map((d) => `${viewYear}-${pad2(viewMonth)}-${pad2(d)}`);
+  const days = Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) =>
+    `${viewYear}-${pad2(viewMonth)}-${pad2(i + 1)}`);
   const todayStr = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+
+  const scrollToToday = useCallback(() => {
+    sheetRef.current?.querySelector('tr.today')?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }, []);
+
+  useEffect(() => {
+    if (!jumpToToday) return;
+    scrollToToday();
+    onTodayJumpHandled();
+  }, [jumpToToday, onTodayJumpHandled, scrollToToday]);
+
+  function changePeriod(year: number, month: number) {
+    onTodayJumpHandled();
+    onViewYear(year);
+    onViewMonth(month);
+  }
 
   /** "Tới hôm nay": về tháng hiện tại rồi cuộn tới đúng hàng hôm nay. */
   function goToday() {
-    onViewYear(today.getFullYear()); onViewMonth(today.getMonth() + 1);
-    requestAnimationFrame(() => document.querySelector('.qc-sheet tr.today')?.scrollIntoView({ block: 'center' }));
+    changePeriod(today.getFullYear(), today.getMonth() + 1);
+    requestAnimationFrame(scrollToToday);
   }
 
   function pointsForDay(level: number, date: string): QcPointView[] {
@@ -87,21 +100,20 @@ export const EntrySheet = memo(function EntrySheet({
     );
   }
 
-  const { noteErr, pointErr, pointFeedback, voidMsg } = messages;
   return (
-    <div className="panel qc-sheet-panel">
+    <div className="panel qc-sheet-panel" data-entry-section="worksheet">
       <div className="qc-sheet-heading">
         <div className="qc-sheet-title"><span>Bảng nhập QC</span><strong>{testName}</strong><small>Lô {entryColumns.map((column) => `${column.lot}${column.parallel ? ' (song song)' : ''}`).join(' / ') || '—'}</small></div>
         <div className="qc-month-area">
           <div className="qc-month-picker">
-            <select value={viewMonth} onChange={(e) => onViewMonth(Number(e.target.value))}>{MONTHS.map((m) => <option key={m} value={m}>Tháng {m}</option>)}</select>
-            <select value={viewYear} onChange={(e) => onViewYear(Number(e.target.value))}>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
-            <button className="btn ghost sm qc-current-month" onClick={() => { onViewYear(today.getFullYear()); onViewMonth(today.getMonth() + 1); }}>Tháng hiện tại</button>
+            <select value={viewMonth} onChange={(e) => changePeriod(viewYear, Number(e.target.value))} aria-label="Tháng của bảng nhập">{MONTHS.map((m) => <option key={m} value={m}>Tháng {m}</option>)}</select>
+            <select value={viewYear} onChange={(e) => changePeriod(Number(e.target.value), viewMonth)} aria-label="Năm của bảng nhập">{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+            <button className="btn ghost sm qc-current-month" onClick={() => changePeriod(today.getFullYear(), today.getMonth() + 1)}>Tháng hiện tại</button>
             <button className="btn teal sm qc-today-jump" onClick={goToday}>Tới hôm nay</button>
           </div>
         </div>
       </div>
-      <div className="qc-sheet-wrap">
+      <div className="qc-sheet-wrap" ref={sheetRef}>
         <table className="qc-sheet">
           <thead>
             <tr>
@@ -209,10 +221,10 @@ export const EntrySheet = memo(function EntrySheet({
                               </div>
                             );
                           })}
-                          {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (val) => {
-                            const saved = await onCommitRun(column, date, sharedRunIdFor(column, date), val);
-                            if (saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
-                            return saved;
+                          {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (raw) => {
+                            const result = await onCommitRun(column, date, sharedRunIdFor(column, date), raw);
+                            if (result.saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
+                            return result;
                           }} />}
                         </div>
                         {showAddBtn && (
@@ -234,7 +246,8 @@ export const EntrySheet = memo(function EntrySheet({
                     : worst === 'warn' ? <span className="tag warn">W(A)</span> : <span className="tag ok">A</span>}</td>
                   <td>{!dayPoints.length ? '—' : writable
                     ? <textarea key={`note:${testId}:${date}:${dayNote}`} className="qc-note-input" rows={1} placeholder="Ghi chú" defaultValue={dayNote}
-                        onBlur={(e) => onSaveNote(date, e.target.value)} />
+                        aria-label={`Ghi chú ngày ${vnDate(date)}`}
+                        onBlur={(e) => { if (e.target.value.trim() !== (dayNote || '').trim()) onSaveNote(date, e.target.value); }} />
                     : (dayNote || '—')}</td>
                 </tr>
               );
@@ -242,14 +255,6 @@ export const EntrySheet = memo(function EntrySheet({
           </tbody>
         </table>
       </div>
-      {(noteErr || pointErr || pointFeedback || voidMsg) && (
-        <div className="entry-sheet-message" role="status" aria-live="polite">
-          {noteErr && <div className="alert warn">{noteErr}</div>}
-          {pointErr && <div className="alert warn">{pointErr}</div>}
-          {pointFeedback && <div className={`alert ${pointFeedback.kind}`}>{pointFeedback.message}</div>}
-          {voidMsg && <div className="alert warn">{voidMsg}</div>}
-        </div>
-      )}
     </div>
   );
 });
@@ -262,16 +267,21 @@ export const EntrySheet = memo(function EntrySheet({
  * ngày cùng mức; Enter xuống hàng dưới và quay vòng về đầu cột. */
 function RunSlot({ date, level, columnKey, columnOrder, onCommit }: {
   date: string; level: number; columnKey: string; columnOrder: number;
-  onCommit: (val: number) => Promise<boolean>;
+  onCommit: (raw: string) => Promise<{ saved: boolean; fieldError?: string }>;
 }) {
   const [val, setVal] = useState('');
+  const [error, setError] = useState('');
+  const errorId = `qc-run-error-${date}-${columnOrder}`;
   return (
     <div className="qc-run-slot">
       <input className="qc-inline-input is-empty" type="text" inputMode="decimal" placeholder="--" value={val}
+        aria-label={`Mức ${level} ngày ${vnDate(date)}`}
+        aria-invalid={!!error || undefined} aria-describedby={error ? errorId : undefined}
         data-focus-date={date} data-focus-level={level} data-focus-column={columnKey} data-focus-column-order={columnOrder}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={async () => { const n = Number(val); if (val.trim() !== '' && !Number.isNaN(n) && await onCommit(n)) setVal(''); }}
+        onChange={(e) => { setVal(e.target.value); setError(''); }}
+        onBlur={async () => { if (val.trim() === '') return; const result = await onCommit(val); if (result.saved) setVal(''); setError(result.fieldError || ''); }}
         onKeyDown={handleSheetKeyDown} />
+      {error && <p id={errorId} className="field-error" role="alert">{error}</p>}
     </div>
   );
 }

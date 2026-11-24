@@ -1,13 +1,15 @@
-// Cột `actions.error_type` chỉ được chứa MÃ `SE` / `RE` / `''`.
+// Cột loại sai số (`actions.error_type` cũ, `nce_records.error_class` mới) chỉ
+// được chứa MÃ `SE` / `RE` / `''`.
 //
 // "SE — Sai số hệ thống", luồng quản lý dải ghi "Quản lý dải kiểm soát"; mà
 // trang Hành động so `=== 'SE'` nên hai nguồn sau hiện NGƯỢC thành "Sai số
-// ngẫu nhiên". File này khóa hằng nhãn, cổng ghi, chuẩn hóa dữ liệu và hiển thị.
+// ngẫu nhiên". File này khoá hằng nhãn, cổng ghi, chuẩn hoá dữ liệu và hiển thị.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
+import { createIqcNce, ensureUser } from './helpers/nce-flow.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -77,39 +79,39 @@ test('mọi cổng ghi chỉ lưu mã SE/RE/rỗng', t => {
   assert.equal(point.data.verdict, 'rej');
   const voided = entry.voidPoint({ data: { pointId: point.data.id, kind: 'analytical', reason: 'Bọt khí trong cuvette', openNce: true } }, actor);
   assert.equal(voided.ok, true, JSON.stringify(voided));
-  assert.equal(db.prepare('SELECT error_type FROM actions WHERE point_id=?').get(point.data.id).error_type, 'RE');
+  assert.equal(db.prepare('SELECT error_class FROM nce_records WHERE nce_id=?').get(voided.data.nceId).error_class, 'RE');
+  // Mô tả sự kiện ghi điều đã xảy ra, xử lý tức thời ghi việc đã làm: không lặp nhau.
+  const opened = db.prepare('SELECT description, correction FROM nce_records WHERE nce_id=?').get(voided.data.nceId);
+  assert.match(opened.description, /^QC mức 1, lần chạy 2026-09-02-1 ngày 02\/09\/2026 cho giá trị 107\.00; lần chạy bị loại theo luật 1-3s/);
+  assert.match(opened.description, /Lý do huỷ: .*Bọt khí trong cuvette\.$/);
+  assert.match(opened.correction, /^Đã huỷ điểm QC mức 1 \(giá trị 107\.00\) khỏi thống kê và đánh dấu lần chạy 2026-09-02-1 ngày 02\/09\/2026 phải chạy lại QC\.$/);
+  assert.notEqual(opened.description, opened.correction);
 
-  // 2. Hồ sơ quản lý dải: hoàn dải nhà sản xuất → KHÔNG phân loại sai số.
+  // 2. Hoàn dải nhà sản xuất không tạo hồ sơ NCE (D-12), nên không có dòng
+  // nào mang nhãn "Hoàn dải QC" trong cột loại sai số.
   db.prepare("UPDATE test_levels SET applied='lab', mfg_mean=100, mfg_sd=2 WHERE test_id=? AND level=1").run(assay.id);
   const reverted = entry.revertManufacturerRange({ data: { testId: assay.id, level: 1, reason: 'Hoàn dải theo SOP để đối chiếu' } }, actor);
   assert.equal(reverted.ok, true, JSON.stringify(reverted));
-  const rangeRow = db.prepare("SELECT error_type,rule,detail_json FROM actions WHERE detail_json LIKE '%rangeWorkflow%'").get();
-  assert.equal(rangeRow.error_type, '', 'hồ sơ quản lý dải không có loại sai số');
-  assert.equal(rangeRow.rule, 'Hoàn dải QC', 'loại việc nằm ở cột `rule`, không nhét vào `error_type`');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM nce_records').get().n, 1, 'chỉ có hồ sơ của lần huỷ điểm');
 
-  // 3. Form NCE nhận chuỗi dài từ client cũ → vẫn lưu về mã.
-  const created = nce.create({ data: {
-    testId: assay.id, level: 1, lot: 'L1', date: '2026-09-03', rule: '2-2s',
-    errorType: 'SE — Sai số hệ thống', correction: 'Hiệu chuẩn lại và chạy lại QC', dueDate: '2026-09-10',
-  } }, actor);
-  assert.equal(created.ok, true, JSON.stringify(created));
-  assert.equal(db.prepare('SELECT error_type FROM actions WHERE id=?').get(created.data.id).error_type, 'SE');
+  // 3. Lập hồ sơ IQC: loại sai số do main đọc từ luật của lần chạy (2-2s → SE),
+  // client gửi kèm nhãn dài hay mã khác cũng bị bỏ qua.
+  ensureUser(db, actor);
+  for (const day of ['2026-09-03', '2026-09-04']) {
+    assert.equal(entry.addPoint({ data: { testId: assay.id, level: 1, date: day, runId: `${day}-1`, val: 105 } }, actor).ok, true);
+  }
+  const created = createIqcNce(nce, actor, assay.id, { date: '2026-09-04', runId: '2026-09-04-1' }, { errorType: 'RE — Sai số ngẫu nhiên' });
+  assert.equal(created.record.error_class, 'SE');
 
-  const stored = db.prepare('SELECT DISTINCT error_type FROM actions').all().map(r => r.error_type);
+  const stored = db.prepare('SELECT DISTINCT error_class FROM nce_records').all().map(r => r.error_class);
   assert.ok(stored.every(value => CODES.has(value)), `cột chỉ chứa mã: ${JSON.stringify(stored)}`);
 });
 
 test('các chỗ hiển thị đọc mã ra nhãn, không in giá trị thô', () => {
-  const actions = readFileSync(new URL('../renderer/pages/ActionsPage.tsx', import.meta.url), 'utf8');
-  const report = readFileSync(new URL('../renderer/pages/ReportPage.tsx', import.meta.url), 'utf8');
+  const report = readFileSync(new URL('../renderer/lib/iqc-report.ts', import.meta.url), 'utf8');
   const westgard = readFileSync(new URL('../main/ipc/westgard-handlers.ts', import.meta.url), 'utf8');
-  assert.doesNotMatch(actions, /\{record\.error_type \|\| '—'\}/, 'hộp thoại duyệt phải in nhãn');
-  assert.match(actions, /errorClassLabel\(record\.error_type\)/);
-  assert.match(actions, /normalizeErrorClass\(record\.error_type\), detail\.correction/, 'CSV xuất mã đã chuẩn hoá');
-  assert.match(report, /ERROR_CLASS_LABEL\[normalizeErrorClass\(r\.error_type\)\]/);
+  assert.match(report, /ERROR_CLASS_LABEL\[r\.error_class\]/);
   // Bảng điểm Westgard: tín hiệu CUSUM phải cùng bộ từ vựng với luật thường,
   // không phải mã trần 'SE' bên cạnh "SE — Sai số hệ thống".
   assert.match(westgard, /cusumSignal \? ERROR_CLASS_LABEL\.SE : detail\.type/);
 });
-
-

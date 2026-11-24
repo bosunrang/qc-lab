@@ -1,6 +1,7 @@
-import { useRef, useState, type MouseEvent } from 'react';
+import { useId, useRef, useState, type MouseEvent } from 'react';
 import { vnDate } from '../lib/format';
 import { openDatePicker } from '../state/date-picker-store';
+import { FIELD_EDIT_EVENT } from '../lib/modal-close';
 
 function CalendarIcon() {
   return (
@@ -32,10 +33,15 @@ export function parseDateInput(value: unknown): string {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export function DateField({ label, value, onChange, defaultValue, name, id, disabled, className = '' }: {
+export function DateField({ label, value, onChange, defaultValue, name, id, disabled, invalid, describedBy, className = '' }: {
   label?: string; id?: string; name?: string; disabled?: boolean; className?: string;
+  invalid?: boolean; describedBy?: string;
   value?: string; onChange?: (value: string) => void; defaultValue?: string;
 }) {
+  // Không truyền `id` thì tự sinh: có `label` mà ô không có id thì bấm nhãn
+  // không focus được ô và trình đọc màn hình không nối nhãn với ô (U7).
+  const autoId = useId();
+  const inputId = id || autoId;
   const isControlled = value !== undefined;
   const nativeRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLInputElement>(null);
@@ -47,6 +53,10 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   function commit(nextIso: string) {
     if (!isControlled) setOwnIso(nextIso);
     if (textRef.current) textRef.current.value = formatDateDisplay(nextIso);
+    // Báo modal chứa ô này là người dùng đã sửa form: chọn trên lịch (nằm ngoài
+    // khung modal) không phát `input` nào nổi bọt qua modal. Rời ô mà không
+    // đổi ngày (blur cũng gọi `commit`) thì không tính là sửa.
+    if (nextIso !== iso) textRef.current?.dispatchEvent(new Event(FIELD_EDIT_EVENT, { bubbles: true }));
     onChange?.(nextIso);
   }
 
@@ -60,8 +70,8 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
 
   const box = (
     <span className={`datebox ${className}`.trim()}>
-      <input ref={textRef} id={id} className="date-text" inputMode="numeric" placeholder="dd/mm/yyyy"
-        disabled={disabled} aria-label={label} defaultValue={formatDateDisplay(iso)}
+      <input ref={textRef} id={inputId} className="date-text" inputMode="numeric" placeholder="dd/mm/yyyy"
+        disabled={disabled} aria-label={label} aria-invalid={invalid || undefined} aria-describedby={describedBy} defaultValue={formatDateDisplay(iso)}
         key={isControlled ? iso : undefined}
         onBlur={(e) => commit(parseDateInput(e.target.value))}
         onKeyDown={(e) => {
@@ -80,7 +90,7 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
   );
 
   if (label === undefined) return box;
-  return <div className="field">{label && <label htmlFor={id}>{label}</label>}{box}</div>;
+  return <div className="field">{label && <label htmlFor={inputId}>{label}</label>}{box}</div>;
 }
 
 

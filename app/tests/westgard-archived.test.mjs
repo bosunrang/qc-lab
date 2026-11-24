@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
+import { receivePendingRejectedRuns } from './helpers/nce-flow.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -32,6 +33,8 @@ const oldOperational = makeOperationalQc(db, {
 // chỉ tính hai chuỗi độc lập theo từng mức.
 assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-01', runId: 'old-run-1', val: 105 } }, actor).ok, true);
 assert.equal(entry.addPoint({ data: { testId: test.id, level: 2, date: '2026-09-01', runId: 'old-run-1', val: 190 } }, actor).ok, true);
+// Lần chạy bị loại phải có hồ sơ NCE trước khi dừng nhóm lô (R03).
+receivePendingRejectedRuns(db, actor);
 assert.equal(config.stopLotGroup({ id: oldOperational.groupId }, actor).ok, true);
 
 // Chuyển hẳn sang lô mới có Mean/SD khác: quá trình này phải chốt target cũ

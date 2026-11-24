@@ -1,0 +1,15 @@
+/* Chỉ bố cục công cụ. Nút, field, panel, lịch, bảng và focus dùng app.css. */
+.issuer-shell{max-width:1040px;margin:0 auto;}
+.issuer-key{width:100%;align-items:center;justify-content:space-between;margin-bottom:var(--space-5);}
+.issuer-key-info{display:flex;flex-direction:column;gap:var(--space-1);min-width:0;overflow-wrap:anywhere;}
+.issuer-error{margin-bottom:var(--space-4);}
+.issuer-fields{display:grid;gap:var(--field-gap);padding:0 var(--panel-header-px) var(--space-4);}
+.issuer-fields .field{min-width:0;}
+.issuer-expiry{display:flex;align-items:flex-end;gap:var(--field-gap);flex-wrap:wrap;}
+.issuer-perpetual{display:flex;align-items:center;gap:var(--space-2);}
+.issuer-actions{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap;padding:var(--space-3) var(--panel-header-px);border-top:1px solid var(--surface-divider);}
+.issuer-actions>.hint{flex:1;min-width:0;overflow-wrap:anywhere;}
+.issuer-buttons{display:flex;gap:var(--space-2);}
+.issuer-footer{text-align:center;}
+#machine-code,#activation-code{font-family:Consolas,monospace;}
+#activation-code{resize:vertical;}

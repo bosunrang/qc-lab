@@ -1,0 +1,127 @@
+// Nghiệp vụ thuần của phân hệ Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md):
+// xếp loại theo ISO 13528 (E-01), đối chiếu z với báo cáo (E-03), gộp báo cáo
+// từng máy và kiểm một lần nhập. Bộ đọc PDF có test riêng ở `eqa-pdf.test.mjs`.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const {
+  eqaClass, eqaZ, eqaPct, eqaProviderCheck, eqaPeerComparison, eqaCounts, eqaSuggestTests, eqaRoundNumber,
+} = require('../../app-dist/main/domain/eqa/evaluation.js');
+const { mergeEqaSources, groupEqaSources, checkEqaImport, eqaPairKey, eqaDate } = require('../../app-dist/main/domain/eqa/import.js');
+
+test('E-01: |z| ≤ 2,0 chấp nhận, 2,0 < |z| < 3,0 cảnh báo, |z| ≥ 3,0 không chấp nhận', () => {
+  assert.equal(eqaClass(2), 'ok', '|z| = 2,00 là chấp nhận (công cụ cũ xếp nhầm cảnh báo)');
+  assert.equal(eqaClass(-2.004), 'ok', 'so trên z làm tròn 2 chữ số như báo cáo');
+  assert.equal(eqaClass(2.01), 'warn');
+  assert.equal(eqaClass(-2.99), 'warn');
+  assert.equal(eqaClass(3), 'rej');
+  assert.equal(eqaClass(-3.5), 'rej');
+  assert.equal(eqaZ(54.278, 55, 4.917).toFixed(4), '-0.1468');
+  assert.equal(eqaZ(1, 1, 0), null, 'σp phải dương');
+  assert.equal(eqaPct(110, 100), 10);
+  assert.equal(eqaPct(1, 0), null);
+});
+
+test('E-03: đối chiếu z với z trên báo cáo', () => {
+  assert.equal(eqaProviderCheck(0.147, 0.15), 'match', 'lệch do làm tròn của nhà cung cấp');
+  assert.equal(eqaProviderCheck(-0.147, 0.15), 'swapped');
+  assert.equal(eqaProviderCheck(0.5, 1.2), 'mismatch');
+  // E-14: trái dấu dù khác độ lớn vẫn là ngược chiều báo cáo, chặn dòng.
+  assert.equal(eqaProviderCheck(1.5, -1), 'swapped');
+  assert.equal(eqaProviderCheck(0.01, -0.5), 'mismatch', 'z tính lại gần 0 thì không xác định được chiều');
+  assert.equal(eqaProviderCheck(0.01, -0.01), 'match');
+  assert.equal(eqaProviderCheck(0.3, null), 'none');
+});
+
+test('so nhóm đồng đẳng, tỷ lệ chấp nhận, gợi ý xét nghiệm, số đợt', () => {
+  const [peer] = eqaPeerComparison(105, { instrument: { mean: 100, sd: 2.5, cv: 2.5, n: 30 } });
+  assert.deepEqual([peer.level, peer.sdi, peer.pct], ['instrument', 2, 5]);
+  assert.deepEqual(eqaCounts(['ok', 'ok', 'warn', 'rej']), { total: 4, ok: 2, warn: 1, rej: 1, acceptPct: 50 });
+  const catalog = [
+    { id: 'alt-au', name: 'ALT', display_name: '', standard_name: '', abbreviation: 'ALT', aliases: ['GPT'], instrument_id: 'au', instrument_name: 'AU5800', instrument_model: '', active: true },
+    { id: 'alt-dxc', name: 'ALT', display_name: '', standard_name: '', abbreviation: 'ALT', aliases: [], instrument_id: 'dxc', instrument_name: 'DxC 700', instrument_model: 'DxC700', active: true },
+    { id: 'ast-au', name: 'AST', display_name: '', standard_name: '', abbreviation: 'AST', aliases: [], instrument_id: 'au', instrument_name: 'AU5800', instrument_model: '', active: true },
+  ];
+  assert.deepEqual(eqaSuggestTests('ALT(GPT)', 'AU5800', catalog), ['alt-au']);
+  assert.deepEqual(eqaSuggestTests('ALT(GPT)', 'DxC700', catalog), ['alt-dxc'], 'so tên máy không phân biệt khoảng trắng');
+  assert.deepEqual(eqaSuggestTests('Calcium', 'AU5800', catalog), []);
+  assert.equal(eqaRoundNumber('ĐỢT 09'), 9);
+  assert.equal(eqaDate('2026-03-15T08:00:00Z'), '2026-03-15');
+  assert.equal(eqaDate('15/03/2026'), '', 'chỉ nhận ngày ISO');
+});
+
+test('gộp báo cáo từng máy của cùng đợt; báo cáo khác đợt bị từ chối', () => {
+  const round = { program: 'SINH HÓA', provider: 'TTKCXN', programCode: 'BC20C', unitCode: '10026', year: 2026, round: 'ĐỢT 09' };
+  const one = (instrument, over = {}) => ({ round: { ...round, ...over }, rows: [{ ref: instrument, code: 'ALT', instrument }], errors: [], warnings: [`${instrument}: cảnh báo`] });
+  const merged = mergeEqaSources([one('AU5800'), one('DxC700'), one('Cobas', { round: 'ĐỢT 08' })], ['au.pdf', 'dxc.pdf', 'cobas.pdf']);
+  assert.deepEqual(merged.rows.map((r) => r.instrument), ['AU5800', 'DxC700']);
+  assert.match(merged.errors[0], /cobas\.pdf: thuộc đợt khác/);
+  assert.equal(merged.warnings.length, 3);
+});
+
+test('nhập nhiều đợt: chia file theo đợt, xếp theo năm rồi số đợt, file lỗi thành nhóm riêng', () => {
+  const src = (round, year, instrument, rows = 1) => ({ round: { program: 'MC', provider: 'RIQAS', programCode: 'MC', unitCode: '231210.11', year, round },
+    rows: Array.from({ length: rows }, () => ({ ref: instrument, code: 'Na', instrument })), errors: [], warnings: [] });
+  const groups = groupEqaSources([
+    src('CYCLE 23 SAMPLE 2', 2026, 'EasyLyte'), src('CYCLE 22 SAMPLE 12', 2025, 'EasyLyte'),
+    src('CYCLE 23 SAMPLE 1', 2026, 'EasyLyte'), src('CYCLE 23 SAMPLE 1', 2026, 'Máy 2'), src('', null, '', 0),
+  ]);
+  assert.deepEqual(groups.map((g) => [g.round.round, g.indices]), [
+    ['', [4]], ['CYCLE 22 SAMPLE 12', [1]], ['CYCLE 23 SAMPLE 1', [2, 3]], ['CYCLE 23 SAMPLE 2', [0]],
+  ]);
+  assert.equal(groupEqaSources([src('ĐỢT 09', 2026, 'AU'), src('ĐỢT 09', 2025, 'AU')]).length, 2, 'khác năm là khác đợt');
+});
+
+const TESTS = [
+  { id: 'alt-au', name: 'ALT', display_name: '', standard_name: '', abbreviation: 'ALT', aliases: [], instrument_id: 'au', instrument_name: 'AU5800', instrument_model: '', active: true },
+  { id: 'ast-au', name: 'AST', display_name: '', standard_name: '', abbreviation: 'AST', aliases: [], instrument_id: 'au', instrument_name: 'AU5800', instrument_model: '', active: true },
+];
+const ROUND = { program: 'SINH HÓA', provider: 'TTKCXN', year: 2026, round: 'ĐỢT 01' };
+const row = (over) => ({ ref: 'r', code: 'ALT', instrument: 'AU5800', sample: 'S1', unit: 'U/L', result: 55, assigned: 54.278, sigmaP: 4.917, zProvider: 0.15, peer: {}, ...over });
+const ctx = (over = {}) => ({ tests: TESTS, mapping: new Map([[eqaPairKey('ALT', 'AU5800'), 'alt-au'], [eqaPairKey('AST', 'AU5800'), 'ast-au']]), ...over });
+
+test('kiểm một lần nhập: ánh xạ, trùng mẫu, z và xếp loại theo z nhà cung cấp (E-04)', () => {
+  const ok = checkEqaImport({ round: ROUND, rows: [row(), row({ code: 'AST', sample: 'S1', result: 40, assigned: 30, sigmaP: 3, zProvider: 3.33 })] }, ctx());
+  assert.equal(ok.blocking, 0, JSON.stringify(ok.rows.map((r) => r.errors)));
+  assert.equal(ok.rows[0].cls, 'ok');
+  assert.equal(ok.rows[1].cls, 'rej');
+  assert.equal(ok.rows[0].providerCheck, 'match');
+
+  const unmapped = checkEqaImport({ round: ROUND, rows: [row({ code: 'GLU' })] }, ctx());
+  assert.match(unmapped.rows[0].errors[0], /chưa ánh xạ/);
+  assert.deepEqual(unmapped.pairs.map((p) => [p.code, p.testId]), [['GLU', null]]);
+
+  const dup = checkEqaImport({ round: ROUND, rows: [row(), row({ ref: 'r2' })] }, ctx());
+  assert.match(dup.rows[1].errors[0], /trùng mẫu/);
+
+  const mismatch = checkEqaImport({ round: ROUND, rows: [row({ zProvider: 0.9 })] }, ctx());
+  assert.equal(mismatch.blocking, 0, 'lệch khác chỉ là cảnh báo');
+  assert.match(mismatch.rows[0].warnings[0], /lệch z trên báo cáo/);
+
+  const badRound = checkEqaImport({ round: { ...ROUND, year: 'x' }, rows: [row()] }, ctx());
+  assert.deepEqual(badRound.roundErrors, ['Năm ngoại kiểm không hợp lệ.']);
+});
+
+test('E-03: z tính lại ngược dấu z trên báo cáo là lỗi chặn của dòng đó', () => {
+  const flipped = checkEqaImport({ round: ROUND, rows: [row({ result: 54.278, assigned: 55 }), row({ code: 'AST', result: 40, assigned: 30, sigmaP: 3, zProvider: 3.33 })] }, ctx());
+  assert.equal(flipped.blocking, 1);
+  assert.match(flipped.rows[0].errors[0], /ngược dấu z trên báo cáo/);
+  assert.equal(flipped.rows[0].providerCheck, 'swapped');
+});
+
+test('tổng quan: máy chưa có báo cáo theo chương trình–năm, kể cả khi nhập đợt muộn trước', () => {
+  const { eqaMissingInstruments } = require('../../app-dist/main/domain/eqa/overview.js');
+  const round = (id, year, instrumentIds, status = 'open', programId = 'p1') => ({ id, programId, year, status, instrumentIds });
+  const missing = eqaMissingInstruments([
+    round('d09', 2026, ['au', 'dxc']),
+    round('d08', 2026, ['au']),
+    round('d07', 2026, [], 'cancelled'),
+    round('d12', 2025, ['c501']),
+    round('x01', 2026, ['easy'], 'open', 'p2'),
+  ]);
+  assert.deepEqual([...missing], [['d08', ['dxc']]], 'đợt 08 nhập sau đợt 09 vẫn báo thiếu DxC; đợt huỷ, năm khác, chương trình khác không tính');
+  // Đợt đã khai máy trong lịch: so với đúng danh sách đó, kể cả đợt duy nhất của năm.
+  const planned = eqaMissingInstruments([{ ...round('d01', 2027, ['au']), expectedIds: ['au', 'c501'] }, { ...round('d02', 2027, ['au', 'dxc']), expectedIds: ['au'] }]);
+  assert.deepEqual([...planned], [['d01', ['c501']]], 'máy cố ý bỏ ra khỏi đợt không bị báo thiếu');
+});

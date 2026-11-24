@@ -25,8 +25,10 @@ export interface WriteTx {
   /** Khai bảng (và xét nghiệm) vừa đổi; mỗi lời khai thành một `notifyChanged`
    * sau khi commit, giữ nguyên thứ tự — không gộp, vì renderer lọc theo
    * cặp bảng + xét nghiệm của từng lời báo. Thao tác chỉ ghi nhật ký (không
-   * đổi bảng dữ liệu nào) khai `tx.changed(['activity'])`. */
-  changed(tables: string[], testIds?: string[]): void;
+   * đổi bảng dữ liệu nào) khai `tx.changed(['activity'])`.
+   * `lots`: chỉ khai khi `qc_points` chỉ đổi ở đúng các số lô này (xem
+   * `MainChangedPayload`); không chắc thì bỏ trống. */
+  changed(tables: string[], testIds?: string[], lots?: string[]): void;
 }
 
 export interface WriteSteps {
@@ -75,10 +77,10 @@ function beginWrite(db: Db, name: string, actor: Actor) {
     commit<R>(work: (tx: WriteTx) => R): R {
       if (state.committed) violate('commit() chỉ được gọi một lần cho mỗi lần ghi.');
       let audited = 0;
-      const pending: Array<[string[], string[]]> = [];
+      const pending: Array<[string[], string[], string[] | undefined]> = [];
       const tx: WriteTx = {
         audit: (type, detail, target = '') => { writeAudit(db, actor, type, detail, target); audited++; },
-        changed: (tables, testIds = []) => { pending.push([tables, testIds]); },
+        changed: (tables, testIds = [], lots) => { pending.push([tables, testIds, lots]); },
       };
       const result = withTransaction(db, () => {
         const value = work(tx);
@@ -90,7 +92,7 @@ function beginWrite(db: Db, name: string, actor: Actor) {
       state.committed = true;
       // `['activity']` là lời khai "chỉ nhật ký đổi"; `writeAudit()` đã tự báo
       // bảng này, không báo lặp.
-      for (const [tables, testIds] of pending) if (!(tables.length === 1 && tables[0] === 'activity')) notifyChanged(tables, testIds);
+      for (const [tables, testIds, lots] of pending) if (!(tables.length === 1 && tables[0] === 'activity')) notifyChanged(tables, testIds, lots);
       return result;
     },
   };

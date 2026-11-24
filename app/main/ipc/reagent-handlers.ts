@@ -52,7 +52,7 @@ export function createReagentHandlers(db: Db) {
       db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
         VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
         .run(id, name, '', '', '', '', 'Mẫu bệnh nhân', unit, 6, 0.05, JSON.stringify(prepareReagentRows(null)));
-      tx.audit('Tạo phép so sánh hóa chất', `Tạo "${name}"`, name);
+      tx.audit('Tạo phép so sánh hoá chất', `Tạo "${name}"`, name);
       tx.changed(['reagent_tests']);
     });
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
@@ -79,7 +79,7 @@ export function createReagentHandlers(db: Db) {
     w.commit((tx) => {
       db.prepare(`UPDATE reagent_tests SET reagent=?,lot_old=?,lot_new=?,date=?,operator=?,sample_type=?,unit=?,bias_target=?,alpha=?,coverage_confirmed=? WHERE id=?`)
         .run(meta.reagent, meta.lotOld, meta.lotNew, meta.date, meta.operator, meta.sampleType, meta.unit, meta.biasTarget, meta.alpha, meta.coverageConfirmed ? 1 : 0, id);
-      tx.audit('Sửa thông tin so sánh hóa chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
+      tx.audit('Sửa thông tin so sánh hoá chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
       tx.changed(['reagent_tests']);
     });
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
@@ -95,7 +95,7 @@ export function createReagentHandlers(db: Db) {
     if (rowsJson === existing.rows_json) return w.noChange(toView(existing));
     w.commit((tx) => {
       db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run(rowsJson, id);
-      tx.audit('Sửa dữ liệu so sánh hóa chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
+      tx.audit('Sửa dữ liệu so sánh hoá chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
       tx.changed(['reagent_tests']);
     });
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
@@ -109,7 +109,7 @@ export function createReagentHandlers(db: Db) {
     if (count <= 1) return { ok: false, error: { code: 'last-comparison', message: 'Phải giữ lại ít nhất 1 phép so sánh.' } };
     w.commit((tx) => {
       db.prepare('DELETE FROM reagent_tests WHERE id=?').run(id);
-      tx.audit('Xóa phép so sánh hóa chất', `Xóa "${existing.reagent}"`, existing.reagent);
+      tx.audit('Xoá phép so sánh hoá chất', `Xoá "${existing.reagent}"`, existing.reagent);
       tx.changed(['reagent_tests']);
     });
     return { ok: true, data: { id } };

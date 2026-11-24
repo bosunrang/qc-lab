@@ -1,9 +1,10 @@
 // Tab "Nhóm lô đã dừng/lưu trữ" của trang Phân tích Westgard: phần chọn nằm
 // trong panel "Thiết lập phân tích", phần kết quả nằm bên dưới. Cả hai đọc
 // cùng trạng thái của `useArchivedWestgard`.
-import { QcMultiChart } from '../../components/QcChart';
+import { QcChartLegend, QcMultiChart } from '../../components/QcChart';
 import { EmptyState } from '../../components/EmptyState';
 import { WestgardPointTable, vnDate } from './shared';
+import { statText } from '../../lib/westgard-view';
 import type { ArchivedWestgardState } from './useArchivedWestgard';
 
 export function ArchivedGroupPicker({ state }: { state: ArchivedWestgardState }) {
@@ -15,22 +16,22 @@ export function ArchivedGroupPicker({ state }: { state: ArchivedWestgardState })
     <>
       <div className="wg-test-picker wg-test-picker-3">
         <div className="field">
-          <label>Tìm nhanh</label>
-          <input type="search" placeholder="Tên xét nghiệm hoặc số lô..." value={archivedQuery} onChange={(e) => setArchivedQuery(e.target.value)} />
+          <label htmlFor="wg-archived-search">Tìm nhanh</label>
+          <input id="wg-archived-search" type="search" placeholder="Tên xét nghiệm hoặc số lô..." value={archivedQuery} onChange={(e) => setArchivedQuery(e.target.value)} />
         </div>
-        <div className="field"><label>Chọn xét nghiệm <span className="hint">({archivedMatchedTests.length || archivedOrderedTests.length}/{archivedOrderedTests.length})</span></label>
-          <select value={archivedTestId} disabled={archivedTestsLoading || !archivedTestOptions.length} onChange={(e) => setArchivedTestId(e.target.value)}>
+        <div className="field"><label htmlFor="wg-archived-test">Chọn xét nghiệm <span className="hint">({archivedMatchedTests.length || archivedOrderedTests.length}/{archivedOrderedTests.length})</span></label>
+          <select id="wg-archived-test" value={archivedTestId} disabled={archivedTestsLoading || !archivedTestOptions.length} onChange={(e) => setArchivedTestId(e.target.value)}>
             {!archivedTestOptions.length && <option value="">{archivedTestsLoading ? 'Đang nạp xét nghiệm...' : 'Nhóm lô này chưa dùng cho xét nghiệm nào'}</option>}
             {archivedTestOptions.map((t) => <option key={t.id} value={t.id}>{archivedTestPickerLabel(t)}</option>)}
           </select>
         </div>
-        <div className="field"><label>Nhóm lô đã dừng/lưu trữ <span className="hint">({archivedGroupOptions.length}/{archivedGroups.length})</span></label>
-          <select value={archivedGroupId} onChange={(e) => setArchivedGroupId(e.target.value)}>
+        <div className="field"><label htmlFor="wg-archived-group">Nhóm lô đã dừng/lưu trữ <span className="hint">({archivedGroupOptions.length}/{archivedGroups.length})</span></label>
+          <select id="wg-archived-group" value={archivedGroupId} onChange={(e) => setArchivedGroupId(e.target.value)}>
             {archivedGroupOptions.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.active === 0 ? 'đã lưu trữ' : 'đã dừng'}{g.stopped_at ? ` ${vnDate(g.stopped_at)}` : ''}</option>)}
           </select>
         </div>
       </div>
-      <p className="hint wg-archive-note">Ưu tiên Mean/SD lưu tại từng điểm QC, dùng dải lịch sử của lô khi điểm cũ chưa có snapshot; kết luận được đánh giá lại theo bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô còn hoạt động.</p>
+      <p className="hint wg-archive-note">Dùng Mean/SD lưu tại từng điểm QC; điểm cũ chưa lưu thì dùng dải lịch sử của lô. Kết luận tính lại theo bộ luật Westgard đang bật, không theo cấu hình lúc nhóm lô còn hoạt động.</p>
     </>
   );
 }
@@ -58,9 +59,10 @@ export function ArchivedGroupResults({ state }: { state: ArchivedWestgardState }
       {archivedTestId && archivedBlocks.length >= 2 && (
         <div className="panel wg-multi-panel">
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
-          <div className="hint wg-panel-intro">Biểu đồ quy đổi từng mức về Z-score theo Mean/SD đã chốt của chính lô để so sánh trên cùng trục; kết luận được đánh giá lại theo bộ luật Westgard đang bật.</div>
+          <div className="hint wg-panel-intro">Các mức quy về Z-score theo Mean/SD đã chốt của lô; kết luận tính lại theo bộ luật Westgard đang bật.</div>
           <div className="chart-scroll"><QcMultiChart className="wgLJMultiArchived" height={300} responsiveHeight decimals={archivedDecimals}
             series={archivedBlocks.map((b) => ({ level: b.level, lot: b.lotNo, points: b.analysis.points }))} /></div>
+          <QcChartLegend />
         </div>
       )}
 
@@ -68,12 +70,12 @@ export function ArchivedGroupResults({ state }: { state: ArchivedWestgardState }
         <div className={`panel wg-level-panel${b.analysis.points.length ? ' wg-prev-lot' : ''}`} key={`${b.level}-${b.lotId}`}>
           <h3>
             <div className="wg-level-title"><span>Mức {b.level}</span><span className="wg-lot-name">Lô {b.lotNo}</span></div>
-            <div className="wg-level-meta"><span className="tag rej">{archivedStatusLabel}</span><span>Mean {b.mean.toFixed(archivedDecimals)}</span><span>SD {b.sd.toFixed(archivedDecimals)}</span><span>{b.analysis.points.length} điểm</span></div>
+            <div className="wg-level-meta"><span className="tag rej">{archivedStatusLabel}</span><span>Mean {statText(b.mean, archivedDecimals)}</span><span>SD {statText(b.sd, archivedDecimals)}</span><span>{b.analysis.points.length} điểm</span></div>
           </h3>
           {!b.analysis.points.length ? (
             <EmptyState title="Chưa có dữ liệu">Không tìm thấy điểm QC nào cho lô này.</EmptyState>
           ) : (
-            <WestgardPointTable points={b.analysis.points} decimals={archivedDecimals} />
+            <WestgardPointTable points={b.analysis.points} decimals={archivedDecimals} label={`mức ${b.level} lô ${b.lotNo}`} />
           )}
         </div>
       ))}

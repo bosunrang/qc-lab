@@ -2,9 +2,14 @@
 // boolean bật/tắt; ghi đè riêng xét nghiệm có đủ ba hành động:
 // không dùng / cảnh báo / loại bỏ. Boolean cũ vẫn được đọc để dữ liệu đã lưu
 // trước khi nâng cấp không bị mất nghĩa.
-import { WG_DEFAULT_ON, WG_RULES, WG_RULE_BY_ID, allowedRuleScopes, defaultRuleAction, defaultRuleScope, isAllowedRuleScope, type RuleScope } from './westgard-rules';
+import { WG_RULES, WG_RULE_BY_ID, allowedRuleScopes, defaultRuleAction, defaultRuleScope, isAllowedRuleScope, ruleDefaultOn, type RuleScope } from './westgard-rules';
 
 export type RuleAction = 'inactive' | 'alert' | 'reject';
+
+/** Mọi thay đổi cấu hình luật chỉ áp cho lần chạy nhập sau thời điểm đổi
+ * (GV2, `db/rule-config-history.ts`). Câu này đi vào nhật ký và lời nhắc ở
+ * các màn hình cấu hình luật. */
+export const NOT_RETROACTIVE_NOTE = 'Áp dụng cho các lần chạy nhập sau thời điểm này; kết luận của các lần chạy đã có giữ nguyên.';
 export type RuleActionsMap = Record<string, boolean | RuleAction>;
 
 export function isRuleAction(value: unknown): value is RuleAction {
@@ -35,18 +40,20 @@ export function serializeRuleActions(overrides: RuleActionsMap): string {
  *      modal "Sửa xét nghiệm" của trang Cấu hình chung;
  *   2. Cấu hình CHUNG toàn phòng xét nghiệm (`app_meta.westgardRules`) —
  *      chỉnh ở panel "Cấu hình chung của luật" trên trang Phân tích Westgard;
- *   3. Mặc định của `WG_RULE_REGISTRY` (`defaultOn`).
+ *   3. Mặc định của `WG_RULE_REGISTRY` (`defaultOn`) theo số mức QC đang vận
+ *      hành của xét nghiệm (WG-26).
  * Trước đây app chỉ có tầng 1: checkbox trên trang Westgard ghi thẳng vào
  * `rule_actions_json` của RIÊNG xét nghiệm đang chọn, trong khi cấu hình
  * chung phải đổi MẶC ĐỊNH CHO MỌI XÉT NGHIỆM — sai hẳn phạm vi tác động. */
-export function makeIsOnLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap): (ruleId: string) => boolean {
-  const actionOf = makeRuleActionLayered(globalRules, overrides);
+export function makeIsOnLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap, levelCount: number): (ruleId: string) => boolean {
+  const actionOf = makeRuleActionLayered(globalRules, overrides, levelCount);
   return (ruleId: string) => actionOf(ruleId) !== 'inactive';
 }
 
 /** Phân giải đúng thứ tự: hành động riêng của xét nghiệm → trạng thái
- * chung → mặc định registry. `true` cũ mang hành động mặc định của luật. */
-export function makeRuleActionLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap): (ruleId: string) => RuleAction {
+ * chung → mặc định registry theo `levelCount` mức QC đang vận hành. `true`
+ * cũ mang hành động mặc định của luật. */
+export function makeRuleActionLayered(globalRules: RuleActionsMap, overrides: RuleActionsMap, levelCount: number): (ruleId: string) => RuleAction {
   return (ruleId: string) => {
     const override = overrides[ruleId];
     if (isRuleAction(override)) return override;
@@ -54,17 +61,20 @@ export function makeRuleActionLayered(globalRules: RuleActionsMap, overrides: Ru
     const shared = globalRules[ruleId];
     if (isRuleAction(shared)) return shared;
     if (typeof shared === 'boolean') return defaultRuleAction(ruleId, shared);
-    return defaultRuleAction(ruleId, WG_DEFAULT_ON.has(ruleId));
+    return defaultRuleAction(ruleId, ruleDefaultOn(ruleId, levelCount));
   };
 }
 
 /** Danh sách trạng thái luật CHUNG (không tính ghi đè theo xét nghiệm) — panel
- * "Cấu hình chung của luật" của trang Westgard hiển thị đúng tầng này. */
-export function globalRuleList(globalRules: RuleActionsMap): { id: string; on: boolean }[] {
-  const actionOf = makeRuleActionLayered(globalRules, {});
+ * "Cấu hình chung của luật" của trang Westgard hiển thị đúng tầng này, cho
+ * `levelCount` mức QC của xét nghiệm đang xem. `custom`: phòng xét nghiệm đã
+ * đặt riêng luật này ở cấu hình chung, không còn theo mặc định số mức. */
+export function globalRuleList(globalRules: RuleActionsMap, levelCount: number): { id: string; on: boolean; custom: boolean }[] {
+  const actionOf = makeRuleActionLayered(globalRules, {}, levelCount);
   return WG_RULES.map(id => ({
     id,
     on: actionOf(id) !== 'inactive',
+    custom: Object.hasOwn(globalRules, id),
   }));
 }
 
@@ -114,14 +124,17 @@ export function effectiveRuleConfigList(
   const scopeOf = makeScopeOf(overrides, levelCount);
   // `defaultAction` = phân giải KHI xét nghiệm không có ghi đè riêng, nên
   // truyền `{}` ở tham số overrides — đúng thứ ô "Theo cấu hình chung" hứa.
-  const defaultActionOf = makeRuleActionLayered(globalRules, {});
-  const actionOf = makeRuleActionLayered(globalRules, actionOverrides);
+  const defaultActionOf = makeRuleActionLayered(globalRules, {}, levelCount);
+  const actionOf = makeRuleActionLayered(globalRules, actionOverrides, levelCount);
   return WG_RULES.map(id => ({
     id,
     scope: scopeOf(id),
     scopeMin: WG_RULE_BY_ID[id]?.scopeMin ?? 2,
     desc: WG_RULE_BY_ID[id]?.desc ?? '',
-    allowedScopes: allowedRuleScopes(id),
+    // Chỉ phạm vi chạy được với số mức hiện tại (N7). `scope` vẫn là phạm vi
+    // đang áp, kể cả phạm vi cũ không còn chạy được: đổi nó là việc của người
+    // dùng, ghi phiên bản cấu hình mới, không tự sửa ngược (GV2).
+    allowedScopes: allowedRuleScopes(id, levelCount),
     defaultScope: defaultRuleScope(id, levelCount),
     defaultAction: defaultActionOf(id),
     action: actionOf(id),

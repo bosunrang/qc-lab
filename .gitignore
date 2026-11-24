@@ -1,9 +1,13 @@
 # Generated test and tooling output
 dist/
+dist-issuer/
 # Đầu ra của `npm run build` (package.json's `main` trỏ vào đây).
 app-dist/
 .cache/
 .tmp-edits/
+# Dữ liệu mẫu xuất ra và tệp kiểm tra tạm tại máy.
+/output/
+/tmp/
 *.log
 *.tmp
 *.bak
@@ -11,6 +15,10 @@ app-dist/
 *.rej
 # Local dependency/install artifacts
 node_modules/
+# Khoá cấp phép chỉ thuộc máy của bên phát hành, không được đưa lên GitHub.
+*.private.pem
+license-private.pem
+/license-issuer/
 
 # Editor and operating-system metadata
 .DS_Store
@@ -24,3 +32,6 @@ Thumbs.db
 
 # Biên bản thẩm định do `npm run validate` sinh ra
 validation-output/
+
+# Bộ PDF mẫu ngoại kiểm sinh để thử tay, không phải nguồn
+/mau-ngoai-kiem/

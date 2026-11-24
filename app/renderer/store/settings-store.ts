@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   LabProfile, IpcResult, LisGatewaySettings, LisQueueRecord, FirebaseSettings,
   FirebaseConnectResult, FirebaseSyncResult, StorageInfo, BackupFileSummary,
+  BackupStatus, OperationModeState,
 } from '../../shared/qc-api';
 
 /** Trang Cài đặt gom 5 nhóm dữ liệu backend độc lập: hồ sơ đơn vị, dung
@@ -23,7 +24,7 @@ import type {
 interface SettingsState {
   profile: LabProfile | null;
   storage: StorageInfo | null;
-  backup: { lastBackupAt: string | null; lastBackupBytes: number } | null;
+  backup: BackupStatus | null;
   lis: LisGatewaySettings | null;
   lisQueue: { pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null;
   firebase: FirebaseSettings | null;
@@ -37,8 +38,9 @@ interface SettingsState {
   loadBackupStatus: () => Promise<void>;
   exportBackup: () => Promise<IpcResult<{ path: string; bytes: number; points: number } | null>>;
   chooseBackupFile: () => Promise<IpcResult<BackupFileSummary | null>>;
-  importBackup: () => Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
+  importBackup: (keepAccounts: boolean) => Promise<IpcResult<{ preRestoreSnapshotPath: string; signedOut?: boolean }>>;
   resetOperationalData: () => Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
+  enableOperationMode: () => Promise<IpcResult<OperationModeState>>;
 
   loadLis: () => Promise<void>;
   saveLis: (data: { enabled: boolean; url: string; token: string }) => Promise<IpcResult<LisGatewaySettings>>;
@@ -84,15 +86,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     return result;
   },
   chooseBackupFile: async () => window.qcApi.chooseBackupFile(),
-  importBackup: async () => {
-    const result = await window.qcApi.importBackup();
+  importBackup: async (keepAccounts) => {
+    const result = await window.qcApi.importBackup({ keepAccounts });
     // Phục hồi thay gần như MỌI bảng: nạp lại cả hồ sơ đơn vị lẫn dung lượng.
-    if (result.ok) await get().loadAll();
+    // Main đã kết thúc phiên (`signedOut`) thì không nạp: các kênh đọc sẽ ném
+    // "Chưa đăng nhập." và nuốt mất kết quả có đường dẫn bản an toàn.
+    if (result.ok && !result.data.signedOut) await get().loadAll();
     return result;
   },
   resetOperationalData: async () => {
     const result = await window.qcApi.resetOperationalData();
     if (result.ok) await get().loadAll();
+    return result;
+  },
+  enableOperationMode: async () => {
+    const result = await window.qcApi.enableOperationMode();
+    if (result.ok) await get().loadBackupStatus();
     return result;
   },
 

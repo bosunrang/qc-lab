@@ -3,12 +3,14 @@
 // (`store:changed` — thông báo làm mới theo phạm vi cho renderer). Các handler
 // nghiệp vụ dùng chung phần này để tránh lặp lại cùng một cách khai báo.
 import type { Db } from '../db/sqlite-like';
-// `{id: unknown, ...}` nên renderer nhận `unknown` cho mọi trường.
-import type { ActivityEntry } from '../../shared/qc-api';
 import { uid } from '../domain/text-utils';
 import { auditEntryHash } from '../domain/audit-chain';
 import { canWriteRole, isAdminRole } from '../domain/page-roles';
+import { hasUserCapability, parseUserCapabilities, QC_CONFIG_DENIED_MESSAGE } from '../domain/capabilities';
 import { withTransaction } from '../db/transaction';
+import { rowToAuditEntry } from '../db/audit-row';
+
+export { rowToAuditEntry };
 
 export interface Actor { userId: string; username: string; name: string; role: string; clientId: string }
 
@@ -40,14 +42,9 @@ let broadcastWindow: BroadcastTarget | null = null;
 let cloudChangeNotifier: (() => void) | null = null;
 let lanChangeNotifier: ((payload: StoreChangedPayload) => void) | null = null;
 
-/** Giới hạn vận hành: không để bảng nhật ký sống phình vô hạn.
- * Người dùng vẫn có đường lưu trữ thủ công có CSV; xoay vòng chỉ là phao an
- * toàn khi thao tác đó bị bỏ quên. */
-export const AUDIT_HARD_CAP = 50_000;
-export const AUDIT_ROTATE_TO = 40_000;
-
-/** Neo hash của phần nhật ký đã bị lưu trữ/xoay vòng. Cả hai đường cắt đều
- * dùng chung một thao tác upsert để không lệch tên khoá trong `app_meta`. */
+/** Neo hash của phần nhật ký đã được lưu trữ. Chỉ "Lưu trữ nhật ký cũ" (có
+ * xuất CSV trước) mới cắt bảng `activity`; app không tự xoá dòng nào khi bảng
+ * lớn (ISO 15189:2022 8.4.3) — xem `AUDIT_SIZE_WARNING_ROWS`. */
 export function setActivityAnchor(db: Db, hash: string): void {
   db.prepare("INSERT INTO app_meta(key,value) VALUES('activityAnchor',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(hash);
 }
@@ -65,10 +62,15 @@ export function setLanChangeNotifier(notifier: ((payload: StoreChangedPayload) =
 
 export interface StoreChangedPayload { tables: string[]; testIds: string[] }
 
-const changeListeners = new Set<(payload: StoreChangedPayload) => void>();
+/** Lời báo mà bộ nhớ đệm trong main nhận: thêm `lots` — số lô duy nhất bị
+ * đổi trong `qc_points` khi người ghi biết chắc (vd nhập một điểm). Không
+ * gửi ra renderer/LAN; thiếu `lots` nghĩa là "không biết lô nào". */
+export interface MainChangedPayload extends StoreChangedPayload { lots?: string[] }
+
+const changeListeners = new Set<(payload: MainChangedPayload) => void>();
 /** Nghe mọi lời báo `notifyChanged` ngay trong main (vd bộ nhớ đệm tóm tắt
  * Westgard). Trả hàm huỷ đăng ký. */
-export function addChangeListener(listener: (payload: StoreChangedPayload) => void): () => void {
+export function addChangeListener(listener: (payload: MainChangedPayload) => void): () => void {
   changeListeners.add(listener);
   return () => { changeListeners.delete(listener); };
 }
@@ -76,11 +78,12 @@ export function addChangeListener(listener: (payload: StoreChangedPayload) => vo
 /** Báo renderer các bảng nào vừa đổi (+ testId liên quan nếu có) để từng
  * store tự quyết định có refetch không — thay "fetch 1 lần khi mount" cũ.
  * Renderer lọc theo `tables`/`testIds` ở `useStoreInvalidation()`, không lọc
- * ở đây — main không cần biết trang nào đang mở. */
-export function notifyChanged(tables: string[], testIds: string[] = []): void {
+ * ở đây — main không cần biết trang nào đang mở. `lots` chỉ đến bộ nhớ
+ * đệm trong main (xem `MainChangedPayload`). */
+export function notifyChanged(tables: string[], testIds: string[] = [], lots?: string[]): void {
   // Bộ nhớ đệm trong main nghe TRƯỚC, kể cả khi chưa có cửa sổ (test, lúc
   // khởi động): dữ liệu đã đổi thì kết quả giữ lại phải bỏ, dù ai đang xem.
-  for (const listener of changeListeners) listener({ tables, testIds });
+  for (const listener of changeListeners) listener(lots ? { tables, testIds, lots } : { tables, testIds });
   if (!broadcastWindow || broadcastWindow.isDestroyed?.()) return;
   const payload: StoreChangedPayload = { tables, testIds };
   broadcastWindow.webContents.send('store:changed', payload);
@@ -110,21 +113,19 @@ export function requireAdmin(actor: Actor): PermissionDenied | null {
   return { ok: false, error: { code: 'forbidden', message: 'Chỉ quản trị mới được thực hiện thao tác này.' } };
 }
 
-/** SQLite trả cột snake_case (`prev_hash`, `user_id`...) — chuyển về camelCase
- * đúng shape `AuditEntry` mà audit-chain.ts (hash/verify/relink) mong đợi.
- * Đây là ranh giới DUY NHẤT cần ánh xạ; mọi nơi khác đọc activity qua hàm
- * này, không tự SELECT * rồi dùng thẳng. */
-export function rowToAuditEntry(row: Record<string, unknown>): ActivityEntry {
-  return {
-    id: String(row.id ?? ''), seq: Number(row.seq ?? 0), ts: String(row.ts ?? ''),
-    user: String(row.user ?? ''), username: String(row.username ?? ''),
-    userId: String(row.user_id ?? ''), role: String(row.role ?? ''), type: String(row.type ?? ''),
-    detail: String(row.detail ?? ''), target: String(row.target ?? ''),
-    clientId: String(row.client_id ?? ''), prevHash: String(row.prev_hash ?? ''), hash: String(row.hash ?? ''),
+/** Cổng `qc.config` cho `writeCommand()`. `Actor` không mang capability nên
+ * đọc thẳng `users.capabilities_json` ngay lúc gọi: quyền vừa bị thu hồi có
+ * hiệu lực ở lần ghi kế tiếp, không chờ đăng nhập lại. */
+export function requireQcConfig(db: Db): (actor: Actor) => PermissionDenied | null {
+  return (actor) => {
+    if (isAdminRole(actor.role)) return null;
+    const row = db.prepare('SELECT capabilities_json FROM users WHERE id=? AND active<>0').get(actor.userId) as { capabilities_json: string } | undefined;
+    if (hasUserCapability({ role: actor.role, capabilities: parseUserCapabilities(row?.capabilities_json) }, 'qc.config')) return null;
+    return { ok: false, error: { code: 'forbidden-qc-config', message: QC_CONFIG_DENIED_MESSAGE } };
   };
 }
 
-function insertAudit(db: Db, actor: Actor, type: string, detail: string, target = ''): { seq: number } {
+function insertAudit(db: Db, actor: Actor, type: string, detail: string, target = ''): void {
   const row = db.prepare('SELECT hash FROM activity ORDER BY seq DESC LIMIT 1').get() as { hash: string } | undefined;
   const seqRow = db.prepare('SELECT COALESCE(MAX(seq),0) as maxSeq FROM activity').get() as { maxSeq: number };
   const entry = {
@@ -140,36 +141,12 @@ function insertAudit(db: Db, actor: Actor, type: string, detail: string, target 
       userId: entry.userId, role: entry.role, type: entry.type, detail: entry.detail, target: entry.target,
       clientId: entry.clientId, prevHash: entry.prevHash, hash: entry.hash,
     });
-  return { seq: entry.seq };
-}
-
-/** Cắt mềm nhật ký vượt ngưỡng, giữ anchor ở hash cuối của phần bị gỡ. Hàm
- * này không gọi `writeAudit()` để tránh đệ quy; thay vào đó ghi đúng một dòng
- * giải thích sau khi cắt. */
-function rotateAuditOverflow(db: Db, actor: Actor): void {
-  const count = Number((db.prepare('SELECT COUNT(*) AS n FROM activity').get() as { n: number }).n);
-  if (count <= AUDIT_HARD_CAP) return;
-  const dropCount = count - AUDIT_ROTATE_TO;
-  const dropped = db.prepare(`SELECT id,hash FROM activity ORDER BY seq ASC LIMIT ${dropCount}`).all() as { id: string; hash: string }[];
-  const tipHash = [...dropped].reverse().find((row) => row.hash)?.hash || '';
-  if (!dropped.length) return;
-  const placeholders = dropped.map(() => '?').join(',');
-  db.prepare(`DELETE FROM activity WHERE id IN (${placeholders})`).run(...dropped.map((row) => row.id));
-  setActivityAnchor(db, tipHash);
-  insertAudit(db, actor, 'Xoay vòng nhật ký hoạt động',
-    `Nhật ký vượt ${AUDIT_HARD_CAP} dòng: tự động loại ${dropped.length} dòng cũ nhất, giữ lại ${AUDIT_ROTATE_TO} dòng mới nhất (không xuất CSV). Hash đỉnh phần đã loại: ${tipHash || '—'}. Nên dùng "Lưu trữ nhật ký cũ" để có file CSV trước khi cắt.`, 'Nhật ký');
 }
 
 export function writeAudit(db: Db, actor: Actor, type: string, detail: string, target = ''): void {
-  // Thêm dòng và (khi vượt ngưỡng) xoay vòng là một đơn vị: xoá dòng cũ mà
-  // không cập nhật anchor thì chuỗi hash báo sai ngay dòng đầu.
-  withTransaction(db, () => {
-    const entry = insertAudit(db, actor, type, detail, target);
-    // Trước ngưỡng không truy vấn COUNT(*) ở mỗi thao tác. Sau khi seq đã lớn,
-    // chỉ khi bảng thực sự vượt ngưỡng mới cắt; archive có thể làm seq cao mà
-    // bảng nhỏ, khi đó phép đếm rẻ này chỉ là kiểm tra phòng thủ.
-    if (entry.seq > AUDIT_HARD_CAP) rotateAuditOverflow(db, actor);
-  });
+  // Đọc hash/seq cuối và chèn dòng mới là một đơn vị, để hai lần ghi không
+  // cùng nối vào một dòng trước.
+  withTransaction(db, () => insertAudit(db, actor, type, detail, target));
   notifyChanged(['activity']);
   cloudChangeNotifier?.();
 }

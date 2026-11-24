@@ -118,7 +118,7 @@ const defaultPerms = await auth.createUser({
   data: { username: 'kts5', name: 'Pham Van D', role: 'viewer', password: 'mat-khau-kts5-1' },
 }, secondAdminActor);
 assert.equal(defaultPerms.ok, true);
-assert.deepEqual(defaultPerms.data.pagePerms, ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'report']);
+assert.deepEqual(defaultPerms.data.pagePerms, ['dash', 'entry', 'westgard', 'sigma', 'reagent', 'eqa', 'report']);
 
 const narrowed = auth.updateUser({ id: withPerms.data.id, data: { name: 'Nguyen Thi Lan', role: 'technician', active: true, pagePerms: ['report'] } }, secondAdminActor);
 assert.equal(narrowed.ok, true);

@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
+import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -75,4 +76,29 @@ test('Lưu trữ nhật ký khi chưa có dòng nào đủ cũ; Mean/SD dự ki�
   assert.equal(archived.removedCount, 0);
   const planned = expectNoChange(ctx, 'savePlannedTargets bỏ mục không tồn tại', () => ctx.config.savePlannedTargets({ remove: [{ testId: 'khong-co', level: 1, qcLotId: 'khong-co' }] }, admin));
   assert.deepEqual(planned, { saved: 0, removed: 0 });
+});
+
+test('Nhập QC: rời ô ghi chú mà không sửa gì, kể cả khi tháng đã khoá', () => {
+  const ctx = setup();
+  const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.js');
+  const entry = createEntryHandlers(ctx.db);
+  const instrument = ctx.config.saveInstrument({ data: { name: 'Máy C' } }, admin).data;
+  const t = ctx.config.saveTest({ data: { name: 'Glucose ghi chú', instrumentId: instrument.id } }, admin).data;
+  ctx.config.saveTestLevel({ testId: t.id, data: { level: 1, mean: 10, sd: 1 } }, admin);
+  makeOperationalQc(ctx.db, { testId: t.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
+  assert.equal(entry.addPoint({ data: { testId: t.id, level: 1, date: '2026-08-03', val: 10.2 } }, admin).ok, true);
+  assert.equal(entry.setDayNote({ data: { testId: t.id, date: '2026-08-03', note: 'Thay cuvette' } }, admin).ok, true);
+  expectNoChange(ctx, 'setDayNote cùng ghi chú', () => entry.setDayNote({ data: { testId: t.id, date: '2026-08-03', note: '  Thay cuvette ' } }, admin));
+  ctx.db.prepare("INSERT INTO period_locks(id,ym,locked_at,locked_by,note) VALUES ('lock-08','2026-08','2026-09-01T00:00:00Z','admin','')").run();
+  expectNoChange(ctx, 'setDayNote cùng ghi chú ở tháng đã khoá', () => entry.setDayNote({ data: { testId: t.id, date: '2026-08-03', note: 'Thay cuvette' } }, admin));
+  assert.equal(entry.setDayNote({ data: { testId: t.id, date: '2026-08-03', note: 'Khác' } }, admin).error?.code, 'period-locked', 'sửa thật ở tháng khoá vẫn bị chặn');
+});
+
+test('Six Sigma: rời ô EFLM mà không sửa gì', () => {
+  const ctx = setup();
+  const instrument = ctx.config.saveInstrument({ data: { name: 'Máy D' } }, admin).data;
+  const t = ctx.config.saveTest({ data: { name: 'Cholesterol', instrumentId: instrument.id } }, admin).data;
+  assert.equal(ctx.sigma.saveTeaConfig({ testId: t.id, source: 'eflm', tea: 8, eflmAnalyte: 'Cholesterol', eflmRef: 'EFLM' }, admin).ok, true);
+  expectNoChange(ctx, 'saveTeaConfig cùng giá trị', () => ctx.sigma.saveTeaConfig({ testId: t.id, source: 'eflm', eflmAnalyte: 'Cholesterol' }, admin));
+  expectNoChange(ctx, 'saveTeaConfig cùng link', () => ctx.sigma.saveTeaConfig({ testId: t.id, source: 'eflm', eflmRef: 'EFLM' }, admin));
 });

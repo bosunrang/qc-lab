@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/auth-store';
+import { ImagePlusIcon } from './BtnIcons';
 import { Modal } from './Modal';
 
 const AVATAR_SIZE = 160;
 
-export function AvatarModal({ onClose }: { onClose: () => void }) {
+export function AvatarModal({ initials, onClose }: { initials: string; onClose: () => void }) {
   const { user, setAvatar, clearAvatar } = useAuthStore(useShallow((s) => ({ user: s.user, setAvatar: s.setAvatar, clearAvatar: s.clearAvatar })));
-  const [fileName, setFileName] = useState('Chưa chọn ảnh nào');
+  const [fileName, setFileName] = useState('Chưa chọn tệp');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -47,15 +48,18 @@ export function AvatarModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Ảnh đại diện" onClose={onClose}
-      footer={<><button type="button" className="btn ghost" disabled={busy || !user?.avatar} onClick={clear}>Xóa ảnh</button><button type="button" className="btn teal" onClick={onClose}>Đóng</button></>}>
+    <Modal title="Ảnh đại diện" onClose={onClose} guardUnsaved={false}
+      footer={<><button type="button" className="btn ghost" disabled={busy || !user?.avatar} onClick={clear}>Xoá ảnh</button><button type="button" className="btn teal" onClick={onClose}>Đóng</button></>}>
       <div className="avatar-modal-preview">
-        {user?.avatar ? <img src={user.avatar} alt="Ảnh đại diện" /> : <div className="avatar-modal-initial">{(user?.name || user?.username || 'U').trim().charAt(0).toUpperCase() || 'U'}</div>}
+        {user?.avatar ? <img src={user.avatar} alt="Ảnh đại diện" /> : <div className="avatar-modal-initial">{initials}</div>}
       </div>
       <div className="field">
         <label htmlFor="avatarPick">Chọn ảnh mới</label>
         <div className="file-pick">
-          <button type="button" className="btn ghost sm" disabled={busy} onClick={() => inputRef.current?.click()}>Chọn tệp</button>
+          <button type="button" className="btn ghost" disabled={busy} onClick={() => inputRef.current?.click()}>
+            <ImagePlusIcon />
+            Chọn tệp
+          </button>
           <span className="hint">{fileName}</span>
         </div>
         <input ref={inputRef} id="avatarPick" type="file" accept="image/*" style={{ display: 'none' }} aria-label="Chọn ảnh đại diện mới" onChange={pick} />

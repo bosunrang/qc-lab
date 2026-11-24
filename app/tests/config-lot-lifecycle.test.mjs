@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { makeOperationalQc } from './helpers/operational-fixture.mjs';
+import { seedParallelRun } from './helpers/parallel-run.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -79,7 +80,7 @@ assert.equal(entry.queryPoints(test.id, 1).every((point) => point.lot === 'L-MOI
 
 // Kỳ đã khoá vẫn được đếm và báo rõ (đổi nhãn lô là thao tác được PHÉP, khác
 // xoá xét nghiệm — nhưng người dùng phải biết nó chạm vào kỳ đã chốt).
-report.lockPeriod({ data: { ym: '2026-03', note: 'chot ky' } }, actor);
+report.lockPeriod({ data: { ym: '2026-03', note: 'chot ky', acknowledge: true } }, actor);
 const previewLocked = config.previewLotRename({ id: lotOld.id, lotNo: 'L-BA' });
 assert.equal(previewLocked.data.rename.affected, 2);
 assert.equal(previewLocked.data.rename.lockedCount, 2, 'phai dem duoc diem thuoc ky da khoa');
@@ -181,6 +182,8 @@ assert.equal(config.listLotTransitions().length, 1, 'khong duoc sinh them ho so'
 // (2026-09-03): status đi kèm createLotTransition, không phải
 // hàm riêng — không cần gửi lại `criteria` vì hồ sơ đã giữ criteria_json từ
 // lần sửa trước, và status thiếu thì giữ nguyên (ở đây gửi rõ 'accepted').
+// Cổng N12: lô mới phải chạy song song đủ dữ liệu trước khi chấp nhận.
+seedParallelRun(db, { transitionId: created.data.id, testId: test.id, level: 1, lotNo: 'CAND-1', mean: 212, sd: 4.2, start: '2026-04-05' });
 const accepted = config.createLotTransition({ id: created.data.id, data: { panelId: panel.id, fromLotId: runningLot.id, toLotId: candidateLot.id, startDate: '2026-04-05', note: 'da sua', status: 'accepted', criteria: [{ testId: test.id, level: 1, mean: 212, sd: 4.2 }] } }, actor);
 assert.equal(accepted.ok, true);
 assert.equal(accepted.data.status, 'accepted');
@@ -246,9 +249,11 @@ const groupLotB = config.saveLot({ data: { lotNo: 'GRP-B', level: 1 } }, actor).
 const lotGroup = config.saveLotGroup({ data: { name: 'Nhóm GRP', lotIds: [groupLotA.id, groupLotB.id] } }, actor).data;
 config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 90, sd: 2, qcLotId: groupLotA.id } }, actor);
 const groupLotC = config.saveLot({ data: { lotNo: 'GRP-C', level: 1 } }, actor).data;
-const groupTransition = config.createLotTransition({
-  data: { panelId: panel.id, fromLotId: groupLotA.id, toLotId: groupLotC.id, status: 'accepted', criteria: [{ testId: test.id, level: 1, mean: 95, sd: 2.5 }] },
-}, actor);
+const groupData = { panelId: panel.id, fromLotId: groupLotA.id, toLotId: groupLotC.id, criteria: [{ testId: test.id, level: 1, mean: 95, sd: 2.5 }] };
+// Cổng N12: không chấp nhận thẳng khi lô mới chưa chạy song song.
+const groupPlanned = config.createLotTransition({ data: groupData }, actor).data;
+seedParallelRun(db, { transitionId: groupPlanned.id, testId: test.id, level: 1, lotNo: 'GRP-C', mean: 95, sd: 2.5, start: '2026-05-01' });
+const groupTransition = config.createLotTransition({ id: groupPlanned.id, data: { ...groupData, status: 'accepted' } }, actor);
 assert.equal(groupTransition.ok, true);
 const groupsAfter = config.listLotGroups();
 const activeGroup = groupsAfter.find((g) => g.id === lotGroup.id);
@@ -273,9 +278,10 @@ const autoLotB = config.saveLot({ data: { lotNo: 'AUTO-B', level: 3 } }, actor).
 const autoGroup = config.saveLotGroup({ data: { name: 'AUTO-A/AUTO-B', lotIds: [autoLotA.id, autoLotB.id] } }, actor).data;
 config.saveTestLevel({ testId: test.id, data: { level: 3, mean: 10, sd: 1, qcLotId: autoLotA.id } }, actor);
 const autoLotC = config.saveLot({ data: { lotNo: 'AUTO-C', level: 3 } }, actor).data;
-config.createLotTransition({
-  data: { panelId: panel.id, fromLotId: autoLotA.id, toLotId: autoLotC.id, status: 'accepted', criteria: [{ testId: test.id, level: 3, mean: 11, sd: 1.1 }] },
-}, actor);
+const autoData = { panelId: panel.id, fromLotId: autoLotA.id, toLotId: autoLotC.id, criteria: [{ testId: test.id, level: 3, mean: 11, sd: 1.1 }] };
+const autoPlanned = config.createLotTransition({ data: autoData }, actor).data;
+seedParallelRun(db, { transitionId: autoPlanned.id, testId: test.id, level: 3, lotNo: 'AUTO-C', mean: 11, sd: 1.1, start: '2026-05-01' });
+config.createLotTransition({ id: autoPlanned.id, data: { ...autoData, status: 'accepted' } }, actor);
 assert.equal(config.listLotGroups().find((g) => g.id === autoGroup.id).name, 'AUTO-C/AUTO-B', 'ten tu sinh phai tu doi theo to hop lo moi');
 
 console.log('config-lot-lifecycle: doi so lo cascade dung, kich hoat nhom lo 3 trang thai, sua ho so chuyen lo dung cong chan, chap nhan giu dung thanh vien nhom lo.');

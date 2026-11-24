@@ -13,9 +13,11 @@ interface UsersState {
   update: (id: string, input: UpdateUserInput) => Promise<IpcResult<PublicUser>>;
   remove: (id: string) => Promise<IpcResult<{ id: string }>>;
   resetPassword: (id: string, newPassword: string) => Promise<IpcResult<{ id: string }>>;
+  /** Cấp/thu quyền nghiệp vụ NCE (`nce.release`, `nce.approve`). */
+  setNceCapabilities: (id: string, capabilities: string[]) => Promise<IpcResult<PublicUser>>;
 }
 
-export const useUsersStore = create<UsersState>((set, get) => ({
+export const useUsersStore = create<UsersState>((set) => ({
   users: [],
 
   load: async () => {
@@ -40,6 +42,7 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   resetPassword: async (id, newPassword) => {
     return window.qcApi.resetUserPassword({ id, data: { newPassword } });
   },
+  setNceCapabilities: (id, capabilities) => window.qcApi.setUserNceCapabilities({ id, capabilities }),
 }));
 
 

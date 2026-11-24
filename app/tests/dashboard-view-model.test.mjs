@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict';
-import {
+import { createServer } from 'vite';
+import { fileURLToPath } from 'node:url';
+
+// Nạp cùng module và các hàm sắp xếp mà renderer dùng khi chạy thật.
+const server = await createServer({ configFile: false, root: fileURLToPath(new URL('../renderer', import.meta.url)), logLevel: 'error',
+  appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true, include: [] } });
+let model;
+try { model = await server.ssrLoadModule('/view-models/dashboard-view-model.ts'); }
+finally { await server.close(); }
+const {
   buildDashboardViewModel, normalizeDashboardSearch, daysToExpiry, dashboardShiftStatus, levelTargetOk,
   dashboardNceOverdue, dashboardTestRank, operationalDashboardSummaries,
-} from '../renderer/view-models/dashboard-view-model.ts';
+} = model;
 
 function level(over = {}) {
   return {
@@ -19,7 +28,7 @@ function level(over = {}) {
 const healed = buildDashboardViewModel([{
   testId: 'T1', testName: 'Glucose', instrumentName: 'May A', unit: 'mmol/L', decimalPlaces: 2,
   levels: [level({ worstVerdict: 'rej', latestVerdict: 'ok' })],
-}], [], [], '2026-09-01');
+}], [], []);
 assert.equal(healed.tests[0].status, 'ok', 'da khac phuc xong thi khong con bao do');
 assert.equal(healed.urgent.length, 0);
 assert.equal(healed.kpi.rejected, 0);
@@ -31,7 +40,7 @@ const alerting = buildDashboardViewModel([{
     level({ level: 1, latestVerdict: 'warn', latestRules: ['1-2s'], latest: { date: '2026-09-01', runId: '1', val: 104 } }),
     level({ level: 2, qcLotId: 'L2', lot: 'LOT-2', latestVerdict: 'rej', latestRules: ['1-3s'], latest: { date: '2026-09-02', runId: '1', val: 109.5 } }),
   ],
-}], [], [], '2026-09-02');
+}], [], []);
 assert.equal(alerting.tests[0].status, 'rej', 'xet nghiem lay muc xau nhat trong cac diem cuoi');
 assert.equal(alerting.urgent.length, 1);
 assert.equal(alerting.watch.length, 1);
@@ -50,20 +59,20 @@ assert.equal(alerting.kpi.warnings, 0, 'xet nghiem da tinh la rej thi khong dem 
 const halfDone = buildDashboardViewModel([{
   testId: 'T1', testName: 'Glucose', instrumentName: 'May A', unit: 'mmol/L', decimalPlaces: 2,
   levels: [level({ level: 1, todayPointCount: 1 }), level({ level: 2, todayPointCount: 0 })],
-}], [], [], '2026-09-01');
+}], [], []);
 assert.equal(halfDone.kpi.completeTests, 0);
 assert.equal(halfDone.kpi.completionPercent, 0);
 assert.equal(halfDone.kpi.missingToday, 1);
 assert.equal(halfDone.kpi.todayPoints, 1, 'todayPoints van dem theo MUC da co diem hom nay');
 
-// ── 4) daysToExpiry: nửa đêm giờ địa phương, làm tròn theo giờ hiện tại ───
-// 15:45 chiều ngày 02/09, lô hết hạn 20/09 → còn 17,34 ngày → 17 (KHÔNG 18).
+// ── 4) daysToExpiry: đếm theo NGÀY LỊCH, không phụ thuộc giờ trong ngày ───
+// Trước 2026-09-27 phép tính so với giờ hiện tại nên buổi chiều ra số khác
+// buổi sáng, và đúng ngày hết hạn mà quá 12 giờ trưa thì hiện "Hết hạn 1 ngày".
 const afternoon = new Date(2026, 8, 2, 15, 45, 0);
-assert.equal(daysToExpiry('2026-09-20', afternoon), 17);
-// Lô đã hết hạn 31/08 → -2,66 → -3.
-assert.equal(daysToExpiry('2026-08-31', afternoon), -3);
-// Buổi sáng cùng ngày cho ra con số khác — đúng bản chất phép tính này.
-assert.equal(daysToExpiry('2026-09-20', new Date(2026, 8, 2, 8, 0, 0)), 18);
+assert.equal(daysToExpiry('2026-09-20', afternoon), 18);
+assert.equal(daysToExpiry('2026-09-20', new Date(2026, 8, 2, 8, 0, 0)), 18, 'sáng hay chiều cùng một số ngày');
+assert.equal(daysToExpiry('2026-08-31', afternoon), -2);
+assert.equal(daysToExpiry('2026-09-02', new Date(2026, 8, 2, 13, 0, 0)), 0, 'đúng ngày hết hạn là 0, chưa phải "hết hạn 1 ngày"');
 assert.equal(daysToExpiry('', afternoon), null);
 
 // ── 5) Gom lô sắp hết hạn theo lô, giữ ngày gần nhất, đếm số mức dùng chung
@@ -76,10 +85,10 @@ const shared = buildDashboardViewModel([
     testId: 'T2', testName: 'Urea', instrumentName: 'May A', unit: 'mmol/L', decimalPlaces: 2,
     levels: [level({ level: 1, qcLotId: 'L1', lot: 'LOT-1', exp: '2026-09-20' }), level({ level: 2, qcLotId: 'L9', lot: 'LOT-9', exp: '2030-01-01' })],
   },
-], [], [], '2026-09-02', afternoon);
+], [], [], afternoon);
 assert.equal(shared.expiringLots.length, 1, 'lo dung chung chi hien 1 dong; lo con han 3 nam khong hien');
 assert.equal(shared.expiringLots[0].count, 2, 'dem dung 2 muc dung chung lo L1');
-assert.equal(shared.expiringLots[0].days, 17);
+assert.equal(shared.expiringLots[0].days, 18);
 
 assert.deepEqual(dashboardShiftStatus({ rejected: 1, overdueActions: 9, warnings: 9, missingToday: 9 }), {
   mood: 'Cần xử lý ngay', text: 'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.',
@@ -90,17 +99,39 @@ assert.equal(dashboardShiftStatus({ rejected: 0, overdueActions: 0, warnings: 1,
 assert.equal(dashboardShiftStatus({ rejected: 0, overdueActions: 0, warnings: 0, missingToday: 1 }).mood, 'Còn QC cần nhập');
 assert.equal(dashboardShiftStatus({ rejected: 0, overdueActions: 0, warnings: 0, missingToday: 0 }).mood, 'Đang trong kiểm soát');
 // Hồ sơ NCE quá hạn cũng phải đi vào mood qua model, không chỉ qua hàm thuần
-assert.equal(buildDashboardViewModel([], [], [{ id: 'N1' }], '2026-09-01').mood, 'Có hồ sơ NCE quá hạn');
+assert.equal(buildDashboardViewModel([], [], [{ id: 'N1' }]).mood, 'Có hồ sơ NCE quá hạn');
 
 // ── 7) Mức thiếu Mean/SD: vào noTarget theo MỨC, không theo xét nghiệm ────
 const noTarget = buildDashboardViewModel([{
   testId: 'T1', testName: 'Glucose', instrumentName: 'May A', unit: 'mmol/L', decimalPlaces: 2,
   levels: [level({ level: 1 }), level({ level: 2, mean: null, sd: null }), level({ level: 3, sd: 0 })],
-}], [], [], '2026-09-01');
+}], [], []);
 assert.equal(noTarget.noTarget.length, 2, 'ca muc thieu Mean/SD lan muc SD=0 deu tinh la chua co dai');
 assert.deepEqual(noTarget.noTarget.map(item => item.level.level), [2, 3]);
 assert.equal(levelTargetOk(level({ sd: 0 })), false);
 assert.equal(levelTargetOk(level()), true);
+assert.equal(levelTargetOk(level({ mean: null, sd: 2 })), false, 'thiếu Mean không được ép thành 0 rồi coi là đủ dải');
+assert.equal(levelTargetOk(level({ mean: 0, sd: 2 })), true, 'Mean bằng 0 thật vẫn là giá trị hữu hạn');
+assert.equal(levelTargetOk(level({ mean: NaN })), false);
+const missingMean = buildDashboardViewModel([{
+  testId: 'T-missing', testName: 'Thiếu Mean', levels: [level({ mean: null, sd: 2 })],
+}], [], []);
+assert.equal(missingMean.noTarget.length, 1, 'mức thiếu Mean phải xuất hiện trong nhắc thiết lập dải');
+
+// Cột Gần nhất phải dùng cùng thứ tự lần chạy tự nhiên với bảng lịch sử,
+// kể cả khi hai mức có điểm cuối khác nhau trong cùng ngày.
+for (const prefix of ['', '2026-11-12-']) {
+  const latest = buildDashboardViewModel([{
+    testId: 'T-order', testName: 'Nhiều lần chạy', levels: [
+      level({ level: 1, latest: { date: '2026-11-12', runId: `${prefix}10`, val: 110 } }),
+      level({ level: 2, latest: { date: '2026-11-12', runId: `${prefix}2`, val: 102 } }),
+      level({ level: 3, latest: { date: '2026-11-11', runId: `${prefix}99`, val: 99 } }),
+    ],
+  }], [], []);
+  assert.equal(latest.tests[0].latest.runId, `${prefix}10`);
+  assert.equal(latest.tests[0].latest.level, 1);
+  assert.equal(latest.tests[0].latest.val, 110);
+}
 
 // ── 8) Tìm kiếm bỏ dấu ───────────────────────────────────────────────────
 assert.equal(normalizeDashboardSearch('Điện Giải'), 'dien giai');
@@ -128,13 +159,10 @@ const operational = operationalDashboardSummaries(
 );
 assert.deepEqual(operational.map(item => item.testId), ['T2', 'T1'], 'lọc đủ active/panel/nhóm lô và giữ thứ tự Panel');
 
-// ── 10) Hồ sơ quá hạn: số ngày do main tính (`overdue_days`), ở đây chỉ
-// dựng nhãn. Quy tắc nằm ở `domain/nce-overdue.ts`, test ở nce-overdue.test.mjs.
-const nce = (over = {}) => ({
-  id: 'N1', due_date: '2026-09-01', record_status: 'active', approval_status: 'pending',
-  detail_json: JSON.stringify({ owner: 'Nguyễn An', correction: 'Đã kiểm tra lại QC' }), overdue_days: 3,
-  ...over,
-});
+// ── 10) Hồ sơ quá hạn: số ngày và tên người phụ trách do main tính
+// (`overdue_days`, `owner_name`), ở đây chỉ dựng nhãn. Quy tắc nằm ở
+// `domain/nce/overdue.ts`, test ở nce-domain-queue.test.mjs.
+const nce = (over = {}) => ({ id: 'N1', due_date: '2026-09-01', status: 'open', owner_name: 'Nguyễn An', overdue_days: 3, ...over });
 assert.deepEqual(dashboardNceOverdue(nce()), {
   overdue: true, days: 3, label: 'Quá hạn 3 ngày', owner: 'Nguyễn An',
 });

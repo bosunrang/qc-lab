@@ -1,6 +1,11 @@
 // Hợp đồng IPC lộ ra qua preload.ts — dùng chung giữa main và renderer để
 // renderer có type an toàn khi gọi window.qcApi.*
 export interface LisGatewaySettings { enabled: boolean; url: string; token: string }
+/** Chế độ vận hành đã bật: lúc nào, ai bật. */
+export interface OperationModeState { enabledAt: string; enabledBy: string }
+/** Trạng thái cho panel "Quản trị dữ liệu". `activityRows` dùng để nhắc lưu
+ * trữ nhật ký; `operationMode` là `null` khi chưa bật chế độ vận hành. */
+export interface BackupStatus { lastBackupAt: string | null; lastBackupBytes: number; activityRows: number; operationMode: OperationModeState | null }
 /** Kết quả kiểm tra một tệp backup trước khi phục hồi. `legacy` là tệp .json
  * xuất trước khi đổi sang định dạng SQLite. */
 export interface BackupFileSummary {
@@ -17,6 +22,9 @@ export interface LisMessage {
 }
 export interface LisQueueRecord {
   id: string; receivedAt: string; status: string; message: LisMessage; resolved: LisResolved;
+  /** Nguồn và mã bản tin gốc của LIS (Gateway SQLite cấp); `message.messageId`
+   * là UUID của Gateway. QC Lab dùng để không nhận trùng sau khi phục hồi Gateway. */
+  source?: { sourceId: string; messageId: string };
 }
 
 export interface Instrument {
@@ -42,6 +50,8 @@ export interface Test {
   tea: number;
   section: string;
   tea_source: string;
+  /** Nguồn TEa vận hành chung của danh mục và Sigma; rỗng giữ cách phân giải của cấu hình cũ. */
+  operational_tea_source: string;
   tea_ref_key: string;
   eflm_analyte: string;
   eflm_aps: string;
@@ -104,12 +114,30 @@ export interface LotTransition {
 export interface TeaRef {
   id: string; name: string; unit: string; section: string; lab: number | null; lab_source: string;
   lab_prepared_by: string; lab_next_review_date: string; sources_json: string;
+  /** TEa riêng theo số mức QC của analyte, áp dụng cho mọi cấu hình xét
+   * nghiệm–máy khớp analyte; mức không có ở đây dùng `lab` (TEa chung). */
+  lab_level_defaults: TeaRefLevelDefault[];
+  /** Các phiên bản đã lưu của hồ sơ TEa PXN, cũ trước. */
+  lab_versions: TeaRefVersion[];
   /** `config:listTeaRefs` trả nguyên hàng `tea_refs`, nên 3 cột này cũng có
    * sẵn — khai đủ ở đây vì bảng TEa tham chiếu cần chúng: `analyte_id` khoá
    * theo analyte của danh mục tích hợp, `clia`/`ricos` là GHI ĐÈ của phòng
    * xét nghiệm lên giá trị mặc định (null = dùng mặc định). */
   analyte_id?: string; aliases_json?: string; clia?: number | null; ricos?: number | null;
   clia_rule?: 'percent' | 'absolute' | 'greater-of' | ''; clia_absolute?: number | null; clia_absolute_unit?: string;
+}
+
+export interface TeaRefLevelDefault {
+  level: number;
+  tea: number;
+}
+
+/** Một phiên bản hồ sơ TEa của PXN (N8): ảnh chụp lúc lưu hoặc xoá, cũ trước.
+ * `baseline` là hồ sơ đã có trước khi app lưu phiên bản (`saved_at` rỗng). */
+export interface TeaRefVersion {
+  id: string; action: 'baseline' | 'save' | 'remove'; saved_at: string; saved_by: string;
+  lab: number | null; levels: TeaRefLevelDefault[]; lab_source: string; lab_prepared_by: string;
+  lab_next_review_date: string; sources_json: string;
 }
 
 export interface RuleScopeItem {
@@ -163,7 +191,7 @@ export interface InstrumentDraft {
 export interface TestDraft {
   name?: string; instrumentId?: string; unit?: string; decimalPlaces?: number; tea?: number; section?: string;
   instrumentIds?: string[]; assignmentIds?: string[]; analyteId?: string; preserveExistingAssignments?: boolean;
-  teaSource?: string; teaRefKey?: string; method?: string; reagent?: string;
+  teaSource?: string; operationalTeaSource?: string; teaRefKey?: string; method?: string; reagent?: string;
   cusumOn?: boolean; cusumK?: number; cusumH?: number; active?: boolean;
 }
 export interface TestLevelDraft {
@@ -212,6 +240,15 @@ export interface ActivityArchivePreview {
   retainedCount: number;
   /** CSV của đúng phần sẽ bị gỡ, gồm PrevHash và Hash để đối chiếu độc lập. */
   csv: string;
+}
+
+/** Một lần chạy ĐÃ CÓ đổi kết luận Westgard vì điểm vừa nhập lùi ngày hoặc
+ * vừa huỷ (luật nhiều lần chạy nhìn lại lần chạy trước) — xem tệp
+ * `main/domain/run-conclusion-change.ts` để biết cách so trước/sau. */
+export interface QcRunConclusionChange {
+  date: string; runId: string;
+  before: 'ok' | 'warn' | 'rej'; after: 'ok' | 'warn' | 'rej';
+  rulesBefore: string[]; rulesAfter: string[];
 }
 
 export interface QcPointView {
@@ -285,26 +322,32 @@ export interface LevelAnalysis {
   cusumOn: boolean;
 }
 
-/** Điểm QC thô cho tab "Lịch sử dữ liệu": MỌI lô của xét nghiệm, KHÔNG kèm
- * kết luận Westgard.
- *
- * Cố ý KHÔNG dùng lại `QcPointView`: trang đó đọc lại Mean/SD đã chốt của
- * từng điểm rồi tự xếp theo dải Z (`Trong ±2s` / `Ngoài ±2s` / `Ngoài ±3s`),
- * và ghi rõ trên giao diện rằng đây không phải kết luận Westgard. Bản trước
- * vẫn trả một trường `verdict` cùng tên, cùng kiểu với verdict thật nhưng
- * tính bằng ngưỡng z thuần — không ai đọc, chỉ nằm đó chờ người sửa sau
- * tưởng nó là kết luận Westgard rồi đem đi dùng. */
+/** Điểm chưa huỷ của MỌI lô trong lịch sử xét nghiệm. Kết luận do main đánh
+ * giá bằng đầy đủ chuỗi/lần chạy, cùng nguồn với báo cáo nội kiểm; không
+ * phân loại đạt/loại chỉ từ Z của một điểm. */
 export interface HistoryQcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
   lot: string; qc_mean: number | null; qc_sd: number | null;
   note: string; operator_name: string; operator_username: string; operator_code: string;
   voided: 0 | 1; void_reason: string;
+  verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[];
+  accepted: boolean; run_rejected_by: number[];
+}
+
+export interface VoidPointAssessment {
+  error_class: 'SE' | 'RE' | '';
+  /** Chỉ các luật cùng loại sai số trong những điểm bị loại của lần chạy. */
+  rules: string[];
+  run_rejected: boolean;
+  rejected_levels: number[];
 }
 
 export interface VoidedQcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string;
   lot: string; val: number; operator_name: string; void_reason: string;
   void_kind: string; void_requires_rerun: 0 | 1; voided_at: string; voided_by: string;
+  /** Họ tên tài khoản người huỷ; dùng username gốc khi không còn tên để đối chiếu. */
+  voided_by_name: string;
 }
 
 export interface RangeCandidateView {
@@ -331,9 +374,30 @@ export interface PreviousLotSeries {
   points: QcPointView[];
 }
 
+export interface EntryWindowRequest {
+  worksheetFrom: string; worksheetTo: string;
+  chartFrom: string; chartTo: string;
+  previousLots: Record<number, string>;
+}
+
+export interface EntryCumulativeStats {
+  recorded: number; excluded: number; n: number; mean: number | null; sd: number | null; cv: number | null;
+}
+
+export interface EntryWindow {
+  current: Record<number, {
+    points: (QcPointView & { chartZ: number | null; chartVerdict: LevelAnalysis['points'][number]['verdict'] })[];
+    cumulative: EntryCumulativeStats;
+  }>;
+  parallelColumns: (ParallelEntryColumn & { cumulative: EntryCumulativeStats })[];
+  previousLotSeries: (PreviousLotSeries & { cumulative?: EntryCumulativeStats })[];
+  voidedPoints: VoidedQcPointView[];
+}
+
 /** Trạng thái CHUNG của 1 luật Westgard (toàn phòng xét nghiệm, không riêng
  * xét nghiệm nào) — panel "Cấu hình chung của luật" trang Phân tích Westgard. */
-export interface RuleSetting { id: string; desc: string; on: boolean; fix: string; alert: boolean; }
+/** `custom`: luật đã đặt riêng ở cấu hình chung; không thì theo mặc định số mức QC (WG-26). */
+export interface RuleSetting { id: string; desc: string; on: boolean; custom: boolean; fix: string; alert: boolean; }
 
 /** Phân tích Westgard cho một lô thuộc nhóm lô đã dừng/lưu trữ. Kết quả được
  * tính lại theo bộ luật đang bật, dùng Mean/SD đã chốt của lô thay vì
@@ -351,21 +415,40 @@ export interface UncertaintyBudgetResult {
   target: number | null; absoluteUc: number | null; absoluteU: number | null;
   tea: number | null; teaRatio: number | null; withinTea: boolean | null;
 }
-export interface SigmaEqaRound { lab: number; target: number; bias: number }
+/** Một mẫu ngoại kiểm đề xuất làm Bias cho Sigma (SIGMA-REVIEW-2026-11-17). */
+export interface SigmaEqaBiasSampleView {
+  resultId: string; label: string; reportDate: string; result: number; assigned: number; assignedUncertain: boolean; ncCauseCategory: string;
+}
+export type SigmaEqaExclusionView = 'after-period' | 'outside-window' | 'nce-cause' | 'invalid';
+export interface SigmaEqaBiasView {
+  included: (SigmaEqaBiasSampleView & { bias: number })[];
+  excluded: (SigmaEqaBiasSampleView & { reason: SigmaEqaExclusionView })[];
+  /** Trung bình có dấu (Sigma), RMS (chỉ MU), sai số chuẩn; null khi chưa có mẫu. */
+  mean: number | null; rms: number | null; sem: number | null; n: number; mixedSigns: boolean; enough: boolean;
+  /** targetMean giữ null để tương thích bản cũ; Bias chung không lọc theo Mean QC. */
+  window: { start: string; end: string }; windowMonths: number; targetMean: number | null;
+}
+/** Vòng lấy từ ngoại kiểm đã nhập mang mã kết quả và nhãn để truy vết (SIGMA-REVIEW-2026-11-17 SB-7). */
+export interface SigmaEqaRound { lab: number; target: number; bias: number; eqaResultId?: string; label?: string }
 export interface SigmaLevelResult {
+  /** Khoảng tháng đã chụp khi áp dụng Bias chung. */
+  eqaWindowMonths?: number;
   muBiasMode?: 'include' | 'exclude';
   cohortReviewed?: boolean;
   cohortReviewBy?: string;
   cohortReviewAt?: string;
   cohortStale?: boolean;
   teaCriterion?: string;
+  /** Mean và đơn vị thực dùng khi quy đổi CLIA. null ở Mean nghĩa là kỳ cũ chưa lưu căn cứ này. */
+  teaConversion?: { targetMean: number | null; unit: string };
   level: number; /** TEa% ĐÃ GIẢI để tính Sigma/MU — có thể đến từ snapshot của mức, từ nguồn TEa của kỳ, từ TEa cấp kỳ, hoặc bậc dự phòng. Dùng để HIỂN THỊ, không phải để ghi lại. */ tea: number | null;
   /** TEa% THẬT SỰ đã chốt trong `lv_json` của mức; `null` = kỳ chưa từng chụp
    * và đang được giải lại mỗi lần đọc. Khi lưu lại kỳ phải gửi trường NÀY chứ
    * không phải `tea`: gửi giá trị đã giải sẽ đóng băng một con số có thể đến
    * từ bậc dự phòng (nguồn khác hẳn nguồn chốt của kỳ) và không kèm `teaBasis`
    * nào — hồ sơ khi đó mang một TEa không nguồn gốc. */
-  teaSnapshot: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; /** Bias trung bình có dấu từ các vòng EQA; chỉ để truy xuất hướng lệch. */ biasMean: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
+  teaSnapshot: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; /** Bias dùng tính Sigma: trung bình có dấu các vòng EQA, hoặc Bias nhập tay (SIGMA-REVIEW-2026-11-17 SB-1). */ biasEqa: number | null; /** Bias trung bình có dấu từ các vòng EQA; null khi nhập Bias tay. */ biasMean: number | null;
+  /** Bias RMS các vòng, CHỈ dùng cho ngân sách MU (Nordtest); bằng `biasEqa` khi nhập tay hoặc một vòng. */ biasRms: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
   /** Sai số chuẩn của chính ước lượng bias (SD giữa các vòng / căn n) — CHỈ tham khảo, KHÔNG phải u(Cref). */ biasSem: number | null;
   uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
@@ -377,46 +460,160 @@ export interface SigmaLevelResult {
     risk: string; plan: string;
   } | null;
 }
-export interface SigmaPeriodView { id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[] }
+export type SigmaTeaMode = 'stored' | 'operational';
+export interface SigmaPeriodView {
+  id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[];
+  /** Bản gốc để lưu CV/Bias mà không ghi đè TEa lịch sử bằng kết quả đang tính theo nguồn vận hành. */
+  savedTea?: { tea: number | null; source: string };
+}
 export interface SigmaCohortView {
   fingerprint?: string;
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
   targetMean: number | null; targetSd: number | null; issues: string[];
-  excluded: { voided: number; invalidValue: number };
+  excluded: { voided: number; invalidValue: number; resolved: number };
   outOfControl: { rejected: number; unresolved: number };
   status: 'insufficient' | 'provisional' | 'eligible' | 'unstable' | 'out-of-control';
 }
 
-export interface NceRecord {
-  id: string; date: string; created_at: string; updated_at?: string; created_by_user_id?: string; test_id: string | null; level: number | null; lot: string;
-  point_id: string | null; rule: string; error_type: string; nce_id: string; parent_nce_id: string; follow_up_nce_id: string; protocol_version: number;
-  approval_status: 'pending' | 'approved' | 'returned'; effectiveness_status: 'pending' | 'effective' | 'ineffective';
-  record_status: 'active' | 'cancelled'; risk_level?: string; due_date: string; action_completed_date: string; detail_json: string;
-  /** Số ngày quá hạn, main tính lúc đọc (`domain/nce-overdue.ts`); 0 là chưa quá hạn. */
-  overdue_days: number;
+/** Hồ sơ NCE protocol 4 (docs/NCE-REDESIGN-2026-10-12.md). Các dòng dưới đây
+ * là bảng `nce_*` đọc thẳng từ SQLite (snake_case) kèm vài trường main tính. */
+export type NceStatus = 'open' | 'released' | 'pending_approval' | 'closed' | 'cancelled';
+export type NceSource = 'iqc' | 'eqa' | 'instrument' | 'reagent' | 'calibration' | 'other';
+export type NceNextStepName = 'release' | 'submit' | 'approve' | null;
+
+export interface NceRecordRow {
+  id: string; nce_id: string; source: NceSource; phase: 'pre' | 'exam' | 'post';
+  eqa_result_id: string | null; eqa_source_key: string; eqa_snapshot_json: string;
+  test_id: string | null; detected_at: string; description: string; correction: string;
+  containment_note: string; occurred_note: string;
+  /** 1 có giữ kết quả, 0 không, null chưa xác định. */
+  hold_results: 0 | 1 | null;
+  status: NceStatus; tier: 'low' | 'capa' | ''; tier_reason: string;
+  risk_severity: number; risk_probability: number; risk_level: 'low' | 'medium' | 'high' | 'critical' | ''; risk_basis: string;
+  checklist_json: string;
+  cause_status: 'identified' | 'suspected' | 'undetermined' | ''; cause_category: string; cause_text: string; cause_check_plan: string;
+  effectiveness_criteria: string; effectiveness_review_due: string;
+  owner_user_id: string; due_date: string; reported_by_user_id: string; reported_by_name: string;
+  error_class: 'SE' | 'RE' | ''; qc_resolved: 0 | 1;
+  created_at: string; updated_at: string; row_version: number; protocol_version: number; legacy_json: string;
+  /** Main tính lúc đọc. */
+  test_name: string; owner_name: string; overdue_days: number; next_step: NceNextStepName;
+  open_actions: number; overdue_actions: number;
 }
 
-export interface NceDetail {
-  correction?: string; investigation?: string;
-  /** Nhóm nguyên nhân gốc, tách khỏi `NceRecord.error_type` (SE/RE). */
-  causeCategory?: 'qc' | 'operator' | 'instrument' | 'reagent' | 'calibration' | 'environment' | 'unknown' | '';
-  cause?: string; /** Tên cũ để đọc dữ liệu thí điểm trước protocol-v3. */ causeDescription?: string; action?: string;
+export interface NceRunRow {
+  id: string; nce_record_id: string; test_id: string; date: string; run_id: string;
+  role: 'trigger' | 'repeat_reject' | 'rerun'; snapshot_json: string;
+  attached_at: string; attached_by_user_id: string; attached_by_name: string;
+}
 
-  owner?: string;
-  releaseDecision?: 'held' | 'released'; releaseNote?: string; releaseDecidedAt?: string; releaseDecidedBy?: string;
-  rerunPointId?: string; rerunNote?: string; rerunSnapshot?: { date: string; runId: string; val: number; level: number };
-  effectivenessNote?: string; residualRisk?: string;
-  eventSource?: 'iqc' | 'eqa' | 'instrument' | 'clinical' | 'audit' | 'other' | '';
-  processPhase?: 'pre' | 'exam' | 'post' | '';
-  containmentStatus?: 'held' | 'none' | ''; containmentNote?: string;
-  riskSeverity?: number; riskOccurrence?: number; riskDetectability?: number; riskLevel?: 'low' | 'medium' | 'high' | 'critical' | ''; riskBasis?: string;
-  qcMaterialStatus?: string; qcMaterialNote?: string; instrumentStatus?: string; instrumentNote?: string; reagentStatus?: string; reagentNote?: string; calibrationStatus?: string; calibrationNote?: string; lotToLotStatus?: string; lotToLotNote?: string;
-  biasBefore?: string; biasAfter?: string; actionCompletedDate?: string;
-  releaseStatus?: 'released' | ''; releaseDate?: string; releaseBy?: string;
-  patientImpact?: 'none' | 'held' | 'affected' | ''; patientAction?: string;
-  effectivenessStatus?: 'pending' | 'effective' | 'ineffective'; effectivenessDate?: string;
-  residualSeverity?: number; residualOccurrence?: number; residualDetectability?: number; residualRiskLevel?: 'low' | 'medium' | 'high' | 'critical' | ''; residualRiskBasis?: string;
-  reopenedFrom?: string; reopenNote?: string; returnNote?: string; cancelReason?: string; cancelledBy?: string; cancelledAt?: string;
+export interface NceActionRow {
+  id: string; nce_record_id: string; kind: 'corrective' | 'preventive' | 'system_change'; description: string;
+  owner_user_id: string; due_date: string; status: 'open' | 'done' | 'cancelled';
+  done_at: string; done_by_user_id: string; done_by_name: string; evidence: string; cancel_reason: string;
+  created_at: string; created_by_user_id: string;
+  owner_name: string; overdue_days: number;
+}
+
+export interface NceDecisionRow {
+  id: string; nce_record_id: string;
+  type: 'release' | 'technical_assessment' | 'patient_impact' | 'effectiveness' | 'submit' | 'approve' | 'return' | 'cancel';
+  payload_json: string; actor_user_id: string; actor_name: string; decided_at: string;
+}
+
+export interface NceRevisionRow { id: string; nce_record_id: string; actor_user_id: string; actor_name: string; at: string; changes_json: string }
+
+export interface NceMissingItem { code: string; message: string }
+export interface NceRunKeyView { date: string; runId: string }
+
+export interface NceDossierView {
+  eqa_followup?: { evidence: EqaNceEvidence | null; missing: string[]; fingerprint: string } | null;
+  record: NceRecordRow;
+  runs: NceRunRow[]; actions: NceActionRow[]; decisions: NceDecisionRow[]; revisions: NceRevisionRow[];
+  /** Bước kế tiếp còn thiếu gì (main tính bằng `domain/nce/gates.ts`). */
+  missing: NceMissingItem[];
+  /** Lý do bắt buộc tầng CAPA; rỗng thì được chọn xử lý nhanh. */
+  capa_triggers: NceMissingItem[];
+  recurrence: boolean;
+  /** Khoảng nghi ngờ ảnh hưởng kết quả bệnh nhân (chỉ hồ sơ có lần chạy khởi đầu). */
+  /** `onset`: lần chạy đầu tiên của chuỗi vi phạm (khác `trigger` khi luật
+   * đếm nhiều lần chạy làm khoảng lùi về trước); `onset_rules`: các luật đó. */
+  suspect_window: { last_accepted: NceRunKeyView | null; onset: NceRunKeyView; onset_rules: string[]; trigger: NceRunKeyView; rerun: NceRunKeyView | null; runs: NceRunKeyView[] } | null;
+  /** Thao tác người đang xem được phép làm, để giao diện ẩn/hiện nút; main vẫn chặn thật. */
+  can: { edit: boolean; release: boolean; patient_impact: boolean; submit: boolean; approve: boolean; return: boolean; cancel: boolean; review_effectiveness: boolean };
+  /** Lý do người đang xem không được duyệt (không độc lập…); rỗng nếu được. */
+  approve_block: string;
+  /** Số liệu gợi ý để điền sẵn form "Xác minh kỹ thuật IQC" (chỉ hồ sơ IQC có
+   * lần khởi đầu, chưa nộp duyệt) — xem `main/domain/nce/technical-prefill.ts`. */
+  technical_prefill: NceTechnicalPrefillView | null;
+  /** Lời nhắc theo mục checklist từ dữ liệu sẵn có (lô QC hết hạn, mới đổi
+   * lô…), khoá là mã mục — xem `main/domain/nce/checklist-hints.ts`. */
+  checklist_hints: Record<string, string>;
+  /** Mốc thời gian dựng từ dữ liệu đã lưu (`main/domain/nce/timeline.ts`),
+   * thay việc gõ lại diễn biến; `occurred_note` chỉ để ghi thêm. */
+  timeline: NceTimelineEntryView[];
+  /** Bản nháp phạm vi kiểm soát từ dữ liệu app biết, chừa `[cần ghi]` cho
+   * phần người làm phải ghi; rỗng khi không có (hồ sơ không phải IQC…). */
+  containment_draft: string;
+}
+
+export interface NceTimelineEntryView {
+  /** `YYYY-MM-DD` khi `dateOnly`, ngược lại là ISO đầy đủ. */
+  at: string; dateOnly: boolean; label: string; detail: string;
+  /** Lần chạy QC gắn với mốc (bị loại, chạy lại); `null` nếu không có. */
+  run: NceRunKeyView | null;
+}
+
+/** Gợi ý số liệu xác minh kỹ thuật, đơn vị % so với Mean đích. */
+export interface NceTechnicalPrefillView {
+  /** Mức và lô dùng để tính: mức bị loại có |z| lớn nhất trong lần khởi đầu. */
+  level: number; lot: string; unit: string;
+  tea: number | null; teaSource: string;
+  stableBias: number | null; incidentBias: number | null;
+  sd: number | null; sdSource: string;
+  observedDispersion: number | null; sampleCount: number | null;
+  /** Số điểm sự cố đã dùng (từ lần đầu chuỗi vi phạm tới lần khởi đầu). */
+  incidentCount: number;
+  /** Lưu ý khi thiếu dữ liệu (ít điểm ổn định, chưa có TEa…). */
+  notes: string[];
+}
+
+export interface NceQueueRowView {
+  test_id: string; test_name: string; date: string; run_id: string;
+  rejected_levels: { level: number; lot: string; rules: string[]; point_id: string }[];
+  record: { id: string; nce_id: string } | null;
+  attach_to: { id: string; nce_id: string } | null;
+}
+
+export interface NceReleasePreview {
+  ok: boolean; problems: NceMissingItem[]; lot_changed_levels: number[];
+  warnings: NceMissingItem[];
+  /** Quyết định ảnh hưởng bệnh nhân hiện hành chưa bao phủ khoảng nghi ngờ
+   * kết thúc ở lần chạy ứng viên; chặn cho phép hoạt động trở lại. */
+  impact_problems: NceMissingItem[];
+  points: { level: number; lot: string; val: number; z: number | null; verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[]; voided: boolean }[];
+}
+
+export interface NceUserOption { id: string; name: string; username: string; role: 'admin' | 'technician' | 'viewer'; capabilities: string[] }
+
+export interface NceConfigView {
+  dueDays: { low: number; capa: number }; recurrenceWindowDays: number;
+  separationException: { enabled: boolean; sopRef: string };
+}
+
+/** Mọi lệnh sửa một hồ sơ gửi kèm `expectedVersion` (= `row_version` đang
+ * xem); lệch thì main trả lỗi `stale`. */
+export interface NceWriteBase { id: string; expectedVersion: number }
+
+export interface NceTechnicalAssessmentInput {
+  errorNature: 'systematic' | 'random' | 'mixed' | 'undetermined';
+  verificationMethod: string; correctiveEvidence: string; technicalConclusion: string;
+  metricMode: 'calculated' | 'not_applicable'; metricReason: string; unit: string;
+  tea: number | null; teaSource: string; stableBias: number | null; incidentBias: number | null;
+  postCorrectionBias: number | null; sd: number | null; sdSource: string;
+  observedDispersion: number | null; sampleCount: number | null;
+  meanResetDecision: 'not_applicable' | 'not_allowed' | 'eligible';
+  meanResetReason: string; meanResetEvidence: string;
 }
 
 export interface ReagentComparisonFit { a: number; b: number; r2: number }
@@ -444,6 +641,9 @@ export interface PublicUser {
   /** Data URL PNG 160×160 (canvas tự resize ở renderer trước khi gửi lên) —
    * chuỗi rỗng = chưa đặt, hiện chữ cái đầu tên/username thay ảnh. */
   avatar: string;
+  /** Quyền nghiệp vụ NCE cấp riêng (`nce.release`, `nce.approve`); quản trị
+   * viên mặc nhiên có cả hai nên mảng có thể rỗng. */
+  capabilities: string[];
 }
 
 export interface LabProfile {
@@ -460,7 +660,38 @@ export interface StorageInfo {
   schemaVersion: number;
   storageMode: 'file' | 'memory' | 'browser-preview';
 }
-export interface ReportTemplateSettings { formCode: string; version: string }
+/** Loại PDF có biểu mẫu kiểm soát riêng: nội kiểm, Westgard, Six Sigma, so sánh hoá chất. */
+export type ReportFormKind = 'iqc' | 'westgard' | 'sigma' | 'reagent' | 'review' | 'eqa';
+/** Thông tin kiểm soát tài liệu in ở đầu PDF. `effectiveDate` là `YYYY-MM-DD` hoặc rỗng. */
+export interface ReportForm { formCode: string; version: string; effectiveDate: string }
+export type ReportTemplateSettings = Record<ReportFormKind, ReportForm>;
+/** Một dòng biên bản xem xét QC tháng: một xét nghiệm × mức × lô (GV4 mục 2). */
+export interface QcMonthlyReviewRow {
+  test_id: string; test_name: string; instrument_name: string; unit: string; decimal_places: number; level: number; lot: string;
+  n: number; accepted: number; rejected: number; unevaluated: number;
+  mean: number | null; sd: number | null; cv: number | null;
+  target_mean: number | null; target_sd: number | null; target_cv: number | null; target_changed: boolean;
+  shift_sd: number | null; bias_pct: number | null;
+  /** Điểm đã huỷ trong tháng; trong đó thuộc lần chạy bị loại. */
+  voided: number; voided_rejected: number;
+}
+export interface QcMonthlyReviewNce { nce_id: string; test_name: string; status: string; error_class: string; detected_at: string }
+export type QcReviewConclusion = 'ok' | 'monitor' | 'action';
+export interface QcMonthlyReviewSignature {
+  id: string; ym: string; conclusion: QcReviewConclusion; note: string;
+  reviewer_name: string; reviewer_username: string; reviewed_at: string;
+}
+export interface QcMonthlyReview {
+  ym: string; rows: QcMonthlyReviewRow[]; nce: QcMonthlyReviewNce[];
+  totals: { points: number; accepted: number; rejected: number; rejected_runs: number; voided: number; voided_rejected: number; nce: number; nce_open: number };
+  /** Việc còn tồn của kỳ (lần chạy bị loại chưa có NCE, NCE chưa đóng); rỗng nếu không còn. */
+  open_items: string;
+  /** Các lần ký, cũ trước; lần cuối là kết luận hiện hành. */
+  signatures: QcMonthlyReviewSignature[];
+  /** Đã ký nhưng số liệu tháng đổi sau lần ký cuối: kết luận chỉ áp dụng cho
+   * số liệu lúc ký, cần ký lại trước khi khoá kỳ. */
+  signature_stale: boolean;
+}
 export interface FirebaseSettings {
   labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
 }
@@ -477,9 +708,220 @@ export interface ReportPointRow {
    * kiểm ISO 15189. */
   lot: string;
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
+  /** Cùng nguồn đánh giá với Westgard, tính trước khi cắt khoảng ngày báo cáo.
+   * Điểm đã huỷ/chưa đánh giá có z=null, không được vẽ thành điểm đạt. */
+  target_mean: number | null; target_sd: number | null; z: number | null;
+  verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[];
+  accepted: boolean; run_rejected_by: number[];
+}
+
+// ── Ngoại kiểm (docs/EQA-PLAN-2026-10-28.md) ──────────────────────────────
+// Bản nháp nhập (camelCase) là dữ liệu renderer đọc từ báo cáo PDF; main kiểm lại
+// toàn bộ. Dòng đọc từ SQLite giữ snake_case.
+
+export interface EqaPeerStatsView { mean: number | null; sd: number | null; cv: number | null; n: number | null }
+export type EqaPeerView = Partial<Record<'all' | 'method' | 'instrument', EqaPeerStatsView>>;
+export interface EqaRoundDraft {
+  program: string; provider: string; programCode: string; unitCode: string; year: number | null; round: string;
+  reportCode: string; reportDate: string; assignedLevel: string;
+}
+export interface EqaRowDraft {
+  ref: string; code: string; instrument: string; sample: string; unit: string;
+  result: number | null; assigned: number | null; sigmaP: number | null; zProvider: number | null;
+  method: string; peerGroup: string; peer: EqaPeerView;
+}
+export type EqaClassView = 'ok' | 'warn' | 'rej';
+export type EqaProviderCheckView = 'match' | 'swapped' | 'mismatch' | 'none';
+export interface EqaCheckedRowDraft extends EqaRowDraft {
+  testId: string | null; z: number | null; pct: number | null; zOfficial: number | null; cls: EqaClassView | null;
+  providerCheck: EqaProviderCheckView; errors: string[]; warnings: string[];
+}
+export interface EqaSourceFileDraft { fileName: string; sha256: string; creationDate: string }
+export interface EqaImportInput {
+  round: EqaRoundDraft; rows: EqaRowDraft[]; source: 'pdf'; sourceName?: string;
+  sourceFiles?: EqaSourceFileDraft[];
+  /** Ánh xạ người dùng chọn cho cặp mã thông số × tên máy chưa có. */
+  mappings?: { code: string; instrument: string; testId: string }[];
+  /** Bắt buộc khi thay kết quả của máy đã có trong kỳ hoặc mở lại kỳ đã huỷ. */
+  replaceReason?: string;
+  /** Phiên bản kỳ lúc xem trước, để không ghi đè lần nhập của người khác. */
+  expectedVersion?: number;
+}
+export interface EqaImportPreview {
+  round: EqaRoundDraft; round_errors: string[]; rows: EqaCheckedRowDraft[];
+  pairs: { code: string; instrument: string; test_id: string | null; suggestions: string[]; rows: number }[];
+  blocking: number;
+  counts: { total: number; ok: number; warn: number; rej: number; accept_pct: number | null };
+  /** Kỳ cùng chương trình/năm/đợt đã có trong CSDL: máy đang có kết quả,
+   * máy mà lần nhập này thay kết quả, và có cần lý do nhập lại không. */
+  existing: { id: string; version: number; row_version: number; status: string; instruments: string[]; replaces: string[]; needs_reason: boolean;
+    /** Mọi dòng trùng khớp kết quả đang lưu: ghi sẽ không tạo phiên bản mới. */
+    unchanged: boolean;
+    /** Đợt có phiếu "Tất cả máy" đã ký trên phiên bản hiện hành: sau khi bổ sung cần ký lại phiếu đó. */
+    reviewed_all: boolean } | null;
+}
+export interface EqaRoundRow {
+  id: string; program_id: string; program_name: string; provider: string; program_code: string; unit_code: string;
+  year: number; round: string; round_no: number; report_code: string; report_date: string;
+  assigned_level: string; source: string; source_name: string; status: 'open' | 'cancelled';
+  version: number; row_version: number; created_at: string; updated_at: string;
+  /** `accept_pct`: tỷ lệ kết quả chấp nhận — chỉ số tổng hợp, không phải tiêu chí đạt (N-06). */
+  total: number; ok: number; warn: number; rej: number; accept_pct: number | null; instruments: string[];
+  /** Đếm xếp loại theo từng máy của phiên bản hiện hành. */
+  by_instrument: EqaInstrumentSummary[];
+  /** Máy đã có kết quả ở đợt khác cùng chương trình–năm nhưng chưa có ở đợt này. */
+  missing_instruments: { instrument_id: string; instrument_name: string }[];
+}
+export interface EqaInstrumentSummary { instrument_id: string; instrument_name: string; total: number; ok: number; warn: number; rej: number; accept_pct: number | null }
+/** Một xét nghiệm của một máy qua các đợt đang dùng trong một chương trình–năm. */
+export interface EqaInstrumentGridRow {
+  test_id: string; test_name: string; unit: string;
+  cells: { round_id: string; result_id: string; sample: string; z: number; class: EqaClassView }[];
+}
+export interface EqaPeerComparisonView { level: 'all' | 'method' | 'instrument'; mean: number; sd: number | null; sdi: number | null; pct: number | null; cv: number | null; n: number | null }
+export interface EqaResultRow {
+  id: string; test_id: string; test_name: string; instrument_id: string; instrument_name: string;
+  code: string; instrument_label: string; sample: string; unit: string;
+  result: number; assigned: number; sigma_p: number; z: number; z_provider: number | null; z_official: number; pct: number | null;
+  class: EqaClassView; provider_check: EqaProviderCheckView; method: string; peer_group: string;
+  peer: EqaPeerComparisonView[]; warnings: string[];
+  /** Độ tin cậy giá trị ấn định từ N, SD của nhóm làm giá trị ấn định (N-05). */
+  assigned_check: { level: 'all' | 'method' | 'instrument'; n: number; u: number; ratio: number; uncertain: boolean; z_prime: number } | null;
+  /** TEa (%) của xét nghiệm trong danh mục và % lệch có nằm trong đó không — thông tin nội bộ. */
+  tea_pct: number | null; within_tea: boolean | null;
+  /** Tín hiệu của chuỗi xét nghiệm tính tới kết quả này (N-06, N-07). */
+  trend: { signals: EqaSignalView[]; unsuccessful: boolean; j: number; enough: boolean } | null;
+}
+export type EqaSignalView = 'reject' | 'two_of_three' | 'six_same_side' | 'j_score';
+export interface EqaSeriesView {
+  test_id: string; test_name: string; instrument_id: string; instrument_name: string; unit: string; enough: boolean;
+  /** Ngưỡng đang dùng để biểu đồ và xếp loại cùng một cấu hình. */
+  config: { z_warn: number; z_reject: number };
+  /** Số đợt của chương trình có đợt mới nhất — `enough` khi ≥ `min_points`. */
+  rounds: number; j_limit: number; min_points: number;
+  /** Số đợt của từng chương trình; màn xem một chương trình dùng dòng của nó. */
+  programs: { program_id: string; program_name: string; rounds: number; enough: boolean }[];
+  points: {
+    result_id: string; round_id: string; program_id: string; program_name: string; year: number; round: string; sample: string; report_date: string;
+    result: number; assigned: number; z: number; class: EqaClassView; pct: number | null;
+    /** Cùng căn cứ lưu ý với chi tiết đợt, không thay xếp loại chính thức. */
+    assigned_check: EqaResultRow['assigned_check']; provider_check: EqaProviderCheckView; warnings: string[];
+    /** TEa vận hành (%) tại giá trị ấn định của mẫu; null khi xét nghiệm chưa có TEa. */
+    tea_pct: number | null; within_tea: boolean | null;
+    j: number; signals: EqaSignalView[]; unsuccessful: boolean;
+  }[];
+}
+export interface EqaAttentionRow {
+  test_id: string; test_name: string; instrument_id: string; instrument_name: string; points: number;
+  /** Số kết quả có tín hiệu trong đợt mới nhất (mọi mẫu, N-06/N-07). */
+  flagged: number;
+  /** Kết quả nặng nhất trong đợt mới nhất của MỘT chương trình, kèm hợp mọi
+   * tín hiệu của đợt. Một xét nghiệm ở hai chương trình là hai dòng. */
+  latest: { round_id: string; program_id: string; program_name: string; year: number; round: string; sample: string; z: number; class: EqaClassView; signals: EqaSignalView[]; unsuccessful: boolean };
+}
+/** Một đợt trong lịch ngoại kiểm. `status` do main suy ra: đã có báo cáo của
+ * trung tâm > đã nộp > quá hạn > chưa nộp. `days_left`: số ngày tới hạn nộp (âm = đã quá). */
+export type EqaScheduleStatus = 'planned' | 'overdue' | 'submitted' | 'reported';
+/** Một máy chạy mẫu của đợt: đã nộp phiếu kết quả chưa, đã có báo cáo chưa. */
+export interface EqaScheduleInstrument {
+  instrument_id: string; instrument_name: string; submitted_at: string; submitted_by: string;
+  /** Báo cáo của trung tâm đã có kết quả của máy này (coi như đã nộp). */
+  reported: boolean;
+}
+export interface EqaScheduleRow {
+  /** Mỗi lịch có loại mẫu và ngày riêng cho nhóm máy đã chọn của đợt. */
+  id: string; program_id: string; program_name: string; provider: string; sample_type: string;
+  year: number; round: string; round_no: number;
+  receive_date: string; run_date: string; due_date: string; assignee: string; note: string;
+  /** Đợt có khai máy: lần nộp cuối khi đã đủ máy, ngược lại rỗng. */
+  submitted_at: string; submitted_by: string;
+  /** Máy chạy mẫu; rỗng = đợt không khai máy, "đã nộp" ghi cho cả đợt. */
+  instruments: EqaScheduleInstrument[];
+  /** Đợt đã có báo cáo của trung tâm (eqa_rounds đang dùng), nếu có. */
+  round_id: string | null;
+  status: EqaScheduleStatus; days_left: number;
+}
+export interface EqaProgramOption {
+  /** Loại mẫu gợi sẵn từ lịch gần nhất; không phải phân loại chung của chương trình. */
+  id: string; name: string; provider: string; sample_type: string;
+  /** Máy gợi sẵn cho đợt mới: máy của lịch gần nhất, nếu chưa có lịch thì
+   * máy có kết quả ở báo cáo gần nhất của chương trình. */
+  instrument_ids: string[];
+}
+export interface EqaScheduleInput {
+  programId?: string; programName?: string; provider?: string; year: number; round: string;
+  receiveDate?: string; runDate?: string; dueDate: string; assignee?: string; note?: string;
+  sampleType?: string; instrumentIds?: string[];
+}
+/** Thông tin tối thiểu của tài khoản đang hoạt động để chọn người phụ trách. */
+export interface EqaAssigneeOption { id: string; name: string; username: string }
+export interface EqaDecisionRow { id: string; type: string; payload_json: string; actor_name: string; decided_at: string }
+/** Không truyền instrumentId khi xem tất cả máy trong phạm vi. */
+export interface EqaReportScope { programId: string; year: number; roundId?: string; instrumentId?: string }
+export interface EqaNceSource {
+  round: EqaRoundRow; result: EqaResultRow; fingerprint: string;
+  required: boolean; reasons: string[];
+}
+export interface EqaCorrectiveRow extends EqaNceSource {
+  current: boolean;
+  evidence: EqaNceEvidence | null;
+  record: Pick<NceRecordRow, 'id' | 'nce_id' | 'status' | 'owner_name' | 'due_date' | 'overdue_days' | 'open_actions' | 'overdue_actions'> | null;
+}
+export interface EqaNceEvidence extends EqaNceSource {
+  run_date: string; captured_at: string;
+  last_accepted: { round_id: string; round: string; year: number; report_date: string } | null;
+  related_results: EqaResultRow[];
+  iqc_runs: { date: string; run_id: string; complete: boolean; points: { level: number; lot: string; value: number; z: number | null; verdict: string; rules: string[]; voided: boolean }[] }[];
+}
+export type EqaReviewKind = 'preliminary_review' | 'analysis_review' | 'system_review';
+export type EqaReviewAssessment = 'pending' | 'appropriate' | 'not_appropriate';
+export type EqaCarDecision = 'pending' | 'not_required' | 'proposed' | 'recorded';
+export interface EqaCoverageAlternative { testId: string; method: string; reason: string; result: string }
+export interface EqaReviewDraft {
+  scope: EqaReportScope; expectedFingerprint: string; kind: EqaReviewKind;
+  conclusion: string; communication: string; warningNote: string; receivedDate: string; nextReviewDate: string;
+  alternatives: EqaCoverageAlternative[];
+  assessment?: EqaReviewAssessment; carDecision?: EqaCarDecision; carReference?: string; communicationDate?: string;
+}
+export interface EqaReportReview {
+  id: string; kind: EqaReviewKind; conclusion: string; communication: string; warning_note: string;
+  received_date: string; next_review_date: string; actor_name: string; decided_at: string;
+  fingerprint: string; current: boolean; alternatives: EqaCoverageAlternative[];
+  assessment: EqaReviewAssessment; car_decision: EqaCarDecision; car_reference: string; communication_date: string;
+}
+export interface EqaReportView {
+  scope: EqaReportScope; program_name: string; fingerprint: string;
+  rounds: EqaRoundView[]; totals: { total: number; ok: number; warn: number; rej: number; accept_pct: number | null };
+  tests: { test_id: string; test_name: string; instrument_name: string; total: number; ok: number; warn: number; rej: number }[];
+  requires_investigation: boolean; reviews: EqaReportReview[];
+  coverage: { start_date: string; end_date: string; missing: { test_id: string; test_name: string; instrument_name: string }[] };
+}
+export interface EqaRoundView {
+  round: EqaRoundRow; results: EqaResultRow[]; decisions: EqaDecisionRow[];
+  instruments: EqaInstrumentSummary[];
+  config: { z_warn: number; z_reject: number };
+}
+
+export interface SoftwareLicenseStatus {
+  state: 'development' | 'required' | 'active' | 'expired' | 'invalid' | 'unavailable';
+  runtime: 'desktop' | 'development' | 'browser-preview' | 'lan';
+  machine_code: string; license_id: string; licensed_to: string; issued_at: string; expires_at: string | null;
+  message: string;
+}
+
+export interface SoftwareUpdateStatus {
+  phase: 'unsupported' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error';
+  current_version: string; available_version: string; release_notes: string; checked_at: string;
+  percent: number; transferred: number; total: number; message: string;
 }
 
 export interface QcApi {
+  getLicenseStatus(): Promise<SoftwareLicenseStatus>;
+  activateSoftware(input: { data: { activationCode: string } }): Promise<IpcResult<SoftwareLicenseStatus>>;
+  getSoftwareUpdateStatus(): Promise<SoftwareUpdateStatus>;
+  checkSoftwareUpdate(): Promise<IpcResult<SoftwareUpdateStatus>>;
+  downloadSoftwareUpdate(): Promise<IpcResult<SoftwareUpdateStatus>>;
+  installSoftwareUpdate(): Promise<IpcResult<SoftwareUpdateStatus>>;
   hasAnyUsers(): Promise<boolean>;
   currentUser(): Promise<PublicUser | null>;
   bootstrapAdmin(input: { data: { username: string; name: string; password: string } }): Promise<IpcResult<PublicUser>>;
@@ -491,6 +933,8 @@ export interface QcApi {
   /** `initials` giữ để tương thích API cũ nhưng bị main bỏ qua; `pagePerms`
    * bỏ trống = GIỮ NGUYÊN giá trị đang có (không phải xoá). */
   updateUser(input: { id: string; data: { name: string; role: string; active: boolean; initials?: string; pagePerms?: string[] } }): Promise<IpcResult<PublicUser>>;
+  /** Cấp/thu quyền NCE cho một tài khoản (chỉ quản trị viên). */
+  setUserNceCapabilities(input: { id: string; capabilities: string[] }): Promise<IpcResult<PublicUser>>;
   deleteUser(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   resetUserPassword(input: { id: string; data: { newPassword: string } }): Promise<IpcResult<{ id: string }>>;
   changeOwnPassword(input: { data: { oldPassword: string; newPassword: string } }): Promise<IpcResult<{ id: string }>>;
@@ -576,9 +1020,11 @@ export interface QcApi {
   verifyActivityChainNow(): Promise<IpcResult<{ ok: boolean; checked: number; unhashed: number; brokenIndex: number; reason: string }>>;
   archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }>>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
+  getEntryWindow(testId: string, request: EntryWindowRequest): Promise<EntryWindow>;
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */
   listEntryHistoryPoints(testId: string): Promise<HistoryQcPointView[]>;
   listVoidedEntryPoints(testId: string): Promise<VoidedQcPointView[]>;
+  getVoidPointAssessment(pointId: string): Promise<IpcResult<VoidPointAssessment>>;
   listParallelEntryColumns(testId: string): Promise<ParallelEntryColumn[]>;
   listPreviousEntryLotSeries(testId: string): Promise<PreviousLotSeries[]>;
   getRangeCandidate(testId: string, level: number): Promise<IpcResult<RangeCandidateView>>;
@@ -587,42 +1033,90 @@ export interface QcApi {
    * toàn sai số hệ thống; đây không phải đường bỏ qua điều kiện lập dải. */
   applyLabRange(input: { data: { testId: string; level: number; reason: string; causeConfirmed?: boolean; bias?: number; mean?: number; sd?: number } }): Promise<IpcResult<RangeCandidateView>>;
   revertManufacturerRange(input: { data: { testId: string; level: number; reason: string } }): Promise<IpcResult<RangeCandidateView>>;
-  addPoint(input: { data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string } }): Promise<IpcResult<QcPointView>>;
+  /** Điểm làm đổi kết luận của lần chạy đã có (nhập lùi ngày): đổi trạng thái
+   * loại bỏ thì cần `retroReason` ≥10 ký tự, thiếu thì trả lỗi
+   * `retro-reason-required`; lần chạy đổi kết luận thuộc kỳ đã khoá thì trả
+   * `retro-locked`. `retroChanges` liệt kê mọi lần chạy khác đã đổi kết luận. */
+  addPoint(input: { data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string; retroReason?: string } }): Promise<IpcResult<QcPointView & { retroChanges: QcRunConclusionChange[] }>>;
   /** `kind` quyết định có tự mở/dùng lại hồ sơ NCE hay không
    * (`voidNceChoice()` ở `main/domain/entry-validation.ts`): 'analytical'
    * luôn mở NCE, 'data-entry' luôn không mở, 'other' để `openNce` tự chọn và
-   * bắt buộc `reason` ≥5 ký tự (2 kind đầu không bắt buộc, chỉ khuyến nghị). */
-  voidPoint(input: { data: { pointId: string; reason: string; kind?: 'analytical' | 'data-entry' | 'other'; openNce?: boolean } }): Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }>>;
+   * bắt buộc `reason` ≥5 ký tự (2 kind đầu không bắt buộc, chỉ khuyến nghị).
+   * Huỷ điểm làm đổi trạng thái loại bỏ của lần chạy khác cũng cần `reason`
+   * ≥10 ký tự (`reason-required-retro`); chạm kỳ đã khoá thì `retro-locked`. */
+  voidPoint(input: { data: { pointId: string; reason: string; kind?: 'analytical' | 'data-entry' | 'other'; openNce?: boolean } }): Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean; retroChanges: QcRunConclusionChange[] }>>;
   setDayNote(input: { data: { testId: string; date: string; note: string } }): Promise<IpcResult<{ note: string; updated: number }>>;
   listTestSummaries(): Promise<TestSummary[]>;
   analyzeLevel(testId: string, level: number): Promise<LevelAnalysis>;
   saveRuleAction(testId: string, ruleId: string, action: 'inactive' | 'alert' | 'reject' | ''): Promise<IpcResult<{ ruleId: string; action: 'inactive' | 'alert' | 'reject' | '' }>>;
-  listRuleSettings(): Promise<RuleSetting[]>;
+  /** `levelCount`: số mức QC của xét nghiệm đang xem, để hiện mặc định đúng nhóm. */
+  listRuleSettings(levelCount?: number): Promise<RuleSetting[]>;
   saveRuleSetting(ruleId: string, on: boolean): Promise<IpcResult<{ ruleId: string; on: boolean }>>;
-  resetRuleSettings(): Promise<IpcResult<RuleSetting[]>>;
+  resetRuleSettings(levelCount?: number): Promise<IpcResult<RuleSetting[]>>;
   listArchivedBlocks(testId: string, groupId: string): Promise<ArchivedBlock[]>;
   listArchivedGroupTests(groupId: string): Promise<{ id: string; label: string }[]>;
   /** Chuỗi lô cũ của từng mức đang vận hành — công tắc "Xem lô cũ" trên trang
    * Phân tích Westgard. Cùng hình dạng `ArchivedBlock` với tab nhóm lô đã dừng. */
   listPreviousLotBlocks(testId: string): Promise<ArchivedBlock[]>;
-  listSigmaPeriods(testId: string): Promise<SigmaPeriodView[]>;
+  listPreviousLotLevels(testId: string): Promise<number[]>;
+  listSigmaPeriods(testId: string, teaMode?: SigmaTeaMode): Promise<SigmaPeriodView[]>;
   listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
+  /** Mẫu ngoại kiểm đề xuất làm Bias cho một mức QC của kỳ Sigma; null khi tham số sai. */
+  getSigmaEqaBias(testId: string, period: string, level: number, windowMonths?: number): Promise<SigmaEqaBiasView | null>;
   saveSigmaTeaConfig(input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }): Promise<IpcResult<Test>>;
-  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
+  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Nạp lại cohort là thao tác chủ động, không phải lưu Bias/MU. */ refreshCohort?: boolean; cohortFingerprint?: string; /** Xác nhận rà soát theo SOP; main ghi người/thời điểm và dấu vân tay dữ liệu. */ cohortReviewed?: boolean; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number; eqaResultId?: string; label?: string }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean; /** Chủ động thay Bias chung của mọi mức trong kỳ; không dùng khi chỉ sửa CV/MU. */ sharedEqaRounds?: Array<{ lab: number; target: number; eqaResultId?: string; label?: string }>; eqaWindowMonths?: number }): Promise<IpcResult<SigmaPeriodView>>;
   renameSigmaPeriod(input: { id: string; period: string }): Promise<IpcResult<SigmaPeriodView>>;
   removeSigmaPeriod(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
-  listNceRecords(): Promise<NceRecord[]>;
-  createNce(input: { data: { testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string; errorType?: string; correction: string; dueDate?: string; investigation?: string; causeCategory?: string; causeDescription?: string; protocol?: Partial<NceDetail> } }): Promise<IpcResult<NceRecord>>;
-  /** Lưu tiến độ protocol-v3; phê duyệt vẫn có cổng đầy đủ ở main process. */
-  saveNceProtocol(input: { data: { id: string; dueDate?: string; protocol: Partial<NceDetail> } }): Promise<IpcResult<NceRecord>>;
-  approveNce(input: { data: { id: string } }): Promise<IpcResult<NceRecord>>;
-  returnNce(input: { data: { id: string; note: string } }): Promise<IpcResult<NceRecord>>;
-  cancelNce(input: { data: { id: string; note: string } }): Promise<IpcResult<NceRecord>>;
-  setNceCompletedDate(input: { data: { id: string; actionCompletedDate: string } }): Promise<IpcResult<NceRecord>>;
-  markNceEffectiveness(input: { data: { id: string; status: 'effective' | 'ineffective'; residualRisk?: string; note?: string } }): Promise<IpcResult<NceRecord>>;
-  setNceReleaseDecision(input: { data: { id: string; decision: 'held' | 'released'; note: string } }): Promise<IpcResult<NceRecord>>;
-  setNceRerunEvidence(input: { data: { id: string; rerunPointId: string; note?: string } }): Promise<IpcResult<NceRecord>>;
-  reopenNce(input: { data: { id: string; note?: string } }): Promise<IpcResult<NceRecord>>;
+  listNceQueue(): Promise<NceQueueRowView[]>;
+  listNce(): Promise<NceRecordRow[]>;
+  getNce(id: string): Promise<NceDossierView | null>;
+  listNceUsers(): Promise<NceUserOption[]>;
+  getNceConfig(): Promise<NceConfigView>;
+  saveNceConfig(input: { data: NceConfigView }): Promise<IpcResult<NceConfigView>>;
+  /** Đánh giá thử lần chạy rerun/xác minh trong giai đoạn mới, không ghi gì. */
+  previewNceRelease(input: { data: { id: string; rerun: NceRunKeyView; lotChangeNote?: string } }): Promise<IpcResult<NceReleasePreview>>;
+  // Ngoại kiểm
+  listEqaRounds(): Promise<EqaRoundRow[]>;
+  getEqaRound(id: string): Promise<EqaRoundView | null>;
+  /** Có reviewId: đọc số liệu và chữ ký đã chụp tại thời điểm ký phiếu đó. */
+  getEqaReport(scope: EqaReportScope, reviewId?: string): Promise<EqaReportView>;
+  listEqaCorrective(scope: EqaReportScope): Promise<EqaCorrectiveRow[]>;
+  getEqaCorrectiveEvidence(input: { resultId: string; runDate?: string }): Promise<EqaNceEvidence>;
+  reviewEqaReport(input: { data: EqaReviewDraft }): Promise<IpcResult<EqaReportView>>;
+  /** Chuỗi z/J của một xét nghiệm qua các đợt. */
+  getEqaSeries(testId: string): Promise<EqaSeriesView | null>;
+  /** Xét nghiệm đang có tín hiệu hoặc không thành công ở đợt mới nhất. */
+  listEqaAttention(input?: { programId?: string; year?: number; instrumentId?: string }): Promise<EqaAttentionRow[]>;
+  getEqaInstrumentGrid(input: { programId: string; year: number; instrumentId: string }): Promise<EqaInstrumentGridRow[]>;
+  listEqaSchedule(): Promise<EqaScheduleRow[]>;
+  listEqaPrograms(): Promise<EqaProgramOption[]>;
+  listEqaAssignees(): Promise<EqaAssigneeOption[]>;
+  saveEqaSchedule(input: { id?: string; data: EqaScheduleInput }): Promise<IpcResult<EqaScheduleRow>>;
+  /** Đợt có khai máy: `instrumentIds` là các máy đã nộp (máy khác bỏ đánh dấu);
+   * không gửi thì `submitted` áp cho mọi máy. */
+  markEqaSubmitted(input: { data: { id: string; submitted?: boolean; instrumentIds?: string[] } }): Promise<IpcResult<EqaScheduleRow>>;
+  removeEqaSchedule(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
+  /** Kiểm và tính thử một lần nhập; không ghi gì. */
+  previewEqaImport(input: { data: EqaImportInput }): Promise<IpcResult<EqaImportPreview>>;
+  importEqaRound(input: { data: EqaImportInput }): Promise<IpcResult<EqaRoundView>>;
+  cancelEqaRound(input: { data: { id: string; expectedVersion: number; reason: string } }): Promise<IpcResult<EqaRoundView>>;
+  /** IQC chỉ gửi khoá lần chạy; main tự đọc xét nghiệm, mức, lô, luật, verdict. */
+  createNce(input: { data: { source: NceSource; phase?: 'pre' | 'exam' | 'post'; testId?: string; trigger?: NceRunKeyView; eqaResultId?: string; expectedEqaFingerprint?: string; eqaRunDate?: string; description: string; correction: string; holdResults: boolean; detectedAt: string; ownerUserId: string; dueDate?: string } }): Promise<IpcResult<NceDossierView>>;
+  attachNceRun(input: { data: NceWriteBase & { run: NceRunKeyView } }): Promise<IpcResult<NceDossierView>>;
+  /** Đính chính ngày lưu riêng, cần nce.release, chỉ khi open; giữ lịch sử và lý do. */
+  updateNce(input: { data: NceWriteBase & { patch: Record<string, unknown>; detectedAtCorrection?: { detectedAt: string; reason: string } } }): Promise<IpcResult<NceDossierView>>;
+  addNceAction(input: { data: NceWriteBase & { action: { kind: string; description: string; ownerUserId: string; dueDate: string } } }): Promise<IpcResult<NceDossierView>>;
+  updateNceAction(input: { data: NceWriteBase & { actionId: string; action: { kind: string; description: string; ownerUserId: string; dueDate: string } } }): Promise<IpcResult<NceDossierView>>;
+  completeNceAction(input: { data: NceWriteBase & { actionId: string; doneAt: string; evidence: string } }): Promise<IpcResult<NceDossierView>>;
+  cancelNceAction(input: { data: NceWriteBase & { actionId: string; reason: string } }): Promise<IpcResult<NceDossierView>>;
+  recordNceTechnicalAssessment(input: { data: NceWriteBase & { assessment: NceTechnicalAssessmentInput } }): Promise<IpcResult<NceDossierView>>;
+  recordNcePatientImpact(input: { data: NceWriteBase & { impact: { outcome: string; description: string; resultCount?: number | null; reference?: string; notified?: string } } }): Promise<IpcResult<NceDossierView>>;
+  releaseNce(input: { data: NceWriteBase & { release: { reason: string; rerun?: NceRunKeyView | null; lotChangeNote?: string; notApplicable?: boolean } } }): Promise<IpcResult<NceDossierView>>;
+  reviewNceEffectiveness(input: { data: NceWriteBase & { review: { result: string; reviewedAt: string; evidence: string; residualSeverity?: number; residualProbability?: number; residualLevel?: string; residualBasis?: string } } }): Promise<IpcResult<NceDossierView>>;
+  submitNce(input: { data: NceWriteBase }): Promise<IpcResult<NceDossierView>>;
+  approveNce(input: { data: NceWriteBase & { note?: string } }): Promise<IpcResult<NceDossierView>>;
+  returnNce(input: { data: NceWriteBase & { note: string } }): Promise<IpcResult<NceDossierView>>;
+  cancelNce(input: { data: NceWriteBase & { reason: string } }): Promise<IpcResult<NceDossierView>>;
   listReagentComparisons(): Promise<ReagentComparisonView[]>;
   createReagentComparison(input: { data: { name?: string; unit?: string } }): Promise<IpcResult<ReagentComparisonView>>;
   saveReagentMetadata(input: { id: string; data: { reagent?: string; lotOld?: string; lotNew?: string; date?: string; operator?: string; sampleType?: string; unit?: string; biasTarget?: number; alpha?: number; coverageConfirmed?: boolean } }): Promise<IpcResult<ReagentComparisonView>>;
@@ -638,13 +1132,16 @@ export interface QcApi {
   saveLabProfile(input: { data: { name?: string; dept?: string; address?: string; brandTitle?: string; brandSub?: string; logoText?: string; logoData?: string; clearLogo?: boolean } }): Promise<IpcResult<LabProfile>>;
   getStorageInfo(): Promise<StorageInfo>;
   getReportTemplateSettings(): Promise<ReportTemplateSettings>;
-  saveReportTemplateSettings(input: { data: { formCode?: string; version?: string } }): Promise<IpcResult<ReportTemplateSettings>>;
+  saveReportTemplateSettings(input: { data: { kind: ReportFormKind; formCode?: string; version?: string; effectiveDate?: string } }): Promise<IpcResult<ReportTemplateSettings>>;
   getFirebaseSettings(): Promise<FirebaseSettings>;
   connectFirebase(input: { data: { labCode?: string; email?: string; password?: string; config?: string } }): Promise<IpcResult<FirebaseConnectResult>>;
   syncFirebase(input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>>;
   disconnectFirebase(): Promise<IpcResult<null>>;
   listPeriodLocks(): Promise<PeriodLockRow[]>;
-  lockPeriod(input: { data: { ym: string; note?: string } }): Promise<IpcResult<PeriodLockRow>>;
+  /** `acknowledge`: đã xem việc còn tồn của kỳ (lỗi `period-open-items`) và vẫn khoá. */
+  getQcMonthlyReview(ym: string): Promise<QcMonthlyReview>;
+  signQcMonthlyReview(input: { data: { ym: string; conclusion: QcReviewConclusion; note?: string } }): Promise<IpcResult<QcMonthlyReviewSignature>>;
+  lockPeriod(input: { data: { ym: string; note?: string; acknowledge?: boolean } }): Promise<IpcResult<PeriodLockRow>>;
   unlockPeriod(input: { data: { ym: string; note: string } }): Promise<IpcResult<{ ym: string }>>;
   queryReport(input: { testId: string; from?: string; to?: string }): Promise<ReportPointRow[]>;
   /** Excel thật qua `exceljs` (main process), trả base64 để
@@ -661,8 +1158,9 @@ export interface QcApi {
   chooseBackupFile(): Promise<IpcResult<BackupFileSummary | null>>;
   /** Phục hồi từ tệp vừa kiểm tra ở `chooseBackupFile()`; luôn tạo bản an
    * toàn của dữ liệu hiện tại trước khi thay thế. */
-  importBackup(): Promise<IpcResult<{ preRestoreSnapshotPath: string }>>;
-  backupStatus(): Promise<{ lastBackupAt: string | null; lastBackupBytes: number }>;
+  /** `signedOut`: tài khoản đang đăng nhập không có trong dữ liệu vừa phục hồi, main đã kết thúc phiên. */
+  importBackup(input?: { keepAccounts?: boolean }): Promise<IpcResult<{ preRestoreSnapshotPath: string; signedOut?: boolean }>>;
+  backupStatus(): Promise<BackupStatus>;
   /** Ghi lỗi không được bắt của renderer vào tệp log của máy chính. Chỉ cửa
    * sổ Electron của máy chính gọi được; máy trạm LAN không mở kênh này. */
   reportClientError(input: { message: string; stack?: string }): Promise<IpcResult<null>>;
@@ -673,8 +1171,12 @@ export interface QcApi {
    * dùng chọn; `data: null` khi huỷ hộp thoại. Không kèm CSDL. Chỉ quản trị
    * viên, chỉ máy chính. */
   exportLogBundle(): Promise<IpcResult<{ path: string; files: number; bytes: number } | null>>;
-  /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. */
+  /** Khởi tạo lại dữ liệu vận hành; giữ tài khoản và nhật ký. Bị chặn
+   * (`operation-mode`) khi đã bật chế độ vận hành. */
   resetOperationalData(): Promise<IpcResult<{ preResetSnapshotPath: string; clearedTables: string[] }>>;
+  /** Bật chế độ vận hành — một chiều, không tắt được. Renderer xác thực lại
+   * mật khẩu trước khi gọi. Chỉ quản trị viên, chỉ máy chính. */
+  enableOperationMode(): Promise<IpcResult<OperationModeState>>;
 
   getLisSettings(): Promise<LisGatewaySettings>;
   saveLisSettings(input: { data: { enabled: boolean; url: string; token: string } }): Promise<IpcResult<LisGatewaySettings>>;
@@ -687,8 +1189,25 @@ export interface QcApi {
   onStoreChanged(callback: (payload: { tables: string[]; testIds: string[] }) => void): () => void;
 }
 
+/** Công cụ cấp mã riêng của bên phát hành; không lộ qua qcApi của khách hàng. */
+export interface LicenseIssuerInput { machineCode: string; licensedTo: string; expiresOn: string | null }
+export interface LicenseIssuerLicense {
+  activation_code: string; license_id: string; licensed_to: string;
+  machine_code: string; issued_at: string; expires_at: string | null;
+}
+export interface LicenseIssuerStatus { key_path: string; key_ready: boolean; key_message: string }
+export interface LicenseIssuerApi {
+  status(): Promise<LicenseIssuerStatus>;
+  chooseKey(): Promise<IpcResult<LicenseIssuerStatus | null>>;
+  issue(input: LicenseIssuerInput): Promise<IpcResult<LicenseIssuerLicense>>;
+  copy(): Promise<IpcResult<null>>;
+  save(): Promise<IpcResult<{ path: string } | null>>;
+  discard(): Promise<void>;
+}
+
 declare global {
   interface Window {
     qcApi: QcApi;
+    licenseIssuer?: LicenseIssuerApi;
   }
 }

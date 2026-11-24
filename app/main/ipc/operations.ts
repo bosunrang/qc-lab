@@ -22,6 +22,7 @@
 import type { QcApi } from '../../shared/qc-api';
 import { describeError, logEvent } from '../logging/log-sink';
 import type { Actor } from './shared';
+import { canWriteRole } from '../domain/page-roles';
 import type { createAuditHandlers } from './audit-handlers';
 import type { createAuthHandlers } from './auth-handlers';
 import type { createConfigHandlers } from './config-handlers';
@@ -29,6 +30,7 @@ import type { createEntryHandlers } from './entry-handlers';
 import type { createLisHandlers } from './lis-handlers';
 import type { createNceHandlers } from './nce-handlers';
 import type { createReagentHandlers } from './reagent-handlers';
+import type { createEqaHandlers } from './eqa-handlers';
 import type { createReportHandlers } from './report-handlers';
 import type { createSettingsHandlers } from './settings-handlers';
 import type { createSigmaHandlers } from './sigma-handlers';
@@ -59,7 +61,8 @@ export type OperationTable<N extends ApiName> = { [K in N]: Operation<K> };
 /** Thao tác cần tài nguyên riêng của từng môi trường chạy (phiên đăng nhập,
  * hộp thoại tệp, cửa sổ in, Firebase, backup trên đĩa). Electron khai ở
  * `desktop-operations.ts`, bản xem trước tự cài ở `real-api.ts`. */
-export type HostApiName =
+export type SoftwareApiName = 'getLicenseStatus' | 'activateSoftware' | 'getSoftwareUpdateStatus' | 'checkSoftwareUpdate' | 'downloadSoftwareUpdate' | 'installSoftwareUpdate';
+export type HostApiName = SoftwareApiName
   | 'currentUser' | 'bootstrapAdmin' | 'login' | 'logout'
   | 'getFirebaseSettings' | 'connectFirebase' | 'syncFirebase' | 'disconnectFirebase'
   | 'exportTableXlsx' | 'printHtmlToPdf'
@@ -76,6 +79,7 @@ export interface BusinessHandlers {
   sigma: ReturnType<typeof createSigmaHandlers>;
   nce: ReturnType<typeof createNceHandlers>;
   reagent: ReturnType<typeof createReagentHandlers>;
+  eqa: ReturnType<typeof createEqaHandlers>;
   settings: ReturnType<typeof createSettingsHandlers>;
   report: ReturnType<typeof createReportHandlers>;
   lis: ReturnType<typeof createLisHandlers>;
@@ -86,6 +90,20 @@ export interface BusinessHandlers {
 export class NotSignedInError extends Error {
   readonly code = 'unauthenticated';
   constructor() { super('Chưa đăng nhập.'); }
+}
+
+/** Lời gọi bị cổng quyền (`access-gate.ts`) chặn: không có quyền vào trang của
+ * thao tác, hoặc tài khoản phải đổi mật khẩu trước. Lỗi dự kiến nên không ghi
+ * log lỗi như lỗi lập trình. */
+export class AccessError extends Error {
+  constructor(readonly code: 'forbidden' | 'password-change-required' | 'activation-required', message: string) { super(message); }
+}
+
+/** Cổng quyền chạy trước MỌI thao tác (GV5): đọc lại tài khoản từ CSDL, chặn
+ * theo trang và theo cờ phải đổi mật khẩu, trả ngữ cảnh mang vai trò mới
+ * nhất. Ném `NotSignedInError`/`AccessError` khi không cho chạy. */
+export interface AccessGate {
+  guard(channel: string, ctx: CallContext): CallContext;
 }
 
 /** Ngữ cảnh đọc danh tính từ một phiên đang giữ trong bộ nhớ (máy chính,
@@ -109,13 +127,14 @@ export function sessionContext(current: () => Actor | null): CallContext {
 
 type DataApiName = { [K in ApiName]: Result<K> extends { ok: boolean } ? never : K }[ApiName];
 const DATA_API_NAMES = [
+  'getLicenseStatus', 'getSoftwareUpdateStatus',
   'hasAnyUsers', 'currentUser', 'listInstruments', 'listTests', 'listTestLevels', 'listPlannedTargets',
   'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
-  'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
+  'listTeaRefs', 'queryPoints', 'getEntryWindow', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
-  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'listNceRecords',
-  'listReagentComparisons', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
-  'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'backupStatus', 'getLisSettings',
+  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listPreviousLotLevels', 'listSigmaPeriods', 'listSigmaCohorts', 'getSigmaEqaBias', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
+  'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'listEqaAssignees', 'getEqaRound', 'getEqaReport', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'listEqaCorrective', 'getEqaCorrectiveEvidence', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
+  'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
 // Trình biên dịch báo tên còn thiếu nếu `QcApi` có thêm hàm trả thẳng dữ liệu
 // mà danh sách trên chưa ghi.
@@ -127,7 +146,7 @@ const DATA_APIS: ReadonlySet<string> = new Set(DATA_API_NAMES);
 /** Chuyển exception thành `IpcResult` lỗi. Lỗi ngoài dự kiến ghi ra console
  * và tệp log của main để lần được, vì renderer chỉ thấy câu thông báo. */
 export function errorResult(error: unknown, operation?: string): { ok: false; error: { code: string; message: string } } {
-  if (error instanceof NotSignedInError) return { ok: false, error: { code: error.code, message: error.message } };
+  if (error instanceof NotSignedInError || error instanceof AccessError) return { ok: false, error: { code: error.code, message: error.message } };
   console.error(error);
   const described = describeError(error);
   logEvent({ level: 'error', source: 'ipc', message: operation ? `${operation}: ${described.message}` : described.message, detail: described.stack });
@@ -135,10 +154,12 @@ export function errorResult(error: unknown, operation?: string): { ok: false; er
   return { ok: false, error: { code: 'internal-error', message } };
 }
 
-async function invokeOperation(name: string, operation: AnyOperation, ctx: CallContext, args: unknown[]): Promise<unknown> {
-  if (DATA_APIS.has(name)) return operation.run(ctx, ...args);
+async function invokeOperation(name: string, operation: AnyOperation, ctx: CallContext, args: unknown[], gate?: AccessGate): Promise<unknown> {
+  // Cổng quyền nằm TRONG phần bọc lỗi: thao tác trả `IpcResult` nhận
+  // `{ ok:false, code }`, thao tác đọc ném lỗi như mọi lỗi đọc khác.
+  if (DATA_APIS.has(name)) return operation.run(gate ? gate.guard(operation.channel, ctx) : ctx, ...args);
   try {
-    return await operation.run(ctx, ...args);
+    return await operation.run(gate ? gate.guard(operation.channel, ctx) : ctx, ...args);
   } catch (error) {
     return errorResult(error, name);
   }
@@ -147,7 +168,14 @@ async function invokeOperation(name: string, operation: AnyOperation, ctx: CallC
 /** Các thao tác nghiệp vụ chỉ gọi handler của `main/ipc`, giống nhau ở mọi
  * môi trường chạy. */
 export function createBusinessOperations(h: BusinessHandlers): OperationTable<BusinessApiName> {
-  const { auth, config, audit, entry, westgard, sigma, nce, reagent, settings, report, lis } = h;
+  const { auth, config, audit, entry, westgard, sigma, nce, reagent, eqa, settings, report, lis } = h;
+  // Bản tóm tắt phục vụ Tổng quan/Báo cáo vẫn mở cho người chỉ xem đã đăng
+  // nhập. Hồ sơ chi tiết, hàng chờ và danh sách nhân sự chỉ dành cho NCE.
+  const nceReader = (ctx: CallContext) => {
+    const actor = ctx.actor();
+    if (!canWriteRole(actor.role)) throw new Error('Bạn không có quyền xem hồ sơ chi tiết khắc phục sự cố.');
+    return actor;
+  };
   return {
     hasAnyUsers: { channel: 'auth:hasAnyUsers', lan: true, run: () => auth.hasAnyUsers() },
     listUsers: { channel: 'auth:listUsers', lan: false, run: (ctx) => auth.listUsers(ctx.actor()) },
@@ -155,6 +183,7 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     updateUser: { channel: 'auth:updateUser', lan: false, run: (ctx, input) => auth.updateUser(input, ctx.actor()) },
     deleteUser: { channel: 'auth:deleteUser', lan: false, run: (ctx, input) => auth.deleteUser(input, ctx.actor()) },
     resetUserPassword: { channel: 'auth:resetPassword', lan: false, run: (ctx, input) => auth.resetPassword(input, ctx.actor()) },
+    setUserNceCapabilities: { channel: 'auth:setNceCapabilities', lan: false, run: (ctx, input) => auth.setNceCapabilities(input, ctx.actor()) },
     changeOwnPassword: { channel: 'auth:changeOwnPassword', lan: true, run: (ctx, input) => auth.changeOwnPassword(input, ctx.actor()) },
     verifyOwnPassword: { channel: 'auth:verifyPassword', lan: true, run: (ctx, input) => auth.verifyOwnPassword(input, ctx.actor()) },
     setAvatar: { channel: 'auth:setAvatar', lan: true, run: (ctx, input) => auth.setAvatar(input, ctx.actor()) },
@@ -202,8 +231,12 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     archiveActivity: { channel: 'audit:archive', lan: false, run: (ctx, input) => audit.archive(input, ctx.actor()) },
 
     queryPoints: { channel: 'entry:queryPoints', lan: true, run: (_ctx, testId, level) => entry.queryPoints(testId, level) },
+    // Máy trạm đọc cùng dữ liệu theo khoảng như máy chính để nhập và kiểm tra QC.
+    getEntryWindow: { channel: 'entry:getWindow', lan: true, run: (_ctx, testId, request) => entry.getEntryWindow(testId, request) },
     listEntryHistoryPoints: { channel: 'entry:listHistoryPoints', lan: true, run: (_ctx, testId) => entry.listHistoryPoints(testId) },
     listVoidedEntryPoints: { channel: 'entry:listVoidedPoints', lan: true, run: (_ctx, testId) => entry.listVoidedPoints(testId) },
+    // Máy trạm được đọc cùng căn cứ phân loại trước khi huỷ điểm QC.
+    getVoidPointAssessment: { channel: 'entry:voidPointAssessment', lan: true, run: (_ctx, pointId) => entry.getVoidPointAssessment(pointId) },
     listParallelEntryColumns: { channel: 'entry:listParallelColumns', lan: true, run: (_ctx, testId) => entry.listParallelColumns(testId) },
     listPreviousEntryLotSeries: { channel: 'entry:listPreviousLotSeries', lan: true, run: (_ctx, testId) => entry.listPreviousLotSeries(testId) },
     getRangeCandidate: { channel: 'entry:rangeCandidate', lan: true, run: (_ctx, testId, level) => entry.rangeCandidate(testId, level) },
@@ -218,31 +251,66 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     // Ba dòng cấu hình luật dưới đây chỉ cần quyền ghi nhưng vẫn là việc quản
     // trị, nên không mở qua LAN.
     saveRuleAction: { channel: 'westgard:saveRuleAction', lan: false, run: (ctx, testId, ruleId, action) => westgard.saveRuleAction(testId, ruleId, action, ctx.actor()) },
-    listRuleSettings: { channel: 'westgard:listRuleSettings', lan: true, run: () => westgard.listRuleSettings() },
+    listRuleSettings: { channel: 'westgard:listRuleSettings', lan: true, run: (_ctx, levelCount) => westgard.listRuleSettings(levelCount) },
     saveRuleSetting: { channel: 'westgard:saveRuleSetting', lan: false, run: (ctx, ruleId, on) => westgard.saveRuleSetting(ruleId, on, ctx.actor()) },
-    resetRuleSettings: { channel: 'westgard:resetRuleSettings', lan: false, run: (ctx) => westgard.resetRuleSettings(ctx.actor()) },
+    resetRuleSettings: { channel: 'westgard:resetRuleSettings', lan: false, run: (ctx, levelCount) => westgard.resetRuleSettings(levelCount, ctx.actor()) },
     listArchivedBlocks: { channel: 'westgard:listArchivedBlocks', lan: true, run: (_ctx, testId, groupId) => westgard.listArchivedBlocks(testId, groupId) },
     listArchivedGroupTests: { channel: 'westgard:listArchivedGroupTests', lan: true, run: (_ctx, groupId) => westgard.listArchivedGroupTests(groupId) },
     listPreviousLotBlocks: { channel: 'westgard:listPreviousLotBlocks', lan: true, run: (_ctx, testId) => westgard.listPreviousLotBlocks(testId) },
+    // Kiểm tra mức có lô cũ để hiện nút, dữ liệu chi tiết chỉ tải khi mở lô.
+    listPreviousLotLevels: { channel: 'westgard:listPreviousLotLevels', lan: true, run: (_ctx, testId) => westgard.listPreviousLotLevels(testId) },
 
-    listSigmaPeriods: { channel: 'sigma:listPeriods', lan: true, run: (_ctx, testId) => sigma.listPeriods(testId) },
+    listSigmaPeriods: { channel: 'sigma:listPeriods', lan: true, run: (_ctx, testId, teaMode) => sigma.listPeriods(testId, teaMode) },
     listSigmaCohorts: { channel: 'sigma:listCohorts', lan: true, run: (_ctx, testId, period, levels) => sigma.listCohorts(testId, period, levels) },
+    getSigmaEqaBias: { channel: 'sigma:eqaBias', lan: true, run: (_ctx, testId, period, level, windowMonths) => sigma.eqaBias(testId, period, level, windowMonths) },
     saveSigmaTeaConfig: { channel: 'sigma:saveTeaConfig', lan: true, run: (ctx, input) => sigma.saveTeaConfig(input, ctx.actor()) },
     saveSigmaPeriod: { channel: 'sigma:savePeriod', lan: true, run: (ctx, input) => sigma.savePeriod(input, ctx.actor()) },
     renameSigmaPeriod: { channel: 'sigma:renamePeriod', lan: true, run: (ctx, input) => sigma.renamePeriod(input, ctx.actor()) },
     removeSigmaPeriod: { channel: 'sigma:removePeriod', lan: false, run: (ctx, input) => sigma.removePeriod(input, ctx.actor()) },
 
-    listNceRecords: { channel: 'nce:listRecords', lan: true, run: () => nce.listRecords() },
-    createNce: { channel: 'nce:create', lan: true, run: (ctx, input) => nce.create(input, ctx.actor()) },
-    saveNceProtocol: { channel: 'nce:saveProtocol', lan: true, run: (ctx, input) => nce.saveProtocol(input, ctx.actor()) },
-    approveNce: { channel: 'nce:approve', lan: true, run: (ctx, input) => nce.approve(input, ctx.actor()) },
-    returnNce: { channel: 'nce:returnForRevision', lan: true, run: (ctx, input) => nce.returnForRevision(input, ctx.actor()) },
-    cancelNce: { channel: 'nce:cancel', lan: true, run: (ctx, input) => nce.cancel(input, ctx.actor()) },
-    setNceCompletedDate: { channel: 'nce:setActionCompletedDate', lan: true, run: (ctx, input) => nce.setActionCompletedDate(input, ctx.actor()) },
-    markNceEffectiveness: { channel: 'nce:markEffectiveness', lan: true, run: (ctx, input) => nce.markEffectiveness(input, ctx.actor()) },
-    setNceReleaseDecision: { channel: 'nce:setReleaseDecision', lan: true, run: (ctx, input) => nce.setReleaseDecision(input, ctx.actor()) },
-    setNceRerunEvidence: { channel: 'nce:setRerunEvidence', lan: true, run: (ctx, input) => nce.setRerunEvidence(input, ctx.actor()) },
-    reopenNce: { channel: 'nce:reopen', lan: true, run: (ctx, input) => nce.reopenNce(input, ctx.actor()) },
+    listNce: { channel: 'nce:list', lan: true, run: (ctx) => { ctx.actor(); return nce.listNce(); } },
+    listNceQueue: { channel: 'nce:listQueue', lan: true, run: (ctx) => { nceReader(ctx); return nce.listNceQueue(); } },
+    getNce: { channel: 'nce:get', lan: true, run: (ctx, id) => nce.getNce(id, nceReader(ctx)) },
+    listNceUsers: { channel: 'nce:listUsers', lan: true, run: (ctx) => { nceReader(ctx); return nce.listNceUsers(); } },
+    getNceConfig: { channel: 'nce:getConfig', lan: true, run: (ctx) => { nceReader(ctx); return nce.getNceConfig(); } },
+    saveNceConfig: { channel: 'nce:saveConfig', lan: false, run: (ctx, input) => nce.saveNceConfig(input, ctx.actor()) },
+    previewNceRelease: { channel: 'nce:previewRelease', lan: true, run: (ctx, input) => { nceReader(ctx); return nce.previewNceRelease(input); } },
+    // Ngoại kiểm: đọc mở cho mọi vai trò đã đăng nhập; xem trước là bước của luồng nhập nên cần quyền ghi.
+    listEqaRounds: { channel: 'eqa:listRounds', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaRounds(); } },
+    getEqaRound: { channel: 'eqa:getRound', lan: true, run: (ctx, id) => { ctx.actor(); return eqa.getEqaRound(id); } },
+    listEqaCorrective: { channel: 'eqa:listCorrective', lan: true, run: (ctx, scope) => { ctx.actor(); return eqa.listEqaCorrective(scope); } },
+    getEqaCorrectiveEvidence: { channel: 'eqa:getCorrectiveEvidence', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.getEqaCorrectiveEvidence(input); } },
+    getEqaReport: { channel: 'eqa:getReport', lan: true, run: (ctx, scope, reviewId) => { ctx.actor(); return eqa.getEqaReport(scope, reviewId); } },
+    reviewEqaReport: { channel: 'eqa:reviewReport', lan: true, run: (ctx, input) => eqa.reviewEqaReport(input, ctx.actor()) },
+    getEqaSeries: { channel: 'eqa:getSeries', lan: true, run: (ctx, testId) => { ctx.actor(); return eqa.getEqaSeries(testId); } },
+    listEqaAttention: { channel: 'eqa:listAttention', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.listEqaAttention(input); } },
+    getEqaInstrumentGrid: { channel: 'eqa:getInstrumentGrid', lan: true, run: (ctx, input) => { ctx.actor(); return eqa.getEqaInstrumentGrid(input); } },
+    previewEqaImport: { channel: 'eqa:previewImport', lan: true, run: (ctx, input) => { nceReader(ctx); return eqa.previewEqaImport(input); } },
+    importEqaRound: { channel: 'eqa:importRound', lan: true, run: (ctx, input) => eqa.importEqaRound(input, ctx.actor()) },
+    cancelEqaRound: { channel: 'eqa:cancelRound', lan: true, run: (ctx, input) => eqa.cancelEqaRound(input, ctx.actor()) },
+    // Lịch và hạn nộp ngoại kiểm: việc của KTV, cùng nhóm với nhập báo cáo.
+    listEqaSchedule: { channel: 'eqa:listSchedule', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaSchedule(); } },
+    listEqaPrograms: { channel: 'eqa:listPrograms', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaPrograms(); } },
+    // KTV chọn người phụ trách ở máy trạm; chỉ trả danh tính, không mở quyền quản trị người dùng.
+    listEqaAssignees: { channel: 'eqa:listAssignees', lan: true, run: (ctx) => { ctx.actor(); return eqa.listEqaAssignees(); } },
+    saveEqaSchedule: { channel: 'eqa:saveSchedule', lan: true, run: (ctx, input) => eqa.saveEqaSchedule(input, ctx.actor()) },
+    markEqaSubmitted: { channel: 'eqa:markSubmitted', lan: true, run: (ctx, input) => eqa.markEqaSubmitted(input, ctx.actor()) },
+    removeEqaSchedule: { channel: 'eqa:removeSchedule', lan: true, run: (ctx, input) => eqa.removeEqaSchedule(input, ctx.actor()) },
+    createNce: { channel: 'nce:create', lan: true, run: (ctx, input) => nce.createNce(input, ctx.actor()) },
+    attachNceRun: { channel: 'nce:attachRun', lan: true, run: (ctx, input) => nce.attachNceRun(input, ctx.actor()) },
+    updateNce: { channel: 'nce:update', lan: true, run: (ctx, input) => nce.updateNce(input, ctx.actor()) },
+    addNceAction: { channel: 'nce:addAction', lan: true, run: (ctx, input) => nce.addNceAction(input, ctx.actor()) },
+    updateNceAction: { channel: 'nce:updateAction', lan: true, run: (ctx, input) => nce.updateNceAction(input, ctx.actor()) },
+    completeNceAction: { channel: 'nce:completeAction', lan: true, run: (ctx, input) => nce.completeNceAction(input, ctx.actor()) },
+    cancelNceAction: { channel: 'nce:cancelAction', lan: true, run: (ctx, input) => nce.cancelNceAction(input, ctx.actor()) },
+    recordNceTechnicalAssessment: { channel: 'nce:recordTechnicalAssessment', lan: true, run: (ctx, input) => nce.recordNceTechnicalAssessment(input, ctx.actor()) },
+    recordNcePatientImpact: { channel: 'nce:recordPatientImpact', lan: true, run: (ctx, input) => nce.recordNcePatientImpact(input, ctx.actor()) },
+    releaseNce: { channel: 'nce:release', lan: true, run: (ctx, input) => nce.releaseNce(input, ctx.actor()) },
+    reviewNceEffectiveness: { channel: 'nce:reviewEffectiveness', lan: true, run: (ctx, input) => nce.reviewNceEffectiveness(input, ctx.actor()) },
+    submitNce: { channel: 'nce:submit', lan: true, run: (ctx, input) => nce.submitNce(input, ctx.actor()) },
+    approveNce: { channel: 'nce:approve', lan: true, run: (ctx, input) => nce.approveNce(input, ctx.actor()) },
+    returnNce: { channel: 'nce:return', lan: true, run: (ctx, input) => nce.returnNce(input, ctx.actor()) },
+    cancelNce: { channel: 'nce:cancel', lan: true, run: (ctx, input) => nce.cancelNce(input, ctx.actor()) },
 
     listReagentComparisons: { channel: 'reagent:listComparisons', lan: true, run: () => reagent.listComparisons() },
     createReagentComparison: { channel: 'reagent:createComparison', lan: true, run: (ctx, input) => reagent.createComparison(input, ctx.actor()) },
@@ -257,17 +325,21 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     getLoginBrand: { channel: 'settings:getLoginBrand', lan: true, run: () => settings.getLoginBrand() },
     saveLabProfile: { channel: 'settings:saveLabProfile', lan: false, run: (ctx, input) => settings.saveLabProfile(input, ctx.actor()) },
     getStorageInfo: { channel: 'settings:getStorageInfo', lan: true, run: () => settings.getStorageInfo() },
+    // Một chiều, chặn "Xoá sạch dữ liệu test": quản trị làm trên máy chính.
+    enableOperationMode: { channel: 'settings:enableOperationMode', lan: false, run: (ctx) => settings.enableOperationMode(ctx.actor()) },
 
     listPeriodLocks: { channel: 'report:listPeriodLocks', lan: true, run: () => report.listPeriodLocks() },
     getReportTemplateSettings: { channel: 'report:getTemplateSettings', lan: true, run: () => report.getReportTemplateSettings() },
     saveReportTemplateSettings: { channel: 'report:saveTemplateSettings', lan: false, run: (ctx, input) => report.saveReportTemplateSettings(input, ctx.actor()) },
+    getQcMonthlyReview: { channel: 'report:getMonthlyReview', lan: true, run: (_ctx, ym) => report.getQcMonthlyReview(ym) },
+    signQcMonthlyReview: { channel: 'report:signMonthlyReview', lan: false, run: (ctx, input) => report.signQcMonthlyReview(input, ctx.actor()) },
     lockPeriod: { channel: 'report:lockPeriod', lan: false, run: (ctx, input) => report.lockPeriod(input, ctx.actor()) },
     unlockPeriod: { channel: 'report:unlockPeriod', lan: false, run: (ctx, input) => report.unlockPeriod(input, ctx.actor()) },
     queryReport: { channel: 'report:queryReport', lan: true, run: (_ctx, input) => report.queryReport(input) },
 
     getLisSettings: { channel: 'lis:getSettings', lan: true, run: (ctx) => lis.getSettings(ctx.actor()) },
     saveLisSettings: { channel: 'lis:saveSettings', lan: false, run: (ctx, input) => lis.saveSettings(input, ctx.actor()) },
-    pullLisQueue: { channel: 'lis:pullQueue', lan: true, run: () => lis.pullQueue() },
+    pullLisQueue: { channel: 'lis:pullQueue', lan: true, run: (ctx) => lis.pullQueue(ctx.actor()) },
     importLisResult: { channel: 'lis:importResult', lan: true, run: (ctx, input) => lis.importResult(input, ctx.actor()) },
     rejectLisResult: { channel: 'lis:rejectResult', lan: true, run: (ctx, input) => lis.rejectResult(input, ctx.actor()) },
   };
@@ -284,12 +356,13 @@ export function registerIpcOperations(
   ipc: { handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void },
   tables: object[],
   ctx: CallContext,
+  gate?: AccessGate,
 ): void {
   const seen = new Set<string>();
   for (const [name, operation] of entriesOf(tables)) {
     if (seen.has(operation.channel)) throw new Error(`Kênh IPC bị khai hai lần: ${operation.channel} (${name}).`);
     seen.add(operation.channel);
-    ipc.handle(operation.channel, (_event, ...args) => invokeOperation(name, operation, ctx, args));
+    ipc.handle(operation.channel, (_event, ...args) => invokeOperation(name, operation, ctx, args, gate));
   }
 }
 
@@ -301,21 +374,27 @@ export const LAN_UNKNOWN_OPERATION = {
 /** Bộ điều phối RPC của máy trạm LAN: tra ĐÚNG tên hàm `QcApi` trong danh
  * sách `lan: true`, chạy với actor của phiên HTTP. Không xếp hàng: mỗi lời
  * gọi mang danh tính riêng nên chạy song song như IPC của máy chính. */
-export function createLanInvoker(tables: object[]): (method: string, args: unknown[], actor: Actor) => Promise<unknown> {
+export function createLanInvoker(tables: object[], gate?: AccessGate): (method: string, args: unknown[], actor: Actor) => Promise<unknown> {
   // `Map` thay vì tra thuộc tính object: tên như `constructor`, `__proto__`
   // không được khớp vào prototype.
   const allowed = new Map(entriesOf(tables).filter(([, operation]) => operation.lan));
   return async (method, args, actor) => {
     const operation = allowed.get(method);
     if (!operation) return LAN_UNKNOWN_OPERATION;
-    return invokeOperation(method, operation, { actor: () => actor }, args);
+    try {
+      return await invokeOperation(method, operation, { actor: () => actor }, args, gate);
+    } catch (error) {
+      // Thao tác đọc ném lỗi; qua HTTP thì gói lại kèm `readFailed` để client
+      // LAN ném lại đúng lỗi, thay vì nhận một object lỗi ở chỗ chờ mảng.
+      return { ...errorResult(error, method), readFailed: true };
+    }
   };
 }
 
 /** Biến bảng thành các hàm `QcApi` gắn sẵn một ngữ cảnh — dùng cho bản xem
  * trước, nơi renderer gọi thẳng hàm thay vì qua IPC. */
 export type BoundOperations<N extends ApiName> = { [K in N]: (...args: Args<K>) => Promise<Result<K>> };
-export function bindOperations<N extends ApiName>(table: OperationTable<N>, ctx: CallContext): BoundOperations<N> {
+export function bindOperations<N extends ApiName>(table: OperationTable<N>, ctx: CallContext, gate?: AccessGate): BoundOperations<N> {
   return Object.fromEntries(entriesOf([table]).map(([name, operation]) =>
-    [name, (...args: unknown[]) => invokeOperation(name, operation, ctx, args)])) as unknown as BoundOperations<N>;
+    [name, (...args: unknown[]) => invokeOperation(name, operation, ctx, args, gate)])) as unknown as BoundOperations<N>;
 }

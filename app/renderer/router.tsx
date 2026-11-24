@@ -8,11 +8,13 @@ import { WestgardPage } from './pages/WestgardPage';
 import { SigmaPage } from './pages/SigmaPage';
 import { ActionsPage } from './pages/ActionsPage';
 import { ReagentPage } from './pages/ReagentPage';
+import { EqaPage } from './pages/EqaPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditPage } from './pages/AuditPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ReportPage } from './pages/ReportPage';
 import { LoginPage } from './pages/LoginPage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { AppShell } from './components/AppShell';
 import { useAuthStore } from './store/auth-store';
 import { PAGE_DEFS, canUserAccessPage, firstAccessPath } from './lib/permissions';
@@ -27,6 +29,7 @@ const PAGE_ELEMENTS: Record<string, ReactElement> = {
   westgard: <WestgardPage />,
   sigma: <SigmaPage />,
   reagent: <ReagentPage />,
+  eqa: <EqaPage />,
   actions: <ActionsPage />,
   report: <ReportPage />,
   manage: <ManagePage />,
@@ -53,6 +56,8 @@ export function AppRouter() {
   // màn hình trước khi form đăng nhập hoàn chỉnh xuất hiện.
   if (status === 'checking') return <LoginPage />;
   if (status !== 'logged-in') return <LoginPage />;
+  // Main chặn mọi thao tác khác tới khi đổi mật khẩu xong (GV5).
+  if (user?.mustChangePassword) return <ChangePasswordPage />;
 
   return (
     <HashRouter>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ReagentComparisonResult } from '../../shared/qc-api';
+import { CHART_TEAL } from '../lib/chart-colors';
 
 // Footprint gọn nhưng vẫn giữ đầy đủ trục/lưới.
 // Ở desktop, mỗi biểu đồ rộng gần bằng một cột và cao xấp xỉ 280px.
@@ -7,7 +8,7 @@ const SIZE = { width: 760, height: 280 };
 // Chừa đủ lề cho nhãn trục dọc và các tick có nhiều chữ số (vd. 143.17).
 const PAD = { left: 72, right: 18, top: 18, bottom: 46 };
 const COLOR = {
-  teal: '#0c6f78',
+  teal: CHART_TEAL,
   ink: '#172833',
   muted: '#667b89',
   line: '#d4dde3',

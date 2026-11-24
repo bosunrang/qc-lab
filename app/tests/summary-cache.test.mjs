@@ -13,9 +13,9 @@ const { createEntryHandlers } = require('../../app-dist/main/ipc/entry-handlers.
 const { createWestgardHandlers } = require('../../app-dist/main/ipc/westgard-handlers.js');
 const { createNceHandlers } = require('../../app-dist/main/ipc/nce-handlers.js');
 const { writeAudit, notifyChanged } = require('../../app-dist/main/ipc/shared.js');
+import { ensureUser, receivePendingRejectedRuns, releaseByVerificationRun } from './helpers/nce-flow.mjs';
 
 const actor = { userId: 'u1', username: 'admin', name: 'Quản trị', role: 'admin', clientId: 'test' };
-const reviewer = { ...actor, userId: 'u2', username: 'duyet', name: 'Người duyệt' };
 
 test('quy tắc bỏ kết quả đã giữ', () => {
   const cache = new TestSummaryCache();
@@ -32,7 +32,7 @@ test('quy tắc bỏ kết quả đã giữ', () => {
   assert.deepEqual(computed, ['A'], 'điểm QC của A đổi: chỉ tính lại A');
 
   fill();
-  cache.onChanged({ tables: ['qc_points', 'actions'], testIds: ['A', 'B'] });
+  cache.onChanged({ tables: ['qc_points', 'nce_cuts'], testIds: ['A', 'B'] });
   read('A'); read('B');
   assert.deepEqual(computed, ['A', 'B']);
 
@@ -131,19 +131,14 @@ test('mọi thao tác ghi thật: kết quả có bộ nhớ đệm trùng lư�
   must(config.saveLot({ id: lot1.id, data: { lotNo: 'L1-MOI', level: 1 } }, actor), 'đổi số lô');
   check('đổi số lô dùng chung');
 
-  const record = must(nce.create({ data: { testId: A.id, level: 1, lot: 'L1-MOI', date: '2026-09-02', rule: '1-3s', errorType: 'RE', correction: 'Giữ kết quả, kiểm tra lại máy và làm lại QC', dueDate: '2026-09-10' } }, actor), 'NCE');
-  must(nce.setActionCompletedDate({ data: { id: record.id, actionCompletedDate: '2026-09-02' } }, actor), 'ngày khắc phục');
-  must(nce.saveProtocol({ data: { id: record.id, dueDate: '2026-09-10', protocol: {
-    eventSource: 'iqc', processPhase: 'exam', owner: 'KTV A', containmentStatus: 'none', correction: 'Giữ kết quả, kiểm tra lại máy và làm lại QC',
-    riskSeverity: 2, riskOccurrence: 2, riskDetectability: 2, riskLevel: 'low', riskBasis: 'SOP-QC-07',
-    qcMaterialStatus: 'ok', instrumentStatus: 'ok', reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
-    causeCategory: 'instrument', cause: 'Máy bắt đầu lệch sau bảo trì', action: 'Bảo trì máy và xác nhận lại hiệu chuẩn',
-    patientImpact: 'none', effectivenessStatus: 'pending',
-    residualSeverity: 1, residualOccurrence: 1, residualDetectability: 1, residualRiskLevel: 'low', residualRiskBasis: 'Theo dõi sau bảo trì',
-  } } }, actor), 'hồ sơ NCE');
-  must(nce.markEffectiveness({ data: { id: record.id, status: 'effective', residualRisk: 'Rủi ro còn lại thấp', note: 'Không tái diễn' } }, actor), 'hiệu quả');
-  must(nce.approve({ data: { id: record.id } }, reviewer), 'duyệt NCE');
-  check('NCE khắc phục hiệu quả (mốc bắt đầu lại luật)');
+  // Cho phép hoạt động trở lại bằng một lần chạy xác minh: ghi mốc cắt
+  // `nce_cuts`, kết quả Westgard của A đổi từ lần chạy đó.
+  ensureUser(db, actor);
+  must(entry.addPoint({ data: { testId: A.id, level: 1, date: '2026-09-03', runId: '2026-09-03-1', val: 5.5 } }, actor), 'xác minh M1');
+  must(entry.addPoint({ data: { testId: A.id, level: 2, date: '2026-09-03', runId: '2026-09-03-1', val: 15 } }, actor), 'xác minh M2');
+  check('nhập lần chạy xác minh');
+  releaseByVerificationRun(nce, actor, A.id, { date: '2026-09-03', runId: '2026-09-03-1' });
+  check('NCE cho chạy lại (mốc bắt đầu lại luật)');
 
   // Handler quên báo bảng đổi (chỉ ghi nhật ký): vẫn không trả kết quả cũ.
   db.prepare('UPDATE qc_points SET val=6.5 WHERE test_id=? AND voided=0').run(B.id);
@@ -152,11 +147,14 @@ test('mọi thao tác ghi thật: kết quả có bộ nhớ đệm trùng lư�
 
   must(config.removeTest({ id: C.id }, actor), 'xoá xét nghiệm');
   assert.equal(check('xoá xét nghiệm C').length, 2);
+  // Lần chạy bị loại phải có hồ sơ NCE trước khi dừng nhóm lô (R03).
+  receivePendingRejectedRuns(db, actor);
+  check('lập hồ sơ NCE cho lần chạy bị loại còn tồn');
   must(config.stopLotGroup({ id: group.id }, actor), 'dừng nhóm lô');
   const stopped = check('dừng nhóm lô');
   assert.deepEqual(stopped.map((s) => s.levels.length), [0, 0], 'nhóm lô dừng thì không còn mức vận hành');
   notifyChanged(['activity']);
   check('lời báo lạc (chỉ activity)');
-  assert.equal(steps.length, 17, 'chạy đủ mọi bước');
+  assert.equal(steps.length, 19, 'chạy đủ mọi bước');
   db.close();
 });

@@ -1,9 +1,10 @@
 // Hộp thoại chọn CV IQC theo lô (cohort) và xác nhận rà soát của trang Six Sigma.
 import { useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
-import { confirmDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, errorDialog } from '../../state/dialog-store';
 import { cohortStatusLabel, cohortStatusTone, vnDate, vnPeriod } from './shared';
 import type { SigmaCohortView, SigmaPeriodView } from '../../../shared/qc-api';
+import { AsyncButton } from '../../components/AsyncButton';
 
 export function CohortModal({ period, cohorts, onClose, onSubmit }: {
   period: SigmaPeriodView; cohorts: SigmaCohortView[]; onClose: () => void;
@@ -20,15 +21,15 @@ export function CohortModal({ period, cohorts, onClose, onSubmit }: {
     );
     if (!confirmed) return;
     const result = await onSubmit(selected, true);
-    if (!result.ok) await infoDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC', type: 'warn' });
+    if (!result.ok) await errorDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC' });
   }
   return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} size="xl"
-    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</button></>}>
+    footer={<><button className="btn ghost" onClick={onClose}>Huỷ</button><AsyncButton className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</AsyncButton></>}>
     <div className="sg-cohort-table-wrap"><table className="sg-cohort-table"><thead><tr><th className="sg-cohort-level">Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th className="num">n</th><th className="num">CV</th><th>Trạng thái</th></tr></thead><tbody>
       {period.levels.flatMap((level) => {
         const rows = byLevel.get(level.level) || [];
         if (!rows.length) return <tr key={level.level}><td>Mức {level.level}</td><td colSpan={5} className="hint">Chưa có điểm IQC hợp lệ theo lô trong kỳ này.</td></tr>;
-        return rows.map((cohort, index) => <tr key={`${level.level}:${cohort.lot}:${cohort.start}`}><td className="sg-cohort-level">{index === 0 ? `Mức ${level.level}` : ''}</td><td><label><input type="radio" name={`cohort-${level.level}`} checked={choices[level.level] === cohort.lot} onChange={() => setChoices((old) => ({ ...old, [level.level]: cohort.lot }))} /> Lô {cohort.lot || '—'}</label></td><td>{vnDate(cohort.start)}–{vnDate(cohort.end)}</td><td className="num">{cohort.n}</td><td className="num">{cohort.cv != null ? `${cohort.cv.toFixed(2)}%` : '—'}</td><td><span className={`tag ${cohortStatusTone(cohort.status)}`}>{cohortStatusLabel(cohort.status)}</span>{cohort.issues.length ? <div className="sg-cohort-issue">{cohort.issues.join(' · ')}</div> : null}</td></tr>);
+        return rows.map((cohort, index) => <tr key={`${level.level}:${cohort.lot}:${cohort.start}`}><td className="sg-cohort-level">{index === 0 ? `Mức ${level.level}` : ''}</td><td><label><input type="radio" name={`cohort-${level.level}`} checked={choices[level.level] === cohort.lot} onChange={() => setChoices((old) => ({ ...old, [level.level]: cohort.lot }))} /> Lô {cohort.lot || '—'}</label></td><td>{vnDate(cohort.start)}–{vnDate(cohort.end)}</td><td className="num">{cohort.n}{cohort.excluded.resolved > 0 && <span className="hint-inline sg-cohort-excluded" title="Điểm thuộc lần chạy bị loại đã đóng hồ sơ NCE">bỏ {cohort.excluded.resolved} điểm đã xử lý</span>}</td><td className="num">{cohort.cv != null ? `${cohort.cv.toFixed(2)}%` : '—'}</td><td><span className={`tag ${cohortStatusTone(cohort.status)}`}>{cohortStatusLabel(cohort.status)}</span>{cohort.issues.length ? <div className="sg-cohort-issue">{cohort.issues.join(' · ')}</div> : null}</td></tr>);
       })}
     </tbody></table></div>
   </Modal>;

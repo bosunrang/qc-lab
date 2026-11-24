@@ -34,6 +34,52 @@ Giới hạn còn phải nghiệm thu: SOP thực tế của phòng xét nghiệ
 trong cùng ngày (DB chưa lưu tới run/giờ), và giao diện/export trên dữ liệu thật.
 Đây là khắc phục phần mềm có kiểm thử, không phải chứng nhận lâm sàng.
 
+## Quyết định 12/10/2026 — mốc bắt đầu lại chuỗi sau sự cố (thay phần WG-07)
+
+Chốt cùng kế hoạch làm lại NCE (`docs/NCE-REDESIGN-2026-10-12.md`, D-03).
+Đã triển khai ở giai đoạn 2 của kế hoạch đó: mốc cắt lưu ở bảng `nce_cuts`,
+đọc qua `qcCuts()` (`db/westgard-evaluation.ts`) và so bằng `qcEpochOf()`
+(`domain/qc-cuts.ts`) cho cả luật nhiều lần chạy lẫn CUSUM. Kiểm thử:
+`WG07`/`WG07b` trong `westgard-review-regressions.test.mjs`, mục 9b của
+`westgard-handlers.test.mjs`, ca thẩm định CU-05.
+
+**Cách cũ và vấn đề.** `effectiveQcFixDates()` lấy `action_completed_date` của
+hồ sơ NCE đã duyệt, hiệu quả, không hủy; luật nhiều lần chạy và CUSUM bắt đầu
+giai đoạn mới từ ngày **sau** ngày đó. Hai hậu quả:
+
+1. Từ lúc đã hiệu chuẩn lại và QC chạy lại đạt cho tới lúc hồ sơ được duyệt
+   (thường vài tuần, vì phải chờ CAPA và đánh giá hiệu lực), chuỗi cũ vẫn nối
+   tiếp: 4-1s, 10x, CUSUM tiếp tục cộng dồn từ dữ liệu trước khắc phục.
+2. Khi duyệt, mọi điểm sau ngày hoàn thành được tính lại: điểm từng bị **loại**
+   (có thể đã dẫn tới giữ kết quả bệnh nhân) có thể chuyển thành **đạt**. Kết
+   luận QC đã dùng để ra quyết định bị đổi hồi tố.
+
+Ngày hoàn thành CAPA cũng không phải thời điểm quá trình được sửa: CAPA (đào
+tạo lại, sửa SOP…) có thể hoàn thành sau khi đã cho chạy lại rất lâu.
+
+**Quyết định.** Mốc bắt đầu lại là **lần chạy rerun được chấp nhận khi cho
+chạy lại** (release-to-service) của hồ sơ NCE:
+
+- định danh theo khóa lần chạy (ngày + mã run, `compareQcRunKey`), không theo
+  ngày, nên phân biệt được các run trong cùng ngày (giải quyết giới hạn "mốc
+  khắc phục trong cùng ngày" ghi ở trên);
+- lần chạy rerun là lần chạy **đầu tiên** của giai đoạn mới, và được đánh giá
+  trong giai đoạn mới khi kiểm tra có đạt hay không;
+- có hiệu lực ngay khi ghi quyết định cho chạy lại, không phụ thuộc duyệt hay
+  kết luận hiệu lực; vì vậy verdict của các lần chạy trước mốc không bao giờ
+  đổi sau đó;
+- hồ sơ đã cho chạy lại không được hủy, để mốc cắt không bị gỡ ngược.
+
+Căn cứ: Westgard, *Basic QC Practices* bài 18 — sau khi loại lần chạy và khắc
+phục nguyên nhân, các luật nhiều lần chạy áp dụng lại từ quá trình đã sửa; và
+ISO 15189:2022 7.5 tách quyết định cho hoạt động trở lại khỏi hành động khắc
+phục (8.7).
+
+**Hồ sơ cũ.** Hồ sơ đã duyệt và hiệu quả trước khi đổi được chuyển thành mốc
+cắt "sau toàn bộ ngày hoàn thành", giữ đúng kết quả hiện tại. Ca thẩm định
+CU-05 giữ cho dữ liệu cũ; thêm ca mới cho mốc theo lần chạy rerun (4-1s và
+CUSUM bắt đầu lại từ rerun).
+
 ## Kết luận
 
 Chưa thể kết luận thẻ Westgard đúng nghiệp vụ từ đầu đến cuối. Các phép tính nền và nhiều luật đơn lẻ đã có kiểm thử tốt, nhưng cách chọn dữ liệu, đánh giá lịch sử, xác định lần chạy và đồng bộ kết quả còn tạo ra kết luận mâu thuẫn.

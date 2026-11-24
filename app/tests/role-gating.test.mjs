@@ -62,7 +62,7 @@ assertForbidden(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-
 assertForbidden(entry.voidPoint({ data: { pointId: 'bat-ky', reason: 'Ly do du dai' } }, viewer), 'viewer voidPoint');
 assertForbidden(sigma.savePeriod({ testId: test.id, period: '2026-09', tea: 10, levels: [{ level: 1, cv: 3 }] }, viewer), 'viewer saveSigmaPeriod');
 assertForbidden(westgard.saveRuleAction(test.id, '1-3s', 'inactive', viewer), 'viewer saveRuleAction');
-assertForbidden(nce.create({ data: { testId: test.id, level: 1, date: '2026-09-01', ruleId: '1-3s', errorType: 'SE', correction: 'Chay lai QC', dueDate: '2026-09-05' } }, viewer), 'viewer createNce');
+assertForbidden(nce.createNce({ data: { source: 'other', description: 'Hồ sơ đào tạo thiếu chữ ký', correction: 'Bổ sung hồ sơ đào tạo', holdResults: false, detectedAt: '2026-09-01', ownerUserId: 'u-tech' } }, viewer), 'viewer createNce');
 assertForbidden(reagent.saveMetadata({ id: comparison.id, data: { reagent: 'Doi ten' } }, viewer), 'viewer saveReagentMetadata');
 assertForbidden(reagent.removeComparison({ id: comparison.id }, viewer), 'viewer removeReagentComparison');
 assertForbidden(report.lockPeriod({ data: { ym: '2026-09' } }, viewer), 'viewer lockPeriod');
@@ -91,16 +91,19 @@ assertForbidden(config.saveInstrument({ data: { name: 'May la' } }, unknown), 'v
 // ── 3) technician: ghi được dữ liệu QC ────────────────────────────────────
 const techPoint = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-01', val: 5, runId: 'r1' } }, tech);
 assert.equal(techPoint.ok, true, 'KTV phai them duoc diem QC');
-assert.equal(westgard.saveRuleAction(test.id, '1-2s', 'alert', tech).ok, true, 'KTV phai cap nhat duoc hanh dong luat Westgard');
 assert.equal(sigma.savePeriod({ testId: test.id, period: '2026-09', tea: 10, levels: [{ level: 1, cv: 3 }] }, tech).ok, true, 'KTV phai luu duoc ky Sigma');
 assert.equal(reagent.saveMetadata({ id: comparison.id, data: { reagent: 'KTV sua ten' } }, tech).ok, true, 'KTV phai sua duoc so sanh hoa chat');
-const techNce = nce.create({ data: { testId: test.id, level: 1, date: '2026-09-01', ruleId: '1-3s', errorType: 'SE', correction: 'Chay lai QC sau hieu chuan', dueDate: '2026-09-05' } }, tech);
+db.prepare("INSERT INTO users(id,username,name,role,active) VALUES ('u-tech','ktv','Ky thuat vien','technician',1)").run();
+const techNce = nce.createNce({ data: { source: 'other', description: 'Hồ sơ đào tạo thiếu chữ ký', correction: 'Bổ sung hồ sơ đào tạo', holdResults: false, detectedAt: '2026-09-01', ownerUserId: 'u-tech' } }, tech);
 assert.equal(techNce.ok, true, 'KTV phai lap duoc ho so NCE');
 
 // ── 4) technician: KHÔNG đụng được cấu hình/khoá kỳ/xoá/cài đặt/nhật ký ──
 assertForbidden(config.saveInstrument({ data: { name: 'May cua KTV' } }, tech), 'KTV saveInstrument');
 assertForbidden(config.saveTest({ data: { name: 'Test cua KTV', instrumentId: instrument.id } }, tech), 'KTV saveTest');
 assertForbidden(config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 5, sd: 0.2 } }, tech), 'KTV saveTestLevel');
+// Hành động luật quyết định lần chạy nào bị loại: cùng mức admin với phạm vi
+// luật (đánh giá tổng thể 2026-10-31, N1). Trước đó KTV đổi được qua LAN.
+assertForbidden(westgard.saveRuleAction(test.id, '1-2s', 'alert', tech), 'KTV saveRuleAction');
 assertForbidden(config.saveTeaRef({ data: { test: 'Glucose', value: 10, source: 'clia', reference: 'CLIA 2024', reason: 'Ly do du dai de qua gate', effective: '2026-01-01', prepared: 'A', approved: 'B', approvedDate: '2026-01-01' } }, tech), 'KTV saveTeaRef');
 assertForbidden(report.lockPeriod({ data: { ym: '2026-09' } }, tech), 'KTV lockPeriod');
 assertForbidden(reagent.removeComparison({ id: comparison.id }, tech), 'KTV removeReagentComparison');
@@ -114,13 +117,13 @@ assert.equal(westgard.listRuleSettings().find((rule) => rule.id === '1-2s').on, 
 
 // ── 5) admin: làm được cả 2 nhóm ──────────────────────────────────────────
 assert.equal(config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 5, sd: 0.2, qcLotId: operational.lotIds[0] } }, admin).ok, true, 'admin phai luu duoc Mean/SD');
-assert.equal(report.lockPeriod({ data: { ym: '2026-10' } }, admin).ok, true, 'admin phai khoa duoc ky bao cao');
+assert.equal(report.lockPeriod({ data: { ym: '2026-10', acknowledge: true } }, admin).ok, true, 'admin phai khoa duoc ky bao cao');
 assert.equal(westgard.saveRuleSetting('1-2s', false, admin).ok, true, 'admin phai tat duoc luat chung');
 assert.equal(westgard.resetRuleSettings(admin).ok, true, 'admin phai khoi phuc duoc luat chung');
 assert.equal(settings.saveLabProfile({ data: { name: 'Khoa Xet nghiem' } }, admin).ok, true, 'admin phai luu duoc ho so PXN');
 assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-03', val: 5.1, runId: 'r1' } }, admin).ok, true, 'admin phai them duoc diem QC');
 
-// ── 5b) Xuất backup: CHỈ admin — bản backup chứa cả chuỗi mật khẩu PBKDF2
+// ── 5b) Xuất bản sao lưu: CHỈ admin — bản backup chứa cả chuỗi mật khẩu PBKDF2
 // của mọi người dùng, không phải dữ liệu ai cũng được tải về.
 const backupDir = require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'qclab-role-'));
 const backupFile = require('node:path').join(backupDir, 'backup.sqlite');

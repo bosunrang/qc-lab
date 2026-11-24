@@ -3,11 +3,11 @@
 // modal Bias/MU tự quản lý state của mình rồi gọi thẳng, không cần store
 // biết cấu trúc modal.
 import { create } from 'zustand';
-import type { SigmaPeriodView, SigmaCohortView, IpcResult } from '../../shared/qc-api';
+import type { SigmaPeriodView, SigmaCohortView, SigmaEqaRound, IpcResult } from '../../shared/qc-api';
 
 export interface SigmaLevelSaveInput {
   refreshCohort?: boolean; cohortReviewed?: boolean; cohortFingerprint?: string;
-  level: number; /** TEa% snapshot của riêng mức QC (CLIA tuyệt đối phụ thuộc Mean). */ tea?: number; /** Mean mục tiêu tại thời điểm đánh giá, dùng đổi MU% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number }>; /** u(Cref)% - do khong dam bao cua GIA TRI GAN EQA/CRM, do nha cung cap cong bo. */ uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude';
+  level: number; /** TEa% snapshot của riêng mức QC (CLIA tuyệt đối phụ thuộc Mean). */ tea?: number; /** Mean mục tiêu tại thời điểm đánh giá, dùng đổi MU% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number; target: number; bias?: number; eqaResultId?: string; label?: string }>; /** u(Cref)%: độ không đảm bảo của giá trị gán EQA/CRM do nhà cung cấp công bố. */ uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude';
   cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string;
 }
 
@@ -19,8 +19,7 @@ interface SigmaState {
   periods: SigmaPeriodView[];
   loadPeriods: (testId: string) => Promise<void>;
   loadCohorts: (testId: string, period: string, levels: number[]) => Promise<SigmaCohortView[]>;
-  savePeriod: (testId: string, period: string, tea: number | undefined, teaSource: string | undefined, levels: SigmaLevelSaveInput[], createOnly?: boolean) => Promise<IpcResult<SigmaPeriodView>>;
-  renamePeriod: (id: string, testId: string, period: string) => Promise<IpcResult<SigmaPeriodView>>;
+  savePeriod: (testId: string, period: string, tea: number | undefined, teaSource: string | undefined, levels: SigmaLevelSaveInput[], createOnly?: boolean, sharedEqaRounds?: Omit<SigmaEqaRound, 'bias'>[], eqaWindowMonths?: number) => Promise<IpcResult<SigmaPeriodView>>;
   removePeriod: (id: string, testId: string) => Promise<IpcResult<{ id: string }>>;
 }
 
@@ -39,10 +38,13 @@ export const useSigmaStore = create<SigmaState>((set, get) => ({
 
   loadPeriods: async (testId) => {
     const revision = ++requestRevision;
-    set({ testId, loading: !!testId, error: '', periods: [] });
+    // Nạp lại cùng xét nghiệm (sau khi lưu, hay khi QC đổi) thì giữ danh sách
+    // kỳ đang hiện: xoá trắng làm vùng làm việc unmount và mất chữ đang gõ.
+    if (get().testId === testId && !get().error) set({ error: '' });
+    else set({ testId, loading: !!testId, error: '', periods: [] });
     if (!testId) return;
     try {
-      const periods = await window.qcApi.listSigmaPeriods(testId);
+      const periods = await window.qcApi.listSigmaPeriods(testId, 'operational');
       if (revision === requestRevision) set({ periods: periods.filter(period => period.testId === testId), loading: false });
     } catch {
       if (revision === requestRevision) set({ periods: [], loading: false, error: 'Không tải được dữ liệu Sigma. Vui lòng thử lại.' });
@@ -55,13 +57,8 @@ export const useSigmaStore = create<SigmaState>((set, get) => ({
     if (result.ok && get().testId === testId) await get().loadPeriods(testId);
     return result;
   },
-  savePeriod: async (testId, period, tea, teaSource, levels, createOnly = false) => {
-    const result = await window.qcApi.saveSigmaPeriod({ testId, period, tea, teaSource, levels, createOnly });
-    if (result.ok && get().testId === testId) await get().loadPeriods(testId);
-    return result;
-  },
-  renamePeriod: async (id, testId, period) => {
-    const result = await window.qcApi.renameSigmaPeriod({ id, period });
+  savePeriod: async (testId, period, tea, teaSource, levels, createOnly = false, sharedEqaRounds, eqaWindowMonths) => {
+    const result = await window.qcApi.saveSigmaPeriod({ testId, period, tea, teaSource, levels, createOnly, ...(sharedEqaRounds ? { sharedEqaRounds, eqaWindowMonths } : {}) });
     if (result.ok && get().testId === testId) await get().loadPeriods(testId);
     return result;
   },
