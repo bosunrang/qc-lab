@@ -22,37 +22,63 @@ test('thang chữ 14/13.5/13: các trang và nhãn control không bị cắt', {
         rows: [{ code: 'GLU', instrument: machine.name, sample: `Mẫu thử ${month}`, result: 5.05, assigned: 5, sigmaP: .1, zProvider: .5, unit: 'mmol/L', peer: {} }],
         mappings: [{ code: 'GLU', instrument: machine.name, testId }] } }));
     }, seed);
-    const labels = (await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link').allInnerTexts()).map(s => s.trim());
+    const navigation = page.getByRole('navigation', { name: 'Điều hướng chính' });
+    const labels = (await navigation.getByRole('link').allInnerTexts()).map(s => s.trim());
     const clipped = [];
+    async function checkTypography(label, width) {
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(120);
+      const result = await page.evaluate(() => {
+        const flat = token => getComputedStyle(document.body).getPropertyValue(token).trim();
+        const problems = [];
+        for (const el of document.querySelectorAll('label, th, button.btn, .hint, .meta, .hint-inline, .sg-level-source, .cell-missing, nav a')) {
+          const rect = (el.matches('.cell-missing') ? el.closest('td') : el).getBoundingClientRect(), style = getComputedStyle(el);
+          if (!rect.width || !rect.height || rect.bottom < 0 || rect.top > innerHeight || style.visibility === 'hidden') continue;
+          if (style.textOverflow === 'ellipsis' || el.closest('.sr-only') || el.querySelector('input,select,textarea')) continue;
+          const textNodes = [...el.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+          for (const node of textNodes) {
+            const range = document.createRange(); range.selectNodeContents(node);
+            for (const ink of range.getClientRects()) {
+              if (ink.left < rect.left - 1 || ink.right > rect.right + 1 || ink.top < rect.top - 1 || ink.bottom > rect.bottom + 1)
+                problems.push({ selector: el.className || el.tagName, text: node.textContent.trim(), box: [rect.width, rect.height], textBox: [ink.width, ink.height] });
+            }
+          }
+        }
+        return { body: getComputedStyle(document.body).fontSize, table: flat('--table-body-size'), label: flat('--text-sm'), caption: flat('--text-xs'), problems };
+      });
+      assert.equal(result.body, '14px');
+      assert.equal(result.table, '13.5px');
+      assert.equal(result.label, '13.5px');
+      assert.equal(result.caption, '13px');
+      clipped.push(...result.problems.map(problem => ({ width, page: label, ...problem })));
+    }
+
+    const eqaViews = [
+      ['Tổng quan', page.getByRole('heading', { name: /Bảng tổng hợp z-score/ })],
+      ['Lịch', page.getByRole('region', { name: 'Lịch và danh sách đợt' })],
+      ['Báo cáo', page.getByRole('heading', { name: 'Xem trước biểu mẫu' })],
+      ['Khắc phục', page.getByRole('heading', { name: 'Kết quả & hồ sơ khắc phục' })],
+    ];
     for (const width of [1680, 1366, 1050]) {
       await page.setViewportSize({ width, height: 1050 });
+      const icons = await navigation.locator('a .ic svg').evaluateAll(elements => elements.map(el => {
+        const bounds = el.getBoundingClientRect();
+        return [bounds.width, bounds.height];
+      }));
+      assert.deepEqual(icons, labels.map(() => [16, 16]), `icon thanh điều hướng giữ cỡ 16 px ở cửa sổ ${width}px`);
       for (const label of labels) {
         await openPage(page, label);
         await page.locator('main .head').first().waitFor();
-        await page.evaluate(() => document.fonts.ready);
-        await page.waitForTimeout(120);
-        const result = await page.evaluate(() => {
-          const flat = token => getComputedStyle(document.body).getPropertyValue(token).trim();
-          const problems = [];
-          for (const el of document.querySelectorAll('label, th, button.btn, .hint, .meta, .hint-inline, .sg-level-source, .cell-missing, nav a')) {
-            const rect = (el.matches('.cell-missing') ? el.closest('td') : el).getBoundingClientRect(), style = getComputedStyle(el);
-            if (!rect.width || !rect.height || rect.bottom < 0 || rect.top > innerHeight || style.visibility === 'hidden') continue;
-            if (style.textOverflow === 'ellipsis' || el.closest('.sr-only') || el.querySelector('input,select,textarea')) continue;
-            const textNodes = [...el.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
-            for (const node of textNodes) {
-              const range = document.createRange(); range.selectNodeContents(node);
-              for (const ink of range.getClientRects()) {
-                if (ink.left < rect.left - 1 || ink.right > rect.right + 1 || ink.top < rect.top - 1 || ink.bottom > rect.bottom + 1)
-                  problems.push({ selector: el.className || el.tagName, text: node.textContent.trim(), box: [rect.width, rect.height], textBox: [ink.width, ink.height] });
-              }
-            }
+        if (label === 'Phân tích ngoại kiểm') {
+          const tabs = page.getByRole('group', { name: 'Chế độ xem ngoại kiểm' });
+          for (const [tab, content] of eqaViews) {
+            await tabs.getByRole('button', { name: tab, exact: true }).click();
+            await content.waitFor();
+            await checkTypography(`${label} / ${tab}`, width);
           }
-          return { body: getComputedStyle(document.body).fontSize, table: flat('--table-body-size'), label: flat('--text-sm'), caption: flat('--text-xs'), problems };
-        });
-        assert.equal(result.body, '14px');
-        assert.equal(result.label, '13.5px');
-        assert.equal(result.caption, '13px');
-        clipped.push(...result.problems.map(problem => ({ width, page: label, ...problem })));
+        } else {
+          await checkTypography(label, width);
+        }
         if (['Nhập QC & Biểu đồ', 'Six Sigma & Sai số', 'Cấu hình chung'].includes(label) && width !== 1050)
           await page.screenshot({ path: path.join(userDataDir, `type-${width}-${label.startsWith('Six') ? 'sigma' : label.startsWith('Cấu') ? 'manage' : 'entry'}.png`) });
       }

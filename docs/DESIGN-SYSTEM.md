@@ -26,7 +26,7 @@ Lớp 4 "bí danh tạm" (91 tên đồng nghĩa, 820 chỗ dùng) đã xoá ng�
 | Độ đậm | 400 / 500 / 600 / 700 (chỉ 4 file font) | `--weight-normal/medium/semibold/bold` |
 | Dãn dòng | 1 / 1.15 / 1.3 / 1.4 / 1.55 | `--leading-none/display/heading/snug/body` |
 | Tiêu đề | trang 24, hero 24, panel 16, khối con 14, thẻ 13.5, overline 13 | `--title-page/hero/panel/sub/card/overline` |
-| Thanh điều hướng | mục 14, nhãn nhóm 11 | `--text-base`, `--sidebar-group-font-size` |
+| Thanh điều hướng | mục 14 px, nhãn nhóm 11 px, icon 16 × 16 px | `--text-base`, `--sidebar-group-font-size`, `--icon` |
 | Khoảng cách | 2 / 4 / 6 / 8 / 10 / 12 / 14 / 16 / 20 / 24 / 32px | `--space-0-5` … `--space-8` |
 | Bo góc | 8px mọi nơi; pill 999px | `--radius-sm/md/lg`, `--radius-full` |
 | Chiều cao control | 28 / 32 / 36px | `--control-h-sm`, `--control-h-compact`, `--control-h` |
@@ -45,7 +45,8 @@ Ghi chú:
 
 - **Icon**: xs cho mũi tên cây trong ô 16px; sm cho nút vuông 32px trong
   hàng bảng; chuẩn 16 cho icon cạnh chữ, sidebar, ô ngày; md cạnh tiêu đề
-  panel; lg cho icon minh hoạ lớn.
+  panel; lg cho icon minh hoạ lớn. Mọi mục trên sidebar dùng `--icon` ở cả
+  chế độ mở rộng và thu gọn. Mục đang mở dùng `--sidebar-active-accent`.
 - **Chuyển động**: `prefers-reduced-motion` hạ cả hai bậc về 0 ngay trong
   tokens.css, không cần rule riêng ở trang.
 - **Thứ tự lớp**: các cặp "phải đè" (ví dụ lịch chọn ngày nằm trên hộp thoại)
@@ -154,3 +155,6 @@ Tất cả nằm trong `app/tests/design-system.test.mjs`:
 
 Các test còn lại trong tệp khoá quyết định giao diện riêng của từng trang
 (Sigma, Nhập QC, Westgard…), ghi lý do ngay trong thông báo lỗi.
+Các tab Tổng quan, Lịch, Báo cáo và Khắc phục của Ngoại kiểm dùng cùng
+quy tắc giao diện. Kiểm thử thang chữ trên Electron cũng mở từng tab này
+ở các độ rộng cửa sổ dùng chung của ứng dụng.

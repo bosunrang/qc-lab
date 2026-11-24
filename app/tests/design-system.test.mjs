@@ -393,11 +393,11 @@ test('mật độ control dùng token component, không viết lại số chuẩ
   assert.match(app, /\.datebox\{[^}]*box-sizing:border-box;height:var\(--control-h\);/,
     'DatePicker dùng chung cao 36px kể cả viền');
   assert.match(app, /\.datebox input\.date-text\{[^}]*height:100%;min-height:0;/, 'ô ngày lấp đầy khung, không cộng thêm viền');
-  for (const file of PAGE_CSS.filter((f) => !f.endsWith('eqa.css') && !f.endsWith('app.css'))) {
+  for (const file of PAGE_CSS.filter((f) => !f.endsWith('app.css'))) {
     assert.doesNotMatch(readFileSync(file, 'utf8'), /(?:datebox|date-text)\s*\{[^}]*(?<![-\w])height:var\(--control-h\)/,
       `${relative(STYLE_DIR, file)}: chiều cao ô ngày đặt ở .datebox chung, trang không đặt lại`);
   }
-  for (const name of ['audit.css', 'entry.css', 'manage.css', 'reagent.css']) {
+  for (const name of ['audit.css', 'entry.css', 'eqa.css', 'manage.css', 'reagent.css']) {
     const css = readFileSync(join(STYLE_DIR, 'pages', name), 'utf8');
     assert.doesNotMatch(css, /(?:datebox|date-text)[^{]*\{[^}]*height:var\(--control-h-(?:sm|compact)\)/,
       `${name} không được thu DatePicker xuống bậc control nhỏ hơn chuẩn 36px`);
@@ -693,7 +693,7 @@ test('phân trang, thẻ số liệu và lề tiêu đề panel dùng chung', ()
   const OWNERS = { 'table-pagination': 'Pagination.tsx', 'stat-card': 'StatCard.tsx' };
   const RETIRED = ['dash-kpi', 'rc-stat-card', 'lot-list-pagination', 'lot-page-button'];
   const bad = [];
-  for (const file of tsxFiles(RENDERER).filter((f) => !/[\\/]pages[\\/]eqa[\\/]/.test(f))) {
+  for (const file of tsxFiles(RENDERER)) {
     const source = readFileSync(file, 'utf8');
     for (const m of source.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{'([^']*)'\})/g)) {
       for (const name of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
@@ -724,12 +724,11 @@ test('phân trang, thẻ số liệu và lề tiêu đề panel dùng chung', ()
 // U11: padding/margin/gap có giá trị đúng một bậc của thang `--space-*` phải
 // dùng token (trước đây ~530 chỗ viết thẳng px). Giá trị lẻ ngoài thang (1px,
 // 3px, 5px…) chưa ép: đó là căn chỉnh quang học, không phải nhịp khoảng cách.
-// `eqa.css` thuộc phần EQA đang làm riêng.
 test('khoảng cách trùng thang --space-* viết bằng token', () => {
   const SCALE = new Set([2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32]);
   const PROP = /(?:^|[{;\s])((?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?)\s*:\s*([^;{}]+)/g;
   const found = [];
-  for (const file of PAGE_CSS.filter((f) => !f.endsWith('eqa.css'))) {
+  for (const file of PAGE_CSS) {
     const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const m of source.matchAll(PROP)) {
       for (const px of m[2].matchAll(/(?:^|[\s(,])(\d+)px(?![\w-])/g)) {
@@ -1124,6 +1123,9 @@ test('z-index: thang theo vai trò, không số thô', () => {
 test('cỡ icon: năm bậc theo khung chứa, không số thô', () => {
   assert.deepEqual(['xs', 'sm', '', 'md', 'lg'].map((k) => flat(`--icon${k ? `-${k}` : ''}`)),
     ['10px', '14px', '16px', '20px', '24px']);
+  const appCss = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
+  assert.match(appCss, /nav \.ic svg\{width:var\(--icon\);height:var\(--icon\);\}/,
+    'biểu tượng thanh điều hướng dùng cỡ chung 16 px');
 
   // Lớp CSS gắn thẳng lên thẻ <svg> trong TSX (ví dụ `btn-ico`) cũng là icon.
   const RENDERER = join(ROOT, 'renderer');

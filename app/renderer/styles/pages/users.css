@@ -115,7 +115,7 @@
 }
 
 .user-perm-icon { width:var(--control-h-compact); height:var(--control-h-compact); }
-.user-perm-icon svg { width:var(--icon-nav); height:var(--icon-nav); }
+.user-perm-icon svg { width:var(--icon); height:var(--icon); }
 .user-perm-copy {
   display:grid;
   gap:var(--space-1);

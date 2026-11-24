@@ -469,7 +469,7 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="panel lis-gateway-panel">
+        <div className="panel">
           <h2 className="panel-title">LIS Gateway</h2>
           <div className="lis-gateway-body">
             <div className="lis-gateway-grid">
@@ -477,7 +477,7 @@ export function SettingsPage() {
               <div className="field"><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Nhập token kết nối QC Lab do quản trị Gateway cấp" /></div>
               <label className="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" checked={lisEnabled} onChange={(e) => setLisEnabled(e.target.checked)} /><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label>
             </div>
-            <div id="lisGatewayStatus" className={`alert lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
+            <div id="lisGatewayStatus" role="status" className={`lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
               {LIS_STATUS_LABEL[lisStatus.kind]}{lisErr ? ` · ${lisErr}` : lisStatus.detail ? ` · ${lisStatus.detail}` : ''}
             </div>
             <div className="hint">Nhận kết quả nội kiểm từ Gateway cục bộ tại localhost:8787. Mỗi kết quả chỉ thành điểm QC sau khi bạn xác nhận trong hàng chờ. Bộ kết nối theo từng LIS được triển khai riêng; chỉ tiếp nhận kết quả QC.</div>

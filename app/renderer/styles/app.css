@@ -58,8 +58,8 @@ nav{display:flex;flex:1 1 auto;flex-direction:column;overflow:auto;min-width:0;m
 nav a{position:relative;display:flex;align-items:center;width:100%;text-align:left;text-decoration:none;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font-weight:var(--weight-semibold);color:color-mix(in srgb,var(--sidebar-link-text) 90%,var(--sidebar-bg));font-size:var(--text-base);gap:var(--space-2-5);min-height:var(--control-h);margin:var(--space-0-5) 0;box-sizing:border-box;transition:background var(--motion-fast) ease,color var(--motion-fast) ease;}
 nav a:not(.active):hover{background:color-mix(in srgb,var(--sidebar-bg),var(--sidebar-active-bg));color:var(--sidebar-active-ink);}
 nav a.active{background:var(--sidebar-active-bg);color:var(--on-accent);font-weight:var(--weight-bold);box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
-nav .ic{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--icon-nav);height:var(--icon-nav);color:var(--sidebar-icon);}
-nav .ic svg{width:var(--icon-nav);height:var(--icon-nav);}
+nav .ic{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--icon);height:var(--icon);color:var(--sidebar-icon);}
+nav .ic svg{width:var(--icon);height:var(--icon);}
 nav a.active .ic{color:var(--sidebar-active-accent);}
 /* Khoảng cách giữa các mục do nhóm tạo ở cả hai chế độ. */
 #primary-navigation{margin-top:var(--space-3-5);gap:var(--space-4);}
@@ -100,7 +100,9 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
 .avatar-modal-preview{display:flex;justify-content:center;margin-bottom:var(--panel-content-gap);}
 .avatar-modal-preview img,.avatar-modal-initial{width:96px;height:96px;border-radius:var(--radius-md);overflow:hidden;object-fit:cover;}
 .avatar-modal-initial{display:flex;align-items:center;justify-content:center;background:var(--neutral-surface);color:var(--accent-text);font-size:var(--text-xl);font-weight:var(--weight-bold);}
-.file-pick{display:flex;align-items:center;gap:var(--space-2-5);min-height:var(--control-h-sm);}
+.file-pick{display:flex;align-items:center;gap:var(--space-2-5);min-height:var(--control-h);}
+.file-pick > .btn{flex:none;}
+.file-pick > .hint{min-width:0;overflow-wrap:anywhere;}
 
 /* Panel không mang padding chung để header phủ trọn chiều ngang. Header và
    từng vùng nội dung tự quản lý khoảng đệm, tránh cộng dồn gutter. */
