@@ -241,7 +241,7 @@
   --sidebar-expanded-width:clamp(208px,17vw,258px);
   --sidebar-collapsed-width:78px;
   --sidebar-logo-size:40px;
-  --sidebar-item-h:40px;
+  --sidebar-item-h:44px;
   --sidebar-group-font-size:11px;
 
   /* Focus — MỘT vòng cho cả app. */
