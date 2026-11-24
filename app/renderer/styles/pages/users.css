@@ -55,6 +55,7 @@
   border-color:var(--info-border);
   color:var(--info-text);
 }
+.row-action.user-password-action svg { width:var(--icon);height:var(--icon); }
 .row-action.user-password-action:hover { border-color:var(--info-accent); }
 
 .row-action.user-lock-action {
