@@ -21,6 +21,7 @@ import { observedStats } from '../../main/domain/observed-stats';
 import { displayedWestgardBlocks, statText, westgardExportRows, WESTGARD_EXPORT_HEADERS, escapeHtml } from '../lib/westgard-view';
 import { WestgardPointTable } from './westgard/shared';
 import { useArchivedWestgard } from './westgard/useArchivedWestgard';
+import { usePreviousWestgard } from './westgard/usePreviousWestgard';
 import { ArchivedGroupPicker, ArchivedGroupResults } from './westgard/ArchivedGroupView';
 import { TestPicker } from '../components/TestPicker';
 import { useTestSelection } from '../lib/useTestSelection';
@@ -31,10 +32,10 @@ export function WestgardPage() {
   const { tests, instruments, lots, levelsByTestId, loadLevels, lotGroups } = useManageStore(useShallow((s) => ({
     tests: s.tests, instruments: s.instruments, lots: s.lots, levelsByTestId: s.levelsByTestId, lotGroups: s.lotGroups,
     loadLevels: s.loadLevels, })));
-  const { summaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, previousLotBlocks: loadedPrevious, analysisTestId, analysisLoading, analysisError } = useWestgardStore(useShallow((s) => ({
+  const { summaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel: loadedAnalysis, loadAnalysis, analysisTestId, analysisLoading, analysisError } = useWestgardStore(useShallow((s) => ({
     summaries: s.summaries, ruleSettings: s.ruleSettings, loadRuleSettings: s.loadRuleSettings,
     saveRuleSetting: s.saveRuleSetting, resetRuleSettings: s.resetRuleSettings, analysisByLevel: s.analysisByLevel, loadAnalysis: s.loadAnalysis,
-    previousLotBlocks: s.previousLotBlocks, analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
+    analysisTestId: s.analysisTestId, analysisLoading: s.analysisLoading, analysisError: s.analysisError,
   })));
   const role = useAuthStore((s) => s.user)?.role;
   const admin = isAdmin(role);
@@ -63,9 +64,14 @@ export function WestgardPage() {
   // ở mọi lần render (ESLint exhaustive-deps phát hiện).
   const levels = useMemo(() => (levelsByTestId[testId] || []).filter(level => currentSummary?.levels.some(active => active.level === level.level)), [levelsByTestId, testId, currentSummary]);
   const analysisByLevel = useMemo(() => (analysisTestId === testId ? loadedAnalysis : {}), [analysisTestId, testId, loadedAnalysis]);
-  const previousLotBlocks = useMemo(() => (analysisTestId === testId ? loadedPrevious : []), [analysisTestId, testId, loadedPrevious]);
-  const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError;
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
+  const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError
+    && levelsByTestId[testId] !== undefined && levelNums.every(level => !!analysisByLevel[level]);
+  const viewingLj = view === 'current' && chartMode === 'lj';
+  const isPrevOpen = (level: number) => prevOpen.has(`${testId}|${level}`);
+  const previous = usePreviousWestgard(testId, viewingLj, viewingLj && analysisReady && levelNums.some(isPrevOpen));
+  const { blocks: previousLotBlocks, refresh: refreshPrevious } = previous;
+  const exportReady = analysisReady && !previous.loading && !previous.error;
   // Panel cấu hình chung hiện mặc định theo số mức của xét nghiệm đang xem (WG-26).
   const ruleLevelCount = levelNums.length || 2;
   useEffect(() => {
@@ -90,10 +96,11 @@ export function WestgardPage() {
     // truyền thẳng danh sách thô vào đây là gọi `analyzeLevel` cho cả những
     // mức không bao giờ được vẽ, và nhét vào `analysisByLevel` các khoá không
     // ai đọc.
-    if (testId) void loadLevels(testId).then(() => {
+    if (testId) void loadLevels(testId).then(async () => {
       if (selectedTestRef.current !== testId) return;
       const operational = (useManageStore.getState().levelsByTestId[testId] || []).filter(level => level.operational !== 0);
-      return loadAnalysis(testId, operational.map(level => level.level));
+      await loadAnalysis(testId, operational.map(level => level.level));
+      if (selectedTestRef.current === testId) refreshPrevious();
     });
   });
 
@@ -111,7 +118,6 @@ export function WestgardPage() {
   // Vẫn là MỘT biểu đồ tổng hợp hai mức: dữ liệu quy đổi về Z-score chung,
   // chỉ đồng bộ kích thước/co giãn với biểu đồ ở trang Nhập QC.
   const prevBlocksFor = (level: number) => previousLotBlocks.filter((b) => b.level === level);
-  const isPrevOpen = (level: number) => prevOpen.has(`${testId}|${level}`);
   const togglePrevLot = (level: number) => setPrevOpen((current) => {
     const next = new Set(current), key = `${testId}|${level}`;
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -160,13 +166,13 @@ export function WestgardPage() {
 
   /** Excel và PDF lấy cùng lô, cùng điểm như bảng đang hiển thị. */
   async function exportXlsx() {
-    if (!analysisReady) return;
+    if (!exportReady) return;
     const error = await exportTableXlsx('Westgard', WESTGARD_EXPORT_HEADERS, westgardExportRows(displayBlocks),
       `westgard-${currentSummary?.testName || 'xet-nghiem'}.xlsx`);
     if (error) await errorDialog(error);
   }
   async function printPdf() {
-    if (!analysisReady) return;
+    if (!exportReady) return;
     const rows = westgardExportRows(displayBlocks);
     const body = rows.map(row => '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>').join('');
     const title = `Phân tích Westgard — ${currentSummary?.testName || ''}`;
@@ -230,8 +236,8 @@ export function WestgardPage() {
                 id="wgTestSelect" label="Chọn xét nghiệm" countId="wgTestCount" />
               {chartMode === 'lj' && (
                   <div className="wg-export-actions">
-                    <button className="btn teal" disabled={!analysisReady || noOperationalLevels} title="Xuất bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={exportXlsx}><DownloadIcon />Xuất Excel</button>
-                    <button className="btn teal" disabled={!analysisReady || noOperationalLevels} title="In bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={printPdf}><PrintIcon />In PDF</button>
+                    <button className="btn teal" disabled={!exportReady || noOperationalLevels} title="Xuất bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={exportXlsx}><DownloadIcon />Xuất Excel</button>
+                    <button className="btn teal" disabled={!exportReady || noOperationalLevels} title="In bảng điểm, lô, Mean/SD và bằng chứng đang xem" onClick={printPdf}><PrintIcon />In PDF</button>
                   </div>
               )}
             </div>
@@ -286,6 +292,12 @@ export function WestgardPage() {
       {view === 'current' && !testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở panel phía trên.</EmptyState></div>}
 
       {view === 'current' && testId && !analysisReady && <div className="panel"><EmptyState action={analysisError ? <button className="btn ghost sm" onClick={() => loadAnalysis(testId, levelNums)}>Thử lại</button> : undefined}>{analysisError || 'Đang tải phân tích…'}</EmptyState></div>}
+      {viewingLj && previous.availabilityError && !previous.error && <div className="panel"><EmptyState
+        action={<button className="btn ghost sm" onClick={refreshPrevious}>Thử lại</button>}
+      >Không tải được danh sách lô cũ.</EmptyState></div>}
+      {viewingLj && previous.error && <div className="panel"><EmptyState
+        action={<button className="btn ghost sm" onClick={refreshPrevious}>Thử lại</button>}
+      >Không tải được phân tích lô cũ.</EmptyState></div>}
       {view === 'current' && testId && analysisReady && noOperationalLevels && <div className="panel"><EmptyState
         title="Chưa có mức QC đang vận hành"
         action={admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'targets' } })}>Mở Cấu hình chung</button>}
@@ -358,7 +370,9 @@ export function WestgardPage() {
         // các lô xa hơn vẫn nằm ở tab
         // "Nhóm lô đã dừng".
         const prevBlocks = prevBlocksFor(l.level);
-        const prevBlock = prevBlocks.length && isPrevOpen(l.level) ? prevBlocks[0] : null;
+        const open = isPrevOpen(l.level);
+        const hasPrevious = previous.levels.includes(l.level) || prevBlocks.length > 0;
+        const prevBlock = open ? prevBlocks[0] : undefined;
         const block = displayBlocks.find(item => item.level === l.level)!;
         const analysis = block.analysis;
         const noTarget = !prevBlock && (l.mean == null || l.sd == null);
@@ -375,9 +389,10 @@ export function WestgardPage() {
                 {prevBlock && <span className="tag rej">Đã chuyển tiếp</span>}
                 <span>Mean {meanText}</span><span>SD {sdText}</span><span>{pointCount} điểm</span>
                 <span className="wg-observed-meta" title="Thống kê mô tả trên các lần chạy được chấp nhận; không tự thay Mean/SD đích. Mẫu dưới 20 điểm hoặc 10 ngày chỉ là tạm tính.">Thực tế (n={observed.n}{observed.n < 2 ? ', chưa đủ tính SD' : observed.provisional ? ', tạm tính' : ''}): Mean {statText(observed.mean, currentSummary?.decimalPlaces)} · SD {statText(observed.sd, currentSummary?.decimalPlaces)} · CV {observed.cv == null ? '—' : `${statText(observed.cv)}%`}</span>
-                {!!prevBlocks.length && (
-                  <button className="btn ghost sm wg-prev-toggle" onClick={() => togglePrevLot(l.level)}>
-                    {prevBlock ? 'Xem lô mới' : 'Xem lô cũ'}
+                {open && previous.loading && <span role="status">Đang tải lô cũ…</span>}
+                {(hasPrevious || open) && (
+                  <button className="btn ghost sm wg-prev-toggle" aria-pressed={open} onClick={() => togglePrevLot(l.level)}>
+                    {open ? 'Xem lô mới' : 'Xem lô cũ'}
                   </button>
                 )}
               </div>
@@ -386,7 +401,7 @@ export function WestgardPage() {
               <EmptyState
                 title="Chưa có dữ liệu"
                 action={<button className="btn teal" onClick={() => navigate('/entry', { state: { testId } })}>Nhập QC</button>}
-              >LOT đang dùng chưa có điểm QC. Bạn có thể {prevBlocks.length ? 'chọn LOT cũ hoặc nhập điểm mới' : 'nhập điểm mới'}.</EmptyState>
+              >LOT đang dùng chưa có điểm QC. Bạn có thể {hasPrevious ? 'chọn LOT cũ hoặc nhập điểm mới' : 'nhập điểm mới'}.</EmptyState>
             ) : (
               <>
                 {analysis?.evaluationNote && <div className="alert warn wg-target-warning">{analysis.evaluationNote}</div>}

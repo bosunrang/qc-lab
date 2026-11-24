@@ -1,11 +1,7 @@
-// Zustand store cho trang Nhập QC — chỉ EntryPage.tsx dùng, tự do đổi hình
-// dạng. Viết lại để nạp điểm QC + phân tích cho TẤT CẢ mức của 1 xét nghiệm
-// cùng lúc (bảng worksheet + biểu đồ LJ hiển thị mọi mức song
-// song, không chỉ 1 mức đang chọn như bản thí điểm trước). `loadAnalysis`
-// gọi `westgard:analyzeLevel` (đã có sẵn từ module Westgard) để lấy z-score/
-// CUSUM cho `<QcChart>`, không tính lại ở renderer.
+// Nạp điểm và kết luận của mọi mức trong một lượt, theo tháng nhập và
+// khoảng biểu đồ. Main giữ toàn bộ ngữ cảnh đánh giá Westgard.
 import { create } from 'zustand';
-import type { QcPointView, LevelAnalysis, IpcResult, RangeCandidateView, ParallelEntryColumn, PreviousLotSeries, VoidedQcPointView, QcRunConclusionChange } from '../../shared/qc-api';
+import type { EntryWindow, EntryWindowRequest, QcPointView, IpcResult, RangeCandidateView, QcRunConclusionChange } from '../../shared/qc-api';
 import { useAuthStore } from './auth-store';
 
 let rangeRequestSerial = 0;
@@ -32,15 +28,12 @@ interface EntryState {
   toggleTreeMachine: (key: string) => void;
   toggleTreeGroup: (key: string) => void;
   activeTestId: string | null;
-  loadedLevelKey: string | null;
-  pointsByLevel: Record<number, QcPointView[]>;
-  analysisByLevel: Record<number, LevelAnalysis>;
-  parallelColumns: ParallelEntryColumn[];
-  previousLotSeries: PreviousLotSeries[];
-  voidedPoints: VoidedQcPointView[];
+  entryWindow: EntryWindow | null;
+  loadedRequest: EntryWindowRequest | null;
+  windowError: string | null;
   rangeCandidate: RangeCandidateView | null;
   rangeError: string | null;
-  loadTestData: (testId: string, levels: number[]) => Promise<void>;
+  loadTestData: (testId: string, request: EntryWindowRequest) => Promise<void>;
   resetTestData: () => void;
   addPoint: (data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string; retroReason?: string }) => Promise<IpcResult<QcPointView & { retroChanges: QcRunConclusionChange[] }>>;
   setDayNote: (testId: string, date: string, note: string) => Promise<IpcResult<{ note: string; updated: number }>>;
@@ -63,47 +56,29 @@ export const useEntryStore = create<EntryState>((set, get) => ({
   toggleTreeGroup: (key) => set((state) => ({ openTreeGroups: toggleTreeKey(state.openTreeGroups, key) })),
 
   activeTestId: null,
-  loadedLevelKey: null,
-  pointsByLevel: {},
-  analysisByLevel: {},
-  parallelColumns: [],
-  previousLotSeries: [],
-  voidedPoints: [],
+  entryWindow: null,
+  loadedRequest: null,
+  windowError: null,
   rangeCandidate: null,
   rangeError: null,
 
-  loadTestData: async (testId, levels) => {
-    const request = ++dataRequestSerial;
-    // Đổi sang xét nghiệm khác thì bỏ ngay dữ liệu của xét nghiệm cũ: giữ lại
-    // thì điểm cũ hiện dưới cột mức cùng số của xét nghiệm mới cho tới khi
-    // IPC trả về. Nạp lại CÙNG xét nghiệm thì vẫn giữ để bảng không chớp trống.
-    if (get().activeTestId !== testId) {
-      set({ activeTestId: testId, loadedLevelKey: null, pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [] });
-    } else {
-      set({ loadedLevelKey: null });
+  loadTestData: async (testId, request) => {
+    const serial = ++dataRequestSerial;
+    if (get().activeTestId !== testId) set({ activeTestId: testId, entryWindow: null, loadedRequest: null });
+    set({ windowError: null });
+    try {
+      const entryWindow = await window.qcApi.getEntryWindow(testId, request);
+      if (serial === dataRequestSerial) set({ entryWindow, loadedRequest: request });
+    } catch {
+      if (serial === dataRequestSerial) set({ windowError: 'Không tải được dữ liệu QC trong khoảng xem.' });
     }
-    const [pairs, parallelColumns, previousLotSeries, voidedPoints] = await Promise.all([Promise.all(levels.map(async (level) => {
-      const [points, analysis] = await Promise.all([
-        window.qcApi.queryPoints(testId, level),
-        window.qcApi.analyzeLevel(testId, level),
-      ]);
-      return [level, points, analysis] as const;
-    })), window.qcApi.listParallelEntryColumns(testId), window.qcApi.listPreviousEntryLotSeries(testId), window.qcApi.listVoidedEntryPoints(testId)]);
-    const pointsByLevel: Record<number, QcPointView[]> = {};
-    const analysisByLevel: Record<number, LevelAnalysis> = {};
-    for (const [level, points, analysis] of pairs) { pointsByLevel[level] = points; analysisByLevel[level] = analysis; }
-    // Người dùng có thể đổi xét nghiệm khi các IPC trên còn đang chạy. Chỉ
-    // yêu cầu mới nhất được phép thay dữ liệu đang hiển thị.
-    if (request !== dataRequestSerial || get().activeTestId !== testId) return;
-    set({ loadedLevelKey: levels.join(','), pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints });
   },
 
   resetTestData: () => {
     dataRequestSerial += 1;
     rangeRequestSerial += 1;
     set({
-      activeTestId: null, loadedLevelKey: null,
-      pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [],
+      activeTestId: null, entryWindow: null, loadedRequest: null, windowError: null,
       rangeCandidate: null, rangeError: null,
     });
   },
@@ -142,7 +117,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
 }));
 
 useAuthStore.subscribe((state, previous) => {
-  if (state.user?.id !== previous.user?.id) useEntryStore.setState(initialTreeView);
+  if (state.user?.id === previous.user?.id) return;
+  useEntryStore.getState().resetTestData();
+  useEntryStore.setState(initialTreeView);
 });
 
 

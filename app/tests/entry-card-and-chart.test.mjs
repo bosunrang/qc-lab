@@ -298,17 +298,36 @@ test('EN11: thống kê tích luỹ bỏ điểm thuộc lần chạy bị loạ
     ins.run('a' + i, subject.id, 1, date, date + '-1', i === 1 ? 107 : (i % 2 ? 99.5 : 100.5), 'A1', 100, 2);
     ins.run('b' + i, subject.id, 2, date, date + '-1', i % 2 ? 199.5 : 200.5, 'A2', 200, 4);
   });
-  const rows = entry.queryPoints(subject.id, 2);
-  // Đúng phép lọc của khối "Thống kê tích luỹ" trong EntryPage.
-  const recorded = rows.filter((p) => !p.voided);
-  const cumulative = recorded.filter((p) => p.accepted !== false);
-  assert.equal(recorded.length, 3, 'tổng ghi nhận giữ nguyên cho truy vết');
-  assert.equal(cumulative.length, 2, 'điểm thuộc lần chạy bị loại không vào thống kê');
-  assert.equal(recorded.length - cumulative.length, 1);
+  const { current } = entry.getEntryWindow(subject.id, {
+    worksheetFrom: '2026-09-03', worksheetTo: '2026-09-03',
+    chartFrom: '2026-09-03', chartTo: '2026-09-03', previousLots: {},
+  });
+  assert.deepEqual(current[2].points.map(p => p.id), ['b2'], 'chỉ gửi điểm trong khoảng đang xem');
+  assert.equal(current[2].cumulative.recorded, 3, 'tổng ghi nhận giữ nguyên cho truy vết');
+  assert.equal(current[2].cumulative.n, 2, 'điểm thuộc lần chạy bị loại không vào thống kê');
+  assert.equal(current[2].cumulative.recorded - current[2].cumulative.n, 1);
 
   const page = readEntryPageSources();
-  assert.match(page, /const cumulative = recorded\.filter\(\(p\) => p\.accepted !== false\);/);
-  assert.match(page, /Tổng ghi nhận \{recorded\.length\}/);
+  assert.match(page, /Tổng ghi nhận \{cumulative\?\.recorded/);
+});
+
+test('khoảng Nhập QC giữ bằng chứng Westgard từ trước ngày bắt đầu và tách các khoảng rời nhau', () => {
+  const { db, test: subject, entry } = twoOperationalLevels();
+  const ins = db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,val,lot,qc_mean,qc_sd,voided) VALUES (?,?,?,?,?,?,?,?,?,0)');
+  for (const [index, date] of ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-10-01'].entries()) {
+    ins.run('window-' + index, subject.id, 1, date, date + '-1', index < 4 ? 102.5 : 100, 'A1', 100, 2);
+  }
+  const { current } = entry.getEntryWindow(subject.id, {
+    worksheetFrom: '2026-10-01', worksheetTo: '2026-10-31',
+    chartFrom: '2026-09-04', chartTo: '2026-09-04', previousLots: {},
+  });
+  assert.deepEqual(current[1].points.map(p => p.id), ['window-3', 'window-5']);
+  const [first] = current[1].points;
+  assert.equal(first.chartZ, 1.25);
+  assert.equal(first.chartVerdict, 'rej');
+  assert.ok(first.rules.includes('4-1s'), 'ba điểm ngoài khoảng vẫn tham gia luật');
+  assert.equal(current[1].cumulative.recorded, 4);
+  assert.equal(current[1].cumulative.n, 3);
 });
 
 test('EN13: thẻ biểu đồ là vùng thông tin, không lồng tương tác giả; số điểm nói rõ phần dùng thống kê', () => {

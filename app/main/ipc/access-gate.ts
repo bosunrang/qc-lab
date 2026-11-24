@@ -34,9 +34,10 @@ const CHANNEL_PAGES: Readonly<Record<string, readonly string[]>> = {
   'auth:listUsers': ['users'], 'auth:createUser': ['users'], 'auth:updateUser': ['users'], 'auth:deleteUser': ['users'],
   'auth:resetPassword': ['users'], 'auth:setNceCapabilities': ['users'],
   'entry:addPoint': ['entry'], 'entry:voidPoint': ['entry'], 'entry:setDayNote': ['entry'],
-  'entry:voidPointAssessment': ['entry'],
+  'entry:voidPointAssessment': ['entry'], 'entry:getWindow': ['entry'],
   'entry:applyLabRange': ['entry'], 'entry:revertManufacturerRange': ['entry'], 'entry:rangeCandidate': ['entry'],
   'westgard:saveRuleAction': ['manage'], 'westgard:saveRuleSetting': ['westgard'], 'westgard:resetRuleSettings': ['westgard'],
+  'westgard:listPreviousLotLevels': ['westgard'],
   // Tổng quan và Báo cáo đọc tóm tắt NCE; Cài đặt sửa cấu hình NCE.
   'nce:list': [], 'nce:getConfig': ['settings'], 'nce:saveConfig': ['settings'],
   // Six Sigma và Ngoại kiểm in báo cáo theo biểu mẫu dùng chung.

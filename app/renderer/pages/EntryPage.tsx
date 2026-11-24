@@ -20,9 +20,10 @@ import { LoadNotice } from '../components/LoadNotice';
 import { confirmDialog, errorDialog, reasonDialog } from '../state/dialog-store';
 import { showToast } from '../state/toast-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
+import { isoLocalDate, isoLocalDateAfter } from '../../main/domain/local-date';
 import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
 import type { QcChartPoint } from '../components/QcChart';
-import type { QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
+import type { EntryWindow, EntryWindowRequest, QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
 import { createOperationalCatalog } from './entry/operational';
 import { EntryTree, TreeToggleIcon } from './entry/EntryTree';
 import { EntrySheet } from './entry/EntrySheet';
@@ -31,18 +32,16 @@ import { EntryPointsPanel } from './entry/EntryPointsPanel';
 import { EntryRangePanel } from './entry/EntryRangePanel';
 import { VoidPointModal } from './entry/VoidPointModal';
 import { RangeWorkflowModal, type RangeMode } from './entry/RangeWorkflowModal';
-import { formatQcValue, pad2, parseQcValueText, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
+import { formatQcValue, parseQcValueText, vnDate, type DisplayColumn, type EntryColumn } from './entry/shared';
 import { lotNoOfLevel } from '../lib/lot-label';
 
 const EMPTY_LEVELS: TestLevel[] = [];
+const EMPTY_LOT_SELECTION: Record<number, string> = {};
+const EMPTY_WINDOW: EntryWindow = { current: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [] };
 const ENTRY_TREE_COLLAPSE_KEY = 'qclab-entry-tree-collapsed';
 
 function visibleContentTop(viewport: HTMLElement): number {
   return viewport.querySelector('.head')?.getBoundingClientRect().bottom ?? viewport.getBoundingClientRect().top;
-}
-
-function isoDay(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 export function EntryPage() {
@@ -50,9 +49,9 @@ export function EntryPage() {
     instruments: s.instruments, lots: s.lots, lotGroups: s.lotGroups, tests: s.tests, panels: s.panels, levelsByTestId: s.levelsByTestId,
     loadLevels: s.loadLevels, })));
   const { summaries, loadSummaries } = useWestgardStore(useShallow((s) => ({ summaries: s.summaries, loadSummaries: s.loadSummaries })));
-  const { pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, addPoint, setDayNote } = useEntryStore(useShallow((s) => ({
-    pointsByLevel: s.pointsByLevel, analysisByLevel: s.analysisByLevel, parallelColumns: s.parallelColumns, previousLotSeries: s.previousLotSeries,
-    voidedPoints: s.voidedPoints, rangeCandidate: s.rangeCandidate, rangeError: s.rangeError,
+  const { activeTestId, entryWindow, loadedRequest, windowError, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, addPoint, setDayNote } = useEntryStore(useShallow((s) => ({
+    activeTestId: s.activeTestId, entryWindow: s.entryWindow, loadedRequest: s.loadedRequest, windowError: s.windowError,
+    rangeCandidate: s.rangeCandidate, rangeError: s.rangeError,
     loadTestData: s.loadTestData, resetTestData: s.resetTestData, loadRangeCandidate: s.loadRangeCandidate, addPoint: s.addPoint, setDayNote: s.setDayNote,
   })));
   const selectedTestId = useEntryStore((s) => s.selectedTestId);
@@ -79,10 +78,10 @@ export function EntryPage() {
   const [voiding, setVoiding] = useState<QcPointView | null>(null);
   // Mỗi mức chỉ mở một chuỗi lô cũ trên biểu đồ/bảng chi tiết. Worksheet vẫn
   // hiện mọi điểm lô cũ theo ngày ở dạng chỉ đọc để lịch sử tháng liền mạch.
-  const [previousLotOpen, setPreviousLotOpen] = useState<Record<number, string>>({});
+  const [lotSelection, setLotSelection] = useState({ testId: '', lots: EMPTY_LOT_SELECTION });
   const [ljDays, setLjDays] = useState(30);
-  const [ljFrom, setLjFrom] = useState('');
-  const [ljTo, setLjTo] = useState('');
+  const [ljFrom, setLjFrom] = useState(() => isoLocalDateAfter(-29));
+  const [ljTo, setLjTo] = useState(() => isoLocalDate());
 
   function setTreeVisibility(collapsed: boolean) {
     setTreeCollapsed(collapsed);
@@ -100,6 +99,18 @@ export function EntryPage() {
   const testId = currentSummary?.testId || '';
   const testName = currentSummary?.testName || '';
   const decimals = currentSummary?.decimalPlaces ?? 2;
+  const previousLotOpen = lotSelection.testId === testId ? lotSelection.lots : EMPTY_LOT_SELECTION;
+  const windowRequest = useMemo<EntryWindowRequest>(() => ({
+    worksheetFrom: isoLocalDate(new Date(viewYear, viewMonth - 1, 1)),
+    worksheetTo: isoLocalDate(new Date(viewYear, viewMonth, 0)),
+    chartFrom: ljFrom, chartTo: ljTo, previousLots: previousLotOpen,
+  }), [viewYear, viewMonth, ljFrom, ljTo, previousLotOpen]);
+  const sameTest = activeTestId === testId;
+  const windowReady = sameTest && loadedRequest === windowRequest;
+  const worksheetReady = sameTest && loadedRequest?.worksheetFrom === windowRequest.worksheetFrom
+    && loadedRequest.worksheetTo === windowRequest.worksheetTo;
+  const { current, parallelColumns, previousLotSeries, voidedPoints } = sameTest && entryWindow ? entryWindow : EMPTY_WINDOW;
+  const pointsByLevel = useMemo(() => Object.fromEntries(Object.entries(current).map(([level, value]) => [level, value.points])), [current]);
   // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
   // Mean/SD và Lịch sử dữ liệu cần thấy cả mức đã dừng). Thẻ Nhập QC thì chỉ
   // được dựng cột cho mức ĐANG VẬN HÀNH — cùng tập mà `listOperationalLevels()`
@@ -118,8 +129,7 @@ export function EntryPage() {
   // một lượt ngoài lượt của `useStoreInvalidation` (e2e `reload-count`).
   const levelKey = levels.map((l) => l.level).join(',');
   const levelNums = useMemo(() => (levelKey ? levelKey.split(',').map(Number) : []), [levelKey]);
-  const testDataReady = useEntryStore((s) => !!levelKey && (todayJumpTestId === testId || panelAnchor?.testId === testId)
-    && s.activeTestId === testId && s.loadedLevelKey === levelKey);
+  const testDataReady = !!levelKey && windowReady && (todayJumpTestId === testId || panelAnchor?.testId === testId);
   const jumpToToday = testDataReady && todayJumpTestId === testId;
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   // Giữ mức đang xem nếu xét nghiệm mới có mức đó, chờ nạp danh mục mức trước khi chọn lại.
@@ -128,23 +138,22 @@ export function EntryPage() {
     if (!levelNums.length) { setRangeLevel(null); return; }
     setRangeLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
   }, [testId, allLevels, levelNums]);
-  useEffect(() => { setPreviousLotOpen({}); }, [testId]);
   useEffect(() => {
-    if (testId) loadTestData(testId, levelNums);
+    if (testId) void loadTestData(testId, windowRequest);
     else resetTestData();
-  }, [testId, levelNums, loadTestData, resetTestData]);
+  }, [testId, windowRequest, loadTestData, resetTestData]);
   useEffect(() => { if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel); }, [testId, rangeLevel, loadRangeCandidate]);
-  useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions'], testId || undefined, () => {
-    // Mean/SD hay trạng thái vận hành của mức có thể vừa đổi ở máy khác: nạp
-    // lại mức trước, effect theo `levelNums` sẽ nạp lại dữ liệu nếu tập mức đổi.
+  useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions', 'qc_lots', 'lot_groups', 'tests', 'app_meta', 'nce_cuts', 'qc_panels', 'qc_panel_tests'], testId || undefined, () => {
+    // Khung dữ liệu lấy tập mức từ main; danh mục mức dùng để dựng nhãn cột.
     if (testId) loadLevels(testId);
-    if (testId && levelNums.length) loadTestData(testId, levelNums);
+    if (testId) void loadTestData(testId, windowRequest);
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
 
   const selectLeaf = useCallback((summary: TestSummary, resetMonth = true) => {
     setTodayJumpTestId('');
     setPanelAnchor(null);
+    setLotSelection((selection) => selection.testId === summary.testId ? selection : { testId: summary.testId, lots: EMPTY_LOT_SELECTION });
     selectTreeTest(summary.testId, catalog.machineKeyOf(summary), catalog.lotGroupOf(summary).key);
     if (resetMonth) {
       const now = new Date();
@@ -232,12 +241,8 @@ export function EntryPage() {
   const applyDayPreset = useCallback((days: number) => {
     setLjDays(days);
     const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const start = new Date(end.getTime() - (days - 1) * 86400000);
-    setLjFrom(isoDay(start)); setLjTo(isoDay(end));
+    setLjFrom(isoLocalDateAfter(1 - days, now)); setLjTo(isoLocalDate(now));
   }, []);
-  // Cửa sổ mặc định 30 ngày để khoảng xem luôn có hai mốc ngày.
-  useEffect(() => { if (!ljFrom && !ljTo) applyDayPreset(30); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Cột nhập được xếp theo mức: lô đang vận hành trước, lô chuyển tiếp ngay
    * sau nó. Lô song song dùng Mean/SD của hồ sơ chuyển lô và chuỗi Westgard
@@ -245,17 +250,17 @@ export function EntryPage() {
   const entryColumns: EntryColumn[] = useMemo(() => {
     const lotLabelFor = (level: number) => lotNoOfLevel(levels, lots, level);
     return levels.flatMap((level) => {
-      const analysis = analysisByLevel[level.level];
-      const rows = pointsByLevel[level.level] || [];
-      // `analyzeLevel` mang z + `accepted`; `queryPoints` mang LÝ DO lần chạy bị
-      // loại. Ghép theo id để biểu đồ nói được vì sao một chấm xanh không vào
-      // thống kê, thay vì chỉ âm thầm bớt nó khỏi n.
-      const runRejectedById = new Map(rows.map((point) => [point.id, point.runRejectedBy || []]));
+      const levelData = current[level.level];
+      const rows = levelData?.points || [];
       const main: EntryColumn = {
         key: `main:${level.level}:${lotLabelFor(level.level)}`,
         level: level.level, lot: lotLabelFor(level.level), mean: level.mean, sd: level.sd, exp: '',
-        parallel: false, applied: level.applied, points: rows,
-        chartPoints: (analysis?.points || []).map((point) => ({ ...point, runRejectedBy: runRejectedById.get(point.id) || [] })),
+        parallel: false, applied: level.applied, points: rows, cumulative: levelData?.cumulative,
+        chartPoints: rows.map(point => ({
+          date: point.date, runId: point.run_id, val: point.val, z: point.chartZ ?? NaN, verdict: point.chartVerdict,
+          rules: point.chartVerdict === 'none' ? [] : point.rules, accepted: point.chartVerdict !== 'none' && point.accepted,
+          runRejectedBy: point.runRejectedBy || [],
+        })),
       };
       const candidate = parallelColumns.find((item) => item.level === level.level);
       if (!candidate) return [main];
@@ -271,19 +276,19 @@ export function EntryPage() {
         key: `parallel:${candidate.transitionId}:${candidate.level}:${candidate.lot}`,
         level: candidate.level, lot: candidate.lot, mean: candidate.mean, sd: candidate.sd,
         exp: candidate.exp, parallel: true, applied: 'mfg' as const,
-        points: candidate.points, chartPoints,
+        points: candidate.points, chartPoints, cumulative: candidate.cumulative,
       }];
     });
-  }, [levels, lots, analysisByLevel, pointsByLevel, parallelColumns]);
+  }, [levels, lots, current, parallelColumns]);
 
   const displayColumns: DisplayColumn[] = useMemo(() => entryColumns.map((column) => {
     if (column.parallel) return { ...column, previous: false };
-    const previous = previousLotSeries.find((series) => series.level === column.level && series.lot === previousLotOpen[column.level]);
+    const previous = previousLotSeries.find((series) => series.level === column.level && series.lotId === previousLotOpen[column.level]);
     if (!previous) return { ...column, previous: false };
     return {
       ...column,
       key: `previous:${column.level}:${previous.lot}`,
-      lot: previous.lot, mean: previous.mean, sd: previous.sd, points: previous.points, previous: true,
+      lot: previous.lot, mean: previous.mean, sd: previous.sd, points: previous.points, previous: true, cumulative: previous.cumulative,
       chartPoints: previous.points.map((point) => ({
         date: point.date, runId: point.run_id, val: point.val,
         z: point.qc_mean != null && point.qc_sd != null && point.qc_sd > 0
@@ -295,12 +300,13 @@ export function EntryPage() {
   }), [entryColumns, previousLotSeries, previousLotOpen]);
 
   const togglePreviousLot = useCallback((level: number) => {
-    setPreviousLotOpen((current) => {
-      if (current[level]) { const next = { ...current }; delete next[level]; return next; }
+    setLotSelection((selection) => {
+      const lots = selection.testId === testId ? selection.lots : EMPTY_LOT_SELECTION;
+      if (lots[level]) { const next = { ...lots }; delete next[level]; return { testId, lots: next }; }
       const previous = previousLotSeries.find((series) => series.level === level);
-      return previous ? { ...current, [level]: previous.lot } : current;
+      return previous ? { testId, lots: { ...lots, [level]: previous.lotId } } : selection;
     });
-  }, [previousLotSeries]);
+  }, [previousLotSeries, testId]);
 
   // Chỉ xoá ô nhập khi lưu thành công; nếu thất bại thì hiển thị lỗi trả về.
   const commitRun = useCallback(async (column: EntryColumn, date: string, runId: string, raw: string): Promise<{ saved: boolean; fieldError?: string }> => {
@@ -362,8 +368,8 @@ export function EntryPage() {
   }, []);
   const closeRange = useCallback(() => setRangeMode(null), []);
   const onRangeApplied = useCallback(async () => {
-    await Promise.all([loadLevels(testId), loadTestData(testId, levelNums), loadSummaries()]);
-  }, [testId, levelNums, loadLevels, loadTestData, loadSummaries]);
+    await Promise.all([loadLevels(testId), loadTestData(testId, windowRequest), loadSummaries()]);
+  }, [testId, windowRequest, loadLevels, loadTestData, loadSummaries]);
 
   // Hai trạng thái rỗng thay toàn bộ thân trang: chưa khai báo xét nghiệm và
   // đã có xét nghiệm nhưng chưa sẵn sàng nhập (thiếu Panel QC, nhóm lô đang
@@ -394,21 +400,22 @@ export function EntryPage() {
         <EntryTree summaries={operationalSummaries} instruments={instruments} catalog={catalog} testId={testId}
           treeCollapsed={treeCollapsed} onSelect={selectFromTree} onCollapse={collapseTree} />
 
-        <div className="entry-main" ref={entryMainRef}>
+        <div className="entry-main" ref={entryMainRef} aria-busy={!!testId && !windowReady && !windowError}>
           {!testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở danh mục bên trái.</EmptyState></div>}
           {testId && (
             <>
+              {sameTest && windowError && <LoadNotice state="error" error={windowError} what="dữ liệu QC" onRetry={() => void loadTestData(testId, windowRequest)} />}
               <EntrySheet key={testId} testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
-                pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable}
+                pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable && worksheetReady}
                 jumpToToday={jumpToToday} onTodayJumpHandled={clearTodayJump}
                 viewYear={viewYear} viewMonth={viewMonth} onViewYear={setViewYear} onViewMonth={setViewMonth}
                 onCommitRun={commitRun} onSaveNote={saveDayNote} />
-              <EntryLjPanel key={`charts:${testId}`} displayColumns={displayColumns} levelCount={levels.length} pointsByLevel={pointsByLevel}
-                analysisByLevel={analysisByLevel} previousLotSeries={previousLotSeries} decimals={decimals}
+              <EntryLjPanel key={`charts:${testId}`} displayColumns={displayColumns} levelCount={levels.length}
+                previousLotSeries={previousLotSeries} decimals={decimals}
                 ljFrom={ljFrom} ljTo={ljTo} ljDays={ljDays} onFrom={setLjFrom} onTo={setLjTo} onPreset={applyDayPreset}
                 onTogglePreviousLot={togglePreviousLot} />
               <EntryPointsPanel displayColumns={displayColumns} voidedPoints={voidedPoints} decimals={decimals}
-                writable={writable} ljFrom={ljFrom} ljTo={ljTo} onVoid={openVoid} />
+                writable={writable && windowReady} cumulativeReady={windowReady} ljFrom={ljFrom} ljTo={ljTo} onVoid={openVoid} />
               <EntryRangePanel rangeCandidate={rangeCandidate} rangeError={rangeError} levelNums={levelNums} rangeLevel={rangeLevel}
                 decimals={decimals} writable={writable} onRangeLevel={setRangeLevel} onOpen={setRangeMode} />
             </>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TestSummary, LevelAnalysis, RuleSetting, ArchivedBlock } from '../../shared/qc-api';
+import type { TestSummary, LevelAnalysis, RuleSetting } from '../../shared/qc-api';
 
 // `analysisByLevel` + `loadAnalysis(testId, levels)` nạp MỌI mức của một xét
 // nghiệm trong 1 lượt — cùng quy ước `entry-store.ts` đã dùng, vì trang
@@ -13,10 +13,6 @@ interface WestgardState {
   analysisLoading: boolean;
   analysisError: string;
   analysisByLevel: Record<number, LevelAnalysis>;
-  /** Chuỗi lô cũ của xét nghiệm đang xem (công tắc "Xem lô cũ"). Nạp cùng
-   * nhịp với `analysisByLevel` để `useStoreInvalidation` của trang chạm tới
-   * được — thêm/huỷ điểm hay đổi Mean/SD đều làm số liệu lô cũ đổi theo. */
-  previousLotBlocks: ArchivedBlock[];
   ruleSettings: RuleSetting[];
   /** Số mức QC của xét nghiệm đang xem: luật chưa đặt riêng theo mặc định của nhóm số mức này (WG-26). */
   ruleLevelCount: number;
@@ -36,7 +32,6 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
   analysisLoading: false,
   analysisError: '',
   analysisByLevel: {},
-  previousLotBlocks: [],
   ruleSettings: [], ruleLevelCount: 2,
 
   loadSummaries: async () => {
@@ -50,17 +45,14 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
     // đang hiện cho tới khi bản mới về: xoá trắng làm cả trang đổi sang
     // "Đang tải phân tích…" và mất vị trí cuộn. Chỉ xoá khi đổi xét nghiệm.
     if (get().analysisTestId === testId && !get().analysisError) set({ analysisLoading: false });
-    else set({ analysisTestId: testId, analysisLoading: !!testId && !!levels.length, analysisError: '', analysisByLevel: {}, previousLotBlocks: [] });
-    if (!testId || !levels.length) { set({ analysisByLevel: {}, previousLotBlocks: [], analysisLoading: false }); return; }
+    else set({ analysisTestId: testId, analysisLoading: !!testId && !!levels.length, analysisError: '', analysisByLevel: {} });
+    if (!testId || !levels.length) { set({ analysisByLevel: {}, analysisLoading: false }); return; }
     try {
-      const [results, previousLotBlocks] = await Promise.all([
-        Promise.all(levels.map((level) => window.qcApi.analyzeLevel(testId, level))),
-        window.qcApi.listPreviousLotBlocks(testId),
-      ]);
+      const results = await Promise.all(levels.map((level) => window.qcApi.analyzeLevel(testId, level)));
       if (revision !== analysisRevision) return;
       const analysisByLevel: Record<number, LevelAnalysis> = {};
       levels.forEach((level, i) => { analysisByLevel[level] = results[i]; });
-      set({ analysisByLevel, previousLotBlocks, analysisLoading: false });
+      set({ analysisByLevel, analysisLoading: false });
     } catch {
       if (revision === analysisRevision) set({ analysisLoading: false, analysisError: 'Không tải được phân tích. Vui lòng thử lại.' });
     }

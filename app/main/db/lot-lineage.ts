@@ -19,18 +19,21 @@ export type LineagePoint = Record<string, unknown> & {
   runId: string; qcMean: number | null; qcSd: number | null;
 };
 
-export interface PreviousLotSeriesData {
+export interface PreviousLotMetadata {
   level: number;
   lotId: string;
   lot: string;
   mean: number;
   sd: number;
+}
+
+export interface PreviousLotSeriesData extends PreviousLotMetadata {
   points: LineagePoint[];
 }
 
-function pointsForLot(db: Db, testId: string, level: number, lot: string): LineagePoint[] {
-  const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=?')
-    .all(testId, level, lot) as unknown as (LineagePoint & { qc_mean: number | null; qc_sd: number | null })[];
+export function previousLotPoints(db: Db, testId: string, level: number, lot: string, from = '', to = '\uffff'): LineagePoint[] {
+  const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=? AND date BETWEEN ? AND ?')
+    .all(testId, level, lot, from, to) as unknown as (LineagePoint & { qc_mean: number | null; qc_sd: number | null })[];
   return rows
     .map((point) => ({ ...point, runId: point.run_id, qcMean: point.qc_mean, qcSd: point.qc_sd }))
     .sort(compareQcPointOrder);
@@ -44,8 +47,18 @@ function pointsForLot(db: Db, testId: string, level: number, lot: string): Linea
  * đúng lô đó; snapshot `qc_mean`/`qc_sd` trên điểm là fallback cho dữ liệu đã
  * nhập trước khi lịch sử được hoàn thiện. Lô không tra được Mean/SD hợp lệ,
  * hoặc không còn điểm nào, bị bỏ qua — không có gì để vẽ. */
-export function listPreviousLotSeriesData(db: Db, testId: string): PreviousLotSeriesData[] {
-  const out: PreviousLotSeriesData[] = [];
+export function listPreviousLotMetadata(db: Db, testId: string): PreviousLotMetadata[] {
+  const out: PreviousLotMetadata[] = [];
+  const hasPoints = db.prepare('SELECT 1 FROM qc_points WHERE test_id=? AND level=? AND lot=? AND voided=0 LIMIT 1');
+  const snapshotDays = db.prepare(`SELECT MAX(date) AS date FROM qc_points
+    WHERE test_id=? AND level=? AND lot=? AND voided=0 AND qc_mean IS NOT NULL AND qc_sd>0`);
+  const snapshots = db.prepare(`SELECT date,run_id,qc_mean,qc_sd FROM qc_points
+    WHERE test_id=? AND level=? AND lot=? AND voided=0 AND qc_mean IS NOT NULL AND qc_sd>0 AND date=?`);
+  const transitionFor = db.prepare(`SELECT tr.from_lot_id
+    FROM lot_transitions tr JOIN qc_panel_tests pt ON pt.panel_id=tr.panel_id AND pt.test_id=?
+    WHERE tr.to_lot_id=? AND tr.status='accepted'
+    ORDER BY tr.approved_at DESC,tr.rowid DESC LIMIT 1`);
+  const lotById = db.prepare('SELECT id,lot_no,level FROM qc_lots WHERE id=?');
   for (const config of listOperationalLevels(db, testId)) {
     if (!config.qc_lot_id) continue;
     const historyRow = db.prepare('SELECT mean_sd_history_json FROM test_levels WHERE test_id=? AND level=?')
@@ -61,27 +74,39 @@ export function listPreviousLotSeriesData(db: Db, testId: string): PreviousLotSe
     const seen = new Set<string>();
     while (currentLotId && !seen.has(currentLotId)) {
       seen.add(currentLotId);
-      const transition = db.prepare(`SELECT tr.from_lot_id
-        FROM lot_transitions tr JOIN qc_panel_tests pt ON pt.panel_id=tr.panel_id AND pt.test_id=?
-        WHERE tr.to_lot_id=? AND tr.status='accepted'
-        ORDER BY tr.approved_at DESC,tr.rowid DESC LIMIT 1`).get(testId, currentLotId) as { from_lot_id: string } | undefined;
+      const transition = transitionFor.get(testId, currentLotId) as { from_lot_id: string } | undefined;
       if (!transition) break;
-      const previous = db.prepare('SELECT id,lot_no,level FROM qc_lots WHERE id=?').get(transition.from_lot_id) as
+      const previous = lotById.get(transition.from_lot_id) as
         { id: string; lot_no: string; level: number } | undefined;
       if (!previous || previous.level !== config.level) break;
-
-      const points = pointsForLot(db, testId, config.level, previous.lot_no);
-      const saved = [...history].reverse().find((item) => item.qcLotId === previous.id && item.mean != null && item.sd != null && Number(item.sd) > 0);
-      const snap = [...points].reverse().find((point) => point.qcMean != null && point.qcSd != null && Number(point.qcSd) > 0);
-      const mean = saved?.mean != null ? Number(saved.mean) : snap?.qcMean != null ? Number(snap.qcMean) : NaN;
-      const sd = saved?.sd != null ? Number(saved.sd) : snap?.qcSd != null ? Number(snap.qcSd) : NaN;
-      if (points.length && Number.isFinite(mean) && Number.isFinite(sd) && sd > 0) {
-        out.push({ level: config.level, lotId: previous.id, lot: previous.lot_no, mean, sd, points });
-      }
       currentLotId = previous.id;
+
+      if (!hasPoints.get(testId, config.level, previous.lot_no)) continue;
+      const saved = [...history].reverse().find((item) => item.qcLotId === previous.id && item.mean != null && item.sd != null && Number(item.sd) > 0);
+      let mean = Number(saved?.mean);
+      let sd = Number(saved?.sd);
+      if (!saved) {
+        // Dữ liệu cũ có thể chỉ có Mean/SD chốt trên điểm. Chỉ đọc ảnh
+        // chụp ngày cuối có dải hợp lệ, vẫn xếp mã lần chạy theo số.
+        const latest = snapshotDays.get(testId, config.level, previous.lot_no) as { date: string | null };
+        if (!latest.date) continue;
+        const rows = snapshots.all(testId, config.level, previous.lot_no, latest.date) as
+          { date: string; run_id: string; qc_mean: number; qc_sd: number }[];
+        const snap = rows.sort(compareQcPointOrder).at(-1);
+        mean = Number(snap?.qc_mean);
+        sd = Number(snap?.qc_sd);
+      }
+      if (Number.isFinite(mean) && Number.isFinite(sd) && sd > 0) {
+        out.push({ level: config.level, lotId: previous.id, lot: previous.lot_no, mean, sd });
+      }
     }
   }
   return out;
 }
 
+export function listPreviousLotSeriesData(db: Db, testId: string): PreviousLotSeriesData[] {
+  return listPreviousLotMetadata(db, testId).map(lot => ({
+    ...lot, points: previousLotPoints(db, testId, lot.level, lot.lot),
+  }));
+}
 

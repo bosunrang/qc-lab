@@ -1,6 +1,7 @@
 //
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import testCase from 'node:test';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-dist/main/db/open-database.js');
@@ -107,5 +108,28 @@ console.log('app Westgard previous-lot blocks tests passed');
   assert.deepEqual(block.analysis.points.map(p => p.accepted), [true, false]);
   assert.deepEqual(entry.listPreviousLotSeries(test.id)[0].points.map(p => p.accepted), [true, false]);
 }
+
+testCase('Nhập QC chỉ gửi điểm lô cũ của tháng bảng nhập hoặc lô được mở trong khoảng biểu đồ', () => {
+  const { db, test, westgard, entry } = scenario();
+  try {
+    const request = {
+      worksheetFrom: '2026-07-01', worksheetTo: '2026-07-31',
+      chartFrom: '2026-06-02', chartTo: '2026-06-02', previousLots: {},
+    };
+    const initial = entry.getEntryWindow(test.id, request);
+    assert.deepEqual(westgard.listPreviousLotLevels(test.id), [1]);
+    assert.deepEqual(initial.current[1].points.map(p => p.id), ['n1']);
+    assert.deepEqual(initial.previousLotSeries[0].points, []);
+    assert.equal(initial.previousLotSeries[0].lotId, 'lOld');
+    const opened = entry.getEntryWindow(test.id, { ...request, previousLots: { 1: 'lOld' } });
+    const [history] = opened.previousLotSeries;
+    assert.deepEqual(history.points.map(p => [p.id, p.verdict]), [['o2', 'rej']]);
+    assert.deepEqual(history.cumulative, { recorded: 2, excluded: 1, n: 1, mean: 200, sd: null, cv: null });
+    const worksheet = entry.getEntryWindow(test.id, { ...request, worksheetFrom: '2026-06-01', worksheetTo: '2026-06-30' });
+    assert.deepEqual(worksheet.previousLotSeries[0].points.map(p => p.id), ['o1', 'o2']);
+  } finally {
+    db.close();
+  }
+});
 
 

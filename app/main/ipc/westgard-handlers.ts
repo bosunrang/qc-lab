@@ -14,6 +14,7 @@ import { type IpcResult, addChangeListener } from './shared';
 import { writeCommand } from './write-command';
 import { TestSummaryCache } from './summary-cache';
 import { previousLotsOf } from './previous-lot-cache';
+import { listPreviousLotMetadata } from '../db/lot-lineage';
 import { activeEvaluationOf } from './active-evaluation';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
@@ -260,6 +261,7 @@ export function createWestgardHandlers(db: Db) {
 
   const { listArchivedBlocks, listArchivedGroupTests } = createHistoricalWestgard(db);
   const listPreviousLotBlocks = (testId: string): ArchivedBlock[] => previousLotsOf(db, testId).blocks;
+  const listPreviousLotLevels = (testId: string): number[] => [...new Set(listPreviousLotMetadata(db, testId).map(lot => lot.level))];
 
   /** Ghi đè riêng cho một xét nghiệm. Chuỗi rỗng xoá ghi đè để quay về cấu
    * hình chung.
@@ -291,7 +293,7 @@ export function createWestgardHandlers(db: Db) {
     return { ok: true, data: { ruleId, action } };
   });
 
-  return { listTestSummaries, analyzeLevel, saveRuleAction, listRuleSettings, saveRuleSetting, resetRuleSettings, listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks };
+  return { listTestSummaries, analyzeLevel, saveRuleAction, listRuleSettings, saveRuleSetting, resetRuleSettings, listArchivedBlocks, listArchivedGroupTests, listPreviousLotBlocks, listPreviousLotLevels };
 }
 
 export type WestgardHandlers = ReturnType<typeof createWestgardHandlers>;

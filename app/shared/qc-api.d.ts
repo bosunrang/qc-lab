@@ -374,6 +374,26 @@ export interface PreviousLotSeries {
   points: QcPointView[];
 }
 
+export interface EntryWindowRequest {
+  worksheetFrom: string; worksheetTo: string;
+  chartFrom: string; chartTo: string;
+  previousLots: Record<number, string>;
+}
+
+export interface EntryCumulativeStats {
+  recorded: number; excluded: number; n: number; mean: number | null; sd: number | null; cv: number | null;
+}
+
+export interface EntryWindow {
+  current: Record<number, {
+    points: (QcPointView & { chartZ: number | null; chartVerdict: LevelAnalysis['points'][number]['verdict'] })[];
+    cumulative: EntryCumulativeStats;
+  }>;
+  parallelColumns: (ParallelEntryColumn & { cumulative: EntryCumulativeStats })[];
+  previousLotSeries: (PreviousLotSeries & { cumulative?: EntryCumulativeStats })[];
+  voidedPoints: VoidedQcPointView[];
+}
+
 /** Trạng thái CHUNG của 1 luật Westgard (toàn phòng xét nghiệm, không riêng
  * xét nghiệm nào) — panel "Cấu hình chung của luật" trang Phân tích Westgard. */
 /** `custom`: luật đã đặt riêng ở cấu hình chung; không thì theo mặc định số mức QC (WG-26). */
@@ -1000,6 +1020,7 @@ export interface QcApi {
   verifyActivityChainNow(): Promise<IpcResult<{ ok: boolean; checked: number; unhashed: number; brokenIndex: number; reason: string }>>;
   archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }>>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
+  getEntryWindow(testId: string, request: EntryWindowRequest): Promise<EntryWindow>;
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */
   listEntryHistoryPoints(testId: string): Promise<HistoryQcPointView[]>;
   listVoidedEntryPoints(testId: string): Promise<VoidedQcPointView[]>;
@@ -1037,6 +1058,7 @@ export interface QcApi {
   /** Chuỗi lô cũ của từng mức đang vận hành — công tắc "Xem lô cũ" trên trang
    * Phân tích Westgard. Cùng hình dạng `ArchivedBlock` với tab nhóm lô đã dừng. */
   listPreviousLotBlocks(testId: string): Promise<ArchivedBlock[]>;
+  listPreviousLotLevels(testId: string): Promise<number[]>;
   listSigmaPeriods(testId: string, teaMode?: SigmaTeaMode): Promise<SigmaPeriodView[]>;
   listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
   /** Mẫu ngoại kiểm đề xuất làm Bias cho một mức QC của kỳ Sigma; null khi tham số sai. */

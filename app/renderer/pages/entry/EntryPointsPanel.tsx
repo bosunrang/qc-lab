@@ -1,16 +1,16 @@
 // "Điểm trong khoảng xem": bảng chi tiết từng cột kèm thống kê tích luỹ, nút
 // huỷ điểm và danh sách điểm đã huỷ trong khoảng xem.
 import { memo } from 'react';
-import { observedStats } from '../../../main/domain/observed-stats';
 import { EmptyState } from '../../components/EmptyState';
 import { TrashIcon, VERDICT_LABEL, formatQcValue, inLjWindow, runExcludedNote, vnDate, zText, type DisplayColumn } from './shared';
 import type { QcPointView, VoidedQcPointView } from '../../../shared/qc-api';
 
-export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns, voidedPoints, decimals, writable, ljFrom, ljTo, onVoid }: {
+export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns, voidedPoints, decimals, writable, cumulativeReady, ljFrom, ljTo, onVoid }: {
   displayColumns: DisplayColumn[];
   voidedPoints: VoidedQcPointView[];
   decimals: number;
   writable: boolean;
+  cumulativeReady: boolean;
   ljFrom: string;
   ljTo: string;
   onVoid: (point: QcPointView) => void;
@@ -24,28 +24,19 @@ export const EntryPointsPanel = memo(function EntryPointsPanel({ displayColumns,
         <div className="hint qc-cumulative-note">Thống kê tích luỹ tính từ đầu LOT trên các lần chạy được chấp nhận; bảng bên dưới hiển thị theo khoảng xem {vnDate(ljFrom)} – {vnDate(ljTo)}.</div>
         <div className="qc-table-grid">
           {displayColumns.map((column) => {
-            const all = column.points;
-            const active = inLjWindow(all.filter((p) => !p.voided), ljFrom, ljTo);
-            // Mean/SD/CV tích luỹ chỉ tính trên LẦN CHẠY ĐƯỢC CHẤP
-            // NHẬN. Gộp cả dữ liệu mất kiểm soát vào thì chính sự
-            // cố đó nống SD lên, và lần sau cùng một sự cố không
-            // còn vượt ngưỡng nữa — hệ QC tự làm mù mình. Con số
-            // "đã ghi nhận bao nhiêu" vẫn giữ riêng cho truy vết
-            // ISO 15189, không trộn vào phép thống kê.
-            const recorded = all.filter((p) => !p.voided && (!ljTo || p.date <= ljTo));
-            const cumulative = recorded.filter((p) => p.accepted !== false);
-            const excluded = recorded.length - cumulative.length;
-            const { n, mean, sd, cv } = observedStats(cumulative);
+            const active = inLjWindow(column.points.filter(p => !p.voided), ljFrom, ljTo);
+            const cumulative = cumulativeReady ? column.cumulative : undefined;
+            const excluded = cumulative?.excluded ?? 0;
             return (
               <div className={`qc-table-card${column.parallel ? ' qc-parallel-card' : ''}${column.previous ? ' qc-previous-card' : ''}`} key={column.key}>
                 <h4><span>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="hint qc-table-count">{active.length} điểm trong khoảng</span></span></h4>
                 <div className="qc-cumulative">
-                  <div><span>N dùng thống kê</span><b>{n}</b></div>
-                  <div><span>Mean tích luỹ</span><b>{mean != null ? mean.toFixed(decimals) : '—'}</b></div>
-                  <div><span>SD tích luỹ</span><b>{sd != null ? sd.toFixed(4) : '—'}</b></div>
-                  <div><span>CV tích luỹ</span><b>{cv != null ? cv.toFixed(2) + '%' : '—'}</b></div>
+                  <div><span>N dùng thống kê</span><b>{cumulative?.n ?? '—'}</b></div>
+                  <div><span>Mean tích luỹ</span><b>{cumulative?.mean?.toFixed(decimals) ?? '—'}</b></div>
+                  <div><span>SD tích luỹ</span><b>{cumulative?.sd?.toFixed(4) ?? '—'}</b></div>
+                  <div><span>CV tích luỹ</span><b>{cumulative?.cv == null ? '—' : cumulative.cv.toFixed(2) + '%'}</b></div>
                 </div>
-                <div className="hint qc-cumulative-source">Tổng ghi nhận {recorded.length}{excluded ? ` · ${excluded} điểm thuộc lần chạy bị loại, không vào thống kê` : ''}</div>
+                <div className="hint qc-cumulative-source">Tổng ghi nhận {cumulative?.recorded ?? '—'}{excluded ? ` · ${excluded} điểm thuộc lần chạy bị loại, không vào thống kê` : ''}</div>
                 {active.length ? (
                   <table>
                     <thead><tr><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead>

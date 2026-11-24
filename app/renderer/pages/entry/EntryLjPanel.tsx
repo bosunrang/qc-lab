@@ -6,16 +6,14 @@ import { observedStats } from '../../../main/domain/observed-stats';
 import { QcChart, QcChartLegend } from '../../components/QcChart';
 import { DateField } from '../../components/DateField';
 import { formatQcValue, inLjWindow, vnDate, type DisplayColumn } from './shared';
-import type { LevelAnalysis, PreviousLotSeries, QcPointView } from '../../../shared/qc-api';
+import type { PreviousLotSeries } from '../../../shared/qc-api';
 
 export const EntryLjPanel = memo(function EntryLjPanel({
-  displayColumns, levelCount, pointsByLevel, analysisByLevel, previousLotSeries, decimals,
+  displayColumns, levelCount, previousLotSeries, decimals,
   ljFrom, ljTo, ljDays, onFrom, onTo, onPreset, onTogglePreviousLot,
 }: {
   displayColumns: DisplayColumn[];
   levelCount: number;
-  pointsByLevel: Record<number, QcPointView[]>;
-  analysisByLevel: Record<number, LevelAnalysis>;
   previousLotSeries: PreviousLotSeries[];
   decimals: number;
   ljFrom: string;
@@ -27,17 +25,6 @@ export const EntryLjPanel = memo(function EntryLjPanel({
   onTogglePreviousLot: (level: number) => void;
 }) {
   const valText = (val: number) => formatQcValue(val, decimals);
-
-  /** Điểm ĐƯỢC CHẤP NHẬN (cờ `accepted` do `analyzeLevel` tính qua
-   * `acceptedRunPoints()` — loại CẢ lần chạy khi một mức bị loại; không phải
-   * `acceptedPoints()`, hàm đó đã `@deprecated` và chỉ còn test đối chiếu
-   * dùng) và nằm trong khoảng xem — giữ đúng tập này cho số điểm và thống kê
-   * Mean/SD/CV thực. Biểu đồ vẽ thêm điểm bị loại để biến cố QC không biến
-   * mất khỏi hình. */
-  function acceptedInWindow(level: number): QcPointView[] {
-    const ids = new Set((analysisByLevel[level]?.points || []).filter((p) => p.accepted).map((p) => p.id));
-    return inLjWindow((pointsByLevel[level] || []).filter((p) => !p.voided && ids.has(p.id)), ljFrom, ljTo);
-  }
 
   return (
     <div className="panel" data-entry-section="charts">
@@ -61,18 +48,15 @@ export const EntryLjPanel = memo(function EntryLjPanel({
           const chartPointSummary = acceptedCount === chartPoints.length
             ? `${acceptedCount} điểm`
             : `${acceptedCount}/${chartPoints.length} dùng thống kê`;
-          // Lô cũ và lô song song đều đã có cờ `accepted` do main tính
-          // trên cùng bộ đánh giá ghép; chỉ cột chính mới phải tra lại
-          const acceptedPoints = column.previous || column.parallel
-            ? inLjWindow(column.points.filter((point) => !point.voided && point.accepted === true), ljFrom, ljTo)
-            : acceptedInWindow(column.level);
-          const previousChoices = column.parallel ? [] : previousLotSeries.filter((series) => series.level === column.level);
-          const st = observedStats(acceptedPoints.filter((p) => !p.voided));
+          // Cờ chấp nhận do main tính cho cả lần chạy, dùng cùng tập với
+          // số điểm thống kê ở tiêu đề.
+          const hasPrevious = !column.parallel && previousLotSeries.some(series => series.level === column.level);
+          const st = observedStats(chartPoints.filter(point => point.accepted));
           return (
             <section className={`lj-mini${column.parallel ? ' lj-mini-parallel' : ''}`} key={column.key} aria-labelledby={`lj-chart-${column.key}`}>
               <div className="lj-mini-h">
                 <h3 id={`lj-chart-${column.key}`}>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="lj-point-count">{chartPointSummary}</span></h3>
-                {previousChoices.length ? (
+                {hasPrevious ? (
                   <button type="button" className="btn ghost sm qc-old-lot-toggle" onClick={() => onTogglePreviousLot(column.level)}>
                     {column.previous ? 'Xem lô mới' : 'Xem lô cũ'}
                   </button>

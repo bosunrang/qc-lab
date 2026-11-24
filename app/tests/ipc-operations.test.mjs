@@ -113,7 +113,7 @@ test('mỗi kênh chỉ đăng ký một lần, và handler IPC chạy bằng ph
   addTech(db);
   const handlers = new Map();
   registerIpcOperations({ handle: (channel, fn) => handlers.set(channel, fn) }, tables, sessionContext(() => session.get()));
-  assert.equal(handlers.size, 168);
+  assert.equal(handlers.size, 170);
 
   const signedOut = await handlers.get('nce:create')({}, NCE_INPUT);
   assert.deepEqual(signedOut, { ok: false, error: { code: 'unauthenticated', message: 'Chưa đăng nhập.' } });
@@ -134,14 +134,14 @@ test('máy trạm LAN chỉ nhập liệu: danh sách mở là tường minh', (
   assert.deepEqual(open, [
     'addNceAction', 'addPoint', 'addReagentQuickValue', 'analyzeLevel', 'applyLabRange', 'approveNce',
     'attachNceRun', 'backupStatus', 'cancelEqaRound', 'cancelNce', 'cancelNceAction', 'changeOwnPassword', 'clearAvatar',
-    'completeNceAction', 'createNce', 'createReagentComparison', 'getEqaCorrectiveEvidence', 'getEqaInstrumentGrid', 'getEqaReport', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
+    'completeNceAction', 'createNce', 'createReagentComparison', 'getEntryWindow', 'getEqaCorrectiveEvidence', 'getEqaInstrumentGrid', 'getEqaReport', 'getEqaRound', 'getEqaSeries', 'getFirebaseSettings', 'getLabProfile',
     'getLicenseStatus', 'getLisSettings', 'getLoginBrand', 'getNce', 'getNceConfig', 'getQcMonthlyReview', 'getRangeCandidate',
     // Ngoại kiểm (2026-10-28): nhập kết quả là nhập liệu của KTV, cùng nhóm với NCE.
     'getReportTemplateSettings', 'getSigmaEqaBias', 'getSoftwareUpdateStatus', 'getStorageInfo', 'getVoidPointAssessment', 'hasAnyUsers', 'importEqaRound', 'importLisResult',
     'listArchivedBlocks', 'listArchivedGroupTests', 'listEntryHistoryPoints', 'listEqaAssignees', 'listEqaAttention', 'listEqaCorrective', 'listEqaPrograms', 'listEqaRounds', 'listEqaSchedule', 'listInstruments',
     'listLotGroups', 'listLotTransitions', 'listLots', 'listNce', 'listNceQueue', 'listNceUsers',
     'listPanels', 'listParallelEntryColumns', 'listPeriodLocks', 'listPlannedTargets',
-    'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listReagentComparisons',
+    'listPreviousEntryLotSeries', 'listPreviousLotBlocks', 'listPreviousLotLevels', 'listReagentComparisons',
     'listReagentQuickValues', 'listRuleScopes', 'listRuleSettings', 'listSigmaCohorts',
     'listSigmaPeriods', 'listTeaRefs', 'listTestLevels', 'listTestSummaries', 'listTests',
     'listVoidedEntryPoints', 'markEqaSubmitted', 'previewEqaImport', 'previewLotRename', 'previewNceRelease', 'pullLisQueue', 'queryPoints',

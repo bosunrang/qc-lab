@@ -17,6 +17,11 @@ rộng hoặc chỉnh sửa mã nguồn.
 - Bản xem trước chạy bằng Vite và sql.js/WASM. Bản Electron dùng `node:sqlite`.
 - Renderer chỉ gọi API đã công bố qua preload; không tự thực hiện SQL hoặc
   lặp lại nghiệp vụ của main process.
+- Phân tích Westgard hiển thị lô hiện hành trước, chỉ đọc phân tích lô đã
+  chuyển tiếp khi người dùng mở lô cũ. Nhập QC đọc một lượt điểm thuộc tháng
+  của bảng hoặc khoảng ngày của biểu đồ. Main đánh giá trên toàn bộ chuỗi
+  và các mức liên quan trước khi lọc điểm gửi về, đồng thời tính thống kê
+  tích luỹ từ đầu lô tới ngày kết thúc khoảng biểu đồ.
 - Thông báo nhập/huỷ QC dùng cùng toast góc dưới phải với Cài đặt, tự tắt
   sau 4–8 giây theo độ dài. Giữ màu thành công/cảnh báo/loại bỏ; lỗi không
   lưu được vẫn hiện ở ô nhập hoặc hộp thoại. Không đặt thông báo dưới bảng.

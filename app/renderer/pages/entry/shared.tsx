@@ -4,7 +4,7 @@
 import { pointZ } from '../../../main/domain/westgard-engine';
 import { vnDate as formatVnDate } from '../../lib/format';
 import type { QcChartPoint } from '../../components/QcChart';
-import type { QcPointView } from '../../../shared/qc-api';
+import type { EntryCumulativeStats, QcPointView } from '../../../shared/qc-api';
 
 export const VERDICT_LABEL: Record<string, string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
 
@@ -35,6 +35,7 @@ export function parseQcValueText(raw: string): number | null {
 export type EntryColumn = {
   key: string; level: number; lot: string; mean: number | null; sd: number | null; exp: string;
   parallel: boolean; applied: 'mfg' | 'lab'; points: QcPointView[]; chartPoints: QcChartPoint[];
+  cumulative?: EntryCumulativeStats;
 };
 export type DisplayColumn = EntryColumn & { previous: boolean };
 

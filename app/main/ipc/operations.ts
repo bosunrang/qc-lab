@@ -130,9 +130,9 @@ const DATA_API_NAMES = [
   'getLicenseStatus', 'getSoftwareUpdateStatus',
   'hasAnyUsers', 'currentUser', 'listInstruments', 'listTests', 'listTestLevels', 'listPlannedTargets',
   'listRuleScopes', 'listLots', 'listLotGroups', 'listPanels', 'listLotTransitions',
-  'listTeaRefs', 'queryPoints', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
+  'listTeaRefs', 'queryPoints', 'getEntryWindow', 'listEntryHistoryPoints', 'listVoidedEntryPoints', 'listParallelEntryColumns',
   'listPreviousEntryLotSeries', 'listTestSummaries', 'analyzeLevel', 'listRuleSettings', 'listArchivedBlocks',
-  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listSigmaPeriods', 'listSigmaCohorts', 'getSigmaEqaBias', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
+  'listArchivedGroupTests', 'listPreviousLotBlocks', 'listPreviousLotLevels', 'listSigmaPeriods', 'listSigmaCohorts', 'getSigmaEqaBias', 'listNce', 'listNceQueue', 'getNce', 'listNceUsers', 'getNceConfig',
   'listReagentComparisons', 'listEqaRounds', 'listEqaSchedule', 'listEqaPrograms', 'listEqaAssignees', 'getEqaRound', 'getEqaReport', 'getEqaSeries', 'getEqaInstrumentGrid', 'listEqaAttention', 'listEqaCorrective', 'getEqaCorrectiveEvidence', 'getLabProfile', 'getLoginBrand', 'getStorageInfo', 'getReportTemplateSettings',
   'getFirebaseSettings', 'listPeriodLocks', 'queryReport', 'getQcMonthlyReview', 'backupStatus', 'getLisSettings',
 ] as const satisfies readonly DataApiName[];
@@ -231,6 +231,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     archiveActivity: { channel: 'audit:archive', lan: false, run: (ctx, input) => audit.archive(input, ctx.actor()) },
 
     queryPoints: { channel: 'entry:queryPoints', lan: true, run: (_ctx, testId, level) => entry.queryPoints(testId, level) },
+    // Máy trạm đọc cùng dữ liệu theo khoảng như máy chính để nhập và kiểm tra QC.
+    getEntryWindow: { channel: 'entry:getWindow', lan: true, run: (_ctx, testId, request) => entry.getEntryWindow(testId, request) },
     listEntryHistoryPoints: { channel: 'entry:listHistoryPoints', lan: true, run: (_ctx, testId) => entry.listHistoryPoints(testId) },
     listVoidedEntryPoints: { channel: 'entry:listVoidedPoints', lan: true, run: (_ctx, testId) => entry.listVoidedPoints(testId) },
     // Máy trạm được đọc cùng căn cứ phân loại trước khi huỷ điểm QC.
@@ -255,6 +257,8 @@ export function createBusinessOperations(h: BusinessHandlers): OperationTable<Bu
     listArchivedBlocks: { channel: 'westgard:listArchivedBlocks', lan: true, run: (_ctx, testId, groupId) => westgard.listArchivedBlocks(testId, groupId) },
     listArchivedGroupTests: { channel: 'westgard:listArchivedGroupTests', lan: true, run: (_ctx, groupId) => westgard.listArchivedGroupTests(groupId) },
     listPreviousLotBlocks: { channel: 'westgard:listPreviousLotBlocks', lan: true, run: (_ctx, testId) => westgard.listPreviousLotBlocks(testId) },
+    // Kiểm tra mức có lô cũ để hiện nút, dữ liệu chi tiết chỉ tải khi mở lô.
+    listPreviousLotLevels: { channel: 'westgard:listPreviousLotLevels', lan: true, run: (_ctx, testId) => westgard.listPreviousLotLevels(testId) },
 
     listSigmaPeriods: { channel: 'sigma:listPeriods', lan: true, run: (_ctx, testId, teaMode) => sigma.listPeriods(testId, teaMode) },
     listSigmaCohorts: { channel: 'sigma:listCohorts', lan: true, run: (_ctx, testId, period, levels) => sigma.listCohorts(testId, period, levels) },
