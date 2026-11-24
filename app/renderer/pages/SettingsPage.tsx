@@ -9,6 +9,8 @@ import { showToast } from '../state/toast-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
+import { BrandIdentity } from '../components/BrandIdentity';
+import { ImagePlusIcon } from '../components/BtnIcons';
 import type { LisQueueRecord } from '../../shared/qc-api';
 import { NceConfigPanel } from './settings/NceConfigPanel';
 import { auditSizeWarning } from '../../main/domain/audit-filter';
@@ -28,23 +30,6 @@ const FIREBASE_CONFIG_PLACEHOLDER = `const firebaseConfig = {
 
 function formatMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function UnitProfileIcon() {
-  return (
-    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 21h18M5 21v-7c0-.6.4-1 1-1h4v8M10 21V5c0-.6.4-1 1-1h7c.6 0 1 .4 1 1v16M7 16h1M7 18h1M13 8h1M16 8h1M13 12h1M16 12h1M13 16h1M16 16h1" />
-    </svg>
-  );
-}
-
-function BrandIcon() {
-  return (
-    <svg className="settings-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="m8 15 2.4-2.5 2.2 2 2.1-2.2L18 16M8 9h.01" />
-    </svg>
-  );
 }
 
 function CloudSyncIcon() {
@@ -367,7 +352,7 @@ export function SettingsPage() {
       <PageHeader title="Cài đặt & Kết nối" subtitle="Thông tin đơn vị, sao lưu và kết nối Firebase" />
       <div className="settings-profile-grid">
         <div className="panel">
-          <h2 className="panel-title settings-panel-title"><UnitProfileIcon />Thông tin đơn vị</h2>
+          <h2 className="panel-title">Thông tin đơn vị</h2>
           <div className="settings-unit-fields">
             <div className="field"><label htmlFor="labName">Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="field"><label htmlFor="labDept">Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value={dept} onChange={(e) => setDept(e.target.value)} /></div>
@@ -377,7 +362,7 @@ export function SettingsPage() {
         </div>
 
         <div className="panel">
-          <h2 className="panel-title settings-panel-title"><BrandIcon />Logo &amp; tên phần mềm</h2>
+          <h2 className="panel-title">Logo &amp; tên phần mềm</h2>
           <div className="grid2">
             <div className="settings-brand-fields">
               <div className="field"><label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} /></div>
@@ -387,15 +372,22 @@ export function SettingsPage() {
             <div className="settings-logo-fields">
               <div className="field">
                 <label>Logo hiện tại</label>
-                <div className="brand-preview">
-                  <div className="brand-mark">{currentLogo ? <img src={currentLogo} alt="" /> : (logoText || 'QC')}</div>
-                  <div><b>{brandTitle}</b><small>{brandSub}</small></div>
+                <div className="brand brand-preview">
+                  <BrandIdentity
+                    title={brandTitle.trim()}
+                    subtitle={brandSub.trim()}
+                    logoText={logoText.trim() || profile.logo_text}
+                    logoData={currentLogo}
+                  />
                 </div>
               </div>
               <div className="field">
                 <label htmlFor="logoFilePick">Chọn ảnh logo</label>
                 <div className="file-pick">
-                  <button id="logoFilePick" type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>Chọn tệp</button>
+                  <button id="logoFilePick" type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
+                    <ImagePlusIcon />
+                    Chọn tệp
+                  </button>
                   <span id="logoFileName" className="hint">{logoFileName || 'Chưa chọn tệp'}</span>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickLogo} />

@@ -35,11 +35,11 @@ aside{background:var(--sidebar-bg);color:var(--sidebar-text);padding:0 var(--spa
 
 /* Khi dòng mô tả không còn đủ chỗ cạnh logo, cho nó dùng cả bề ngang. */
 @container (max-width:210px){
-  .brand{grid-template-areas:"logo title toggle" "subtitle subtitle subtitle";}
-  .brand-copy>div{align-self:center;}
-  .brand small{margin-top:var(--space-1-5);margin-inline-start:0;}
+  .brand-row .brand{grid-template-areas:"logo title toggle" "subtitle subtitle subtitle";}
+  .brand-row .brand-copy>div{align-self:center;}
+  .brand-row .brand small{margin-top:var(--space-1-5);margin-inline-start:0;}
 }
-.app-shell.nav-collapsed .brand{grid-template-columns:auto;grid-template-areas:"logo";justify-content:center;}
+.app-shell.nav-collapsed .brand-row .brand{grid-template-columns:auto;grid-template-areas:"logo";justify-content:center;}
 .app-shell.nav-collapsed .nav-toggle{position:absolute;grid-area:auto;inset-block-start:50%;inset-inline-start:calc(50% + var(--sidebar-logo-size) / 2 + var(--space-1));translate:0 -50%;background:var(--surface);border:1px solid var(--surface-border);color:var(--text-primary);box-shadow:var(--shadow-panel);}
 .app-shell.nav-collapsed .nav-toggle:hover{background:var(--accent-surface);color:var(--accent-text);}
 .app-shell.nav-collapsed .nav-toggle svg{transform:rotate(180deg);}
@@ -70,8 +70,8 @@ nav a.active .ic{color:var(--sidebar-active-accent);}
 #primary-navigation.nav-icon-only a.active{padding-left:0;border-left:0;box-shadow:inset 2px 0 0 var(--sidebar-active-bar);}
 
 @media(max-width:1050px){
-  .brand-copy,.nav-group,.nav-label,.sidebar-runtime-copy{display:none;}
-  .brand{grid-template-columns:auto;grid-template-areas:"logo";justify-content:center;}
+  .brand-row .brand-copy,.nav-group,.nav-label,.sidebar-runtime-copy{display:none;}
+  .brand-row .brand{grid-template-columns:auto;grid-template-areas:"logo";justify-content:center;}
   .sidebar-runtime{justify-content:center;}
   .nav-toggle{display:none;}
   .sidebar-footer{padding-right:0;padding-left:0;}.sidebar-runtime{grid-template-columns:var(--control-h-compact);padding:var(--space-1) 0;}

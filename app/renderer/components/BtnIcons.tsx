@@ -19,6 +19,16 @@ export function DownloadIcon() {
   );
 }
 
+export function ImagePlusIcon() {
+  return (
+    <svg {...COMMON}>
+      <path d="M13 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8" />
+      <circle cx={9} cy={9} r={2} />
+      <path d="m6 21 9-9a2 2 0 0 1 2.8 0l3.2 3.2M19 2v6M16 5h6" />
+    </svg>
+  );
+}
+
 export function PrintIcon() {
   return (
     <svg {...COMMON}>

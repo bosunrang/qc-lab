@@ -6,12 +6,33 @@
 // CUSUM cho `<QcChart>`, không tính lại ở renderer.
 import { create } from 'zustand';
 import type { QcPointView, LevelAnalysis, IpcResult, RangeCandidateView, ParallelEntryColumn, PreviousLotSeries, VoidedQcPointView, QcRunConclusionChange } from '../../shared/qc-api';
+import { useAuthStore } from './auth-store';
 
 let rangeRequestSerial = 0;
 let dataRequestSerial = 0;
 
+// Trạng thái xem danh mục thuộc phiên đăng nhập, độc lập với bộ đệm điểm QC.
+const initialTreeView = {
+  selectedTestId: '',
+  closedTreeMachines: new Set<string>(),
+  openTreeGroups: new Set<string>(),
+};
+
+function toggleTreeKey(keys: ReadonlySet<string>, key: string): ReadonlySet<string> {
+  const next = new Set(keys);
+  if (!next.delete(key)) next.add(key);
+  return next;
+}
+
 interface EntryState {
+  selectedTestId: string;
+  closedTreeMachines: ReadonlySet<string>;
+  openTreeGroups: ReadonlySet<string>;
+  selectTreeTest: (testId: string, machineKey: string, groupKey: string) => void;
+  toggleTreeMachine: (key: string) => void;
+  toggleTreeGroup: (key: string) => void;
   activeTestId: string | null;
+  loadedLevelKey: string | null;
   pointsByLevel: Record<number, QcPointView[]>;
   analysisByLevel: Record<number, LevelAnalysis>;
   parallelColumns: ParallelEntryColumn[];
@@ -32,7 +53,17 @@ interface EntryState {
 }
 
 export const useEntryStore = create<EntryState>((set, get) => ({
+  ...initialTreeView,
+  selectTreeTest: (testId, machineKey, groupKey) => set((state) => {
+    const closedTreeMachines = new Set(state.closedTreeMachines);
+    closedTreeMachines.delete(machineKey);
+    return { selectedTestId: testId, closedTreeMachines, openTreeGroups: new Set(state.openTreeGroups).add(groupKey) };
+  }),
+  toggleTreeMachine: (key) => set((state) => ({ closedTreeMachines: toggleTreeKey(state.closedTreeMachines, key) })),
+  toggleTreeGroup: (key) => set((state) => ({ openTreeGroups: toggleTreeKey(state.openTreeGroups, key) })),
+
   activeTestId: null,
+  loadedLevelKey: null,
   pointsByLevel: {},
   analysisByLevel: {},
   parallelColumns: [],
@@ -47,7 +78,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // thì điểm cũ hiện dưới cột mức cùng số của xét nghiệm mới cho tới khi
     // IPC trả về. Nạp lại CÙNG xét nghiệm thì vẫn giữ để bảng không chớp trống.
     if (get().activeTestId !== testId) {
-      set({ activeTestId: testId, pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [] });
+      set({ activeTestId: testId, loadedLevelKey: null, pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [] });
+    } else {
+      set({ loadedLevelKey: null });
     }
     const [pairs, parallelColumns, previousLotSeries, voidedPoints] = await Promise.all([Promise.all(levels.map(async (level) => {
       const [points, analysis] = await Promise.all([
@@ -62,14 +95,14 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // Người dùng có thể đổi xét nghiệm khi các IPC trên còn đang chạy. Chỉ
     // yêu cầu mới nhất được phép thay dữ liệu đang hiển thị.
     if (request !== dataRequestSerial || get().activeTestId !== testId) return;
-    set({ pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints });
+    set({ loadedLevelKey: levels.join(','), pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints });
   },
 
   resetTestData: () => {
     dataRequestSerial += 1;
     rangeRequestSerial += 1;
     set({
-      activeTestId: null,
+      activeTestId: null, loadedLevelKey: null,
       pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [],
       rangeCandidate: null, rangeError: null,
     });
@@ -107,5 +140,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     return result;
   },
 }));
+
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id) useEntryStore.setState(initialTreeView);
+});
 
 

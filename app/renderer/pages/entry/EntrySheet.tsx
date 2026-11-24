@@ -2,7 +2,7 @@
 // song nếu có). Khối nặng nhất trang (31 hàng × mọi mức), nên bọc `memo` và
 // chỉ nhận props ổn định: gõ vào hộp thoại huỷ điểm hay dải QC không làm vẽ
 // lại bảng này.
-import { memo, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { initialsFromName } from '../../../main/domain/name-initials';
 import { handleSheetKeyDown } from '../../lib/entry-sheet-navigation';
 import { nextSharedRunId } from '../../lib/entry-run-id';
@@ -28,6 +28,7 @@ function pointsForColumnDay(column: EntryColumn, date: string): QcPointView[] {
 
 export const EntrySheet = memo(function EntrySheet({
   testId, testName, entryColumns, levels, pointsByLevel, previousLotSeries, decimals, writable,
+  jumpToToday, onTodayJumpHandled,
   viewYear, viewMonth, onViewYear, onViewMonth, onCommitRun, onSaveNote,
 }: {
   testId: string;
@@ -38,6 +39,8 @@ export const EntrySheet = memo(function EntrySheet({
   previousLotSeries: PreviousLotSeries[];
   decimals: number;
   writable: boolean;
+  jumpToToday: boolean;
+  onTodayJumpHandled: () => void;
   viewYear: number;
   viewMonth: number;
   onViewYear: (year: number) => void;
@@ -50,18 +53,35 @@ export const EntrySheet = memo(function EntrySheet({
   // Trạng thái mở này thuần UI,
   // khoá theo `mức|ngày`, không lưu xuống DB.
   const [extraRuns, setExtraRuns] = useState<Set<string>>(new Set());
+  const sheetRef = useRef<HTMLDivElement>(null);
   const valText = (val: number) => formatQcValue(val, decimals);
   const today = new Date();
   // Hiển thị 11 năm, từ năm hiện tại trừ 5 năm.
   const YEARS = Array.from({ length: 11 }, (_, i) => today.getFullYear() - 5 + i);
-  const days = Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) => i + 1)
-    .map((d) => `${viewYear}-${pad2(viewMonth)}-${pad2(d)}`);
+  const days = Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) =>
+    `${viewYear}-${pad2(viewMonth)}-${pad2(i + 1)}`);
   const todayStr = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+
+  const scrollToToday = useCallback(() => {
+    sheetRef.current?.querySelector('tr.today')?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }, []);
+
+  useEffect(() => {
+    if (!jumpToToday) return;
+    scrollToToday();
+    onTodayJumpHandled();
+  }, [jumpToToday, onTodayJumpHandled, scrollToToday]);
+
+  function changePeriod(year: number, month: number) {
+    onTodayJumpHandled();
+    onViewYear(year);
+    onViewMonth(month);
+  }
 
   /** "Tới hôm nay": về tháng hiện tại rồi cuộn tới đúng hàng hôm nay. */
   function goToday() {
-    onViewYear(today.getFullYear()); onViewMonth(today.getMonth() + 1);
-    requestAnimationFrame(() => document.querySelector('.qc-sheet tr.today')?.scrollIntoView({ block: 'center' }));
+    changePeriod(today.getFullYear(), today.getMonth() + 1);
+    requestAnimationFrame(scrollToToday);
   }
 
   function pointsForDay(level: number, date: string): QcPointView[] {
@@ -86,14 +106,14 @@ export const EntrySheet = memo(function EntrySheet({
         <div className="qc-sheet-title"><span>Bảng nhập QC</span><strong>{testName}</strong><small>Lô {entryColumns.map((column) => `${column.lot}${column.parallel ? ' (song song)' : ''}`).join(' / ') || '—'}</small></div>
         <div className="qc-month-area">
           <div className="qc-month-picker">
-            <select value={viewMonth} onChange={(e) => onViewMonth(Number(e.target.value))} aria-label="Tháng của bảng nhập">{MONTHS.map((m) => <option key={m} value={m}>Tháng {m}</option>)}</select>
-            <select value={viewYear} onChange={(e) => onViewYear(Number(e.target.value))} aria-label="Năm của bảng nhập">{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
-            <button className="btn ghost sm qc-current-month" onClick={() => { onViewYear(today.getFullYear()); onViewMonth(today.getMonth() + 1); }}>Tháng hiện tại</button>
+            <select value={viewMonth} onChange={(e) => changePeriod(viewYear, Number(e.target.value))} aria-label="Tháng của bảng nhập">{MONTHS.map((m) => <option key={m} value={m}>Tháng {m}</option>)}</select>
+            <select value={viewYear} onChange={(e) => changePeriod(Number(e.target.value), viewMonth)} aria-label="Năm của bảng nhập">{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+            <button className="btn ghost sm qc-current-month" onClick={() => changePeriod(today.getFullYear(), today.getMonth() + 1)}>Tháng hiện tại</button>
             <button className="btn teal sm qc-today-jump" onClick={goToday}>Tới hôm nay</button>
           </div>
         </div>
       </div>
-      <div className="qc-sheet-wrap">
+      <div className="qc-sheet-wrap" ref={sheetRef}>
         <table className="qc-sheet">
           <thead>
             <tr>

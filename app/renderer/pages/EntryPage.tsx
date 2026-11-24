@@ -22,7 +22,7 @@ import { showToast } from '../state/toast-store';
 import { extremeQcPointDeviation } from '../../main/domain/entry-validation';
 import { describeRunChanges, flipsRejection, RETRO_REASON_MIN } from '../../main/domain/run-conclusion-change';
 import type { QcChartPoint } from '../components/QcChart';
-import type { QcPointView, TestLevel } from '../../shared/qc-api';
+import type { QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
 import { createOperationalCatalog } from './entry/operational';
 import { EntryTree, TreeToggleIcon } from './entry/EntryTree';
 import { EntrySheet } from './entry/EntrySheet';
@@ -51,6 +51,8 @@ export function EntryPage() {
     voidedPoints: s.voidedPoints, rangeCandidate: s.rangeCandidate, rangeError: s.rangeError,
     loadTestData: s.loadTestData, resetTestData: s.resetTestData, loadRangeCandidate: s.loadRangeCandidate, addPoint: s.addPoint, setDayNote: s.setDayNote,
   })));
+  const selectedTestId = useEntryStore((s) => s.selectedTestId);
+  const selectTreeTest = useEntryStore((s) => s.selectTreeTest);
   // Vai trò "chỉ xem" vẫn mở được trang này nhưng không
   // thấy ô nhập/nút huỷ — main process cũng chặn (requireWrite), đây chỉ để
   // không hiện nút rồi mới báo lỗi.
@@ -65,9 +67,9 @@ export function EntryPage() {
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     try { return localStorage.getItem(ENTRY_TREE_COLLAPSE_KEY) === '1'; } catch { return false; }
   });
-  const [testId, setTestId] = useState('');
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
+  const [todayJumpTestId, setTodayJumpTestId] = useState('');
   const [voiding, setVoiding] = useState<QcPointView | null>(null);
   // Mỗi mức chỉ mở một chuỗi lô cũ trên biểu đồ/bảng chi tiết. Worksheet vẫn
   // hiện mọi điểm lô cũ theo ngày ở dạng chỉ đọc để lịch sử tháng liền mạch.
@@ -86,6 +88,12 @@ export function EntryPage() {
   // hay Panel ở máy khác. Nhãn Đạt/Cảnh báo/Loại trên cây lấy từ `summaries`
   // của MỌI xét nghiệm, nên không lọc theo testId.
   const catalogStatus = useCatalog(['instruments', 'lots', 'lotGroups', 'summaries', 'tests', 'panels']);
+  const catalog = useMemo(() => createOperationalCatalog(tests, panels, lots, lotGroups), [tests, panels, lots, lotGroups]);
+  const operationalSummaries = useMemo(() => summaries.filter(catalog.isOperationalTest), [summaries, catalog]);
+  const currentSummary = operationalSummaries.find((s) => s.testId === selectedTestId);
+  const testId = currentSummary?.testId || '';
+  const testName = currentSummary?.testName || '';
+  const decimals = currentSummary?.decimalPlaces ?? 2;
   // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
   // Mean/SD và Lịch sử dữ liệu cần thấy cả mức đã dừng). Thẻ Nhập QC thì chỉ
   // được dựng cột cho mức ĐANG VẬN HÀNH — cùng tập mà `listOperationalLevels()`
@@ -104,6 +112,8 @@ export function EntryPage() {
   // một lượt ngoài lượt của `useStoreInvalidation` (e2e `reload-count`).
   const levelKey = levels.map((l) => l.level).join(',');
   const levelNums = useMemo(() => (levelKey ? levelKey.split(',').map(Number) : []), [levelKey]);
+  const jumpToToday = useEntryStore((s) => !!levelKey && todayJumpTestId === testId
+    && s.activeTestId === testId && s.loadedLevelKey === levelKey);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   // Đổi xét nghiệm thì dải QC đang xem rơi về mức đầu tiên còn vận hành.
   useEffect(() => {
@@ -124,18 +134,17 @@ export function EntryPage() {
     if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
 
-  const catalog = useMemo(() => createOperationalCatalog(tests, panels, lots, lotGroups), [tests, panels, lots, lotGroups]);
-  const currentSummary = summaries.find((s) => s.testId === testId);
-  const testName = currentSummary?.testName || '';
-  const decimals = currentSummary?.decimalPlaces ?? 2;
-
-  const selectLeaf = useCallback((id: string) => {
-    // Nhóm lô chứa xét nghiệm được mở một lần trong `EntryTree` khi `testId`
-    // đổi; ở đây chỉ chọn xét nghiệm và đưa bảng về tháng hiện tại.
+  const selectLeaf = useCallback((summary: TestSummary) => {
     const now = new Date();
-    setTestId(id);
+    setTodayJumpTestId('');
+    selectTreeTest(summary.testId, catalog.machineKeyOf(summary), catalog.lotGroupOf(summary).key);
     setViewYear(now.getFullYear()); setViewMonth(now.getMonth() + 1);
-  }, []);
+  }, [selectTreeTest, catalog]);
+  const selectFromTree = useCallback((summary: TestSummary) => {
+    selectLeaf(summary);
+    setTodayJumpTestId(summary.testId);
+  }, [selectLeaf]);
+  const clearTodayJump = useCallback(() => setTodayJumpTestId(''), []);
 
   // Tự chọn xét nghiệm đầu tiên khi lựa chọn hiện tại không hợp lệ để mở trang
   // là có ngay bảng nhập. `location.state.testId` cho phép điều hướng chéo từ
@@ -148,20 +157,20 @@ export function EntryPage() {
   const handledNavKey = useRef<string | null>(null);
   const handledNavLevelKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!summaries.length) return;
-    const wanted = handledNavKey.current === location.key ? undefined : navState?.testId;
-    if (wanted && summaries.some((s) => s.testId === wanted)) {
+    if (catalogStatus.state !== 'ready') return;
+    const wanted = handledNavKey.current !== location.key
+      ? operationalSummaries.find((s) => s.testId === navState?.testId)
+      : undefined;
+    if (wanted) {
       handledNavKey.current = location.key;
-      if (wanted !== testId) selectLeaf(wanted);
+      selectLeaf(wanted);
       return;
     }
-    if (testId && summaries.some((s) => s.testId === testId)) return;
-    // Chỉ tự chọn xét nghiệm đã sẵn sàng nhập — không rơi vào một xét nghiệm
-    // chưa có nhóm lô hoạt động, thứ
-    // vốn còn không hiện trong cây để mà chọn.
-    const first = summaries.find((s) => catalog.isOperationalTest(s));
-    if (first) selectLeaf(first.testId);
-  }, [summaries, navState?.testId, catalog, location.key]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Quay lại bằng menu thì giữ nhánh người dùng đã đóng, kể cả khi nhánh
+    // đó chứa xét nghiệm đang xem. Chỉ mở nhánh khi có lựa chọn mới.
+    const first = operationalSummaries[0];
+    if (!testId && first) selectLeaf(first);
+  }, [catalogStatus.state, operationalSummaries, navState?.testId, location.key, selectLeaf, testId]);
   // Mức được yêu cầu cũng chỉ áp một lần; `levelNums` đổi sau khi đặt dải PXN
   // thì không kéo dải QC đang xem về lại mức đó.
   useEffect(() => {
@@ -315,7 +324,7 @@ export function EntryPage() {
   // hoạt động hoặc Mean/SD). Mỗi trạng thái có hướng dẫn riêng.
   const emptyState = !tests.length
     ? { title: 'Chưa có xét nghiệm', message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.', linkLabel: 'Thêm xét nghiệm', tab: 'tests' }
-    : !summaries.some((s) => catalog.isOperationalTest(s))
+    : !operationalSummaries.length
       ? { title: 'Chưa có xét nghiệm sẵn sàng nhập', message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.', linkLabel: 'Cấu hình Mean/SD', tab: 'targets' }
       : null;
 
@@ -336,8 +345,8 @@ export function EntryPage() {
         <button type="button" className="btn teal entry-tree-expand" onClick={() => setTreeVisibility(false)}
           title="Hiện danh mục nội kiểm" aria-label="Hiện danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
 
-        <EntryTree summaries={summaries} instruments={instruments} catalog={catalog} testId={testId}
-          treeCollapsed={treeCollapsed} onSelect={selectLeaf} onCollapse={collapseTree} />
+        <EntryTree summaries={operationalSummaries} instruments={instruments} catalog={catalog} testId={testId}
+          treeCollapsed={treeCollapsed} onSelect={selectFromTree} onCollapse={collapseTree} />
 
         <div className="entry-main" key={testId}>
           {!testId && <div className="panel"><EmptyState>Chọn 1 xét nghiệm ở danh mục bên trái.</EmptyState></div>}
@@ -345,6 +354,7 @@ export function EntryPage() {
             <>
               <EntrySheet testId={testId} testName={testName} entryColumns={entryColumns} levels={levels}
                 pointsByLevel={pointsByLevel} previousLotSeries={previousLotSeries} decimals={decimals} writable={writable}
+                jumpToToday={jumpToToday} onTodayJumpHandled={clearTodayJump}
                 viewYear={viewYear} viewMonth={viewMonth} onViewYear={setViewYear} onViewMonth={setViewMonth}
                 onCommitRun={commitRun} onSaveNote={saveDayNote} />
               <EntryLjPanel displayColumns={displayColumns} levelCount={levels.length} pointsByLevel={pointsByLevel}

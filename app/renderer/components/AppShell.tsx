@@ -18,6 +18,7 @@ import { ToastHost } from './ToastHost';
 import { DatePickerPopup } from './DatePickerPopup';
 import { NavIcon } from './NavIcon';
 import { SoftwareLicenseFooter } from './SoftwareLicenseExpiry';
+import { BrandIdentity } from './BrandIdentity';
 
 // Cấu trúc nhóm điều hướng; nhãn/route/vai trò đọc từ PAGE_DEFS, không khai lại.
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
@@ -80,9 +81,6 @@ export function AppShell() {
     });
   }
 
-  const brandTitle = profile?.brand_title || 'QC Lab';
-  const brandSub = profile?.brand_sub || 'Nội kiểm xét nghiệm';
-  const brandMarkText = (profile?.logo_text || 'QC').slice(0, 4);
   const toggleLabel = collapsed ? 'Mở thanh điều hướng' : 'Thu gọn thanh điều hướng';
 
   return (
@@ -90,8 +88,13 @@ export function AppShell() {
       <aside aria-label="Điều hướng ứng dụng">
         <div className="brand-row">
           <div className="brand">
-            <div className="brand-mark">{profile?.logo_data ? <img src={profile.logo_data} alt="" /> : brandMarkText}</div>
-            {!collapsed && <div className="brand-copy"><div>{brandTitle}</div><small>{brandSub}</small></div>}
+            <BrandIdentity
+              title={profile?.brand_title}
+              subtitle={profile?.brand_sub}
+              logoText={profile?.logo_text}
+              logoData={profile?.logo_data}
+              showCopy={!collapsed}
+            />
             <button type="button" className="nav-toggle" title={toggleLabel} aria-label={toggleLabel}
               aria-expanded={!collapsed} aria-controls="primary-navigation" onClick={toggleCollapsed}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
